@@ -1,0 +1,8 @@
+bin/
+obj/
+out/
+BepInEx/
+*.user
+*.suo
+*.log
+*.pdb

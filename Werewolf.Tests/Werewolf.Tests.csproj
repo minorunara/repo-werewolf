@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+
+    <PackageReference Include="Mono.Cecil" Version="0.11.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Werewolf\Werewolf.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <AssemblyMetadata Include="Werewolf.ModDllPath" Value="$(MSBuildThisFileDirectory)..\Werewolf\out\Minorunara_Werewolf.dll" />
+    <AssemblyMetadata Include="Werewolf.GameManagedDir" Value="$(RepoPath)" />
+    <AssemblyMetadata Include="Werewolf.BepInExCoreDir" Value="$(BepInExCorePath)" />
+    <AssemblyMetadata Include="Werewolf.SourceDir" Value="$(MSBuildThisFileDirectory)..\Werewolf\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Werewolf\Core\**\*.cs" Link="Core\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\Werewolf\Net\**\*.cs" Exclude="..\Werewolf\Net\PhotonNetBus.cs" Link="Net\%(RecursiveDir)%(Filename)%(Extension)" />
+
+    <Compile Include="..\Werewolf\Debug\CommandGate.cs" Link="Debug\CommandGate.cs" />
+    <Compile Include="..\Werewolf\Debug\SecretLogBuffer.cs" Link="Debug\SecretLogBuffer.cs" />
+    <Compile Include="..\Werewolf\Debug\SelfTest.cs" Link="Debug\SelfTest.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="!Exists('..\Werewolf\Assets\emoji_people.png')">
+    <Compile Remove="ChatEmojiTests.cs" />
+  </ItemGroup>
+</Project>
