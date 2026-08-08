@@ -1,53 +1,72 @@
 param(
     [ValidateSet("Release", "Debug")]
-    [string]$Configuration = "Release"
+    [string]$Configuration = "Release",
+
+    [ValidateSet("Stable", "Beta")]
+    [string]$Channel = "Stable"
 )
 
 $ErrorActionPreference = "Stop"
 
 $projectDirectory = $PSScriptRoot
 $projectPath = Join-Path $projectDirectory "Werewolf.csproj"
-$metadataDirectory = Join-Path $projectDirectory "thunderstore"
+$stableMetadataDirectory = Join-Path $projectDirectory "thunderstore"
+$metadataDirectory = if ($Channel -eq "Beta") {
+    Join-Path $projectDirectory "thunderstore-beta"
+} else {
+    $stableMetadataDirectory
+}
 $manifestPath = Join-Path $metadataDirectory "manifest.json"
-$pluginSourcePath = Join-Path $projectDirectory "Plugin.cs"
 $outputDirectory = Join-Path $projectDirectory "out"
+$iconPath = Join-Path $metadataDirectory "icon.png"
+
+if (-not (Test-Path -LiteralPath $iconPath -PathType Leaf)) {
+    throw "Thumbnail was not found: $iconPath"
+}
+Add-Type -AssemblyName System.Drawing
+$icon = [Drawing.Image]::FromFile($iconPath)
+try {
+    if ($icon.Width -ne 256 -or $icon.Height -ne 256) {
+        throw "Thunderstore icon must be 256x256: $iconPath is $($icon.Width)x$($icon.Height)"
+    }
+}
+finally {
+    $icon.Dispose()
+}
 
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+$packageName = [string]$manifest.name
+if ($packageName -notmatch '^[A-Za-z0-9_]+$') {
+    throw "manifest.json name contains characters that Thunderstore does not allow: $packageName"
+}
+
 $version = [string]$manifest.version_number
 if ($version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
     throw "manifest.json version_number is not a Thunderstore-compatible version: $version"
 }
 
-$pluginSource = Get-Content -LiteralPath $pluginSourcePath -Raw -Encoding UTF8
-$pluginVersionMatch = [regex]::Match(
-    $pluginSource,
-    'PluginVersion\s*=\s*"(?<version>[^"]+)"')
-if (-not $pluginVersionMatch.Success) {
-    throw "PluginVersion was not found in Plugin.cs."
-}
-if ($pluginVersionMatch.Groups['version'].Value -ne $version) {
-    throw "Version mismatch: manifest=$version, Plugin.cs=$($pluginVersionMatch.Groups['version'].Value)"
+$changelogPath = Join-Path $metadataDirectory "CHANGELOG.md"
+$changelogSource = Get-Content -LiteralPath $changelogPath -Raw -Encoding UTF8
+if ($changelogSource -notmatch "(?m)^##\s+$([regex]::Escape($version))\s*$") {
+    throw "CHANGELOG.md has no section for version $version. Add '## $version' with release notes before packaging."
 }
 
-$projectSource = Get-Content -LiteralPath $projectPath -Raw -Encoding UTF8
-$projectVersionMatch = [regex]::Match(
-    $projectSource,
-    '<Version>(?<version>[^<]+)</Version>')
-if (-not $projectVersionMatch.Success) {
-    throw "Version was not found in Werewolf.csproj."
-}
-if ($projectVersionMatch.Groups['version'].Value -ne $version) {
-    throw "Version mismatch: manifest=$version, Werewolf.csproj=$($projectVersionMatch.Groups['version'].Value)"
-}
-
-$stageDirectory = Join-Path $outputDirectory "thunderstore-stage-$version"
-$zipPath = Join-Path $outputDirectory "REPO_Werewolf-$version.zip"
-$pluginDirectory = Join-Path $stageDirectory "BepInEx\plugins\Minorunara_Werewolf"
+$channelSlug = $Channel.ToLowerInvariant()
+$stageDirectory = Join-Path $outputDirectory "thunderstore-$channelSlug-stage-$version"
+$zipPath = Join-Path $outputDirectory "$packageName-$version.zip"
+$pluginFolderName = if ($Channel -eq "Beta") { "Minorunara_Werewolf_BETA" } else { "Minorunara_Werewolf" }
+$pluginDirectory = Join-Path $stageDirectory "BepInEx\plugins\$pluginFolderName"
 $assemblyPath = Join-Path $outputDirectory "Minorunara_Werewolf.dll"
 
-dotnet build $projectPath -c $Configuration --nologo -p:SkipDeploy=true
+dotnet build $projectPath -c $Configuration --nologo -p:SkipDeploy=true -p:WerewolfVersion=$version
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet build failed with exit code $LASTEXITCODE."
+}
+
+$expectedAssemblyVersion = "$version.0"
+$actualAssemblyVersion = [Reflection.AssemblyName]::GetAssemblyName($assemblyPath).Version.ToString()
+if ($actualAssemblyVersion -ne $expectedAssemblyVersion) {
+    throw "Version mismatch after build: manifest=$version, assembly=$actualAssemblyVersion"
 }
 
 if (Test-Path -LiteralPath $stageDirectory) {
@@ -58,9 +77,23 @@ if (Test-Path -LiteralPath $zipPath) {
 }
 
 New-Item -ItemType Directory -Path $pluginDirectory -Force | Out-Null
-foreach ($fileName in @("manifest.json", "README.md", "icon.png")) {
+foreach ($fileName in @("manifest.json", "CHANGELOG.md")) {
     Copy-Item -LiteralPath (Join-Path $metadataDirectory $fileName) -Destination $stageDirectory
 }
+Copy-Item -LiteralPath $iconPath -Destination (Join-Path $stageDirectory "icon.png")
+Copy-Item -LiteralPath (Join-Path $stableMetadataDirectory "github\LICENSE") -Destination (Join-Path $stageDirectory "LICENSE")
+
+$readmeSource = Get-Content -LiteralPath (Join-Path $metadataDirectory "README.md") -Raw -Encoding UTF8
+if ($Channel -eq "Beta") {
+    $stableReadmeSource = Get-Content -LiteralPath (Join-Path $stableMetadataDirectory "README.md") -Raw -Encoding UTF8
+    $readmeSource = $readmeSource.TrimEnd() + "`n`n---`n`n" + $stableReadmeSource.TrimStart()
+}
+if ($readmeSource.Length -gt 32768) {
+    throw "README.md exceeds Thunderstore's 32,768-character limit: $($readmeSource.Length)"
+}
+$utf8NoBom = New-Object Text.UTF8Encoding($false)
+[IO.File]::WriteAllText((Join-Path $stageDirectory "README.md"), $readmeSource, $utf8NoBom)
+
 Copy-Item -LiteralPath $assemblyPath -Destination $pluginDirectory
 
 Compress-Archive -Path (Join-Path $stageDirectory "*") -DestinationPath $zipPath -CompressionLevel Optimal
@@ -72,8 +105,10 @@ try {
     $requiredEntries = @(
         "manifest.json",
         "README.md",
+        "CHANGELOG.md",
         "icon.png",
-        "BepInEx/plugins/Minorunara_Werewolf/Minorunara_Werewolf.dll"
+        "LICENSE",
+        "BepInEx/plugins/$pluginFolderName/Minorunara_Werewolf.dll"
     )
     foreach ($requiredEntry in $requiredEntries) {
         if ($requiredEntry -notin $entries) {

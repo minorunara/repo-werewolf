@@ -188,6 +188,59 @@ namespace Werewolf.Tests
         }
 
         [Fact]
+        public void EnsureClosingHoldRemaining_ExtendsWhenRemainingIsShort()
+        {
+            var h = Convened();
+            h.Session.Tick(Warp);
+            for (int voter = 1; voter <= 5; voter++) h.Session.CastVote(voter, 2, Warp);
+            h.Session.Tick(Warp);
+            h.PhaseRequests.Clear();
+
+            h.Session.EnsureClosingHoldRemaining(Warp + 4_000, 7_000);
+
+            h.Session.Tick(Warp + 10_999);
+            Assert.Equal(MeetingStage.Closing, h.Session.Stage);
+            Assert.Empty(h.PhaseRequests);
+
+            h.Session.Tick(Warp + 11_000);
+            Assert.Equal(MeetingStage.Idle, h.Session.Stage);
+            Assert.Equal(GamePhase.Play, Assert.Single(h.PhaseRequests));
+        }
+
+        [Fact]
+        public void EnsureClosingHoldRemaining_NoOpWhenEnoughRemains()
+        {
+            var h = Convened();
+            h.Session.Tick(Warp);
+            for (int voter = 1; voter <= 5; voter++) h.Session.CastVote(voter, 2, Warp);
+            h.Session.Tick(Warp);
+            h.PhaseRequests.Clear();
+
+            h.Session.EnsureClosingHoldRemaining(Warp, 3_000);
+
+            h.Session.Tick(Warp + 6_000);
+            Assert.Equal(MeetingStage.Idle, h.Session.Stage);
+            Assert.Equal(GamePhase.Play, Assert.Single(h.PhaseRequests));
+        }
+
+        [Fact]
+        public void EnsureClosingHoldRemaining_IgnoredOutsideClosing()
+        {
+            var h = Convened();
+            h.Session.Tick(Warp);
+
+            h.Session.EnsureClosingHoldRemaining(Warp, 60_000);
+
+            Assert.Equal(MeetingStage.Voting, h.Session.Stage);
+
+            for (int voter = 1; voter <= 5; voter++) h.Session.CastVote(voter, 2, Warp);
+            h.Session.Tick(Warp);
+            h.PhaseRequests.Clear();
+            h.Session.Tick(Warp + 6_000);
+            Assert.Equal(MeetingStage.Idle, h.Session.Stage);
+        }
+
+        [Fact]
         public void ClosingHoldExpiry_WhenExecutionCausesGameOver_SuppressesPlayReturn()
         {
             var h = MeetingSessionHarness.Create(playerCount: 3, forcedRoles: (1, Role.Werewolf));

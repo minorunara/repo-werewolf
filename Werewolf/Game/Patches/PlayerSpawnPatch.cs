@@ -10,11 +10,20 @@ namespace Werewolf.Game.Patches
     {
         internal static volatile bool MeetingActive;
 
+        private static long s_scatterGraceUntilMs;
+
+        internal static void ArmScatterGrace(long durationMs = 10_000L) =>
+            s_scatterGraceUntilMs = NowMs() + durationMs;
+
+        private static long NowMs() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+        private static bool WindowActive => MeetingActive || NowMs() <= s_scatterGraceUntilMs;
+
         private static void Prefix(PlayerAvatar __instance)
         {
             try
             {
-                if (!MeetingActive) return;
+                if (!WindowActive) return;
                 if (PlayerAvatar.instance == null || __instance != PlayerAvatar.instance) return;
 
                 PhysGrabber grabber = PhysGrabber.instance;
@@ -30,7 +39,7 @@ namespace Werewolf.Game.Patches
         {
             try
             {
-                if (!MeetingActive) return;
+                if (!WindowActive) return;
                 if (PlayerAvatar.instance == null || __instance != PlayerAvatar.instance) return;
 
                 PlayerController pc = PlayerController.instance;
@@ -38,8 +47,11 @@ namespace Werewolf.Game.Patches
 
                 pc.rb.position = pc.transform.position;
                 pc.rb.rotation = pc.transform.rotation;
-                pc.rb.velocity = Vector3.zero;
-                pc.rb.angularVelocity = Vector3.zero;
+                if (!pc.rb.isKinematic)
+                {
+                    pc.rb.velocity = Vector3.zero;
+                    pc.rb.angularVelocity = Vector3.zero;
+                }
             }
             catch (Exception e)
             {

@@ -13,6 +13,8 @@ namespace Werewolf.UI
 
         private AudioSource _loopSource;
 
+        private string _loopClipKey;
+
         private bool _mixerResolved;
 
         public bool Exists => _source != null;
@@ -98,6 +100,7 @@ namespace Werewolf.UI
 
             try
             {
+                _loopClipKey = clipKey;
                 _loopSource.volume = Mathf.Clamp01(volume);
                 if (_loopSource.clip != clip)
                 {
@@ -112,9 +115,9 @@ namespace Werewolf.UI
             }
         }
 
-        public void StopLoop()
+        public void StopLoop(string clipKey)
         {
-            if (_loopSource == null) return;
+            if (_loopSource == null || clipKey != _loopClipKey) return;
             try
             {
                 if (_loopSource.isPlaying) _loopSource.Stop();
@@ -155,6 +158,7 @@ namespace Werewolf.UI
                 UnityEngine.Object.Destroy(_loopSource);
                 _loopSource = null;
             }
+            _loopClipKey = null;
             _mixerResolved = false;
         }
 

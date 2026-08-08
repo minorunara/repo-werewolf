@@ -25,7 +25,9 @@
 
   <ItemGroup>
     <Compile Include="..\Werewolf\Core\**\*.cs" Link="Core\%(RecursiveDir)%(Filename)%(Extension)" />
-    <Compile Include="..\Werewolf\Net\**\*.cs" Exclude="..\Werewolf\Net\PhotonNetBus.cs" Link="Net\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\Werewolf\Net\**\*.cs"
+             Exclude="..\Werewolf\Net\PhotonRpcBus.cs;..\Werewolf\Net\RpcEndpoint.cs;..\Werewolf\Net\PhotonRoomCallbackAdapter.cs"
+             Link="Net\%(RecursiveDir)%(Filename)%(Extension)" />
 
     <Compile Include="..\Werewolf\Debug\CommandGate.cs" Link="Debug\CommandGate.cs" />
     <Compile Include="..\Werewolf\Debug\SecretLogBuffer.cs" Link="Debug\SecretLogBuffer.cs" />
@@ -34,5 +36,8 @@
 
   <ItemGroup Condition="!Exists('..\Werewolf\Assets\emoji_people.png')">
     <Compile Remove="ChatEmojiTests.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="!Exists('..\Werewolf\Assets\sfx_bell_five_minutes.wav')">
+    <Compile Remove="SfxFeatureWireTests.cs" />
   </ItemGroup>
 </Project>

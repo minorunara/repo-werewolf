@@ -130,6 +130,8 @@ namespace Werewolf.Core
 
         public float ContentTop(int index) => this[index].Top - _origin;
 
+        public bool IsGroupHead(int index) => index == 0 || this[index - 1].Kind == ChatBlockKind.Speaker;
+
         public void GetVisibleRange(float from, float to, out int first, out int end)
         {
             first = 0;

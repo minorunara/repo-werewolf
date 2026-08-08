@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -31,12 +30,10 @@ namespace Werewolf.UI
         private const float SidePadding = 8f;
         private const float BlockGap = 5f;
         private const float SpeakerGap = 10f;
-        private const float RecapPadding = 8f;
 
         private const float VirtualOverscan = 240f;
 
         private const float TitleFontSize = 26f;
-        private const float RecapFontSize = 18f;
         private const float HintFontSize = 17f;
 
         private const float ScrollSensitivity = 40f;
@@ -50,17 +47,11 @@ namespace Werewolf.UI
         private static readonly Color ScrollbarBgColor = new Color(0.1f, 0.1f, 0.14f, 0.9f);
         private static readonly Color ScrollbarHandleColor = new Color(0.55f, 0.55f, 0.65f, 0.95f);
 
-        private static readonly Color RecapBgColor = new Color(0.10f, 0.10f, 0.17f, 0.92f);
-        private static readonly Color RecapBodyColor = new Color(0.86f, 0.88f, 0.93f, 1f);
-
         private GameObject _root;
         private GameObject _panel;
         private RectTransform _panelRect;
         private readonly IconToggleButton _toggle = new IconToggleButton();
         private KeyCode _labelKey = KeyCode.None;
-        private RectTransform _recapBox;
-        private TextMeshProUGUI _recapText;
-        private RectTransform _scrollRect;
         private TextMeshProUGUI _footerHint;
         private GameObject _emptyHint;
 
@@ -77,7 +68,6 @@ namespace Werewolf.UI
         private Func<ChatLogEntry, ChatBlockSize> _measureFn;
         private Func<int, GameObject> _createBlockFn;
 
-        private long _renderedRecapSignature = long.MinValue;
         private int _renderedVersion = int.MinValue;
         private bool _renderedLocalDead;
         private bool _scrollToBottomPending;
@@ -130,32 +120,6 @@ namespace Werewolf.UI
                 new Vector2(PanelWidth - 16f, HeaderHeight - 8f),
                 Texts.Get(TextId.ChatLogTitle), TitleFontSize, TitleTextColor, TextAlignmentOptions.Center);
 
-            var recapGo = new GameObject("RecapBox", typeof(RectTransform));
-            var recapRect = (RectTransform)recapGo.transform;
-            recapRect.SetParent(rootRect, false);
-            recapRect.anchorMin = new Vector2(0f, 1f);
-            recapRect.anchorMax = new Vector2(1f, 1f);
-            recapRect.pivot = new Vector2(0.5f, 1f);
-            recapRect.offsetMin = new Vector2(SidePadding, 0f);
-            recapRect.offsetMax = new Vector2(-SidePadding, 0f);
-            recapRect.anchoredPosition = new Vector2(0f, -HeaderHeight - 4f);
-            recapRect.sizeDelta = new Vector2(-SidePadding * 2f, 0f);
-            var recapBg = recapGo.AddComponent<Image>();
-            recapBg.color = RecapBgColor;
-            recapBg.sprite = UiKit.RoundedRectSprite();
-            recapBg.type = Image.Type.Sliced;
-            recapBg.raycastTarget = false;
-            _recapBox = recapRect;
-
-            _recapText = UiKit.CreateText(recapRect, "RecapText", Vector2.zero,
-                new Vector2(100f, 20f), string.Empty, RecapFontSize, RecapBodyColor, TextAlignmentOptions.TopLeft);
-            _recapText.enableWordWrapping = true;
-            RectTransform recapTextRect = _recapText.rectTransform;
-            recapTextRect.anchorMin = new Vector2(0f, 1f);
-            recapTextRect.anchorMax = new Vector2(0f, 1f);
-            recapTextRect.pivot = new Vector2(0f, 1f);
-            recapTextRect.anchoredPosition = new Vector2(RecapPadding, -RecapPadding);
-
             var scrollGo = new GameObject("Scroll", typeof(RectTransform));
             var scrollRect = (RectTransform)scrollGo.transform;
             scrollRect.SetParent(rootRect, false);
@@ -172,7 +136,6 @@ namespace Werewolf.UI
             var scrollBgImg = scrollGo.AddComponent<Image>();
             scrollBgImg.color = new Color(0f, 0f, 0f, 0.001f);
             scrollBgImg.raycastTarget = true;
-            _scrollRect = scrollRect;
 
             var viewportGo = new GameObject("Viewport", typeof(RectTransform));
             var viewportRect = (RectTransform)viewportGo.transform;
@@ -318,23 +281,17 @@ namespace Werewolf.UI
 
         private static string FormatKey(KeyCode key) => key == KeyCode.None ? "-" : key.ToString();
 
-        public void Render(MeetingChatLog log, MeetingRecapData recap,
-                           int localActor, Func<int, PlayerAvatar> resolveAvatar, bool localDead)
+        public void Render(MeetingChatLog log,
+                           int localActor, Func<int, PlayerAvatar> resolveAvatar,
+                           Func<int, int> resolveId, Func<int, Role?> markedRole, bool localDead)
         {
             if (_root == null || !_view.Attached) return;
 
             _log = log;
-            _rows.SetContext(localActor, resolveAvatar);
+            _rows.SetContext(localActor, resolveAvatar, resolveId, markedRole);
             _hasRenderState = true;
 
             bool stickToBottom = _open && _view.IsAtBottom();
-            long recapSignature = recap.Signature;
-            bool recapChanged = _open && recapSignature != _renderedRecapSignature;
-            if (recapChanged)
-            {
-                RenderRecap(recap);
-                _renderedRecapSignature = recapSignature;
-            }
 
             if (localDead != _renderedLocalDead)
             {
@@ -355,7 +312,7 @@ namespace Werewolf.UI
                 ApplyContentHeight();
                 UpdateEmptyHint();
             }
-            if (stickToBottom && (recapChanged || layoutChanged)) _scrollToBottomPending = true;
+            if (stickToBottom && layoutChanged) _scrollToBottomPending = true;
             if (_scrollToBottomPending)
             {
                 _scrollToBottomPending = false;
@@ -363,29 +320,6 @@ namespace Werewolf.UI
             }
 
             SyncVirtualization();
-        }
-
-        private void RenderRecap(MeetingRecapData recap)
-        {
-            if (_recapText == null || _recapBox == null) return;
-
-            List<string> lines = MeetingRecap.BuildLines(recap);
-            string title = $"<b><color=#{ColorUtility.ToHtmlStringRGB(TitleTextColor)}>" +
-                           $"{Texts.Get(TextId.RecapTitle)}</color></b>";
-            string text = title + "\n" + string.Join("\n", lines.ToArray());
-
-            float width = ContentWidth - SidePadding * 2f - RecapPadding * 2f;
-            _recapText.text = text;
-            float height = Mathf.Max(RecapFontSize, _recapText.GetPreferredValues(text, width, 0f).y);
-            _recapText.rectTransform.sizeDelta = new Vector2(width, height);
-
-            float boxHeight = height + RecapPadding * 2f;
-            _recapBox.sizeDelta = new Vector2(-SidePadding * 2f, boxHeight);
-
-            if (_scrollRect != null)
-            {
-                _scrollRect.offsetMax = new Vector2(0f, -(HeaderHeight + 4f + boxHeight + 6f));
-            }
         }
 
         private void ApplyContentHeight()
@@ -431,7 +365,7 @@ namespace Werewolf.UI
             ChatLogEntry entry = _log.Entries[(int)offset];
             float topY = -(SidePadding + _layout.ContentTop(index));
 
-            return _rows.CreateRow(topY, block, entry);
+            return _rows.CreateRow(topY, block, entry, _layout.IsGroupHead(index));
         }
 
         private void ClearLiveBlocks()
@@ -442,7 +376,6 @@ namespace Werewolf.UI
 
         public void ResetView()
         {
-            _renderedRecapSignature = long.MinValue;
             _renderedVersion = int.MinValue;
             _scrollToBottomPending = true;
             ClearLiveBlocks();
@@ -474,9 +407,6 @@ namespace Werewolf.UI
             _panelRect = null;
             _toggle.Clear();
             _labelKey = KeyCode.None;
-            _recapBox = null;
-            _recapText = null;
-            _scrollRect = null;
             _footerHint = null;
             _renderedLocalDead = false;
             ResetView();

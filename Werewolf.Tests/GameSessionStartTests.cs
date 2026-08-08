@@ -169,13 +169,35 @@ namespace Werewolf.Tests
 
             var start = _sent.Single(m => m.Code == 170);
             Assert.Equal(MessageTarget.All, start.Target);
-            Assert.Equal(6, start.Payload.Length);
+            Assert.Equal(7, start.Payload.Length);
             Assert.Equal(Now + 600_000L, Assert.IsType<long>(start.Payload[0]));
             Assert.Equal(600, Assert.IsType<int>(start.Payload[1]));
             Assert.Equal((byte)3, Assert.IsType<byte>(start.Payload[2]));
             Assert.Equal((byte)1, Assert.IsType<byte>(start.Payload[3]));
             Assert.Equal(45, Assert.IsType<int>(start.Payload[4]));
             Assert.Equal((byte)0, Assert.IsType<byte>(start.Payload[5]));
+            Assert.Equal(new[] { 1, 2, 3, 4, 5 }, Assert.IsType<int[]>(start.Payload[6]));
+        }
+
+        [Fact]
+        public void Start_GameStartPayload_CarriesParticipantIdRosterInAssignOrder()
+        {
+            var session = CreateSession();
+            var players = new List<WPlayer>
+            {
+                new WPlayer { ActorNumber = 4, Name = "P4" },
+                new WPlayer { ActorNumber = -102, Name = "Bot2", IsBot = true },
+                new WPlayer { ActorNumber = 1, Name = "P1" },
+                new WPlayer { ActorNumber = -101, Name = "Bot1", IsBot = true },
+                new WPlayer { ActorNumber = 2, Name = "P2" },
+            };
+
+            session.Start(new GameConfig(), players, Now, new Random(1));
+
+            var start = _sent.Single(m => m.Code == 170);
+            var roster = Assert.IsType<int[]>(start.Payload[6]);
+            Assert.Equal(new[] { 1, 2, 4, -101, -102 }, roster);
+            Assert.Equal(ParticipantIds.AssignOrder(session.Players), roster);
         }
 
         [Fact]
@@ -299,8 +321,13 @@ namespace Werewolf.Tests
             foreach (var message in _sent.Where(m => m.Target == MessageTarget.All))
             {
                 Assert.Contains((int)message.Code, new[] { 170, 172 });
-                Assert.DoesNotContain(message.Payload, p => p is Array);
+                Assert.DoesNotContain(message.Payload, p => p is byte[]);
             }
+            Assert.DoesNotContain(_sent.Single(m => m.Code == 172).Payload, p => p is Array);
+            var startMessage = _sent.Single(m => m.Code == 170);
+            var roster = Assert.IsType<int[]>(Assert.Single(startMessage.Payload, p => p is Array));
+            Assert.Equal(session.Players.Select(p => p.ActorNumber).OrderBy(a => a).ToArray(),
+                roster.OrderBy(a => a).ToArray());
             foreach (var message in _sent.Where(m => m.Code == 160 || m.Code == 162))
             {
                 Assert.Equal(MessageTarget.Actors, message.Target);

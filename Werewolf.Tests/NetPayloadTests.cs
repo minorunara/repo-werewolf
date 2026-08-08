@@ -56,7 +56,7 @@ namespace Werewolf.Tests
         public void TryDeserialize_ValidPayload_Succeeds()
         {
             bool ok = NetPayload.TryDeserialize(
-                EventCodes.PlayerDied, new object[] { 7, (byte)1 }, out var payload, out var reason);
+                MessageCodes.PlayerDied, new object[] { 7, (byte)1 }, out var payload, out var reason);
 
             Assert.True(ok);
             Assert.Null(reason);
@@ -68,7 +68,7 @@ namespace Werewolf.Tests
         public void TryDeserialize_NormalizesBoolElementToByte()
         {
             bool ok = NetPayload.TryDeserialize(
-                EventCodes.AssignRole, new object[] { true }, out var payload, out _);
+                MessageCodes.AssignRole, new object[] { true }, out var payload, out _);
 
             Assert.True(ok);
             Assert.Equal((byte)1, payload[0]);
@@ -89,21 +89,21 @@ namespace Werewolf.Tests
         public void TryDeserialize_RolesCode_ValidAndInvalidPayload()
         {
             bool ok = NetPayload.TryDeserialize(
-                EventCodes.BeaconAudit, new object[] { (byte)2 }, out _, out var reason);
+                MessageCodes.BeaconAudit, new object[] { (byte)2 }, out _, out var reason);
             Assert.True(ok);
             Assert.Null(reason);
 
             ok = NetPayload.TryDeserialize(
-                EventCodes.BeaconAudit, new object[] { }, out _, out reason);
+                MessageCodes.BeaconAudit, new object[] { }, out _, out reason);
             Assert.False(ok);
 
             ok = NetPayload.TryDeserialize(
-                EventCodes.RoleAction, new object[] { (byte)0, 5, (byte)1 }, out var payload, out reason);
+                MessageCodes.RoleAction, new object[] { (byte)0, 5, (byte)1 }, out var payload, out reason);
             Assert.True(ok);
             Assert.Equal(5, payload[1]);
 
             ok = NetPayload.TryDeserialize(
-                EventCodes.RoleAction, new object[] { "bad", 5, (byte)1 }, out _, out reason);
+                MessageCodes.RoleAction, new object[] { "bad", 5, (byte)1 }, out _, out reason);
             Assert.False(ok);
         }
 
@@ -111,7 +111,7 @@ namespace Werewolf.Tests
         public void TryDeserialize_MeetingCode_ValidPayload_Succeeds()
         {
             bool ok = NetPayload.TryDeserialize(
-                EventCodes.StartMeeting, new object[] { 3, 1000L, 2000L, (byte)0 }, out var payload, out var reason);
+                MessageCodes.StartMeeting, new object[] { 3, 1000L, 2000L, (byte)0 }, out var payload, out var reason);
 
             Assert.True(ok);
             Assert.Null(reason);
@@ -123,21 +123,21 @@ namespace Werewolf.Tests
         public void TryDeserialize_RequestMeeting_KindPayload_Succeeds()
         {
             bool ok = NetPayload.TryDeserialize(
-                EventCodes.RequestMeeting, new object[] { (byte)1 }, out var payload, out var reason);
+                MessageCodes.RequestMeeting, new object[] { (byte)1 }, out var payload, out var reason);
 
             Assert.True(ok);
             Assert.Null(reason);
             Assert.Equal((byte)1, payload[0]);
 
             Assert.False(NetPayload.TryDeserialize(
-                EventCodes.RequestMeeting, Array.Empty<object>(), out _, out _));
+                MessageCodes.RequestMeeting, Array.Empty<object>(), out _, out _));
         }
 
         [Fact]
         public void TryDeserialize_MeetingCode_WrongArity_Drops()
         {
             bool ok = NetPayload.TryDeserialize(
-                EventCodes.VoteProgress, new object[] { new[] { 1, 2 } }, out _, out var reason);
+                MessageCodes.VoteProgress, new object[] { new[] { 1, 2 } }, out _, out var reason);
 
             Assert.False(ok);
             Assert.Equal("arity", reason);
@@ -147,7 +147,7 @@ namespace Werewolf.Tests
         public void TryDeserialize_MeetingCode_WrongElementType_Drops()
         {
             bool ok = NetPayload.TryDeserialize(
-                EventCodes.MeetingResult, new object[] { -1, "notArray", new[] { 0 } }, out _, out var reason);
+                MessageCodes.MeetingResult, new object[] { -1, "notArray", new[] { 0 } }, out _, out var reason);
 
             Assert.False(ok);
             Assert.Equal("badtype", reason);
@@ -156,7 +156,7 @@ namespace Werewolf.Tests
         [Fact]
         public void TryDeserialize_NonArrayContent_Drops()
         {
-            bool ok = NetPayload.TryDeserialize(EventCodes.AssignRole, 42, out _, out var reason);
+            bool ok = NetPayload.TryDeserialize(MessageCodes.AssignRole, 42, out _, out var reason);
 
             Assert.False(ok);
             Assert.Equal("notarray", reason);
@@ -166,7 +166,7 @@ namespace Werewolf.Tests
         public void TryDeserialize_MissingElements_DropsAsArity()
         {
             bool ok = NetPayload.TryDeserialize(
-                EventCodes.PlayerDied, new object[] { 7 }, out _, out var reason);
+                MessageCodes.PlayerDied, new object[] { 7 }, out _, out var reason);
 
             Assert.False(ok);
             Assert.Equal("arity", reason);
@@ -176,7 +176,7 @@ namespace Werewolf.Tests
         public void TryDeserialize_TypeMismatch_DropsAsBadType()
         {
             bool ok = NetPayload.TryDeserialize(
-                EventCodes.AssignRole, new object[] { 5 }, out _, out var reason);
+                MessageCodes.AssignRole, new object[] { 5 }, out _, out var reason);
 
             Assert.False(ok);
             Assert.Equal("badtype", reason);
@@ -186,7 +186,7 @@ namespace Werewolf.Tests
         public void TryDeserialize_NullElement_DropsAsBadType()
         {
             bool ok = NetPayload.TryDeserialize(
-                EventCodes.PlayerDied, new object[] { 7, null }, out _, out var reason);
+                MessageCodes.PlayerDied, new object[] { 7, null }, out _, out var reason);
 
             Assert.False(ok);
             Assert.Equal("badtype", reason);

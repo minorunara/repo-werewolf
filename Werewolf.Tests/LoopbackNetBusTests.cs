@@ -39,11 +39,11 @@ namespace Werewolf.Tests
         {
             var (bus, received) = NewBus();
 
-            bool ok = bus.SendToAll(EventCodes.PhaseChanged, new object[] { (byte)1, 100L, 200L });
+            bool ok = bus.SendToAll(MessageCodes.PhaseChanged, new object[] { (byte)1, 100L, 200L });
 
             Assert.True(ok);
             Assert.Single(received);
-            Assert.Equal(EventCodes.PhaseChanged, received[0].Code);
+            Assert.Equal(MessageCodes.PhaseChanged, received[0].Code);
             Assert.Equal(1, received[0].SenderActor);
         }
 
@@ -52,11 +52,11 @@ namespace Werewolf.Tests
         {
             var (bus, received) = NewBus();
 
-            bool ok = bus.SendToMaster(EventCodes.PlayerDied, new object[] { 3, (byte)0 });
+            bool ok = bus.SendToMaster(MessageCodes.PlayerDied, new object[] { 3, (byte)0 });
 
             Assert.True(ok);
             Assert.Single(received);
-            Assert.Equal(EventCodes.PlayerDied, received[0].Code);
+            Assert.Equal(MessageCodes.PlayerDied, received[0].Code);
         }
 
         [Fact]
@@ -64,10 +64,10 @@ namespace Werewolf.Tests
         {
             var (bus, received) = NewBus(localActor: 1);
 
-            bus.SendToActors(EventCodes.AssignRole, new object[] { (byte)Role.Werewolf }, new[] { 1 });
+            bus.SendToActors(MessageCodes.AssignRole, new object[] { (byte)Role.Werewolf }, new[] { 1 });
 
             Assert.Single(received);
-            Assert.Equal(EventCodes.AssignRole, received[0].Code);
+            Assert.Equal(MessageCodes.AssignRole, received[0].Code);
             Assert.Equal((byte)Role.Werewolf, received[0].Payload[0]);
         }
 
@@ -76,7 +76,7 @@ namespace Werewolf.Tests
         {
             var (bus, received) = NewBus(localActor: 1);
 
-            bus.SendToActors(EventCodes.AssignRole, new object[] { (byte)Role.Villager }, new[] { -1 });
+            bus.SendToActors(MessageCodes.AssignRole, new object[] { (byte)Role.Villager }, new[] { -1 });
 
             Assert.Empty(received);
             Assert.Contains(_log, l => l.Line.Contains("dir=send") && l.Line.Contains("code=160") && l.Secret);
@@ -87,7 +87,7 @@ namespace Werewolf.Tests
         {
             var (bus, received) = NewBus();
 
-            bus.SendToActors(EventCodes.RevealSelfRole, new object[] { (byte)Role.BlackCat }, null);
+            bus.SendToActors(MessageCodes.RevealSelfRole, new object[] { (byte)Role.BlackCat }, null);
 
             Assert.Empty(received);
         }
@@ -97,7 +97,7 @@ namespace Werewolf.Tests
         {
             var (bus, received) = NewBus();
 
-            bus.SendToActors(EventCodes.AssignRole, new object[] { true }, new[] { 1 });
+            bus.SendToActors(MessageCodes.AssignRole, new object[] { true }, new[] { 1 });
 
             Assert.Single(received);
             Assert.Equal((byte)1, received[0].Payload[0]);
@@ -130,11 +130,11 @@ namespace Werewolf.Tests
 
             foreach (int actor in new[] { 1, -1, -2, -3, -4 })
             {
-                bus.SendToActors(EventCodes.AssignRole, new object[] { (byte)Role.Villager }, new[] { actor });
+                bus.SendToActors(MessageCodes.AssignRole, new object[] { (byte)Role.Villager }, new[] { actor });
             }
 
             Assert.Single(received);
-            Assert.Equal(EventCodes.AssignRole, received[0].Code);
+            Assert.Equal(MessageCodes.AssignRole, received[0].Code);
 
             int sendLines = _log.FindAll(l => l.Line.Contains("dir=send") && l.Line.Contains("code=160")).Count;
             Assert.Equal(5, sendLines);

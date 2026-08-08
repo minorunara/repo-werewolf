@@ -31,6 +31,17 @@ namespace Werewolf.Core
         NoticeConveneDeniedNoCorpse,
         NoticePlayerDisconnectedFormat,
         NoticeConveneHoldHint,
+        NoticeScatterSlogan,
+        NoticeScatterGroupLineFormat,
+        NoticeScatterMemberFormat,
+        NoticeScatterGuardTripped,
+        NoticeScatterGroupSeparator,
+        VoteScatterBadgeFormat,
+        VoteScatterBadgeUnknown,
+
+        OutfitBlockedHeader,
+        OutfitBlockedBody,
+        OutfitBlockedOk,
 
         RevealTeammatePrefix,
         RevealHeadingWinCondition,
@@ -64,6 +75,7 @@ namespace Werewolf.Core
         RevealVillagerTipValuableMap,
         RevealVillagerTipAliveCheck,
         RevealSkipHint,
+        RevealSelfIdFormat,
 
         RoleNameWerewolf,
         RoleNameBlackCat,
@@ -91,6 +103,10 @@ namespace Werewolf.Core
         HudBeaconKeyFormat,
         HudBeaconLabel,
         HudTestPlayBanner,
+        HudScatterGuardBanner,
+
+        HudSelfIdFormat,
+        IdNameFormat,
 
         StartHoldWaitingOthers,
 
@@ -104,6 +120,13 @@ namespace Werewolf.Core
         ResultReturnPromptFormat,
         ResultWaitingHost,
         ResultFooterWithCountdownFormat,
+
+        ResultBannerVoid,
+        VoidMatchChargingLabel,
+        VoidMatchArmHeader,
+        VoidMatchArmBody,
+        VoidMatchConfirmPromptFormat,
+        VoidMatchCancelHintFormat,
 
         ResultDigestHeader,
         DigestMatchStart,
@@ -144,8 +167,10 @@ namespace Werewolf.Core
         ChatLogDeadHint,
         ChatLogToggleLabelFormat,
         ChatLogVoted,
+        ChatLogSystemName,
+        ChatLogScatterTitle,
+        ChatLogScatterLineFormat,
 
-        RecapTitle,
         RecapNameSeparator,
         RecapDeathsFormat,
         RecapDeathsNone,
@@ -156,6 +181,7 @@ namespace Werewolf.Core
 
         DeathRevealTitle,
         DeathRevealNone,
+        DeathRevealScatterGuardTitle,
 
         CheckmateTitle,
 
@@ -204,6 +230,7 @@ namespace Werewolf.Core
         ConveneCountdownDefaultCallerName,
         ConveneCountdownHeaderFormat,
         ConveneCountdownCorpseHeaderFormat,
+        ConveneCountdownScatterGuardHeader,
 
         HudCorpseReportKeyFormat,
 
@@ -264,6 +291,8 @@ namespace Werewolf.Core
         SettingsLabelMeetingCountdownSec,
         SettingsLabelMeetingDurationSec,
         SettingsLabelVoteTimeCutEnabled,
+        SettingsLabelMeetingScatterEnabled,
+        SettingsLabelScatterGuardSec,
         SettingsLabelResultDisplaySec,
         SettingsLabelStaminaUnlockPct,
         SettingsLabelJumpUnlockPct,
@@ -280,6 +309,7 @@ namespace Werewolf.Core
         SettingsLabelOrbGaugeEnabled,
         SettingsLabelWerewolfModeEnabled,
         SettingsLabelMinimapHideEnabled,
+        SettingsLabelOutfitChangeAllowed,
         SettingsLabelValuableMapMode,
         SettingsLabelGameOverAutoReturnSec,
         SettingsLabelNecroVoiceMode,
@@ -396,6 +426,8 @@ namespace Werewolf.Core
         ManualMeetingFlowBody,
         ManualVotingTitle,
         ManualVotingBody,
+        ManualScatterTitle,
+        ManualScatterBody,
         ManualGaugeBasicsTitle,
         ManualGaugeIntro,
         ManualGaugeLoss,
@@ -553,6 +585,17 @@ namespace Werewolf.Core
             [TextId.NoticeConveneDeniedNoCorpse] = "会議を開催できません（通報できる死体が無い）",
             [TextId.NoticePlayerDisconnectedFormat] = "{0}がゲームから切断されました",
             [TextId.NoticeConveneHoldHint] = "会議を招集するには、ボタンを長押ししてください",
+            [TextId.NoticeScatterSlogan] = "サイロ化を解消しよう",
+            [TextId.NoticeScatterGroupLineFormat] = "組分け【{0}】{1}",
+            [TextId.NoticeScatterMemberFormat] = "{0}番",
+            [TextId.NoticeScatterGuardTripped] = "引き継ぎのトラブルが発生しました",
+            [TextId.NoticeScatterGroupSeparator] = "・",
+            [TextId.VoteScatterBadgeFormat] = "【{0}】",
+            [TextId.VoteScatterBadgeUnknown] = "【？】",
+
+            [TextId.OutfitBlockedHeader] = "着替えられません",
+            [TextId.OutfitBlockedBody] = "人狼の試合中は見た目を変更できません。ロビーで着替えるか、ルーム設定を変更してください。",
+            [TextId.OutfitBlockedOk] = "OK",
 
             [TextId.RevealTeammatePrefix] = "人狼仲間：",
             [TextId.RevealHeadingWinCondition] = "◆ 勝利条件（いずれか）",
@@ -586,6 +629,7 @@ namespace Werewolf.Core
             [TextId.RevealVillagerTipValuableMap] = "会議のたびにマップの貴重品情報が更新される",
             [TextId.RevealVillagerTipAliveCheck] = "会議では全プレイヤーの生死を確認できる",
             [TextId.RevealSkipHint] = "[menu] でスキップ",
+            [TextId.RevealSelfIdFormat] = "あなたの識別番号はNo.{0}",
 
             [TextId.RoleNameWerewolf] = "人狼",
             [TextId.RoleNameBlackCat] = "黒猫",
@@ -613,12 +657,23 @@ namespace Werewolf.Core
             [TextId.HudBeaconKeyFormat] = "ビーコン [{0}]",
             [TextId.HudBeaconLabel] = "ビーコン",
             [TextId.HudTestPlayBanner] = "テストプレイ中：ホストがデバッグモードを有効にしています",
+            [TextId.HudScatterGuardBanner] = "引き継ぎ期間中…",
+            [TextId.HudSelfIdFormat] = "No.{0}",
+            [TextId.IdNameFormat] = "{0}. {1}",
 
             [TextId.StartHoldWaitingOthers] = "他のプレイヤーの準備を待っています…",
 
             [TextId.ResultBannerVillagerWin] = "村人陣営の勝利",
             [TextId.ResultBannerWerewolfWin] = "人狼陣営の勝利",
             [TextId.ResultBannerDefault] = "試合結果",
+
+            [TextId.ResultBannerVoid] = "無効試合",
+            [TextId.VoidMatchChargingLabel] = "無効試合",
+            [TextId.VoidMatchArmHeader] = "この試合を無効にしますか？",
+            [TextId.VoidMatchArmBody] =
+                "勝者なしで試合を終了します。コスメティックトークンも配布されません。",
+            [TextId.VoidMatchConfirmPromptFormat] = "確定するには {0} キーを {1} 秒長押し",
+            [TextId.VoidMatchCancelHintFormat] = "Esc で取消（{0} 秒で自動的に閉じます）",
             [TextId.ResultStatusAlive] = "生存",
             [TextId.ResultStatusDead] = "死亡",
             [TextId.ResultStatusExecuted] = "処刑",
@@ -666,18 +721,21 @@ namespace Werewolf.Core
             [TextId.ChatLogDeadHint] = "灰色の発言は冥界にだけ見えています",
             [TextId.ChatLogToggleLabelFormat] = "会議チャットログ [{0}]",
             [TextId.ChatLogVoted] = "が投票しました。",
+            [TextId.ChatLogSystemName] = "Taxman",
+            [TextId.ChatLogScatterTitle] = "前回の組分け",
+            [TextId.ChatLogScatterLineFormat] = "【{0}】{1}",
 
-            [TextId.RecapTitle] = "ここまでの経過",
             [TextId.RecapNameSeparator] = "、",
             [TextId.RecapDeathsFormat] = "死亡: {0}",
             [TextId.RecapDeathsNone] = "死亡: なし",
-            [TextId.RecapLostFormat] = "破壊された貴重品: ${0}",
+            [TextId.RecapLostFormat] = "破壊された貴重品: -${0}",
             [TextId.RecapHaulFormat] = "納品: ${0} ／ ノルマ ${1}",
             [TextId.RecapBeaconFormat] = "ビーコン使用: {0}回",
             [TextId.RecapBeaconNone] = "ビーコン使用: なし",
 
             [TextId.DeathRevealTitle] = "死亡者",
             [TextId.DeathRevealNone] = "誰も死んでいない",
+            [TextId.DeathRevealScatterGuardTitle] = "引き継ぎトラブル発生",
 
             [TextId.CheckmateTitle] = "債権はもはや徴収不能だ",
 
@@ -732,6 +790,7 @@ namespace Werewolf.Core
             [TextId.ConveneCountdownDefaultCallerName] = "誰か",
             [TextId.ConveneCountdownHeaderFormat] = "{0}が会議を招集しました！\nワープまで残り…",
             [TextId.ConveneCountdownCorpseHeaderFormat] = "{0}が事件現場を通報しました！\nワープまで残り…",
+            [TextId.ConveneCountdownScatterGuardHeader] = "引き継ぎのトラブルが発生しました！\nワープまで残り…",
 
             [TextId.HudCorpseReportKeyFormat] = "通報 [{0}]",
 
@@ -792,6 +851,8 @@ namespace Werewolf.Core
             [TextId.SettingsLabelMeetingCountdownSec] = "会議開始までの予告時間",
             [TextId.SettingsLabelMeetingDurationSec] = "会議の制限時間",
             [TextId.SettingsLabelVoteTimeCutEnabled] = "投票による会議時間短縮",
+            [TextId.SettingsLabelMeetingScatterEnabled] = "会議後の分散ワープ",
+            [TextId.SettingsLabelScatterGuardSec] = "分散ワープ後の監視時間",
             [TextId.SettingsLabelResultDisplaySec] = "開票結果の表示保持",
             [TextId.SettingsLabelStaminaUnlockPct] = "無限スタミナ解禁閾値",
             [TextId.SettingsLabelJumpUnlockPct] = "追加ジャンプ解禁閾値",
@@ -808,6 +869,7 @@ namespace Werewolf.Core
             [TextId.SettingsLabelOrbGaugeEnabled] = "オーブの減額ゲージ算入",
             [TextId.SettingsLabelWerewolfModeEnabled] = "人狼モード",
             [TextId.SettingsLabelMinimapHideEnabled] = "死体のミニマップ非表示",
+            [TextId.SettingsLabelOutfitChangeAllowed] = "試合中の着替え",
             [TextId.SettingsLabelValuableMapMode] = "貴重品マップ表示モード",
             [TextId.SettingsLabelGameOverAutoReturnSec] = "結果画面の自動帰還秒数（0=自動で戻らない）",
             [TextId.SettingsLabelNecroVoiceMode] = "冥界の声（死者→生存人狼の傍聴）",
@@ -1160,6 +1222,15 @@ namespace Werewolf.Core
                 "最も票を集めたプレイヤーが処刑されます。最多票が同数の場合は誰も処刑されません。\n" +
                 "会議には制限時間があり、誰かが投票するたびに残り時間が少し減ります。",
 
+            [TextId.ManualScatterTitle] = "会議後の散開",
+            [TextId.ManualScatterBody] =
+                "ルーム設定によっては、会議が終わった時に生存者が6人以上いると、ランダムに3人以上の組へ分けられ、組ごとに別々の場所へワープして再出発します。\n" +
+                "行き先はトラックか、2箇所目以降の納品済みの抽出ポイントのいずれかです（最初の抽出ポイントは行き先になりません）。\n" +
+                "組分けは全員に発表されますが、どの組がどこへ行くのかは分かりません。前回の組分けは、次の会議の冒頭に会議チャットログで再掲されます。\n" +
+                "2箇所目の納品が完了するまでの間、全ての抽出を終えた後、生存者が6人に満たないときは、散開せず全員がトラックから再出発します。\n" +
+                "散開の直後、画面上部に「引き継ぎ期間中…」と表示されている間に誰かが死亡すると、「引き継ぎトラブル発生」として自動で緊急会議が開かれます。\n" +
+                "この会議は予告なしで即座に始まり、誰の会議開催回数も消費しません。",
+
             [TextId.ManualGaugeBasicsTitle] = "貴重品減額ゲージの見方",
             [TextId.ManualGaugeIntro] =
                 "貴重品減額ゲージは、村人陣営と人狼陣営の貴重品の奪い合いを視覚化したものです。試合開始時点でマップにある貴重品の総額が基準になります。",
@@ -1228,7 +1299,7 @@ namespace Werewolf.Core
                 "どうしても処刑する場合は、道連れになる覚悟のある人だけが投票しましょう。\n" +
                 "武器や落下など、処刑以外の方法で死亡した場合、道連れは発動しませんがPvPに発展するリスクもあります。\n" +
                 "合意を経ない私刑を行えば、他の村人には正当な理由があったのか判断できません。\n" +
-                "吊るほどの確証がない相手は、武器を没収して様子を見るのも一つの手です。武器がなければ、たとえ人狼陣営でも簡単には人を殺せません。",
+                "処刑するほどの確証がない相手は、武器を没収して様子を見るのも一つの手です。武器がなければ、たとえ人狼陣営でも簡単には人を殺せません。",
 
             [TextId.ManualRoleBomberTitle] = "役職: 爆弾魔",
             [TextId.ManualRoleBomberIntro] =
@@ -1307,6 +1378,17 @@ namespace Werewolf.Core
             [TextId.NoticeConveneDeniedNoCorpse] = "Cannot call a meeting (no body to report)",
             [TextId.NoticePlayerDisconnectedFormat] = "{0} has disconnected from the game",
             [TextId.NoticeConveneHoldHint] = "Hold the button to call an emergency meeting",
+            [TextId.NoticeScatterSlogan] = "Let's maximize our bus factor.",
+            [TextId.NoticeScatterGroupLineFormat] = "Group {0}: {1}",
+            [TextId.NoticeScatterMemberFormat] = "No.{0}",
+            [TextId.NoticeScatterGuardTripped] = "A handover incident has occurred",
+            [TextId.NoticeScatterGroupSeparator] = ", ",
+            [TextId.VoteScatterBadgeFormat] = "[{0}]",
+            [TextId.VoteScatterBadgeUnknown] = "[?]",
+
+            [TextId.OutfitBlockedHeader] = "OUTFIT LOCKED",
+            [TextId.OutfitBlockedBody] = "You cannot change your appearance during a werewolf match. Change outfits in the lobby, or change the room settings.",
+            [TextId.OutfitBlockedOk] = "OK",
 
             [TextId.RevealTeammatePrefix] = "Fellow werewolves: ",
             [TextId.RevealHeadingWinCondition] = "◆ Win Conditions (meet any one)",
@@ -1340,6 +1422,7 @@ namespace Werewolf.Core
             [TextId.RevealVillagerTipValuableMap] = "The map's data on valuables is updated at every meeting",
             [TextId.RevealVillagerTipAliveCheck] = "Meetings show whether each player is alive or dead",
             [TextId.RevealSkipHint] = "[menu] to skip",
+            [TextId.RevealSelfIdFormat] = "Your ID number is No.{0}",
 
             [TextId.RoleNameWerewolf] = "Werewolf",
             [TextId.RoleNameBlackCat] = "Black Cat",
@@ -1367,12 +1450,23 @@ namespace Werewolf.Core
             [TextId.HudBeaconKeyFormat] = "Beacon [{0}]",
             [TextId.HudBeaconLabel] = "Beacon",
             [TextId.HudTestPlayBanner] = "TEST PLAY: the host has debug mode enabled",
+            [TextId.HudScatterGuardBanner] = "Handover in progress…",
+            [TextId.HudSelfIdFormat] = "No.{0}",
+            [TextId.IdNameFormat] = "{0}. {1}",
 
             [TextId.StartHoldWaitingOthers] = "Waiting for other players…",
 
             [TextId.ResultBannerVillagerWin] = "Villager Team Wins",
             [TextId.ResultBannerWerewolfWin] = "Werewolf Team Wins",
             [TextId.ResultBannerDefault] = "Match Results",
+
+            [TextId.ResultBannerVoid] = "No Contest",
+            [TextId.VoidMatchChargingLabel] = "No Contest",
+            [TextId.VoidMatchArmHeader] = "Declare this match a no contest?",
+            [TextId.VoidMatchArmBody] =
+                "The match ends with no winner. No cosmetic tokens are awarded.",
+            [TextId.VoidMatchConfirmPromptFormat] = "Hold {0} for {1} seconds to confirm",
+            [TextId.VoidMatchCancelHintFormat] = "Esc to cancel (closes automatically in {0}s)",
             [TextId.ResultStatusAlive] = "Alive",
             [TextId.ResultStatusDead] = "Dead",
             [TextId.ResultStatusExecuted] = "Executed",
@@ -1420,18 +1514,21 @@ namespace Werewolf.Core
             [TextId.ChatLogDeadHint] = "Gray messages are visible only to the dead",
             [TextId.ChatLogToggleLabelFormat] = "Meeting Chat Log [{0}]",
             [TextId.ChatLogVoted] = "has voted.",
+            [TextId.ChatLogSystemName] = "Taxman",
+            [TextId.ChatLogScatterTitle] = "Previous groups",
+            [TextId.ChatLogScatterLineFormat] = "{0}: {1}",
 
-            [TextId.RecapTitle] = "Recap",
             [TextId.RecapNameSeparator] = ", ",
             [TextId.RecapDeathsFormat] = "Deaths: {0}",
             [TextId.RecapDeathsNone] = "Deaths: none",
-            [TextId.RecapLostFormat] = "Valuables destroyed: ${0}",
+            [TextId.RecapLostFormat] = "Valuables destroyed: -${0}",
             [TextId.RecapHaulFormat] = "Delivered: ${0} / Quota ${1}",
             [TextId.RecapBeaconFormat] = "Beacon uses: {0}",
             [TextId.RecapBeaconNone] = "Beacon uses: none",
 
             [TextId.DeathRevealTitle] = "Deaths",
             [TextId.DeathRevealNone] = "No one died",
+            [TextId.DeathRevealScatterGuardTitle] = "HANDOVER INCIDENT",
 
             [TextId.CheckmateTitle] = "THE DEBT CAN NO LONGER BE COLLECTED",
 
@@ -1486,6 +1583,7 @@ namespace Werewolf.Core
             [TextId.ConveneCountdownDefaultCallerName] = "Someone",
             [TextId.ConveneCountdownHeaderFormat] = "{0} called a meeting!\nWarping in…",
             [TextId.ConveneCountdownCorpseHeaderFormat] = "{0} reported a body!\nWarping in…",
+            [TextId.ConveneCountdownScatterGuardHeader] = "A handover incident has occurred!\nWarping in…",
 
             [TextId.HudCorpseReportKeyFormat] = "Report [{0}]",
 
@@ -1546,6 +1644,8 @@ namespace Werewolf.Core
             [TextId.SettingsLabelMeetingCountdownSec] = "Meeting warp countdown",
             [TextId.SettingsLabelMeetingDurationSec] = "Meeting time limit",
             [TextId.SettingsLabelVoteTimeCutEnabled] = "Votes shorten the meeting",
+            [TextId.SettingsLabelMeetingScatterEnabled] = "Scatter warp after meetings",
+            [TextId.SettingsLabelScatterGuardSec] = "Post-scatter guard window",
             [TextId.SettingsLabelResultDisplaySec] = "Vote result display duration",
             [TextId.SettingsLabelStaminaUnlockPct] = "Infinite stamina unlock",
             [TextId.SettingsLabelJumpUnlockPct] = "Extra jump unlock",
@@ -1562,6 +1662,7 @@ namespace Werewolf.Core
             [TextId.SettingsLabelOrbGaugeEnabled] = "Include orb value in loss gauge",
             [TextId.SettingsLabelWerewolfModeEnabled] = "Werewolf Mode",
             [TextId.SettingsLabelMinimapHideEnabled] = "Hide corpses on minimap",
+            [TextId.SettingsLabelOutfitChangeAllowed] = "Outfit changes during a match",
             [TextId.SettingsLabelValuableMapMode] = "Valuables map mode",
             [TextId.SettingsLabelGameOverAutoReturnSec] = "Result screen auto-return (0 = never)",
             [TextId.SettingsLabelNecroVoiceMode] = "Voices of the dead (dead → living werewolves)",
@@ -1913,6 +2014,15 @@ namespace Werewolf.Core
                 "Everyone can see who has finished voting, but not who they voted for.\n" +
                 "The player with the most votes is executed. If there is a tie for the most votes, no one is executed.\n" +
                 "Meetings have a time limit, and each vote cast reduces the remaining time slightly.",
+
+            [TextId.ManualScatterTitle] = "Scattering After Meetings",
+            [TextId.ManualScatterBody] =
+                "Depending on the room settings, when a meeting ends with 6 or more survivors, they are randomly split into groups of three or more, and each group warps to a different location to set out again.\n" +
+                "Destinations are either the truck or one of the delivered extraction points, starting from the second one (the first extraction point is never a destination).\n" +
+                "The groupings are announced to everyone, but which group goes where is not revealed. The previous groupings are reposted in the meeting chat log at the start of the next meeting.\n" +
+                "Until the second extraction point has been delivered, after every extraction is complete, or when fewer than 6 players are alive, no one scatters and everyone sets out from the truck.\n" +
+                "If someone dies right after scattering while \"Handover in progress…\" is shown at the top of the screen, an emergency meeting is called automatically as a \"handover incident\".\n" +
+                "This meeting starts instantly with no warning countdown and does not consume anyone's meeting call.",
 
             [TextId.ManualGaugeBasicsTitle] = "Reading the Valuable Loss Gauge",
             [TextId.ManualGaugeIntro] =

@@ -24,6 +24,14 @@ namespace Werewolf.Core
             if (_active && !_fired) _returnRequested = true;
         }
 
+        public void Cancel()
+        {
+            _active = false;
+            _returnRequested = false;
+            _autoEnabled = false;
+            _autoReturnAtUnixMs = 0L;
+        }
+
         public bool TickShouldReturn(long nowUnixMs)
         {
             if (!_active || _fired) return false;

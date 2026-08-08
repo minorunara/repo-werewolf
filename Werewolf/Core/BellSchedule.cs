@@ -10,6 +10,12 @@ namespace Werewolf.Core
 
         public const float FinalVolumeScale = 1.0f;
 
+        public const float FiveMinuteVolumeScale = 1.0f;
+
+        public const string DefaultClipKey = "sfx_bell";
+
+        public const string FiveMinuteClipKey = "sfx_bell_five_minutes";
+
         private const long RearmToleranceMs = 1000;
 
         private static readonly (int ThresholdSec, int IntervalSec)[] Tiers =
@@ -42,12 +48,16 @@ namespace Werewolf.Core
 
         public static float VolumeScaleFor(int markSec)
         {
+            if (markSec == AlertThresholdSec) return FiveMinuteVolumeScale;
             int finalTierTop = Tiers[0].ThresholdSec;
             if (markSec > finalTierTop) return BaseVolumeScale;
             if (markSec < 1) markSec = 1;
             float t = (finalTierTop - markSec) / (float)(finalTierTop - 1);
             return BaseVolumeScale + (FinalVolumeScale - BaseVolumeScale) * t;
         }
+
+        public static string ClipKeyFor(int markSec)
+            => markSec == AlertThresholdSec ? FiveMinuteClipKey : DefaultClipKey;
 
         public int Tick(long remainingMs)
         {

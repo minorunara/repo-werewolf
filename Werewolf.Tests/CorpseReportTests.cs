@@ -249,15 +249,15 @@ namespace Werewolf.Tests
         [Fact]
         public void EventCodes_MeetingCancelledAndUpdatedSchemas()
         {
-            Assert.Equal(178, EventCodes.MeetingCancelled);
-            Assert.True(EventCodes.IsInRange(EventCodes.MeetingCancelled));
-            Assert.False(EventCodes.IsSecret(EventCodes.MeetingCancelled));
-            Assert.False(EventCodes.IsMasterInbound(EventCodes.MeetingCancelled));
+            Assert.Equal(178, MessageCodes.MeetingCancelled);
+            Assert.True(MessageCodes.IsInRange(MessageCodes.MeetingCancelled));
+            Assert.False(MessageCodes.IsSecret(MessageCodes.MeetingCancelled));
+            Assert.False(MessageCodes.IsMasterInbound(MessageCodes.MeetingCancelled));
 
             Assert.Equal(new[] { typeof(int), typeof(long), typeof(long), typeof(byte) },
-                EventCodes.Schema(EventCodes.StartMeeting));
-            Assert.Equal(new[] { typeof(byte) }, EventCodes.Schema(EventCodes.RequestMeeting));
-            Assert.Equal(new[] { typeof(byte) }, EventCodes.Schema(EventCodes.MeetingCancelled));
+                MessageCodes.Schema(MessageCodes.StartMeeting));
+            Assert.Equal(new[] { typeof(byte) }, MessageCodes.Schema(MessageCodes.RequestMeeting));
+            Assert.Equal(new[] { typeof(byte) }, MessageCodes.Schema(MessageCodes.MeetingCancelled));
         }
     }
 }

@@ -498,7 +498,7 @@ namespace Werewolf.Debugging
                 Received.Add(msg);
                 object[] p = msg.Payload;
 
-                if (EventCodes.IsMasterInbound(msg.Code))
+                if (MessageCodes.IsMasterInbound(msg.Code))
                 {
                     if (Meeting == null) return;
                     switch (msg.Code)
@@ -539,11 +539,11 @@ namespace Werewolf.Debugging
             }
         }
 
-        private const byte WWMeetingCodesStartMeeting = EventCodes.StartMeeting;
-        private const byte WWCastVoteCode = EventCodes.CastVote;
-        private const byte WWVoteProgressCode = EventCodes.VoteProgress;
-        private const byte WWMeetingResultCode = EventCodes.MeetingResult;
-        private const byte WWMeetingRequestCode = EventCodes.RequestMeeting;
+        private const byte WWMeetingCodesStartMeeting = MessageCodes.StartMeeting;
+        private const byte WWCastVoteCode = MessageCodes.CastVote;
+        private const byte WWVoteProgressCode = MessageCodes.VoteProgress;
+        private const byte WWMeetingResultCode = MessageCodes.MeetingResult;
+        private const byte WWMeetingRequestCode = MessageCodes.RequestMeeting;
 
         private static bool ContainsInt(IEnumerable<int> values, int value)
         {
@@ -665,9 +665,9 @@ namespace Werewolf.Debugging
                 var result = h.LastReceived(WWMeetingResultCode);
                 Check(fails, result != null && result.Payload.Length == 3, "166 payload shape unexpected");
 
-                Check(fails, EventCodes.IsSecret(WWCastVoteCode), "164 not classified as secret");
-                Check(fails, EventCodes.IsMasterInbound(WWCastVoteCode), "164 not master-inbound");
-                Check(fails, EventCodes.IsMasterInbound(WWMeetingRequestCode), "173 not master-inbound");
+                Check(fails, MessageCodes.IsSecret(WWCastVoteCode), "164 not classified as secret");
+                Check(fails, MessageCodes.IsMasterInbound(WWCastVoteCode), "164 not master-inbound");
+                Check(fails, MessageCodes.IsMasterInbound(WWMeetingRequestCode), "173 not master-inbound");
             }
             finally
             {
@@ -1448,14 +1448,14 @@ namespace Werewolf.Debugging
                 Bus.OnReceived += m =>
                 {
                     Received.Add(m);
-                    if (m.Code == EventCodes.BomberState)
+                    if (m.Code == MessageCodes.BomberState)
                     {
                         Client.ApplyState(new BomberStateSnapshot(
                             (int)m.Payload[0], (byte)m.Payload[1],
                             (long)m.Payload[3], (long)m.Payload[4],
                             (BombDenyReason)(byte)m.Payload[2]));
                     }
-                    else if (m.Code == EventCodes.BombDetonation)
+                    else if (m.Code == MessageCodes.BombDetonation)
                     {
                         Client.ApplyPendingDetonation((int)m.Payload[0], (long)m.Payload[1]);
                     }
@@ -1471,7 +1471,7 @@ namespace Werewolf.Debugging
                 var snap = Bomb.BuildSnapshot();
                 if (bomberActor < 0) return;
                 Bus.SendToActors(
-                    EventCodes.BomberState,
+                    MessageCodes.BomberState,
                     new object[]
                     {
                         snap.TargetActor,
@@ -1484,7 +1484,7 @@ namespace Werewolf.Debugging
             }
 
             public void SendDetonation(int targetActor, long detonateAtUnixMs)
-                => Bus.SendToAll(EventCodes.BombDetonation,
+                => Bus.SendToAll(MessageCodes.BombDetonation,
                     new object[] { targetActor, detonateAtUnixMs });
 
             public int CountReceived(byte code)
@@ -1530,8 +1530,8 @@ namespace Werewolf.Debugging
             var h = new BombHarness(cfg, players, Now);
 
             Check(fails, h.Bomb.BomberActor == 1, "bomber actor not resolved to 1");
-            Check(fails, h.CountReceived(EventCodes.BomberState) == 1,
-                $"initial 181 count={h.CountReceived(EventCodes.BomberState)} expected=1");
+            Check(fails, h.CountReceived(MessageCodes.BomberState) == 1,
+                $"initial 181 count={h.CountReceived(MessageCodes.BomberState)} expected=1");
             Check(fails, h.Client.Ammo == 1, "client ammo not 1 after initial 181");
             Check(fails, !h.Client.HasBomb, "client HasBomb not false initially");
             Check(fails, h.Client.PlantReadyUnixMs == Now + cfg.BomberInitialCooldownSec * 1000L,
@@ -1561,9 +1561,9 @@ namespace Werewolf.Debugging
             h.SendDetonation(detonatedTarget, detonateAt);
             h.FlushBomberState();
             Check(fails, !h.Bomb.HasBomb, "bomb not consumed after detonate");
-            Check(fails, h.CountReceived(EventCodes.BombDetonation) == 1,
-                $"180 count={h.CountReceived(EventCodes.BombDetonation)} expected=1");
-            var evDet = h.LastReceived(EventCodes.BombDetonation);
+            Check(fails, h.CountReceived(MessageCodes.BombDetonation) == 1,
+                $"180 count={h.CountReceived(MessageCodes.BombDetonation)} expected=1");
+            var evDet = h.LastReceived(MessageCodes.BombDetonation);
             Check(fails, evDet != null && (int)evDet.Payload[0] == 3 && (long)evDet.Payload[1] == detonateAt,
                 "180 payload mismatch");
             Check(fails, h.Client.HasPendingDetonation && h.Client.PendingTargetActor == 3,
@@ -1583,7 +1583,7 @@ namespace Werewolf.Debugging
             var dud = h.Bomb.TryDetonate(1, tDud, false, false, out int _);
             Check(fails, dud == BombDenyReason.TargetDead, $"dud not TargetDead: {dud}");
             Check(fails, !h.Bomb.HasBomb, "bomb not consumed on dud");
-            Check(fails, h.CountReceived(EventCodes.BombDetonation) == 1,
+            Check(fails, h.CountReceived(MessageCodes.BombDetonation) == 1,
                 "180 unexpectedly sent on dud");
             h.FlushBomberState();
             Check(fails, h.Client.LastDeny == BombDenyReason.TargetDead || h.Client.Ammo == h.Bomb.Ammo,

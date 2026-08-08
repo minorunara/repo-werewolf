@@ -49,6 +49,7 @@ namespace Werewolf.Game
             }
 
             ClearClientState();
+            _resultSequence.Cancel();
 
             StartResult result = _session.Start(Plugin.GameConfig, players, now, new System.Random());
             if (!result.Success)
@@ -76,6 +77,7 @@ namespace Werewolf.Game
             _clientConveneSuppressStartSec = Plugin.GameConfig.ConveneSuppressStartSec;
             _clientConveneSuppressAfterSec = Plugin.GameConfig.ConveneSuppressAfterSec;
             _clientHealIntervalSec = Plugin.GameConfig.HealIntervalSec;
+            _clientOutfitChangeAllowed = Plugin.GameConfig.OutfitChangeAllowed;
             _clientBombPack = RoomStateKeys.EncodeBomb(Plugin.GameConfig, players.Count);
             _clientShamanPack = RoomStateKeys.EncodeShaman(Plugin.GameConfig);
             foreach (var p in players)
@@ -289,16 +291,18 @@ namespace Werewolf.Game
         {
             if (_session == null || !SemiFunc.IsMasterClientOrSingleplayer()) return;
             int actor = Registry.ResolveActor(avatar);
-            _session.RecordDeath(actor, NowUnixMs());
+            bool recorded = _session.RecordDeath(actor, NowUnixMs());
             _meeting?.NotifyPlayerDied(actor);
+            if (recorded) TryFireScatterGuard(actor);
         }
 
         public void HostRecordDeathByActor(int actorNumber, bool asVote)
         {
             if (_session == null || !SemiFunc.IsMasterClientOrSingleplayer()) return;
             if (asVote) _session.MarkNextDeathAsVote(actorNumber);
-            _session.RecordDeath(actorNumber, NowUnixMs());
+            bool recorded = _session.RecordDeath(actorNumber, NowUnixMs());
             _meeting?.NotifyPlayerDied(actorNumber);
+            if (recorded) TryFireScatterGuard(actorNumber);
         }
 
         public void HostNotifyExtraction(bool completed, bool failed)
@@ -402,6 +406,7 @@ namespace Werewolf.Game
                 if (isBlackCat)
                 {
                     _meeting.ExtendClosingHold(holdExtensionMs);
+                    HostMarkScatterAwaitCurse();
                     int catDelayMs = Plugin.GameConfig != null ? Plugin.GameConfig.CurseWaitSec * 1000 : 10_000;
                     StartCoroutine(DelayedExecute(actorNumber, catDelayMs, reason: "blackcat_curse_wait"));
                     WLog.Line("execute_player", secret: false,
@@ -515,6 +520,7 @@ namespace Werewolf.Game
                 WLog.Line("curse_cat_seal_error", secret: false,
                     ("actor", catActor), ("err", e.Message));
             }
+            HostScheduleScatterPlanAfterCurse();
         }
 
         private void ExecuteCurseKill(int actorNumber)
@@ -680,7 +686,7 @@ namespace Werewolf.Game
                 float warningSec = Plugin.GameConfig != null ? Plugin.GameConfig.BomberWarningSec : 1f;
                 long detonateAtUnixMs = now + (long)(warningSec * 1000f);
                 SendViaBus(new OutboundMessage(
-                    EventCodes.BombDetonation,
+                    MessageCodes.BombDetonation,
                     new object[] { detonatedTarget, detonateAtUnixMs },
                     MessageTarget.All, null));
                 WLog.Line("bomb_detonate", secret: true,
@@ -727,7 +733,7 @@ namespace Werewolf.Game
             if (bomberActor < 0) return;
 
             SendViaBus(new OutboundMessage(
-                EventCodes.BomberState,
+                MessageCodes.BomberState,
                 new object[]
                 {
                     snap.TargetActor,
@@ -784,7 +790,7 @@ namespace Werewolf.Game
                                 ("uncommon", rarityCounts[CoinRarity.Uncommon]),
                                 ("rare", rarityCounts[CoinRarity.Rare]),
                                 ("ultraRare", rarityCounts[CoinRarity.UltraRare]));
-                            _bus.SendToAll(EventCodes.CosmeticGrant, CosmeticGrantWire.ToWire(grant));
+                            _bus.SendToAll(MessageCodes.CosmeticGrant, CosmeticGrantWire.ToWire(grant));
                         }
 
                         if (SemiFunc.IsMasterClientOrSingleplayer())
@@ -792,6 +798,19 @@ namespace Werewolf.Game
                             int autoReturnSec = Plugin.GameConfig != null
                                 ? Plugin.GameConfig.GameOverAutoReturnSec : 60;
                             _resultSequence.Begin(NowUnixMs(), autoReturnSec);
+                        }
+                        break;
+
+                    case SessionEventKind.MatchVoided:
+                        WLog.Line("session_void", secret: false);
+                        _enemyIgnoreRoster.ClearAll();
+                        WLog.Line("cosmetic_grant_skipped", secret: false, ("reason", "void_match"));
+
+                        if (SemiFunc.IsMasterClientOrSingleplayer())
+                        {
+                            int voidAutoReturnSec = Plugin.GameConfig != null
+                                ? Plugin.GameConfig.GameOverAutoReturnSec : 60;
+                            _resultSequence.Begin(NowUnixMs(), voidAutoReturnSec);
                         }
                         break;
                 }

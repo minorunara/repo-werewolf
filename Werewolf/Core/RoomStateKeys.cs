@@ -33,6 +33,8 @@ namespace Werewolf.Core
 
         public const string CfgHealInterval = "WW_CfgHealInterval";
 
+        public const string CfgOutfitChange = "WW_CfgOutfitChange";
+
         public const string CfgBomb = "WW_CfgBomb";
 
         public const string CfgShaman = "WW_CfgShaman";
@@ -44,6 +46,7 @@ namespace Werewolf.Core
             CfgNecroVoiceMode,
             CfgExtraJump, CfgConveneSuppressStart, CfgConveneSuppressAfter,
             CfgHealInterval,
+            CfgOutfitChange,
             CfgBomb,
             CfgShaman,
         };

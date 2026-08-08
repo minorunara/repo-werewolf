@@ -162,7 +162,7 @@ namespace Werewolf.Game
                 }
                 else
                 {
-                    _sfxPlayer.StopLoop();
+                    _sfxPlayer.StopLoop("sfx_shaman_storm");
                 }
             }
             catch (Exception e)
@@ -238,7 +238,7 @@ namespace Werewolf.Game
         private void HideShamanUi()
         {
             _shamanPanel?.Hide();
-            _sfxPlayer.StopLoop();
+            _sfxPlayer.StopLoop("sfx_shaman_storm");
         }
 
         private string NextShamanSobKey()

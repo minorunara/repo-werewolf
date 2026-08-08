@@ -24,6 +24,9 @@ namespace Werewolf.Core
                 case NoticeKind.CorpseReportStarted:
                     return CorpseReportClipKey;
 
+                case NoticeKind.ScatterGuardTripped:
+                    return CorpseReportClipKey;
+
                 case NoticeKind.PlayerDisconnected:
                     return PlayerDisconnectedClipKey;
 

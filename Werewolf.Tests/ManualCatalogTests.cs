@@ -114,9 +114,9 @@ namespace Werewolf.Tests
         [Theory]
         [InlineData(0, 0, 4)]
         [InlineData(7, 0, 8)]
-        [InlineData(16, 14, 20)]
-        [InlineData(19, 14, 20)]
-        [InlineData(26, 23, 26)]
+        [InlineData(17, 15, 21)]
+        [InlineData(20, 15, 21)]
+        [InlineData(27, 24, 27)]
         public void SectionNavigation_JumpsToAdjacentSectionStarts(int page, int previous, int next)
         {
             Assert.Equal(previous, ManualCatalog.PreviousSectionStart(page));

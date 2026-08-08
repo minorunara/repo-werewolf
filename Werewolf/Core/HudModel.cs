@@ -45,12 +45,16 @@ namespace Werewolf.Core
                 showTimer: true, timerRemainingMs: timerRemainingMs,
                 timerFrozen: meetingWindow,
                 timerAlert: BellSchedule.AlertActive(timerRemainingMs),
+                bellMarkSec: rungMarkSec,
                 bellVolumeScale: rungMarkSec > 0 ? BellSchedule.VolumeScaleFor(rungMarkSec) : 0f,
                 showGauge: showGauge,
                 gaugeRatioPermille: showGauge ? input.RolesClient.RatioPermille : 0,
                 showRights: input.NearMeetingButton,
                 rightsRemaining: input.RightsRemaining,
-                showTestPlay: input.DebugSession);
+                showTestPlay: input.DebugSession,
+                showScatterGuard: input.ScatterGuardActive,
+                showSelfId: input.SelfParticipantId > 0,
+                selfId: input.SelfParticipantId);
         }
 
         private static long RemainingMs(long endUnixMs, long nowUnixMs)
@@ -80,6 +84,10 @@ namespace Werewolf.Core
 
         public bool DebugSession { get; }
 
+        public int SelfParticipantId { get; }
+
+        public bool ScatterGuardActive { get; }
+
         public HudInput(
             GamePhase phase,
             Role? localRole,
@@ -89,7 +97,9 @@ namespace Werewolf.Core
             int rightsRemaining,
             long nowUnixMs,
             bool meetingActive = false,
-            bool debugSession = false)
+            bool debugSession = false,
+            int selfParticipantId = 0,
+            bool scatterGuardActive = false)
         {
             Phase = phase;
             LocalRole = localRole;
@@ -100,6 +110,8 @@ namespace Werewolf.Core
             NowUnixMs = nowUnixMs;
             MeetingActive = meetingActive;
             DebugSession = debugSession;
+            SelfParticipantId = selfParticipantId;
+            ScatterGuardActive = scatterGuardActive;
         }
     }
 
@@ -119,6 +131,8 @@ namespace Werewolf.Core
 
         public float BellVolumeScale { get; }
 
+        public int BellMarkSec { get; }
+
         public bool ShowGauge { get; }
 
         public int GaugeRatioPermille { get; }
@@ -129,13 +143,21 @@ namespace Werewolf.Core
 
         public bool ShowTestPlay { get; }
 
+        public bool ShowSelfId { get; }
+
+        public int SelfId { get; }
+
+        public bool ShowScatterGuard { get; }
+
         public HudState(
             bool showBadge, Role? badgeRole,
             bool showTimer, long timerRemainingMs, bool timerFrozen,
-            bool timerAlert, float bellVolumeScale,
+            bool timerAlert, int bellMarkSec, float bellVolumeScale,
             bool showGauge, int gaugeRatioPermille,
             bool showRights, int rightsRemaining,
-            bool showTestPlay = false)
+            bool showTestPlay = false,
+            bool showSelfId = false, int selfId = 0,
+            bool showScatterGuard = false)
         {
             ShowBadge = showBadge;
             BadgeRole = badgeRole;
@@ -143,18 +165,22 @@ namespace Werewolf.Core
             TimerRemainingMs = timerRemainingMs;
             TimerFrozen = timerFrozen;
             TimerAlert = timerAlert;
+            BellMarkSec = bellMarkSec;
             BellVolumeScale = bellVolumeScale;
             ShowGauge = showGauge;
             GaugeRatioPermille = gaugeRatioPermille;
             ShowRights = showRights;
             RightsRemaining = rightsRemaining;
             ShowTestPlay = showTestPlay;
+            ShowSelfId = showSelfId;
+            SelfId = selfId;
+            ShowScatterGuard = showScatterGuard;
         }
 
         public static readonly HudState Hidden = new HudState(
             showBadge: false, badgeRole: null,
             showTimer: false, timerRemainingMs: 0, timerFrozen: false,
-            timerAlert: false, bellVolumeScale: 0f,
+            timerAlert: false, bellMarkSec: 0, bellVolumeScale: 0f,
             showGauge: false, gaugeRatioPermille: 0,
             showRights: false, rightsRemaining: 0);
     }

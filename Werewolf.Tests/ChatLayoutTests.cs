@@ -80,6 +80,89 @@ namespace Werewolf.Tests
         }
 
         [Fact]
+        public void Sync_SystemEntry_EmitsItsOwnHeaderEvenRightAfterAVoteLine()
+        {
+            var log = new MeetingChatLog();
+            log.AppendVote(1, "P1", "投票しました。");
+            log.AppendSystem("Taxman", "ここまでの経過", "死亡: なし");
+
+            ChatLayout layout = NewLayout();
+            layout.Sync(log, FixedSize);
+
+            Assert.Equal(3, layout.Count);
+            Assert.Equal(ChatBlockKind.Vote, layout[0].Kind);
+            Assert.Equal(ChatBlockKind.Speaker, layout[1].Kind);
+            Assert.Equal(ChatBlockKind.Bubble, layout[2].Kind);
+        }
+
+        [Fact]
+        public void Sync_ConsecutiveSystemEntries_ShareOneHeader()
+        {
+            var log = new MeetingChatLog();
+            log.AppendSystem("Taxman", "ここまでの経過", "死亡: なし");
+            log.AppendSystem("Taxman", "前回の組分け", "【A】1番\n【B】2番");
+            log.Append(1, "P1", "hi", ChatSpeaker.Alive);
+
+            ChatLayout layout = NewLayout();
+            layout.Sync(log, FixedSize);
+
+            Assert.Equal(5, layout.Count);
+            Assert.Equal(ChatBlockKind.Speaker, layout[0].Kind);
+            Assert.Equal(ChatBlockKind.Bubble, layout[1].Kind);
+            Assert.Equal(ChatBlockKind.Bubble, layout[2].Kind);
+            Assert.Equal(ChatBlockKind.Speaker, layout[3].Kind);
+        }
+
+        [Fact]
+        public void IsGroupHead_MarksOnlyTheBubbleUnderTheSpeakerHeader()
+        {
+            var log = new MeetingChatLog();
+            log.Append(1, "P1", "a", ChatSpeaker.Alive);
+            log.Append(1, "P1", "b", ChatSpeaker.Alive);
+            log.Append(2, "P2", "c", ChatSpeaker.Alive);
+
+            ChatLayout layout = NewLayout();
+            layout.Sync(log, FixedSize);
+
+            Assert.True(layout.IsGroupHead(1));
+            Assert.False(layout.IsGroupHead(2));
+            Assert.True(layout.IsGroupHead(4));
+        }
+
+        [Fact]
+        public void IsGroupHead_ConsecutiveSystemEntries_OnlyTheFirstIsHead()
+        {
+            var log = new MeetingChatLog();
+            log.AppendSystem("Taxman", "ここまでの経過", "死亡: なし");
+            log.AppendSystem("Taxman", "前回の組分け", "【A】1番\n【B】2番");
+
+            ChatLayout layout = NewLayout();
+            layout.Sync(log, FixedSize);
+
+            Assert.True(layout.IsGroupHead(1));
+            Assert.False(layout.IsGroupHead(2));
+        }
+
+        [Fact]
+        public void IsGroupHead_AfterLeadingTrim_FollowsTheSyntheticHeader()
+        {
+            var log = new MeetingChatLog();
+            for (int i = 0; i < MeetingChatLog.MaxEntries; i++)
+            {
+                log.Append(1, "P1", $"msg{i}", ChatSpeaker.Alive);
+            }
+            ChatLayout layout = NewLayout();
+            layout.Sync(log, FixedSize);
+
+            log.Append(1, "P1", "overflow", ChatSpeaker.Alive);
+            layout.Sync(log, FixedSize);
+
+            Assert.Equal(ChatBlockKind.Speaker, layout[0].Kind);
+            Assert.True(layout.IsGroupHead(1));
+            Assert.False(layout.IsGroupHead(2));
+        }
+
+        [Fact]
         public void Sync_BlocksNeverOverlapAndStayOrdered()
         {
             var log = new MeetingChatLog();

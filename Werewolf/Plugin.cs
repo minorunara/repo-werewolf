@@ -18,7 +18,7 @@ namespace Werewolf
     {
         public const string PluginGuid = "minorunara.werewolf";
         public const string PluginName = "Werewolf";
-        public const string PluginVersion = "1.0.0";
+        public const string PluginVersion = WerewolfBuildInfo.Version;
 
         internal static new ManualLogSource Logger;
 
@@ -41,6 +41,8 @@ namespace Werewolf
         internal static ConfigEntry<KeyCode> ResultReturnKey;
 
         internal static ConfigEntry<KeyCode> ManualKey;
+
+        internal static ConfigEntry<KeyCode> VoidMatchKey;
 
         internal static void RefreshGameConfig()
         {
@@ -72,12 +74,19 @@ namespace Werewolf
             CorpseReportKey = Bindings.CorpseReportKey;
             ManualKey = Bindings.ManualKey;
             ResultReturnKey = Bindings.ResultReturnKey;
+            VoidMatchKey = Bindings.VoidMatchKey;
 
             WorldgenItemBindings.Install(Config, Bindings);
 
             WorldgenMapBinding.Install(Config, Bindings);
 
             LoadLanguageOverride();
+
+            UI.AssetCatalog.SetStreamerSafeMode(Bindings.StreamerSafeMode.Value);
+            if (Bindings.StreamerSafeMode.Value)
+            {
+                WLog.Line("streamer_safe_mode", secret: false, ("enabled", true));
+            }
 
             WLog.Line("init", false, ("plugin", PluginName), ("version", PluginVersion));
 

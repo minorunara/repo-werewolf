@@ -88,6 +88,8 @@ namespace Werewolf.Core
 
         private static string FormatMatchEnd(DigestEntry e)
         {
+            if (e.ArgA == TeamCodes.VoidMatch) return Texts.Get(TextId.ResultBannerVoid);
+
             string team;
             switch ((Team)e.ArgA)
             {

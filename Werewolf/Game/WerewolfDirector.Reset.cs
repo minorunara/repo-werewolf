@@ -40,7 +40,7 @@ namespace Werewolf.Game
             {
                 if (_bus == null)
                 {
-                    var photon = new PhotonNetBus();
+                    var photon = new PhotonRpcBus();
                     photon.Register();
                     _bus = photon;
                     _bus.OnReceived += ApplyInbound;
@@ -51,10 +51,15 @@ namespace Werewolf.Game
                         ("localActor", _bus.LocalActorNumber));
                 }
             }
-            else if (_bus is PhotonNetBus && _session == null)
+            else if (_bus is PhotonRpcBus && _session == null)
             {
                 WLog.Line("client_bus_teardown", secret: false, ("reason", "room_left"));
                 TeardownBus();
+            }
+
+            if (_bus is PhotonRpcBus aliveBus)
+            {
+                aliveBus.EnsureEndpoint();
             }
         }
 
@@ -75,14 +80,14 @@ namespace Werewolf.Game
                 _bus.OnReceived += ApplyInbound;
                 _bus.OnPlayerLeft += HandlePlayerLeft;
             }
-            else if (_bus is PhotonNetBus)
+            else if (_bus is PhotonRpcBus)
             {
                 reused = true;
             }
             else
             {
                 TeardownBus();
-                var photon = new PhotonNetBus();
+                var photon = new PhotonRpcBus();
                 photon.Register();
                 _bus = photon;
                 _bus.OnReceived += ApplyInbound;
@@ -98,10 +103,10 @@ namespace Werewolf.Game
         private void TeardownBus()
         {
             if (_bus == null) return;
-            ClientResetPolicy.ApplyRoomLeft(_meetingClient);
+            ClientResetPolicy.ApplyRoomLeft(_meetingClient, IdRoster);
             _bus.OnReceived -= ApplyInbound;
             _bus.OnPlayerLeft -= HandlePlayerLeft;
-            if (_bus is PhotonNetBus photon)
+            if (_bus is PhotonRpcBus photon)
             {
                 photon.OnLocalDisconnected -= HandleLocalDisconnected;
                 photon.OnRoomPropertiesChanged -= HandleRoomPropertiesChanged;
@@ -168,6 +173,7 @@ namespace Werewolf.Game
                 _debugInjectedBlob = null;
                 CrownRoster.Clear();
                 _autoStartWait.Disarm();
+                _resultSequence.Cancel();
             }
             catch (Exception e)
             {
@@ -244,6 +250,14 @@ namespace Werewolf.Game
                     _clientHealIntervalSec = healInterval;
                     WLog.Line("room_props_applied", secret: false,
                         ("key", "healInterval"), ("value", healInterval));
+                }
+
+                if (changed.ContainsKey(RoomState.KeyOutfitChange) &&
+                    _roomState.TryReadOutfitChange(out bool outfitAllowed))
+                {
+                    _clientOutfitChangeAllowed = outfitAllowed;
+                    WLog.Line("room_props_applied", secret: false,
+                        ("key", "outfitChange"), ("value", outfitAllowed ? 1 : 0));
                 }
 
                 if (changed.ContainsKey(RoomState.KeyBomb) &&
@@ -347,6 +361,7 @@ namespace Werewolf.Game
             _clientPhase = GamePhase.Lobby;
             _resetArmed = false;
             _autoStartWait.Disarm();
+            _resultSequence.Cancel();
 
             _lifecycleGate.ResetForNextRound();
 
@@ -371,14 +386,18 @@ namespace Werewolf.Game
         private void ClearClientState()
         {
             ClearResultCountdown();
+            ResetVoidMatch();
             _nextConveneHoldHintUnixMs = 0;
             _localRole = null;
             _knownWerewolves = null;
             _knownTeammateRoles = null;
+            IdRoster.Reset();
             _clientRoundEndUnixMs = 0;
             _clientWerewolfCount = 0;
             _deathMirror.Clear();
             ResetMeetingChat();
+            _chatRecapLostBaseline = 0;
+            _lastScatterGroups = null;
             _displayNameCache = null;
             _clientMinimapHideEnabled = false;
             _clientCatPossible = false;
@@ -389,6 +408,8 @@ namespace Werewolf.Game
             _clientConveneSuppressStartSec = null;
             _clientConveneSuppressAfterSec = null;
             _clientHealIntervalSec = null;
+            _clientOutfitChangeAllowed = null;
+
             _clientBombPack = null;
             _clientShamanPack = null;
             _voiceDriver?.ForceRestore("client_reset");
@@ -405,6 +426,12 @@ namespace Werewolf.Game
             _wasRoleRevealVisible = false;
             _prevBeaconCharges = 0;
             _truckWarper?.ResetWatchdog();
+            _scatterPlanAtUnixMs = 0;
+            _scatterAwaitCurse = false;
+            _extractionScatter?.ClearPlan();
+            _scatterGuard.Disarm();
+            _clientScatterGuard.Disarm();
+            _votePanel?.StopScatterReveal();
             ResetRolesClient("client_reset");
 
             if (_revealCoroutine != null)

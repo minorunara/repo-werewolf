@@ -24,6 +24,8 @@ namespace Werewolf.Core
     {
         public string Title;
 
+        public string SelfIdLine;
+
         public RoleIcon Icon;
 
         public RevealPage[] Pages;
@@ -34,7 +36,7 @@ namespace Werewolf.Core
 
     public static class RevealScript
     {
-        private const int MaxLineLength = 20;
+        private const int MaxLineLength = 26;
 
         private static string TeammatePrefix => Texts.Get(TextId.RevealTeammatePrefix);
         private const string TeammateSeparator = ",";
@@ -51,27 +53,38 @@ namespace Werewolf.Core
         private const float SinglePageHoldSec = 5.0f;
 
         public static RevealContent Build(Role selfRole, IReadOnlyList<string> teammateNames, bool blackCatPossible,
-            ValuableMapMode valuableMapMode, bool blackCatCurseEnabled = true)
+            ValuableMapMode valuableMapMode, bool blackCatCurseEnabled = true, int selfParticipantId = 0)
         {
+            RevealContent content;
             switch (selfRole)
             {
                 case Role.Villager:
-                    return BuildVillager(blackCatPossible, valuableMapMode);
+                    content = BuildVillager(blackCatPossible, valuableMapMode);
+                    break;
                 case Role.Werewolf:
-                    return BuildWolfTeam(
+                    content = BuildWolfTeam(
                         Texts.Get(TextId.RevealWerewolfTitle), RoleIcon.Werewolf, teammateNames,
                         TextId.RevealWolfAbility1, TextId.RevealWolfAbility2, TextId.RevealWolfAbility3);
+                    break;
                 case Role.BlackCat:
-                    return BuildBlackCat(blackCatCurseEnabled);
+                    content = BuildBlackCat(blackCatCurseEnabled);
+                    break;
                 case Role.Bomber:
-                    return BuildWolfTeam(
+                    content = BuildWolfTeam(
                         Texts.Get(TextId.RevealBomberTitle), RoleIcon.Bomber, teammateNames,
                         TextId.RevealBomberAbility1, TextId.RevealBomberAbility2, TextId.RevealBomberAbility3);
+                    break;
                 case Role.Shaman:
-                    return BuildShaman();
+                    content = BuildShaman();
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(selfRole), selfRole, "未知の役職です。");
             }
+
+            content.SelfIdLine = selfParticipantId > 0
+                ? Texts.Format(TextId.RevealSelfIdFormat, selfParticipantId)
+                : null;
+            return content;
         }
 
         private static List<string> WolfWinConditionLines()

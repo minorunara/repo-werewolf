@@ -22,7 +22,7 @@ namespace Werewolf.Game
                 if (msg.Code == WWEventCodes.GameOver && _bus != null)
                 {
                     TryRecordFinalBalance();
-                    _bus.SendToAll(EventCodes.ResultDigest, _matchDigest.ToWire());
+                    _bus.SendToAll(MessageCodes.ResultDigest, _matchDigest.ToWire());
                     WLog.Line("digest_sent", secret: false, ("entries", _matchDigest.Entries.Count));
                 }
             }
@@ -108,6 +108,8 @@ namespace Werewolf.Game
             if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
             if (!_resultSequence.Active) return;
 
+            if (NowUnixMs() < _resultReturnArmedAtUnixMs) return;
+
             KeyCode key = Plugin.ResultReturnKey != null ? Plugin.ResultReturnKey.Value : KeyCode.F5;
             if (key == KeyCode.None) return;
             if (!SemiFunc.NoTextInputsActive()) return;
@@ -115,6 +117,92 @@ namespace Werewolf.Game
             {
                 WLog.Line("result_return_requested", secret: false);
                 _resultSequence.RequestReturn();
+            }
+        }
+
+        private void TickVoidMatch(long nowUnixMs)
+        {
+            EnsurePanelBuilt(_voidMatchPanel);
+            if (!_voidMatchPanel.Exists) return;
+
+            bool available =
+                SemiFunc.IsMasterClientOrSingleplayer()
+                && _session != null
+                && (_session.Phase == GamePhase.Play || _session.Phase == GamePhase.Meeting)
+                && NoTextInputsActiveSafe();
+
+            KeyCode key = Plugin.VoidMatchKey != null ? Plugin.VoidMatchKey.Value : KeyCode.F5;
+            bool held = available && key != KeyCode.None && Input.GetKey(key);
+
+            bool cancel = _voidMatchHold.Armed && MenuKeyDownSafe();
+            if (_voidMatchHold.Armed) SuppressEscMenu();
+
+            VoidMatchHoldEvent result =
+                _voidMatchHold.Tick(held, available, cancel, Time.unscaledDeltaTime);
+
+            switch (result)
+            {
+                case VoidMatchHoldEvent.Armed:
+                    WLog.Line("void_match_armed", secret: false, ("phase", _session.Phase));
+                    break;
+                case VoidMatchHoldEvent.Cancelled:
+                    WLog.Line("void_match_cancelled", secret: false);
+                    break;
+                case VoidMatchHoldEvent.Confirmed:
+                    WLog.Line("void_match_confirmed", secret: false, ("phase", _session.Phase));
+                    _session.VoidMatch(nowUnixMs);
+                    _voidMatchHold.Reset();
+                    break;
+            }
+
+            _voidMatchPanel.Tick(
+                _voidMatchHold.IsCharging,
+                _voidMatchHold.Ratio,
+                _voidMatchHold.Armed,
+                (int)Math.Ceiling(_voidMatchHold.ArmedRemainingSeconds),
+                key);
+        }
+
+        private void ResetVoidMatch()
+        {
+            _voidMatchHold.Reset();
+            if (_voidMatchPanel.Exists)
+            {
+                _voidMatchPanel.Tick(false, 0f, false, 0, KeyCode.None);
+            }
+        }
+
+        private static void SuppressEscMenu()
+        {
+            try
+            {
+                GameDirector director = GameDirector.instance;
+                if (director != null) director.SetDisableEscMenu(1f);
+            }
+            catch { }
+        }
+
+        private static bool MenuKeyDownSafe()
+        {
+            try
+            {
+                return SemiFunc.InputDown(InputKey.Menu);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool NoTextInputsActiveSafe()
+        {
+            try
+            {
+                return SemiFunc.NoTextInputsActive();
+            }
+            catch
+            {
+                return true;
             }
         }
 
@@ -153,9 +241,13 @@ namespace Werewolf.Game
             _roundGameOverAutoReturnSec = Math.Max(0, seconds);
         }
 
+        private const long ResultReturnArmDelayMs = 2000L;
+
         private void BeginResultCountdown()
         {
-            _resultCountdown.Begin(NowUnixMs(), _roundGameOverAutoReturnSec);
+            long now = NowUnixMs();
+            _resultCountdown.Begin(now, _roundGameOverAutoReturnSec);
+            _resultReturnArmedAtUnixMs = now + ResultReturnArmDelayMs;
             _lastResultCountdownSecond = -1;
         }
 
@@ -163,6 +255,7 @@ namespace Werewolf.Game
         {
             _resultCountdown.Clear();
             _roundGameOverAutoReturnSec = 0;
+            _resultReturnArmedAtUnixMs = 0L;
             _lastResultCountdownSecond = -1;
         }
     }

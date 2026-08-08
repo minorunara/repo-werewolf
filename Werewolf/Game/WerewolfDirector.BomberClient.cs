@@ -367,7 +367,7 @@ namespace Werewolf.Game
                 WLog.Line("bomber_send_fail", secret: true, ("subtype", subtype), ("reason", "no_bus"));
                 return;
             }
-            _bus.SendToMaster(EventCodes.RoleAction, new object[] { subtype, arg, (byte)0 });
+            _bus.SendToMaster(MessageCodes.RoleAction, new object[] { subtype, arg, (byte)0 });
         }
 
         private void EnsureBomberGauges()
@@ -421,20 +421,19 @@ namespace Werewolf.Game
             }
         }
 
-        private void PushRawToast(string message, string clipKey = NoticeSfx.DefaultClipKey)
+        private void PushRawToast(string message, string clipKey = NoticeSfx.DefaultClipKey,
+            string logKind = "bomber", bool playSfx = true)
         {
             if (string.IsNullOrEmpty(message)) return;
-            if (_toastQueue == null)
-            {
-                int sec = Plugin.GameConfig != null && Plugin.GameConfig.ToastDurationSec > 0
-                    ? Plugin.GameConfig.ToastDurationSec : 9;
-                _toastQueue = new ToastQueue(sec);
-            }
+            EnsureToastQueue();
             EnsureRolesUiBuilt();
             _toastQueue.Push(message, NowUnixMs());
-            EnsureSfxBuilt();
-            _sfxPlayer.Play(clipKey);
-            WLog.Line("toast_push_raw", secret: false, ("kind", "bomber"));
+            if (playSfx)
+            {
+                EnsureSfxBuilt();
+                _sfxPlayer.Play(clipKey);
+            }
+            WLog.Line("toast_push_raw", secret: false, ("kind", logKind));
         }
     }
 }

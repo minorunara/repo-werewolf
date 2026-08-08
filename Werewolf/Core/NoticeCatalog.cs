@@ -43,6 +43,9 @@ namespace Werewolf.Core
                 case NoticeKind.ConveneHoldHint:
                     return Texts.Get(TextId.NoticeConveneHoldHint);
 
+                case NoticeKind.ScatterGuardTripped:
+                    return Texts.Get(TextId.NoticeScatterGuardTripped);
+
                 case NoticeKind.ConveneDenied:
                     return FormatConveneDenied(notice.DenyReason);
 

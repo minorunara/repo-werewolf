@@ -32,6 +32,10 @@ namespace Werewolf.Core
 
         public int ResultDisplaySec = 9;
 
+        public bool MeetingScatterEnabled = true;
+
+        public int ScatterGuardSec = 15;
+
         public float ButtonOffsetX = -6.2f;
 
         public float ButtonOffsetY = 0f;
@@ -73,6 +77,8 @@ namespace Werewolf.Core
         public bool WerewolfModeEnabled = false;
 
         public bool MinimapHideEnabled = true;
+
+        public bool OutfitChangeAllowed = false;
 
         public ValuableMapMode ValuableMapMode = ValuableMapMode.MeetingSync;
 

@@ -17,17 +17,22 @@ namespace Werewolf.Core
         Message = 0,
 
         Vote = 1,
+
+        System = 2,
     }
 
     public readonly struct ChatLogEntry
     {
-        public ChatLogEntry(int actor, string name, string text, ChatSpeaker speaker, ChatEntryKind kind)
+        public ChatLogEntry(int actor, string name, string text, ChatSpeaker speaker, ChatEntryKind kind,
+                            string title = null, string icon = null)
         {
             Actor = actor;
             Name = name;
             Text = text;
             Speaker = speaker;
             Kind = kind;
+            Title = title ?? string.Empty;
+            Icon = icon ?? string.Empty;
         }
 
         public int Actor { get; }
@@ -39,6 +44,10 @@ namespace Werewolf.Core
         public ChatSpeaker Speaker { get; }
 
         public ChatEntryKind Kind { get; }
+
+        public string Title { get; }
+
+        public string Icon { get; }
     }
 
     public sealed class MeetingChatLog : IReadOnlyList<ChatLogEntry>
@@ -47,7 +56,13 @@ namespace Werewolf.Core
 
         public const int MaxTextLength = 140;
 
+        public const int MaxSystemTextLength = 600;
+
+        public const int MaxTitleLength = 40;
+
         public const int MaxNameLength = 20;
+
+        public const int SystemActor = int.MinValue + 1;
 
         public const string UnknownName = "???";
 
@@ -80,15 +95,24 @@ namespace Werewolf.Core
         public bool AppendVote(int actor, string name, string text)
             => AppendCore(actor, name, text, ChatSpeaker.Alive, ChatEntryKind.Vote);
 
-        private bool AppendCore(int actor, string name, string text, ChatSpeaker speaker, ChatEntryKind kind)
+        public bool AppendSystem(string name, string title, string text, string icon = null)
+            => AppendCore(SystemActor, name, text, ChatSpeaker.Alive, ChatEntryKind.System, title, icon);
+
+        private bool AppendCore(int actor, string name, string text, ChatSpeaker speaker, ChatEntryKind kind,
+                                string title = null, string icon = null)
         {
-            string body = Sanitize(text, MaxTextLength);
+            bool system = kind == ChatEntryKind.System;
+            string body = system
+                ? SanitizeMultiline(text, MaxSystemTextLength)
+                : Sanitize(text, MaxTextLength);
             if (body.Length == 0) return false;
 
             string who = Sanitize(name, MaxNameLength);
             if (who.Length == 0) who = UnknownName;
 
-            var entry = new ChatLogEntry(actor, who, body, speaker, kind);
+            var entry = new ChatLogEntry(actor, who, body, speaker, kind,
+                system ? Sanitize(title, MaxTitleLength) : null,
+                system ? icon : null);
             if (_count < MaxEntries)
             {
                 int tail = (_head + _count) % MaxEntries;
@@ -127,6 +151,12 @@ namespace Werewolf.Core
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
         public static string Sanitize(string raw, int maxLength)
+            => SanitizeCore(raw, maxLength, keepLineBreaks: false);
+
+        public static string SanitizeMultiline(string raw, int maxLength)
+            => SanitizeCore(raw, maxLength, keepLineBreaks: true);
+
+        private static string SanitizeCore(string raw, int maxLength, bool keepLineBreaks)
         {
             if (string.IsNullOrEmpty(raw)) return string.Empty;
 
@@ -134,6 +164,8 @@ namespace Werewolf.Core
             foreach (char c in raw)
             {
                 if (c == '<') { sb.Append('＜'); continue; }
+                if (c == '\n' && keepLineBreaks) { sb.Append('\n'); continue; }
+                if (c == '\r' && keepLineBreaks) continue;
                 if (c == '\n' || c == '\r' || c == '\t') { sb.Append(' '); continue; }
                 if (char.IsControl(c)) continue;
                 sb.Append(c);

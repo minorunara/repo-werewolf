@@ -125,6 +125,54 @@ namespace Werewolf.Tests
         }
 
         [Fact]
+        public void Cancel_DiscardsPendingAutoReturn()
+        {
+            var rs = new ResultSequence();
+            long t0 = 1_000_000L;
+            rs.Begin(t0, autoReturnSeconds: 60);
+            rs.Cancel();
+
+            Assert.False(rs.Active);
+            Assert.False(rs.TickShouldReturn(t0 + 60_000));
+            Assert.False(rs.TickShouldReturn(long.MaxValue));
+        }
+
+        [Fact]
+        public void Cancel_DiscardsPendingRequest()
+        {
+            var rs = new ResultSequence();
+            rs.Begin(nowUnixMs: 0L, autoReturnSeconds: 0);
+            rs.RequestReturn();
+            rs.Cancel();
+
+            Assert.False(rs.TickShouldReturn(1_000L));
+        }
+
+        [Fact]
+        public void Cancel_ThenBegin_StartsFreshSequence()
+        {
+            var rs = new ResultSequence();
+            rs.Begin(nowUnixMs: 1_000L, autoReturnSeconds: 5);
+            rs.Cancel();
+
+            rs.Begin(nowUnixMs: 10_000L, autoReturnSeconds: 5);
+            Assert.False(rs.TickShouldReturn(14_999L));
+            Assert.True(rs.TickShouldReturn(15_000L));
+            Assert.False(rs.TickShouldReturn(15_001L));
+        }
+
+        [Fact]
+        public void Cancel_BeforeBegin_IsIdempotentNoOp()
+        {
+            var rs = new ResultSequence();
+            rs.Cancel();
+            rs.Cancel();
+
+            Assert.False(rs.Active);
+            Assert.False(rs.TickShouldReturn(1_000L));
+        }
+
+        [Fact]
         public void TickShouldReturn_HandlesBackwardsTime_WithoutFiringEarly()
         {
             var rs = new ResultSequence();

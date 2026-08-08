@@ -14,6 +14,9 @@ namespace Werewolf.Game
         private bool _chatDebugAvatarFallback;
 
         public bool DebugInjectChat(int actor, string name, string text)
+            => DebugInjectChatCore(actor, name, text, playSfx: true);
+
+        private bool DebugInjectChatCore(int actor, string name, string text, bool playSfx)
         {
             if (!MeetingChatLogEnabled)
             {
@@ -36,7 +39,8 @@ namespace Werewolf.Game
             ChatSpeaker kind = _meetingClient.GetRowStatus(actor) == RowStatus.Alive
                 ? ChatSpeaker.Alive
                 : ChatSpeaker.Dead;
-            bool added = _chatLog.Append(actor, name ?? ResolveDisplayName(actor), text, kind);
+            bool added = AppendMeetingChatMessageClient(
+                actor, name ?? ResolveDisplayName(actor), text, kind, playSfx);
             WLog.Line("chat_debug_inject", secret: false,
                 ("result", added ? "logged" : "rejected_empty"), ("actor", actor), ("speaker", kind));
             return added;
@@ -64,7 +68,7 @@ namespace Werewolf.Game
             for (int i = 0; i < count; i++)
             {
                 int actor = speakers[(i / 2) % speakers.Length];
-                if (DebugInjectChat(actor, null, $"テスト発言 {i + 1}")) added++;
+                if (DebugInjectChatCore(actor, null, $"テスト発言 {i + 1}", playSfx: false)) added++;
             }
             WLog.Line("chat_debug_spam", secret: false,
                 ("requested", count), ("added", added), ("total", _chatLog.Count));

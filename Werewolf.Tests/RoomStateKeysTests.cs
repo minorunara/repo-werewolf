@@ -59,6 +59,7 @@ namespace Werewolf.Tests
                 "WW_CfgNecroVoiceMode",
                 "WW_CfgExtraJump", "WW_CfgConveneSuppressStart", "WW_CfgConveneSuppressAfter",
                 "WW_CfgHealInterval",
+                "WW_CfgOutfitChange",
                 "WW_CfgBomb",
                 "WW_CfgShaman",
             };
@@ -94,6 +95,7 @@ namespace Werewolf.Tests
         [InlineData(RoomStateKeys.CfgExtraJump)]
         [InlineData(RoomStateKeys.CfgConveneSuppressStart)]
         [InlineData(RoomStateKeys.CfgConveneSuppressAfter)]
+        [InlineData(RoomStateKeys.CfgOutfitChange)]
         [InlineData(RoomStateKeys.CfgBomb)]
         [InlineData(RoomStateKeys.CfgShaman)]
         public void NewKeys_ArePresentInAllKeys(string key)

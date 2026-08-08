@@ -35,10 +35,10 @@ namespace Werewolf.Net
         {
             payload = null;
 
-            if (!EventCodes.IsInRange(code))
+            if (!MessageCodes.IsInRange(code))
                 return Drop(code, "badcode", out dropReason);
 
-            Type[] schema = EventCodes.Schema(code);
+            Type[] schema = MessageCodes.Schema(code);
             if (schema == null)
                 return Drop(code, "unimplemented", out dropReason);
 

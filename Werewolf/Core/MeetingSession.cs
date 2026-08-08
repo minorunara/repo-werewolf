@@ -29,6 +29,8 @@ namespace Werewolf.Core
         Button = 0,
 
         CorpseReport = 1,
+
+        ScatterGuard = 2,
     }
 
     public enum MeetingStage : byte
@@ -134,12 +136,34 @@ namespace Werewolf.Core
                 _rights[callerActor] = _rights[callerActor] - 1;
                 OnRightsChanged?.Invoke(callerActor, _rights[callerActor]);
             }
+            Accept(callerActor, nowUnixMs, kind, _config.MeetingCountdownSec);
+            return ConveneRejectReason.None;
+        }
+
+        public const int ScatterGuardCountdownSec = 0;
+
+        public bool TryConveneScatterGuard(int victimActor, long nowUnixMs)
+        {
+            if (Stage != MeetingStage.Idle || _gameSession.Phase != GamePhase.Play
+                || FindPlayer(victimActor) == null)
+            {
+                WLog.Line("scatter_guard_convene_rejected", secret: false,
+                    ("victim", victimActor), ("stage", Stage), ("phase", _gameSession.Phase));
+                return false;
+            }
+
+            Accept(victimActor, nowUnixMs, ConveneKind.ScatterGuard, ScatterGuardCountdownSec);
+            return true;
+        }
+
+        private void Accept(int callerActor, long nowUnixMs, ConveneKind kind, int countdownSec)
+        {
             CallerActor = callerActor;
             CurrentKind = kind;
             Outcome = null;
             _voteBox = null;
 
-            _warpUnixMs = nowUnixMs + _config.MeetingCountdownSec * 1000L;
+            _warpUnixMs = nowUnixMs + countdownSec * 1000L;
             _timer.Start(_warpUnixMs + MeetingIntro.VotingUiDelayMs, _config.MeetingDurationSec);
             Stage = MeetingStage.Countdown;
 
@@ -153,8 +177,6 @@ namespace Werewolf.Core
                 MessageTarget.All, null));
             OnPhaseChangeRequest?.Invoke(GamePhase.Meeting);
             OnMeetingStateChanged?.Invoke(callerActor, _timer.EndUnixMs);
-
-            return ConveneRejectReason.None;
         }
 
         private ConveneRejectReason EvaluateConvene(
@@ -286,6 +308,13 @@ namespace Werewolf.Core
         public void ExtendClosingHold(long extraMs)
         {
             if (Stage == MeetingStage.Closing) _closingUntilUnixMs += extraMs;
+        }
+
+        public void EnsureClosingHoldRemaining(long nowUnixMs, long minRemainMs)
+        {
+            if (Stage != MeetingStage.Closing) return;
+            long minUntil = nowUnixMs + minRemainMs;
+            if (_closingUntilUnixMs < minUntil) _closingUntilUnixMs = minUntil;
         }
 
         private void BeginVoting()

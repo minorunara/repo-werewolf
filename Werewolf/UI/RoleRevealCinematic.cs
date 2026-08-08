@@ -18,6 +18,9 @@ namespace Werewolf.UI
         private const float BodyFontSize = 34f;
         private const float BodyLineHeight = 44f;
 
+        private const float SelfIdFontSize = 40f;
+        private const float SelfIdPosY = 370f;
+
         private const float PageCrossfadeSec = 0.3f;
 
         private const float SkipFadeOutSec = 0.2f;
@@ -30,6 +33,7 @@ namespace Werewolf.UI
         private CanvasGroup _group;
         private Image _background;
         private Image _iconImage;
+        private TextMeshProUGUI _selfIdText;
         private TextMeshProUGUI _titleText;
         private TextMeshProUGUI _bodyText;
         private CanvasGroup _bodyGroup;
@@ -69,6 +73,10 @@ namespace Werewolf.UI
             bgRect.offsetMax = Vector2.zero;
             _background.raycastTarget = false;
 
+            _selfIdText = UiKit.CreateText(rect, "SelfId", new Vector2(0f, SelfIdPosY),
+                new Vector2(1200f, 56f), "", SelfIdFontSize,
+                new Color(0.92f, 0.94f, 1f, 0.9f), TextAlignmentOptions.Center);
+
             _iconImage = UiKit.CreateImage(rect, "Icon", new Vector2(0f, 180f), IconSize, Color.white);
             _iconImage.raycastTarget = false;
             _iconImage.enabled = false;
@@ -102,6 +110,10 @@ namespace Werewolf.UI
 
             _titleText.text = content.Title ?? string.Empty;
             _skipHintText.text = BuildSkipHintText();
+
+            bool hasSelfId = !string.IsNullOrEmpty(content.SelfIdLine);
+            _selfIdText.text = hasSelfId ? content.SelfIdLine : string.Empty;
+            if (_selfIdText.gameObject.activeSelf != hasSelfId) _selfIdText.gameObject.SetActive(hasSelfId);
 
             Sprite icon = AssetCatalog.GetSprite(IconKey(content.Icon));
             if (icon != null)
@@ -327,6 +339,7 @@ namespace Werewolf.UI
             _group = null;
             _background = null;
             _iconImage = null;
+            _selfIdText = null;
             _titleText = null;
             _bodyText = null;
             _bodyGroup = null;

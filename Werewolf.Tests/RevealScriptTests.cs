@@ -147,6 +147,51 @@ namespace Werewolf.Tests
         }
 
         [Fact]
+        public void Werewolf_IdPrefixedTeammates_KeepEveryNameAcrossWrap()
+        {
+            var teammates = new[]
+            {
+                ParticipantLabel.Format(3, "Alice"),
+                ParticipantLabel.Format(12, "Bob"),
+                ParticipantLabel.Format(7, "Charlie"),
+            };
+            var content = Build(Role.Werewolf, teammates, blackCatPossible: false);
+
+            string joined = string.Join("", content.Pages[0].BodyLines);
+            Assert.Contains("3. Alice", joined);
+            Assert.Contains("12. Bob", joined);
+            Assert.Contains("7. Charlie", joined);
+        }
+
+        [Fact]
+        public void SelfId_WhenRosterKnown_BuildsNameplateLineForEveryRole()
+        {
+            foreach (var role in new[] { Role.Villager, Role.Werewolf, Role.Bomber, Role.BlackCat, Role.Shaman })
+            {
+                var content = RevealScript.Build(role, new[] { "Alice" }, blackCatPossible: false,
+                    ValuableMapMode.MeetingSync, blackCatCurseEnabled: true, selfParticipantId: 7);
+
+                Assert.Equal("あなたの識別番号はNo.7", content.SelfIdLine);
+
+                Assert.DoesNotContain(AllLines(content), l => l.Contains("識別番号"));
+            }
+        }
+
+        [Fact]
+        public void SelfId_WhenRosterMissing_LeavesNameplateEmpty()
+        {
+            var content = Build(Role.Werewolf, new[] { "Alice" }, blackCatPossible: false);
+            Assert.True(string.IsNullOrEmpty(content.SelfIdLine));
+        }
+
+        [Fact]
+        public void BlackCatAwakening_HasNoSelfIdLine()
+        {
+            var awakening = RevealScript.BuildBlackCatAwakening();
+            Assert.True(string.IsNullOrEmpty(awakening.SelfIdLine));
+        }
+
+        [Fact]
         public void Bomber_ShowsTwoPages_WithBomberAbilities()
         {
             var content = Build(Role.Bomber, new[] { "Alice" }, blackCatPossible: false);

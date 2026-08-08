@@ -3,6 +3,7 @@ using HarmonyLib;
 using TMPro;
 using UnityEngine;
 using Werewolf.Core;
+using Werewolf.UI;
 
 namespace Werewolf.Game.Patches
 {
@@ -31,9 +32,9 @@ namespace Werewolf.Game.Patches
                 if (text == null) return;
 
                 Color current = text.color;
-                text.color = marked == Role.Bomber
-                    ? new Color(1f, 0.6f, 0.3f, current.a)
-                    : new Color(1f, 0.25f, 0.25f, current.a);
+                Color tint = marked == Role.Bomber ? MarkerColors.Bomber : MarkerColors.Werewolf;
+                tint.a = current.a;
+                text.color = tint;
             }
             catch (Exception e)
             {

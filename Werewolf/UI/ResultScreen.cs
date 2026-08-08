@@ -21,7 +21,7 @@ namespace Werewolf.UI
         private const float RowHeight = 56f;
         private const float RowSpacing = 4f;
         private const float RowInnerMargin = 24f;
-        private const float BannerFontSize = 52f;
+        private const float BannerFontSize = 60f;
         private const float RowFontSize = 26f;
         private const float FooterFontSize = 30f;
         private const float DigestHeaderHeight = 44f;
@@ -35,6 +35,16 @@ namespace Werewolf.UI
         private const float AvatarScale = 1.8f;
         private const float AvatarHolderX = -PanelWidth * 0.5f + 120f;
         private const float AvatarHolderY = -29f;
+        private const float StatusIconSize = 50f;
+        private const float IdLabelX = -PanelWidth * 0.5f + 62f;
+        private const float IdFontSize = 22f;
+        private static readonly Color IdColor = new Color(1f, 0.9f, 0.6f, 1f);
+
+        private static readonly Color WerewolfTeamColor = new Color(1f, 0.45f, 0.45f, 1f);
+        private static readonly Color VillagerTeamColor = new Color(0.55f, 0.85f, 1f, 1f);
+        private static readonly Color BannerDefaultColor = new Color(1f, 0.95f, 0.6f, 1f);
+
+        private static readonly Color VoidMatchColor = new Color(0.72f, 0.72f, 0.72f, 1f);
 
         private GameObject _root;
         private TextMeshProUGUI _bannerText;
@@ -81,7 +91,10 @@ namespace Werewolf.UI
             _bannerText = UiKit.CreateText(_bannerImage.rectTransform, "BannerText",
                 Vector2.zero, new Vector2(PanelWidth, BannerHeight),
                 string.Empty, BannerFontSize,
-                new Color(1f, 0.95f, 0.6f, 1f), TextAlignmentOptions.Center);
+                BannerDefaultColor, TextAlignmentOptions.Center);
+            _bannerText.fontStyle = FontStyles.Bold;
+            _bannerText.outlineWidth = 0.25f;
+            _bannerText.outlineColor = Color.black;
             var btRect = _bannerText.rectTransform;
             btRect.anchorMin = Vector2.zero;
             btRect.anchorMax = Vector2.one;
@@ -108,14 +121,16 @@ namespace Werewolf.UI
             WLog.Line("result_screen_built", secret: false);
         }
 
-        public void Show(Team winningTeam, IReadOnlyList<ResultRow> rows,
+        public void Show(byte winningTeam, IReadOnlyList<ResultRow> rows,
             Func<int, PlayerAvatar> resolveAvatar = null,
             IReadOnlyList<string> digestLines = null,
-            string footerText = null)
+            string footerText = null,
+            Func<int, int> resolveId = null)
         {
             if (_root == null) return;
 
             _bannerText.text = FormatBanner(winningTeam);
+            _bannerText.color = BannerColor(winningTeam);
             _footerText.text = footerText ?? string.Empty;
 
             int count = rows != null ? rows.Count : 0;
@@ -131,8 +146,14 @@ namespace Werewolf.UI
                         try { avatar = resolveAvatar(rows[i].ActorNumber); }
                         catch { avatar = null; }
                     }
+                    int participantId = 0;
+                    if (resolveId != null && rows[i] != null)
+                    {
+                        try { participantId = resolveId(rows[i].ActorNumber); }
+                        catch { participantId = 0; }
+                    }
                     _slots[i].SetTop(y);
-                    _slots[i].Show(rows[i], avatar);
+                    _slots[i].Show(rows[i], avatar, participantId);
                     y += RowHeight + RowSpacing;
                 }
                 else
@@ -236,13 +257,25 @@ namespace Werewolf.UI
             rt.anchoredPosition = new Vector2(0f, -(yFromTop + height * 0.5f));
         }
 
-        private static string FormatBanner(Team team)
+        private static string FormatBanner(byte team)
         {
-            switch (team)
+            if (team == TeamCodes.VoidMatch) return Texts.Get(TextId.ResultBannerVoid);
+            switch ((Team)team)
             {
                 case Team.Villagers: return Texts.Get(TextId.ResultBannerVillagerWin);
                 case Team.Werewolves: return Texts.Get(TextId.ResultBannerWerewolfWin);
                 default: return Texts.Get(TextId.ResultBannerDefault);
+            }
+        }
+
+        private static Color BannerColor(byte team)
+        {
+            if (team == TeamCodes.VoidMatch) return VoidMatchColor;
+            switch ((Team)team)
+            {
+                case Team.Villagers: return VillagerTeamColor;
+                case Team.Werewolves: return WerewolfTeamColor;
+                default: return BannerDefaultColor;
             }
         }
 
@@ -274,8 +307,8 @@ namespace Werewolf.UI
         private static Color RoleColor(Role role, bool alive)
         {
             Color c = RoleDistribution.TeamOf(role) == Team.Werewolves
-                ? new Color(1f, 0.45f, 0.45f, 1f)
-                : new Color(0.55f, 0.85f, 1f, 1f);
+                ? WerewolfTeamColor
+                : VillagerTeamColor;
             if (!alive) { c.r *= 0.75f; c.g *= 0.75f; c.b *= 0.75f; c.a = 0.9f; }
             return c;
         }
@@ -291,14 +324,19 @@ namespace Werewolf.UI
             bgRect.anchorMax = new Vector2(0.5f, 1f);
 
             var mark = UiKit.CreateText(bgRect, "Mark",
-                new Vector2(-PanelWidth * 0.5f + RowInnerMargin + 12f, 0f),
-                new Vector2(32f, RowHeight),
+                new Vector2(-PanelWidth * 0.5f + RowInnerMargin + 8f, 0f),
+                new Vector2(28f, RowHeight),
                 string.Empty, RowFontSize,
                 new Color(1f, 0.9f, 0.4f, 1f), TextAlignmentOptions.Center);
 
             RectTransform avatarHolder = UiKit.CreateRect(bgRect, "AvatarHolder",
                 new Vector2(AvatarHolderX, AvatarHolderY), new Vector2(220f, RowHeight));
             avatarHolder.localScale = new Vector3(AvatarScale, AvatarScale, 1f);
+
+            var idLabel = UiKit.CreateText(bgRect, "Id",
+                new Vector2(IdLabelX, 0f), new Vector2(30f, RowHeight),
+                string.Empty, IdFontSize, IdColor, TextAlignmentOptions.Center);
+            idLabel.enableWordWrapping = false;
 
             var name = UiKit.CreateText(bgRect, "Name",
                 new Vector2(-PanelWidth * 0.25f, 0f),
@@ -318,8 +356,12 @@ namespace Werewolf.UI
                 string.Empty, RowFontSize,
                 new Color(0.85f, 0.85f, 0.9f, 1f), TextAlignmentOptions.MidlineRight);
 
+            var statusIcon = UiKit.CreateImage(bgRect, "StatusIcon",
+                new Vector2(AvatarHolderX, 0f), new Vector2(StatusIconSize, StatusIconSize), Color.white);
+            statusIcon.gameObject.SetActive(false);
+
             bg.gameObject.SetActive(false);
-            return new Slot(bg.gameObject, mark, avatarHolder, name, role, status);
+            return new Slot(bg.gameObject, mark, avatarHolder, name, role, status, statusIcon, idLabel);
         }
 
         private sealed class Slot
@@ -330,6 +372,8 @@ namespace Werewolf.UI
             private readonly TextMeshProUGUI _name;
             private readonly TextMeshProUGUI _role;
             private readonly TextMeshProUGUI _status;
+            private readonly Image _statusIcon;
+            private readonly TextMeshProUGUI _id;
             private MenuPlayerListed _listed;
 
             internal Slot(
@@ -338,7 +382,9 @@ namespace Werewolf.UI
                 RectTransform avatarHolder,
                 TextMeshProUGUI name,
                 TextMeshProUGUI role,
-                TextMeshProUGUI status)
+                TextMeshProUGUI status,
+                Image statusIcon,
+                TextMeshProUGUI idLabel)
             {
                 _go = go;
                 _mark = mark;
@@ -346,6 +392,8 @@ namespace Werewolf.UI
                 _name = name;
                 _role = role;
                 _status = status;
+                _statusIcon = statusIcon;
+                _id = idLabel;
             }
 
             internal void SetTop(float yFromTop)
@@ -353,16 +401,18 @@ namespace Werewolf.UI
                 PlaceTop((RectTransform)_go.transform, yFromTop, RowHeight);
             }
 
-            internal void Show(ResultRow row, PlayerAvatar avatar)
+            internal void Show(ResultRow row, PlayerAvatar avatar, int participantId)
             {
                 if (row == null) { Hide(); return; }
                 _mark.text = row.IsWinningSide ? "★" : string.Empty;
+                _id.text = participantId > 0 ? participantId.ToString() : string.Empty;
                 SetAvatar(avatar, row.Name);
                 _name.gameObject.SetActive(_listed == null);
                 _name.text = row.Name ?? string.Empty;
                 _role.text = RoleLabel(row.Role);
                 _role.color = RoleColor(row.Role, row.Alive);
                 _status.text = StatusLabel(row.Status);
+                SetStatusIcon(row.Status);
                 Color nameColor = row.Alive
                     ? new Color(1f, 1f, 1f, 1f)
                     : new Color(0.7f, 0.7f, 0.7f, 0.9f);
@@ -374,6 +424,27 @@ namespace Werewolf.UI
             {
                 SetAvatar(null, null);
                 if (_go.activeSelf) _go.SetActive(false);
+            }
+
+            private void SetStatusIcon(ResultRowStatus status)
+            {
+                if (_statusIcon == null) return;
+                string key;
+                switch (status)
+                {
+                    case ResultRowStatus.Dead: key = "icon_status_dead"; break;
+                    case ResultRowStatus.Executed: key = "icon_status_executed"; break;
+                    case ResultRowStatus.Disconnected: key = "icon_status_disconnected"; break;
+                    default: key = null; break;
+                }
+                Sprite sprite = key != null ? AssetCatalog.GetSprite(key) : null;
+                if (sprite == null)
+                {
+                    _statusIcon.gameObject.SetActive(false);
+                    return;
+                }
+                _statusIcon.sprite = sprite;
+                _statusIcon.gameObject.SetActive(true);
             }
 
             private void SetAvatar(PlayerAvatar avatar, string playerName)

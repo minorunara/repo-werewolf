@@ -22,7 +22,7 @@ namespace Werewolf.Game
             {
                 if (TryHandleModIntegrityInbound(msg, NowUnixMs())) return;
 
-                if (EventCodes.IsMasterInbound(msg.Code))
+                if (MessageCodes.IsMasterInbound(msg.Code))
                 {
                     HandleMasterInbound(msg);
                     return;
@@ -31,12 +31,12 @@ namespace Werewolf.Game
                 object[] p = msg.Payload;
                 switch (msg.Code)
                 {
-                    case EventCodes.AssignRole:
+                    case MessageCodes.AssignRole:
                         _localRole = (Role)(byte)p[0];
                         WLog.Line("recv_role", secret: true, ("role", _localRole));
                         TryStartRoleReveal();
                         break;
-                    case EventCodes.RevealSelfRole:
+                    case MessageCodes.RevealSelfRole:
                         {
                             bool initialRevealDone = _revealStarted;
                             _localRole = (Role)(byte)p[0];
@@ -45,7 +45,7 @@ namespace Werewolf.Game
                             if (initialRevealDone) TryStartAwakeningReveal();
                         }
                         break;
-                    case EventCodes.RevealTeammates:
+                    case MessageCodes.RevealTeammates:
                         _knownWerewolves = (int[])p[0];
                         {
                             byte[] rr = p.Length > 1 ? p[1] as byte[] : null;
@@ -56,7 +56,7 @@ namespace Werewolf.Game
                         if (_localRole == Role.BlackCat)
                             MaybeShowTutorial(TutorialId.InformantUnlockedAsBlackCat);
                         break;
-                    case EventCodes.PlayerDied:
+                    case MessageCodes.PlayerDied:
                         int deadActor = (int)p[0];
                         var deadCause = (DeathCause)(byte)p[1];
                         _deathMirror[deadActor] = deadCause;
@@ -72,10 +72,10 @@ namespace Werewolf.Game
                         WLog.Line("recv_died", secret: false,
                             ("actor", deadActor), ("cause", deadCause));
                         break;
-                    case EventCodes.ResultDigest:
+                    case MessageCodes.ResultDigest:
                         ApplyResultDigest(p);
                         break;
-                    case EventCodes.GameOver:
+                    case MessageCodes.GameOver:
                         _clientPhase = GamePhase.GameOver;
                         _meetingClient.ApplyPhase(GamePhase.GameOver);
                         _meeting?.AbortForGameOver();
@@ -84,7 +84,7 @@ namespace Werewolf.Game
                         BeginResultCountdown();
                         ShowResultScreen((byte)p[0], (int[])p[1], (byte[])p[2]);
                         break;
-                    case EventCodes.GameStart:
+                    case MessageCodes.GameStart:
                         ClearCosmeticGrantState("game_start");
                         ClearClientDigest();
                         CrownRoster.Clear();
@@ -97,6 +97,7 @@ namespace Werewolf.Game
                         _clientRevealDelaySec = (int)p[4];
                         _clientCatPossible = (byte)p[3] != 0;
                         _clientDebugSession = (byte)p[5] != 0;
+                        IdRoster.Apply((int[])p[6]);
                         WLog.Line("recv_gamestart", secret: false,
                             ("roundEnd", _clientRoundEndUnixMs),
                             ("werewolfCount", _clientWerewolfCount),
@@ -105,7 +106,7 @@ namespace Werewolf.Game
                             ("debugSession", _clientDebugSession ? 1 : 0));
                         TryStartRoleReveal();
                         break;
-                    case EventCodes.PhaseChanged:
+                    case MessageCodes.PhaseChanged:
                         {
                             GamePhase newPhase = (GamePhase)(byte)p[0];
                             if (_clientPhase == GamePhase.Meeting && newPhase == GamePhase.Play)
@@ -125,23 +126,33 @@ namespace Werewolf.Game
                         }
                         break;
 
-                    case EventCodes.StartMeeting:
+                    case MessageCodes.StartMeeting:
                         {
-                            ConveneKind startKind = (byte)p[3] == 1
-                                ? ConveneKind.CorpseReport : ConveneKind.Button;
+                            byte kindByte = (byte)p[3];
+                            ConveneKind startKind = kindByte == 1 ? ConveneKind.CorpseReport
+                                : kindByte == 2 ? ConveneKind.ScatterGuard
+                                : ConveneKind.Button;
                             HandleStartMeeting((int)p[0], (long)p[1], (long)p[2], startKind);
                             string startCaller = ResolveDisplayName((int)p[0]);
                             PushToast(startKind == ConveneKind.CorpseReport
                                 ? SessionNotice.ForCorpseReportStarted(startCaller)
-                                : SessionNotice.ForConveneStarted(startCaller));
+                                : startKind == ConveneKind.ScatterGuard
+                                    ? SessionNotice.ForScatterGuardTripped()
+                                    : SessionNotice.ForConveneStarted(startCaller));
                         }
                         break;
-                    case EventCodes.MeetingCancelled:
+                    case MessageCodes.MeetingCancelled:
                         _meetingClient.ApplyCancelled();
                         PushToast(SessionNotice.ForMeetingCancelled());
                         WLog.Line("recv_meeting_cancelled", secret: false, ("reason", (byte)p[0]));
                         break;
-                    case EventCodes.VoteProgress:
+                    case MessageCodes.ScatterGroups:
+                        HandleScatterGroups(p);
+                        break;
+                    case MessageCodes.ScatterGuardWindow:
+                        HandleScatterGuardWindow((int)p[0]);
+                        break;
+                    case MessageCodes.VoteProgress:
                         int[] votedActors = (int[])p[0];
                         bool voteAdded = votedActors.Length > _meetingClient.VotedActors.Count;
                         RecordMeetingVotesClient(votedActors);
@@ -155,7 +166,7 @@ namespace Werewolf.Game
                         WLog.Line("recv_voteprogress", secret: false,
                             ("voted", votedActors.Length), ("endUnixMs", (long)p[1]));
                         break;
-                    case EventCodes.MeetingResult:
+                    case MessageCodes.MeetingResult:
                         int executedActor = (int)p[0];
                         _meetingClient.ApplyResult(new MeetingOutcome
                         {
@@ -168,45 +179,46 @@ namespace Werewolf.Game
                             ? SessionNotice.ForNoExecution()
                             : SessionNotice.ForExecuted(ResolveDisplayName(executedActor)));
                         if (executedActor != -1) _executionSfxWaitTicks = 0;
+                        HostScheduleScatterPlanFromResult(executedActor);
                         break;
-                    case EventCodes.ConveneDenied:
+                    case MessageCodes.ConveneDenied:
                         var denyReason = ConveneDeniedWire.FromWire((byte)p[0]);
                         PushToast(SessionNotice.ForConveneDenied(denyReason));
                         WLog.Line("recv_convenedenied", secret: false,
                             ("wire", (byte)p[0]), ("reason", denyReason));
                         break;
 
-                    case EventCodes.BeaconAudit:
+                    case MessageCodes.BeaconAudit:
                         _pendingBeaconAudit = (byte)p[0];
                         WLog.Line("recv_beacon_audit", secret: false, ("uses", (byte)p[0]));
                         break;
-                    case EventCodes.SyncPerkGauge:
+                    case MessageCodes.SyncPerkGauge:
                         RolesClient.ApplyGaugeSync((int)p[0], (byte)p[1], (byte)p[2], (byte)p[3], (long)p[4], (int[])p[5], NowUnixMs());
                         WLog.Line("recv_gauge", secret: true,
                             ("ratio", (int)p[0]), ("flags", (byte)p[1]),
                             ("charges", (byte)p[2]), ("status", (byte)p[3]));
                         break;
-                    case EventCodes.RoleState:
+                    case MessageCodes.RoleState:
                         HandleRoleState((byte)p[0], (int[])p[1], (long)p[2]);
                         break;
-                    case EventCodes.CurseCandidates:
+                    case MessageCodes.CurseCandidates:
                         RolesClient.ApplyCurseCandidates((int[])p[0]);
                         WLog.Line("recv_curse_candidates", secret: true,
                             ("count", ((int[])p[0])?.Length ?? -1));
                         break;
 
-                    case EventCodes.CosmeticGrant:
+                    case MessageCodes.CosmeticGrant:
                         HandleCosmeticGrant(p);
                         break;
 
-                    case EventCodes.BomberState:
+                    case MessageCodes.BomberState:
                         ApplyBomberState((int)p[0], (byte)p[1], (byte)p[2], (long)p[3], (long)p[4]);
                         break;
-                    case EventCodes.BombDetonation:
+                    case MessageCodes.BombDetonation:
                         ApplyBombDetonation((int)p[0], (long)p[1]);
                         break;
 
-                    case EventCodes.CheckmateReveal:
+                    case MessageCodes.CheckmateReveal:
                         HandleCheckmateReveal(p);
                         break;
                 }
@@ -228,7 +240,7 @@ namespace Werewolf.Game
             long now = NowUnixMs();
             switch (msg.Code)
             {
-                case EventCodes.RequestMeeting:
+                case MessageCodes.RequestMeeting:
                     {
                         if (_meeting == null) { DropMasterInbound(msg, "no_meeting_session"); return; }
                         if (_checkmate != null && _checkmate.CeremonyStarted)
@@ -244,11 +256,11 @@ namespace Werewolf.Game
                         _meeting.TryConvene(msg.SenderActor, now, kind, lastRun, corpse);
                     }
                     break;
-                case EventCodes.CastVote:
+                case MessageCodes.CastVote:
                     if (_meeting == null) { DropMasterInbound(msg, "no_meeting_session"); return; }
                     _meeting.CastVote(msg.SenderActor, (int)msg.Payload[0], now);
                     break;
-                case EventCodes.RoleAction:
+                case MessageCodes.RoleAction:
                     {
                         byte subtype = (byte)msg.Payload[0];
                         int arg = (int)msg.Payload[1];

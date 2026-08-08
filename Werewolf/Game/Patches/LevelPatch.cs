@@ -7,10 +7,12 @@ namespace Werewolf.Game.Patches
     [HarmonyPatch(typeof(RunManager), "ChangeLevel")]
     internal static class LevelPatch
     {
-        private static void Prefix(bool _completedLevel, bool _levelFailed)
+        private static void Prefix(bool _completedLevel, bool _levelFailed, RunManager.ChangeLevelType _changeLevelType)
         {
             try
             {
+                if (_changeLevelType == RunManager.ChangeLevelType.LobbyMenu) return;
+
                 WerewolfDirector dir = WerewolfDirector.Instance;
                 if (dir == null || !dir.IsHostSessionActive) return;
                 if (!SemiFunc.IsMasterClientOrSingleplayer()) return;

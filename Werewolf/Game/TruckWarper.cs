@@ -39,7 +39,7 @@ namespace Werewolf.Game
             }
         }
 
-        private const float WrapOffset = 0.6f;
+        internal const float WrapOffset = 0.6f;
 
         internal const float RewarpDistance = 6f;
 
@@ -174,7 +174,9 @@ namespace Werewolf.Game
             return true;
         }
 
-        private void WarpAliveAvatar(PlayerAvatar avatar, Vector3 pos, Quaternion rot)
+        internal const float TumbleDropHeight = 0.3f;
+
+        internal static void WarpAliveAvatar(PlayerAvatar avatar, Vector3 pos, Quaternion rot)
         {
             avatar.Spawn(pos, rot);
             if (IsTumbling(avatar))
@@ -182,8 +184,8 @@ namespace Werewolf.Game
                 PhysGrabObject tumbleGrab = TumbleGrabObject(avatar);
                 if (tumbleGrab != null)
                 {
-                    tumbleGrab.Teleport(pos, rot);
-                    if (tumbleGrab.rb != null)
+                    tumbleGrab.Teleport(pos + Vector3.up * TumbleDropHeight, rot);
+                    if (tumbleGrab.rb != null && !tumbleGrab.rb.isKinematic)
                     {
                         tumbleGrab.rb.velocity = Vector3.zero;
                         tumbleGrab.rb.angularVelocity = Vector3.zero;

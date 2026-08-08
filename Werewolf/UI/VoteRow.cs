@@ -40,6 +40,8 @@ namespace Werewolf.UI
 
         private static Func<int, bool> s_showDeadCues;
 
+        private static Func<int, int> s_participantId;
+
         private readonly PlayerAvatar _avatar;
         private GameObject _root;
         private Image _background;
@@ -51,9 +53,12 @@ namespace Werewolf.UI
         private TextMeshProUGUI _voteCountLabel;
         private Image _teamMarkerBg;
         private TextMeshProUGUI _teamMarkerLabel;
+        private TextMeshProUGUI _idLabel;
         private Image _statusIcon;
         private Image _hostIcon;
         private Image _myVoteIcon;
+        private TextMeshProUGUI _scatterBadge;
+        private Vector2 _rowSize;
         private MenuPlayerListed _listed;
         private bool _deadCuesHidden;
         private int _deadCueWaitFrames;
@@ -103,6 +108,7 @@ namespace Werewolf.UI
         {
             RectTransform rect = UiKit.CreateRect(parent, $"WW_VoteRow_{ActorNumber}", Vector2.zero, size);
             _root = rect.gameObject;
+            _rowSize = size;
 
             _background = UiKit.CreateImage(rect, "Bg", Vector2.zero, size, BgAliveColor);
 
@@ -138,6 +144,15 @@ namespace Werewolf.UI
             _voteCountLabel.gameObject.SetActive(false);
 
             float leftX2 = -size.x * 0.5f;
+            int participantId = ResolveParticipantIdSafe(ActorNumber);
+            if (participantId > 0)
+            {
+                _idLabel = UiKit.CreateText(rect, "IdLabel", new Vector2(leftX2 + 14f, 0f),
+                    new Vector2(28f, size.y), participantId.ToString(), 22f, VoteCountColor,
+                    TextAlignmentOptions.Center);
+                _idLabel.enableWordWrapping = false;
+            }
+
             _teamMarkerBg = UiKit.CreateImage(rect, "WwMarker", new Vector2(leftX2 + 40f, size.y * 0.5f - 14f),
                 new Vector2(24f, 24f), WerewolfMarkerBgColor);
             _teamMarkerLabel = UiKit.CreateText(_teamMarkerBg.rectTransform, "Label", Vector2.zero,
@@ -192,7 +207,8 @@ namespace Werewolf.UI
             float leftX = -size.x * 0.5f;
             if (!IsBot && _avatar != null)
             {
-                _talkIndicator = UiKit.CreateImage(rowRect, "Talk", new Vector2(leftX + 22f, 0f),
+                _talkIndicator = UiKit.CreateImage(rowRect, "Talk",
+                    new Vector2(leftX + 22f, size.y * 0.5f - 14f),
                     new Vector2(14f, 14f), TalkIdleColor);
             }
             _fallbackName = UiKit.CreateText(rowRect, "Name", new Vector2(leftX + 130f, 0f),
@@ -267,6 +283,29 @@ namespace Werewolf.UI
             }
         }
 
+        private static readonly Color ScatterBadgeSpinColor = new Color(0.8f, 0.8f, 0.85f, 0.9f);
+
+        public void SetScatterBadge(string text, bool settled)
+        {
+            if (_root == null) return;
+            if (text == null)
+            {
+                if (_scatterBadge != null) _scatterBadge.gameObject.SetActive(false);
+                return;
+            }
+            if (_scatterBadge == null)
+            {
+                _scatterBadge = UiKit.CreateText((RectTransform)_root.transform, "ScatterBadge",
+                    new Vector2(_rowSize.x * 0.5f - 55f, 0f), new Vector2(110f, _rowSize.y),
+                    text, 28f, ScatterBadgeSpinColor, TextAlignmentOptions.Center);
+                _scatterBadge.enableWordWrapping = false;
+            }
+            _scatterBadge.text = text;
+            _scatterBadge.color = settled ? VoteCountColor : ScatterBadgeSpinColor;
+            _scatterBadge.fontStyle = settled ? FontStyles.Bold : FontStyles.Normal;
+            if (!_scatterBadge.gameObject.activeSelf) _scatterBadge.gameObject.SetActive(true);
+        }
+
         public void SetVoted(bool voted)
         {
             if (_votedMark == null) return;
@@ -313,6 +352,10 @@ namespace Werewolf.UI
 
         public void SetTeamMarker(Role? role)
         {
+            if (_idLabel != null)
+            {
+                _idLabel.color = MarkerColors.ForRole(role, VoteCountColor);
+            }
             if (_teamMarkerBg == null) return;
             bool visible = role.HasValue;
             if (visible)
@@ -353,6 +396,18 @@ namespace Werewolf.UI
         public static void SetDeadCueProvider(Func<int, bool> provider)
         {
             s_showDeadCues = provider;
+        }
+
+        public static void SetParticipantIdProvider(Func<int, int> provider)
+        {
+            s_participantId = provider;
+        }
+
+        private static int ResolveParticipantIdSafe(int actorNumber)
+        {
+            if (s_participantId == null) return 0;
+            try { return s_participantId(actorNumber); }
+            catch { return 0; }
         }
 
         public void Tick()

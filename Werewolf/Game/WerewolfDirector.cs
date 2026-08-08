@@ -75,11 +75,20 @@ namespace Werewolf.Game
 
         private readonly MeetingChatLog _chatLog = new MeetingChatLog();
 
+        private const string MeetingChatSfxClipKey = "sfx_chat_message";
+        private const float MeetingChatSfxVolumeScale = 1.5f;
+
         private bool _chatVoteBaselinePending;
 
         private readonly MeetingChatPanel _chatPanel = new MeetingChatPanel();
         private readonly List<string> _chatRecapDeaths = new List<string>();
         private int _chatRecapBeaconUses = MeetingRecap.Unknown;
+
+        private int _chatRecapLostBaseline;
+
+        private bool _chatSystemPosted;
+
+        private List<List<int>> _lastScatterGroups;
 
         private bool _pendingMeetingTutorial;
 
@@ -92,6 +101,11 @@ namespace Werewolf.Game
         private readonly ResultCountdown _resultCountdown = new ResultCountdown();
         private int _roundGameOverAutoReturnSec;
         private int _lastResultCountdownSecond = -1;
+
+        private readonly VoidMatchHold _voidMatchHold = new VoidMatchHold();
+        private readonly VoidMatchPanel _voidMatchPanel = new VoidMatchPanel();
+
+        private long _resultReturnArmedAtUnixMs;
         private bool _revealStarted;
         private bool _awakeningRevealStarted;
         private Coroutine _revealCoroutine;
@@ -129,6 +143,7 @@ namespace Werewolf.Game
         private int? _clientConveneSuppressStartSec;
         private int? _clientConveneSuppressAfterSec;
         private int? _clientHealIntervalSec;
+        private bool? _clientOutfitChangeAllowed;
 
         private int[] _clientBombPack;
 
@@ -143,6 +158,7 @@ namespace Werewolf.Game
         private MeetingButton _meetingButton;
         private long _nextConveneHoldHintUnixMs;
         private TruckWarper _truckWarper;
+        private ExtractionScatter _extractionScatter;
         private MovementFreezer _movementFreezer;
         private EnemyFreezer _enemyFreezer;
         private WerewolfUIManager _uiManager;
@@ -176,6 +192,10 @@ namespace Werewolf.Game
         public GamePhase HostPhase => _session?.Phase ?? GamePhase.Lobby;
 
         public RolesClientState RolesClient { get; } = new RolesClientState();
+
+        public IdRosterClient IdRoster { get; } = new IdRosterClient();
+
+        public int ParticipantIdFor(int actorNumber) => IdRoster.IdOf(actorNumber);
 
         public Role? LocalRoleClient => _localRole;
 
@@ -269,6 +289,8 @@ namespace Werewolf.Game
 
         public int ClientHealIntervalSec =>
             _clientHealIntervalSec ?? (Plugin.GameConfig != null ? Plugin.GameConfig.HealIntervalSec : 3);
+
+        public bool ClientOutfitChangeAllowed => _clientOutfitChangeAllowed ?? false;
 
         private int ClientBombPackValue(int index)
         {
@@ -366,6 +388,11 @@ namespace Werewolf.Game
                 WerewolfDirector dir = Instance;
                 return dir == null || dir.ShouldShowDeadCuesClient(actor);
             });
+            VoteRow.SetParticipantIdProvider(actor =>
+            {
+                WerewolfDirector dir = Instance;
+                return dir != null ? dir.ParticipantIdFor(actor) : 0;
+            });
 
             _roundPanels = new IClientPanel[]
             {
@@ -379,6 +406,7 @@ namespace Werewolf.Game
                 _startHoldOverlay,
                 _conveneHoldGauge,
                 _chatPanel,
+                _idBadgePresenter,
             };
         }
 
@@ -425,6 +453,8 @@ namespace Werewolf.Game
 
                 TickResultReturn();
 
+                TickVoidMatch(now);
+
                 TickLobbySettings(now);
                 TickLobbySettingsPanelVisibility();
 
@@ -440,6 +470,8 @@ namespace Werewolf.Game
                 TickBomberClient(now);
 
                 TickShamanClient(now);
+
+                TickIdBadges();
 
                 TickVoice();
 
@@ -587,7 +619,7 @@ namespace Werewolf.Game
             }
         }
 
-        private string BusMode() => _bus is PhotonNetBus ? "photon" : "loopback";
+        private string BusMode() => _bus is PhotonRpcBus ? "photon" : "loopback";
 
         private static long NowUnixMs() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     }

@@ -59,13 +59,15 @@ namespace Werewolf.Game
                     rightsRemaining: rights,
                     nowUnixMs: now,
                     meetingActive: _meetingClient.MeetingActive,
-                    debugSession: _clientDebugSession);
+                    debugSession: _clientDebugSession,
+                    selfParticipantId: IdRoster.IdOf(LocalActor),
+                    scatterGuardActive: _clientScatterGuard.IsArmed(now));
                 HudState hudState = _hudPanel.Tick(_hudModel, hudInput);
 
                 if (hudState.BellVolumeScale > 0f)
                 {
                     EnsureSfxBuilt();
-                    _sfxPlayer.Play("sfx_bell", hudState.BellVolumeScale);
+                    _sfxPlayer.Play(BellSchedule.ClipKeyFor(hudState.BellMarkSec), hudState.BellVolumeScale);
                 }
             }
             if (_toastPanel.Exists && _toastQueue != null) _toastPanel.Tick(_toastQueue, now);
@@ -184,15 +186,29 @@ namespace Werewolf.Game
             }
         }
 
+        private int DebugRevealSelfId
+        {
+            get
+            {
+                int id = IdRoster.IdOf(LocalActor);
+                return id > 0 ? id : 7;
+            }
+        }
+
         public void DebugPlayReveal(Role role)
         {
             try
             {
                 string[] dummyTeammates = role == Role.Werewolf
-                    ? new[] { "テスト太郎", "テスト次郎" }
+                    ? new[]
+                    {
+                        ParticipantLabel.Format(3, "テスト太郎"),
+                        ParticipantLabel.Format(12, "テスト次郎"),
+                    }
                     : Array.Empty<string>();
                 RevealContent content = RevealScript.Build(role, dummyTeammates, blackCatPossible: true,
-                    ClientValuableMapMode, IsBlackCatCurseEnabledForClient());
+                    ClientValuableMapMode, IsBlackCatCurseEnabledForClient(),
+                    DebugRevealSelfId);
 
                 EnsurePanelBuilt(_revealCinematic);
                 if (!_revealCinematic.Exists)
@@ -221,12 +237,7 @@ namespace Werewolf.Game
             {
                 if (string.IsNullOrEmpty(message)) message = "テスト通知";
 
-                if (_toastQueue == null)
-                {
-                    int sec = Plugin.GameConfig != null && Plugin.GameConfig.ToastDurationSec > 0
-                        ? Plugin.GameConfig.ToastDurationSec : 9;
-                    _toastQueue = new ToastQueue(sec);
-                }
+                EnsureToastQueue();
                 EnsureRolesUiBuilt();
                 _toastQueue.Push(message, NowUnixMs());
                 WLog.Line("cmd_fx_toast", secret: false, ("message", message));
@@ -280,9 +291,9 @@ namespace Werewolf.Game
                     new DigestEntry(DigestKind.FinalBalance, 300, 9_500, 12_000, 8_000),
                 };
                 List<string> digestLines = ResultDigestText.FormatLines(digest, a => "デバッグ" + a);
-                _resultScreen.Show(Team.Werewolves, rows, ResolveAvatar,
-                    digestLines, BuildResultFooterText());
-                PlayResultSfx(Team.Werewolves);
+                _resultScreen.Show((byte)Team.Werewolves, rows, ResolveAvatar,
+                    digestLines, BuildResultFooterText(), ParticipantIdFor);
+                PlayResultSfx((byte)Team.Werewolves);
                 SetCrownRosterFromRows(rows);
                 WLog.Line("cmd_fx_result", secret: false, ("rows", rows.Count));
             }
@@ -366,7 +377,7 @@ namespace Werewolf.Game
                     {
                         int a = _knownWerewolves[i];
                         if (a == selfActor) continue;
-                        string name = ResolveDisplayName(a);
+                        string name = ParticipantLabel.Format(IdRoster.IdOf(a), ResolveDisplayName(a));
                         if (_knownTeammateRoles != null && i < _knownTeammateRoles.Length
                             && (Role)_knownTeammateRoles[i] == Role.Bomber)
                         {
@@ -382,7 +393,8 @@ namespace Werewolf.Game
                 }
 
                 RevealContent content = RevealScript.Build(role, teammateNames, _clientCatPossible,
-                    ClientValuableMapMode, IsBlackCatCurseEnabledForClient());
+                    ClientValuableMapMode, IsBlackCatCurseEnabledForClient(),
+                    IdRoster.IdOf(LocalActor));
 
                 EnsurePanelBuilt(_revealCinematic);
                 if (!_revealCinematic.Exists)
@@ -502,9 +514,9 @@ namespace Werewolf.Game
                 List<string> digestLines = _clientDigestEntries != null
                     ? ResultDigestText.FormatLines(_clientDigestEntries, ResolveDisplayName)
                     : null;
-                _resultScreen.Show((Team)winningTeam, rows, ResolveAvatar,
-                    digestLines, BuildResultFooterText());
-                PlayResultSfx((Team)winningTeam);
+                _resultScreen.Show(winningTeam, rows, ResolveAvatar,
+                    digestLines, BuildResultFooterText(), ParticipantIdFor);
+                PlayResultSfx(winningTeam);
             }
             catch (Exception e)
             {
@@ -512,10 +524,10 @@ namespace Werewolf.Game
             }
         }
 
-        private void PlayResultSfx(Team winningTeam)
+        private void PlayResultSfx(byte winningTeam)
         {
             string clipKey;
-            switch (winningTeam)
+            switch ((Team)winningTeam)
             {
                 case Team.Werewolves: clipKey = "sfx_result_wolves_win"; break;
                 case Team.Villagers:  clipKey = "sfx_result_villagers_win"; break;
@@ -547,18 +559,24 @@ namespace Werewolf.Game
             EnsurePanelBuilt(_valuableRecordHud);
         }
 
+        private const int ToastDurationFallbackSec = 9;
+
+        private static int ToastDurationSec()
+            => Plugin.GameConfig != null && Plugin.GameConfig.ToastDurationSec > 0
+                ? Plugin.GameConfig.ToastDurationSec : ToastDurationFallbackSec;
+
+        private void EnsureToastQueue()
+        {
+            _toastQueue ??= new ToastQueue(ToastDurationSec());
+        }
+
         private void PushToast(SessionNotice notice)
         {
             if (notice == null) return;
             string message = NoticeCatalog.Format(notice);
             if (string.IsNullOrEmpty(message)) return;
 
-            if (_toastQueue == null)
-            {
-                int sec = Plugin.GameConfig != null && Plugin.GameConfig.ToastDurationSec > 0
-                    ? Plugin.GameConfig.ToastDurationSec : 9;
-                _toastQueue = new ToastQueue(sec);
-            }
+            EnsureToastQueue();
             EnsureRolesUiBuilt();
             _toastQueue.Push(message, NowUnixMs());
             EnsureSfxBuilt();
@@ -656,7 +674,7 @@ namespace Werewolf.Game
                     ("subtype", subtype), ("reason", "no_bus"));
                 return;
             }
-            _bus.SendToMaster(EventCodes.RoleAction, new object[] { subtype, arg, flag });
+            _bus.SendToMaster(MessageCodes.RoleAction, new object[] { subtype, arg, flag });
         }
 
         private void ResetRolesClient(string via)

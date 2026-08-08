@@ -37,6 +37,8 @@ namespace Werewolf.Game
 
         public const string KeyHealInterval = RoomStateKeys.CfgHealInterval;
 
+        public const string KeyOutfitChange = RoomStateKeys.CfgOutfitChange;
+
         public const string KeyBomb = RoomStateKeys.CfgBomb;
 
         public const string KeyShaman = RoomStateKeys.CfgShaman;
@@ -135,6 +137,7 @@ namespace Werewolf.Game
             SemiFunc.SetCurrentRoomProperty(KeyConveneSuppressStart, config.ConveneSuppressStartSec);
             SemiFunc.SetCurrentRoomProperty(KeyConveneSuppressAfter, config.ConveneSuppressAfterSec);
             SemiFunc.SetCurrentRoomProperty(KeyHealInterval, config.HealIntervalSec);
+            SemiFunc.SetCurrentRoomProperty(KeyOutfitChange, RoomStateKeys.EncodeBool(config.OutfitChangeAllowed));
             SemiFunc.SetCurrentRoomProperty(KeyBomb, RoomStateKeys.EncodeBomb(config, playerCount));
             SemiFunc.SetCurrentRoomProperty(KeyShaman, RoomStateKeys.EncodeShaman(config));
             WLog.Line("roomstate_publish", secret: false,
@@ -147,6 +150,7 @@ namespace Werewolf.Game
                 ("conveneSupStart", config.ConveneSuppressStartSec),
                 ("conveneSupAfter", config.ConveneSuppressAfterSec),
                 ("healInterval", config.HealIntervalSec),
+                ("outfitChange", config.OutfitChangeAllowed ? 1 : 0),
                 ("bomberPossible", config.BomberPossible(playerCount) ? 1 : 0));
         }
 
@@ -267,6 +271,18 @@ namespace Werewolf.Game
             if (room != null && room.CustomProperties.TryGetValue(KeyHealInterval, out object value) && value is int i)
             {
                 seconds = i;
+                return true;
+            }
+            return false;
+        }
+
+        public bool TryReadOutfitChange(out bool allowed)
+        {
+            allowed = false;
+            Room room = PhotonNetwork.CurrentRoom;
+            if (room != null && room.CustomProperties.TryGetValue(KeyOutfitChange, out object value) && value is byte b)
+            {
+                allowed = RoomStateKeys.DecodeBool(b);
                 return true;
             }
             return false;

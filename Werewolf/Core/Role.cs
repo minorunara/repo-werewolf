@@ -17,6 +17,11 @@ namespace Werewolf.Core
         Werewolves = 1,
     }
 
+    public static class TeamCodes
+    {
+        public const byte VoidMatch = 255;
+    }
+
     public static class RoleDistribution
     {
         public static Team TeamOf(Role role)

@@ -1,11 +1,10 @@
 {
     "name": "REPO_Werewolf",
-    "version_number": "1.0.0",
+    "version_number": "1.1.0",
     "website_url": "https://github.com/minorunara/repo-werewolf",
     "description": "REPO人狼：Among Us-style werewolf (social deduction) mode for R.E.P.O. Meetings, voting, corpse reports, and unique roles: Shaman, Werewolf, Black Cat, Bomber. All players must install.",
     "dependencies": [
         "BepInEx-BepInExPack-5.4.2305",
-        "nickklmao-MenuLib-2.5.4",
         "nickklmao-REPOConfig-1.2.6"
     ]
 }

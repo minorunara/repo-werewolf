@@ -18,6 +18,9 @@ namespace Werewolf.UI
         private const float EntranceStartScale = 2.6f;
         private const float ExitRiseY = 700f;
 
+        private const float TitleFontSize = 120f;
+        private const float GuardTitleFontSizeMin = 56f;
+
         private static readonly Color BackdropColor = new Color(0f, 0f, 0f, 0.75f);
 
         private GameObject _root;
@@ -66,12 +69,12 @@ namespace Werewolf.UI
             _iconImage.enabled = false;
 
             _titleTextBack = UiKit.CreateText(_content, "TitleBack", new Vector2(0f, 40f),
-                new Vector2(1200f, 140f), "", 120f, Color.black, TextAlignmentOptions.Center);
+                new Vector2(1200f, 140f), "", TitleFontSize, Color.black, TextAlignmentOptions.Center);
             _titleTextBack.outlineColor = Color.white;
             _titleTextBack.outlineWidth = 0.30f;
             _titleTextBack.fontStyle = FontStyles.Bold;
             _titleText = UiKit.CreateText(_content, "Title", new Vector2(0f, 40f),
-                new Vector2(1200f, 140f), "", 120f, Color.black, TextAlignmentOptions.Center);
+                new Vector2(1200f, 140f), "", TitleFontSize, Color.black, TextAlignmentOptions.Center);
             _titleText.outlineColor = Color.red;
             _titleText.outlineWidth = 0.15f;
             _titleText.fontStyle = FontStyles.Bold;
@@ -80,17 +83,22 @@ namespace Werewolf.UI
             WLog.Line("death_reveal_built", secret: false);
         }
 
-        public void Show(IReadOnlyList<WPlayer> deadRoster, Func<int, PlayerAvatar> resolveAvatar)
+        public void Show(IReadOnlyList<WPlayer> deadRoster, Func<int, PlayerAvatar> resolveAvatar,
+                         ConveneKind kind = ConveneKind.Button)
         {
             if (_root == null) return;
             ClearRows();
 
             bool hasDeaths = deadRoster != null && deadRoster.Count > 0;
-            string title = Texts.Get(hasDeaths ? TextId.DeathRevealTitle : TextId.DeathRevealNone);
-            _titleText.text = title;
-            _titleTextBack.text = title;
+            bool guard = kind == ConveneKind.ScatterGuard && hasDeaths;
+            string title = Texts.Get(guard ? TextId.DeathRevealScatterGuardTitle
+                : hasDeaths ? TextId.DeathRevealTitle : TextId.DeathRevealNone);
+            ApplyTitle(_titleText, title, autoShrink: guard);
+            ApplyTitle(_titleTextBack, title, autoShrink: guard);
 
-            Sprite icon = AssetCatalog.GetSprite(hasDeaths ? "img_taxman_death" : "img_taxman_nodeath");
+            Sprite icon = guard
+                ? (AssetCatalog.GetSprite("img_taxman_handover") ?? AssetCatalog.GetSprite("img_taxman_death"))
+                : AssetCatalog.GetSprite(hasDeaths ? "img_taxman_death" : "img_taxman_nodeath");
             if (icon != null)
             {
                 _iconImage.sprite = icon;
@@ -199,6 +207,17 @@ namespace Werewolf.UI
         {
             foreach (VoteRow row in _rows) row.Destroy();
             _rows.Clear();
+        }
+
+        private static void ApplyTitle(TextMeshProUGUI label, string title, bool autoShrink)
+        {
+            if (label == null) return;
+            label.enableWordWrapping = false;
+            label.fontSize = TitleFontSize;
+            label.fontSizeMin = GuardTitleFontSizeMin;
+            label.fontSizeMax = TitleFontSize;
+            label.enableAutoSizing = autoShrink;
+            label.text = title;
         }
     }
 }

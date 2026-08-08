@@ -24,7 +24,7 @@ Werewolves sabotage from the shadows; villagers report bodies, call emergency me
 - A valuable loss gauge tracking deaths and valuables, plus a full meeting map with a coordinate grid
 - Room settings for the stage, level, starting items, player upgrades, the truck's initial charge, and more
 - Guests can review the host's room settings, and everyone's mod lineup is easy to check in the lobby
-- A 27-page in-game manual covering the rules and every role's abilities, available at any time
+- A 28-page in-game manual covering the rules and every role's abilities, available at any time
 
 ## Meetings and Voting
 
@@ -81,12 +81,13 @@ REPO Werewolf can be played entirely over text chat, without voice chat.
 
 Use the game's chat key (default `T`) to open the normal chat and speak.
 Messages sent during a meeting are recorded in the meeting chat log, which can be shown or hidden by clicking its icon or pressing its assigned key.
+A notification sound plays as each new message arrives, so it is harder to miss one while you are looking at the meeting map.
 
 To type Japanese, install [JapaneseTextInput](https://thunderstore.io/c/repo/p/sukunabikona/JapaneseTextInput/).
 
 ## Installation
 
-- Manual install: install the dependencies (BepInExPack, MenuLib, REPOConfig), then place `Minorunara_Werewolf.dll` in `BepInEx/plugins/Minorunara_Werewolf/` in the game folder.
+- Manual install: install the prerequisite mods, then place `Minorunara_Werewolf.dll` in `BepInEx/plugins/Minorunara_Werewolf/` in the game folder.
 - Every player in the lobby must install the mod.
 - To keep everyone's mod lineup identical — for fairness and to avoid trouble — we recommend creating a dedicated profile with your mod manager and sharing it with all participants.
 - This is a large mod and may conflict with others. If you want to run other mods alongside it, add them a few at a time and watch for issues.
@@ -219,6 +220,15 @@ Each surviving player casts one vote at a meeting. Skipping (voting for no one) 
 Everyone can see who has finished voting, but not who they voted for.
 The player with the most votes is executed. If there is a tie for the most votes, no one is executed.
 Meetings have a time limit, and each vote cast reduces the remaining time slightly.
+
+### Scattering After Meetings
+
+Depending on the room settings, when a meeting ends with 6 or more survivors, they are randomly split into groups of three or more, and each group warps to a different location to set out again.
+Destinations are either the truck or one of the delivered extraction points, starting from the second one (the first extraction point is never a destination).
+The groupings are announced to everyone, but which group goes where is not revealed. The previous groupings are reposted in the meeting chat log at the start of the next meeting.
+Until the second extraction point has been delivered, after every extraction is complete, or when fewer than 6 players are alive, no one scatters and everyone sets out from the truck.
+If someone dies right after scattering while "Handover in progress…" is shown at the top of the screen, an emergency meeting is called automatically as a "handover incident".
+This meeting starts instantly with no warning countdown and does not consume anyone's meeting call.
 
 ### Reading the Valuable Loss Gauge
 
@@ -367,6 +377,7 @@ Wolf Mode and Plant Bomb, as well as Beacon and Detonate, can each be bound to s
 | L | Meeting chat log (during meetings) | `MeetingChatLogKey` |
 | F1 | In-game manual | `ManualKey` |
 | F5 | Return to lobby from the match results (host only) | `ResultReturnKey` |
+| F5 | Hold to declare a no contest (host only) | `VoidMatchKey` |
 | F7 | Show/hide the lobby settings panel | `LobbySettingsPanelKey` |
 
 ## Notes
@@ -375,10 +386,11 @@ Wolf Mode and Plant Bomb, as well as Beacon and Detonate, can each be bound to s
   Trying to start with fewer shows a warning and the match will not start
 - Setting the werewolf count (WerewolfCount) to the number of participants or higher also shows a warning and blocks the start (a role assignment with no villagers is impossible; lower the setting to proceed)
 - To play regular R.E.P.O., the host can turn off Werewolf Mode (WerewolfModeEnabled) in the settings (the host's setting decides whether the room runs Werewolf Mode; a guest's setting applies only when that player hosts)
+- **No contest**: when a bug, a disconnect, or an accident (a role getting exposed, for example) makes the match impossible to continue, the host can end it by holding `VoidMatchKey`. A confirmation screen appears, and holding the key again confirms it (two stages, so it cannot be triggered by accident). No team wins and no cosmetic tokens are awarded, but the result screen and the match log are shown as usual, and everyone's role is revealed
 
 ## Streamer-Safe Mode
 
-For anyone who wants to avoid automated content detection on streaming platforms or misunderstandings from viewers, this mode replaces some parody visuals and distinctive sound effects with generic assets or silence. Set `StreamerSafeMode = true` in the `[Streamer]` section of the config file (`BepInEx/config/minorunara.werewolf.cfg`); the change takes effect after a restart:
+As a precaution, this mode replaces some parody visuals and distinctive sound effects with generic assets or silence. Set `StreamerSafeMode = true` in the `[Streamer]` section of the config file (`BepInEx/config/minorunara.werewolf.cfg`); the change takes effect after a restart:
 
 - The Bomber's two ability icons (parody visuals) → generic bomb icons
 - The meeting-convene chime → a generic notification sound

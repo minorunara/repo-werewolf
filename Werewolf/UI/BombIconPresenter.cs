@@ -15,8 +15,6 @@ namespace Werewolf.UI
         private const float BombIconSize = 144f;
         private const float HeadOffsetY = 1.7f;
         private const float BombIconVerticalOffsetPx = -52.8f;
-        private const float VisionMaxDistance = 15f;
-        private const float VisionProbeHeight = 1.2f;
         private const float PlantFlightSeconds = 3f;
         private const float PlantArcHeightPx = 260f;
         private const float PlantThrowOriginScreenX = 0.56f;
@@ -34,6 +32,8 @@ namespace Werewolf.UI
         private float _plantFlightStartedAt;
 
         public bool Exists => _root != null;
+
+        private RectTransform RootRect => (RectTransform)_root.transform;
 
         public void Build(Transform layerRoot)
         {
@@ -78,7 +78,7 @@ namespace Werewolf.UI
                     {
                         Vector3? anchor = resolveWorldPos != null ? resolveWorldPos(kv.Key) : null;
                         Image img = EnsureRadial(kv.Key);
-                        if (anchor != null && !BodyVisibleFromCamera(anchor.Value, cam))
+                        if (anchor != null && !OverheadVision.BodyVisibleFromCamera(anchor.Value, cam))
                             img.enabled = false;
                         else
                             PlaceOrHide(img, anchor, cam);
@@ -124,7 +124,7 @@ namespace Werewolf.UI
                         Image img = EnsureBombIcon(actor);
                         if (actor == _plantFlightTarget)
                             img.enabled = false;
-                        else if (anchor != null && !BodyVisibleFromCamera(anchor.Value, cam))
+                        else if (anchor != null && !OverheadVision.BodyVisibleFromCamera(anchor.Value, cam))
                             img.enabled = false;
                         else
                             PlaceOrHide(img, anchor, cam, verticalOffsetPx: BombIconVerticalOffsetPx);
@@ -185,16 +185,6 @@ namespace Werewolf.UI
         {
             foreach (int a in set) if (a == actor) return true;
             return false;
-        }
-
-        private static bool BodyVisibleFromCamera(Vector3 bodyPos, Camera cam)
-        {
-            Vector3 probe = bodyPos + Vector3.up * VisionProbeHeight;
-            Vector3 toCam = cam.transform.position - probe;
-            float dist = toCam.magnitude;
-            if (dist > VisionMaxDistance) return false;
-            int mask = (int)SemiFunc.LayerMaskGetVisionObstruct() & ~LayerMask.GetMask("Player");
-            return !Physics.Raycast(probe, toCam, dist, mask, QueryTriggerInteraction.Collide);
         }
 
         private Image EnsureRadial(int actor)
@@ -291,7 +281,8 @@ namespace Werewolf.UI
                 return;
             }
 
-            Vector2 startUi = ViewportToUi(new Vector2(PlantThrowOriginScreenX, PlantThrowOriginScreenY));
+            Vector2 startUi = OverheadProjection.ViewportToUi(
+                new Vector2(PlantThrowOriginScreenX, PlantThrowOriginScreenY), RootRect);
             Vector3 endViewport = cam.WorldToViewportPoint(target.Value + Vector3.up * HeadOffsetY);
             if (endViewport.z <= 0f)
             {
@@ -299,7 +290,7 @@ namespace Werewolf.UI
                 return;
             }
 
-            Vector2 uiPos = Vector2.Lerp(startUi, ViewportToUi(endViewport), t);
+            Vector2 uiPos = Vector2.Lerp(startUi, OverheadProjection.ViewportToUi(endViewport, RootRect), t);
             uiPos.y += BombIconVerticalOffsetPx * t;
             uiPos.y += PlantArcHeightPx * 4f * t * (1f - t);
             Image icon = EnsurePlantFlightIcon();
@@ -329,26 +320,14 @@ namespace Werewolf.UI
                 return;
             }
             Vector3 world = anchorPos.Value + Vector3.up * HeadOffsetY;
-            Vector3 viewport = cam.WorldToViewportPoint(world);
-            if (viewport.z <= 0f
-                || viewport.x < 0f || viewport.x > 1f
-                || viewport.y < 0f || viewport.y > 1f)
+            if (!OverheadProjection.TryProject(cam, world, RootRect, out Vector2 uiPos))
             {
                 img.enabled = false;
                 return;
             }
             if (!img.enabled) img.enabled = true;
-            Vector2 uiPos = ViewportToUi(viewport);
             uiPos.y += verticalOffsetPx;
             img.rectTransform.anchoredPosition = uiPos;
-        }
-
-        private Vector2 ViewportToUi(Vector2 viewport)
-        {
-            RectTransform canvasRect = _root.transform as RectTransform;
-            return new Vector2(
-                (viewport.x - 0.5f) * canvasRect.rect.width,
-                (viewport.y - 0.5f) * canvasRect.rect.height);
         }
 
         private void HideAll()

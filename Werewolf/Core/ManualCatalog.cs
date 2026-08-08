@@ -88,6 +88,7 @@ namespace Werewolf.Core
             new ManualPage(TextId.ManualMeetingFlowTitle, TextId.ManualMeetingFlowBody, "manual_death_reveal"),
             new ManualPage(TextId.ManualVotingTitle, TextId.ManualVotingBody, "manual_vote_panel",
                 VotePanelImageHeight, VotePanelImageWidth),
+            new ManualPage(TextId.ManualScatterTitle, TextId.ManualScatterBody),
             new ManualPage(TextId.ManualGaugeBasicsTitle, new[]
             {
                 ManualBlock.Text(TextId.ManualGaugeIntro),
@@ -137,13 +138,13 @@ namespace Werewolf.Core
             new ManualSection(TextId.ManualSectionBasics, 0),
             new ManualSection(TextId.ManualSectionExploration, 4),
             new ManualSection(TextId.ManualSectionMeeting, 8),
-            new ManualSection(TextId.ManualSectionGauge, 12),
-            new ManualSection(TextId.ManualSectionVillager, 13),
-            new ManualSection(TextId.ManualSectionShaman, 14),
-            new ManualSection(TextId.ManualSectionWerewolf, 16),
-            new ManualSection(TextId.ManualSectionBlackCat, 20),
-            new ManualSection(TextId.ManualSectionBomber, 23),
-            new ManualSection(TextId.ManualSectionAfterDeath, 26),
+            new ManualSection(TextId.ManualSectionGauge, 13),
+            new ManualSection(TextId.ManualSectionVillager, 14),
+            new ManualSection(TextId.ManualSectionShaman, 15),
+            new ManualSection(TextId.ManualSectionWerewolf, 17),
+            new ManualSection(TextId.ManualSectionBlackCat, 21),
+            new ManualSection(TextId.ManualSectionBomber, 24),
+            new ManualSection(TextId.ManualSectionAfterDeath, 27),
         };
 
         public static int PageCount => Pages.Length;

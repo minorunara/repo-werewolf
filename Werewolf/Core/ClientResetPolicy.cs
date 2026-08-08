@@ -2,10 +2,10 @@ namespace Werewolf.Core
 {
     public static class ClientResetPolicy
     {
-        public static void ApplyRoomLeft(MeetingClientState meetingClient)
+        public static void ApplyRoomLeft(MeetingClientState meetingClient, IdRosterClient idRoster)
         {
-            if (meetingClient == null) return;
-            meetingClient.Reset();
+            meetingClient?.Reset();
+            idRoster?.Reset();
         }
     }
 }

@@ -146,11 +146,20 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void VolumeScaleFor_AboveTenSeconds_IsBaseVolume()
+        public void VolumeScaleFor_RegularMarksAboveTenSeconds_IsBaseVolume()
         {
-            Assert.Equal(BellSchedule.BaseVolumeScale, BellSchedule.VolumeScaleFor(300));
+            Assert.Equal(BellSchedule.BaseVolumeScale, BellSchedule.VolumeScaleFor(270));
             Assert.Equal(BellSchedule.BaseVolumeScale, BellSchedule.VolumeScaleFor(60));
             Assert.Equal(BellSchedule.BaseVolumeScale, BellSchedule.VolumeScaleFor(15));
+        }
+
+        [Fact]
+        public void VolumeScaleFor_FiveMinuteBell_UsesDedicatedFullVolume()
+        {
+            Assert.Equal(BellSchedule.FiveMinuteVolumeScale,
+                BellSchedule.VolumeScaleFor(BellSchedule.AlertThresholdSec));
+            Assert.Equal(1.0f, BellSchedule.FiveMinuteVolumeScale);
+            Assert.True(BellSchedule.FiveMinuteVolumeScale > BellSchedule.BaseVolumeScale);
         }
 
         [Fact]
@@ -166,6 +175,16 @@ namespace Werewolf.Tests
                 Assert.True(v > prev, $"mark={mark} の音量 {v} が直前 {prev} より大きくない");
                 prev = v;
             }
+        }
+
+        [Fact]
+        public void ClipKeyFor_FiveMinuteMark_UsesDedicatedBellInsteadOfDefault()
+        {
+            Assert.Equal(BellSchedule.FiveMinuteClipKey,
+                BellSchedule.ClipKeyFor(BellSchedule.AlertThresholdSec));
+            Assert.Equal(BellSchedule.DefaultClipKey, BellSchedule.ClipKeyFor(270));
+            Assert.NotEqual(BellSchedule.DefaultClipKey,
+                BellSchedule.ClipKeyFor(BellSchedule.AlertThresholdSec));
         }
     }
 }

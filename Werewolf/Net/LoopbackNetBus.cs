@@ -61,7 +61,7 @@ namespace Werewolf.Net
         private static void LogSend(byte code, string target, object[] payload, int[] targetActors)
         {
             WLog.Event("send", code, target, payload,
-                secret: EventCodes.IsSecret(code), targetActors: targetActors);
+                secret: MessageCodes.IsSecret(code), targetActors: targetActors);
         }
 
         private static bool Contains(int[] actors, int value)

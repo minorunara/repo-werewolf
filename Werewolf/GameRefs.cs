@@ -42,6 +42,7 @@ namespace Werewolf
         public static AccessTools.FieldRef<RoundDirector, bool> RoundDirector_allExtractionPointsCompleted;
         public static AccessTools.FieldRef<RoundDirector, int> RoundDirector_haulGoal;
         public static AccessTools.FieldRef<RoundDirector, int> RoundDirector_extractionPointSurplus;
+        public static AccessTools.FieldRef<ExtractionPoint, ExtractionPoint.State> ExtractionPoint_currentState;
         public static AccessTools.FieldRef<StatsManager, string> StatsManager_saveFileCurrent;
         public static AccessTools.FieldRef<StatsManager,
             SortedDictionary<string, Dictionary<string, int>>> StatsManager_dictionaryOfDictionaries;
@@ -119,6 +120,7 @@ namespace Werewolf
             RunManager_cosmeticWorldObjectCooldown = Field<RunManager, float>("cosmeticWorldObjectCooldown");
             RunManager_moonLevelChanged = Field<RunManager, bool>("moonLevelChanged");
             RoundDirector_extractionPoints = Field<RoundDirector, int>("extractionPoints");
+            ExtractionPoint_currentState = Field<ExtractionPoint, ExtractionPoint.State>("currentState");
             RoundDirector_extractionPointsCompleted = Field<RoundDirector, int>("extractionPointsCompleted");
             RoundDirector_allExtractionPointsCompleted = Field<RoundDirector, bool>("allExtractionPointsCompleted");
             RoundDirector_haulGoal = Field<RoundDirector, int>("haulGoal");

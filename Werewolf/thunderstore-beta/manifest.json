@@ -1,0 +1,10 @@
+{
+    "name": "REPO_Werewolf_BETA",
+    "version_number": "0.1.0",
+    "website_url": "https://github.com/minorunara/repo-werewolf",
+    "description": "[Experimental/BETA] Work-in-progress builds of REPO Werewolf (REPO人狼). Expect bugs and instability. Use the stable version unless you have a specific reason not to.",
+    "dependencies": [
+        "BepInEx-BepInExPack-5.4.2305",
+        "nickklmao-REPOConfig-1.2.6"
+    ]
+}

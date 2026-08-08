@@ -21,6 +21,10 @@ namespace Werewolf.UI
         private static AssetBundle _bundle;
         private static bool _bundleAttempted;
 
+        private static bool _streamerSafeMode;
+
+        public static void SetStreamerSafeMode(bool enabled) => _streamerSafeMode = enabled;
+
         public static Sprite GetSprite(string key)
         {
             if (string.IsNullOrEmpty(key)) return null;
@@ -86,9 +90,20 @@ namespace Werewolf.UI
             if (_textures.TryGetValue(key, out var cached)) return cached;
 
             Texture2D tex = null;
+            string effectiveKey = key;
+            if (StreamerSafe.TryResolve(_streamerSafeMode, key, out string safeReplacement))
+            {
+                if (safeReplacement == null)
+                {
+                    LogFallback(key, "streamer_safe");
+                    _textures[key] = null;
+                    return null;
+                }
+                effectiveKey = safeReplacement;
+            }
             try
             {
-                var bytes = LoadEmbeddedBytes(key + ".png");
+                var bytes = LoadEmbeddedBytes(effectiveKey + ".png");
                 if (bytes != null && bytes.Length > 0)
                 {
                     tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
@@ -150,9 +165,20 @@ namespace Werewolf.UI
             if (_clips.TryGetValue(key, out var cached)) return cached;
 
             AudioClip clip = null;
+            string effectiveKey = key;
+            if (StreamerSafe.TryResolve(_streamerSafeMode, key, out string safeReplacement))
+            {
+                if (safeReplacement == null)
+                {
+                    LogFallback(key, "streamer_safe");
+                    _clips[key] = null;
+                    return null;
+                }
+                effectiveKey = safeReplacement;
+            }
             try
             {
-                var bytes = LoadEmbeddedBytes(key + ".wav");
+                var bytes = LoadEmbeddedBytes(effectiveKey + ".wav");
                 if (bytes != null && bytes.Length > 0)
                 {
                     clip = DecodePcm16Wav(key, bytes);
@@ -275,6 +301,7 @@ namespace Werewolf.UI
             _clips.Clear();
             _bundle = null;
             _bundleAttempted = false;
+            _streamerSafeMode = false;
             _bombIconPlaceholder = null;
             _heartbeatPlaceholder = null;
         }

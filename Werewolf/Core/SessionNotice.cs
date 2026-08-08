@@ -25,6 +25,8 @@ namespace Werewolf.Core
         PlayerDisconnected = 10,
 
         ConveneHoldHint = 11,
+
+        ScatterGuardTripped = 12,
     }
 
     public sealed class SessionNotice
@@ -77,5 +79,8 @@ namespace Werewolf.Core
 
         public static SessionNotice ForConveneHoldHint()
             => new SessionNotice(NoticeKind.ConveneHoldHint);
+
+        public static SessionNotice ForScatterGuardTripped()
+            => new SessionNotice(NoticeKind.ScatterGuardTripped);
     }
 }

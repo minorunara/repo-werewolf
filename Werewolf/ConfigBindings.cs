@@ -20,121 +20,129 @@ namespace Werewolf
         internal const string SecLoadoutItems = "10. Loadout Items";
         private const string SecClientKeybinds = "Client Keybinds";
         private const string SecClientUi = "Client UI";
+        private const string SecStreamer = "Streamer";
         private const string SecTutorial = "Tutorial";
         private const string SecVoice = "Voice";
         private const string SecDebug = "Debug";
 
-        internal readonly ConfigEntry<int> WerewolfCount;
-        internal readonly ConfigEntry<int> BlackCatChancePercent;
-        internal readonly ConfigEntry<int> BomberChancePercent;
-        internal readonly ConfigEntry<int> RoundSeconds;
-        internal readonly ConfigEntry<int> BlackCatRevealDelaySec;
-        internal readonly ConfigEntry<bool> BlackCatCurseEnabled;
-        internal readonly ConfigEntry<bool> DebugMode;
+        internal ConfigEntry<int> WerewolfCount;
+        internal ConfigEntry<int> BlackCatChancePercent;
+        internal ConfigEntry<int> BomberChancePercent;
+        internal ConfigEntry<int> RoundSeconds;
+        internal ConfigEntry<int> BlackCatRevealDelaySec;
+        internal ConfigEntry<bool> BlackCatCurseEnabled;
+        internal ConfigEntry<bool> DebugMode;
 
-        internal readonly ConfigEntry<int> ShamanChancePercent;
-        internal readonly ConfigEntry<int> ShamanGazeFullSec;
-        internal readonly ConfigEntry<int> ShamanGhostCooldownSec;
-        internal readonly ConfigEntry<int> ShamanStormWeakMeters;
-        internal readonly ConfigEntry<int> ShamanStormMediumMeters;
-        internal readonly ConfigEntry<int> ShamanStormStrongMeters;
+        internal ConfigEntry<int> ShamanChancePercent;
+        internal ConfigEntry<int> ShamanGazeFullSec;
+        internal ConfigEntry<int> ShamanGhostCooldownSec;
+        internal ConfigEntry<int> ShamanStormWeakMeters;
+        internal ConfigEntry<int> ShamanStormMediumMeters;
+        internal ConfigEntry<int> ShamanStormStrongMeters;
 
-        internal readonly ConfigEntry<int> BomberProximityMeters;
-        internal readonly ConfigEntry<int> BomberGaugeFullSec;
-        internal readonly ConfigEntry<int> BomberInitialCooldownSec;
-        internal readonly ConfigEntry<int> BomberCooldownSec;
-        internal readonly ConfigEntry<int> BomberBlastRadiusMeters;
-        internal readonly ConfigEntry<int> BomberBlastPlayerDamage;
-        internal readonly ConfigEntry<int> BomberBlastEnemyDamage;
-        internal readonly ConfigEntry<int> BomberAmmoRefillPct;
-        internal readonly ConfigEntry<KeyCode> BomberPlantKey;
-        internal readonly ConfigEntry<KeyCode> BomberDetonateKey;
+        internal ConfigEntry<int> BomberProximityMeters;
+        internal ConfigEntry<int> BomberGaugeFullSec;
+        internal ConfigEntry<int> BomberInitialCooldownSec;
+        internal ConfigEntry<int> BomberCooldownSec;
+        internal ConfigEntry<int> BomberBlastRadiusMeters;
+        internal ConfigEntry<int> BomberBlastPlayerDamage;
+        internal ConfigEntry<int> BomberBlastEnemyDamage;
+        internal ConfigEntry<int> BomberAmmoRefillPct;
+        internal ConfigEntry<KeyCode> BomberPlantKey;
+        internal ConfigEntry<KeyCode> BomberDetonateKey;
 
-        internal readonly ConfigEntry<string> Language;
+        internal ConfigEntry<string> Language;
 
-        internal readonly ConfigEntry<int> MeetingRightsPerPlayer;
-        internal readonly ConfigEntry<int> ConveneSuppressStartSec;
-        internal readonly ConfigEntry<int> ConveneSuppressAfterSec;
-        internal readonly ConfigEntry<int> MeetingCountdownSec;
-        internal readonly ConfigEntry<int> MeetingDurationSec;
-        internal readonly ConfigEntry<bool> VoteTimeCutEnabled;
-        internal readonly ConfigEntry<int> ResultDisplaySec;
-        internal readonly ConfigEntry<float> ButtonOffsetX;
-        internal readonly ConfigEntry<float> ButtonOffsetY;
-        internal readonly ConfigEntry<float> ButtonOffsetZ;
-        internal readonly ConfigEntry<float> ButtonYaw;
-        internal readonly ConfigEntry<float> ButtonPitch;
+        internal ConfigEntry<int> MeetingRightsPerPlayer;
+        internal ConfigEntry<int> ConveneSuppressStartSec;
+        internal ConfigEntry<int> ConveneSuppressAfterSec;
+        internal ConfigEntry<int> MeetingCountdownSec;
+        internal ConfigEntry<int> MeetingDurationSec;
+        internal ConfigEntry<bool> VoteTimeCutEnabled;
+        internal ConfigEntry<int> ResultDisplaySec;
+        internal ConfigEntry<bool> MeetingScatterEnabled;
+        internal ConfigEntry<int> ScatterGuardSec;
+        internal ConfigEntry<float> ButtonOffsetX;
+        internal ConfigEntry<float> ButtonOffsetY;
+        internal ConfigEntry<float> ButtonOffsetZ;
+        internal ConfigEntry<float> ButtonYaw;
+        internal ConfigEntry<float> ButtonPitch;
 
-        internal readonly ConfigEntry<int> StaminaUnlockPct;
-        internal readonly ConfigEntry<int> JumpUnlockPct;
-        internal readonly ConfigEntry<int> EnemyIgnoreUnlockPct;
-        internal readonly ConfigEntry<int> HealUnlockPct;
-        internal readonly ConfigEntry<int> HealIntervalSec;
-        internal readonly ConfigEntry<int> BeaconChargePct;
-        internal readonly ConfigEntry<int> InformantThresholdPct;
-        internal readonly ConfigEntry<int> ExtraJumpCount;
-        internal readonly ConfigEntry<int> BeaconCooldownSec;
-        internal readonly ConfigEntry<int> BeaconSuppressStartSec;
-        internal readonly ConfigEntry<int> BeaconSuppressAfterMeetingSec;
-        internal readonly ConfigEntry<int> CatGaugeSyncIntervalSec;
-        internal readonly ConfigEntry<bool> OrbGaugeEnabled;
-        internal readonly ConfigEntry<KeyCode> WolfModeKey;
-        internal readonly ConfigEntry<KeyCode> BeaconKey;
+        internal ConfigEntry<int> StaminaUnlockPct;
+        internal ConfigEntry<int> JumpUnlockPct;
+        internal ConfigEntry<int> EnemyIgnoreUnlockPct;
+        internal ConfigEntry<int> HealUnlockPct;
+        internal ConfigEntry<int> HealIntervalSec;
+        internal ConfigEntry<int> BeaconChargePct;
+        internal ConfigEntry<int> InformantThresholdPct;
+        internal ConfigEntry<int> ExtraJumpCount;
+        internal ConfigEntry<int> BeaconCooldownSec;
+        internal ConfigEntry<int> BeaconSuppressStartSec;
+        internal ConfigEntry<int> BeaconSuppressAfterMeetingSec;
+        internal ConfigEntry<int> CatGaugeSyncIntervalSec;
+        internal ConfigEntry<bool> OrbGaugeEnabled;
+        internal ConfigEntry<KeyCode> WolfModeKey;
+        internal ConfigEntry<KeyCode> BeaconKey;
 
-        internal readonly ConfigEntry<bool> WerewolfModeEnabled;
-        internal readonly ConfigEntry<bool> MinimapHideEnabled;
-        internal readonly ConfigEntry<int> ValuableMapMode;
-        internal readonly ConfigEntry<int> GameOverAutoReturnSec;
-        internal readonly ConfigEntry<int> ToastDurationSec;
+        internal ConfigEntry<bool> WerewolfModeEnabled;
+        internal ConfigEntry<bool> MinimapHideEnabled;
+        internal ConfigEntry<bool> OutfitChangeAllowed;
+        internal ConfigEntry<int> ValuableMapMode;
+        internal ConfigEntry<int> GameOverAutoReturnSec;
+        internal ConfigEntry<int> ToastDurationSec;
 
-        internal readonly ConfigEntry<KeyCode> LobbySettingsPanelKey;
+        internal ConfigEntry<KeyCode> LobbySettingsPanelKey;
 
-        internal readonly ConfigEntry<KeyCode> ManualKey;
+        internal ConfigEntry<KeyCode> ManualKey;
 
-        internal readonly ConfigEntry<KeyCode> CorpseReportKey;
+        internal ConfigEntry<KeyCode> CorpseReportKey;
 
-        internal readonly ConfigEntry<KeyCode> ResultReturnKey;
+        internal ConfigEntry<KeyCode> ResultReturnKey;
 
-        internal readonly ConfigEntry<KeyCode> MeetingMapKey;
-        internal readonly ConfigEntry<KeyCode> MeetingChatLogKey;
-        internal readonly ConfigEntry<float> MeetingMapOrthoSize;
-        internal readonly ConfigEntry<int> MeetingMapResolution;
-        internal readonly ConfigEntry<bool> MeetingMapGrid;
-        internal readonly ConfigEntry<bool> MeetingChatLog;
+        internal ConfigEntry<KeyCode> VoidMatchKey;
 
-        internal readonly ConfigEntry<int> NecroVoiceMode;
+        internal ConfigEntry<KeyCode> MeetingMapKey;
+        internal ConfigEntry<KeyCode> MeetingChatLogKey;
+        internal ConfigEntry<float> MeetingMapOrthoSize;
+        internal ConfigEntry<int> MeetingMapResolution;
+        internal ConfigEntry<bool> MeetingMapGrid;
+        internal ConfigEntry<bool> MeetingChatLog;
 
-        internal readonly ConfigEntry<float> NecroVoiceVolume;
-        internal readonly ConfigEntry<float> NecroVoiceLowPassCutoffHz;
-        internal readonly ConfigEntry<float> NecroVoiceEchoDelayMs;
-        internal readonly ConfigEntry<float> NecroVoiceEchoDecay;
-        internal readonly ConfigEntry<float> NecroVoiceReverbRoom;
-        internal readonly ConfigEntry<float> NecroVoiceReverbRoomHF;
-        internal readonly ConfigEntry<float> NecroVoiceReverbDecayTime;
-        internal readonly ConfigEntry<float> NecroVoiceReverbDecayHFRatio;
-        internal readonly ConfigEntry<float> NecroVoiceReverbReflections;
-        internal readonly ConfigEntry<float> NecroVoiceReverbReflectionsDelay;
-        internal readonly ConfigEntry<float> NecroVoiceReverbLevel;
-        internal readonly ConfigEntry<float> NecroVoiceReverbDelay;
-        internal readonly ConfigEntry<float> NecroVoiceReverbDiffusion;
-        internal readonly ConfigEntry<float> NecroVoiceReverbDensity;
-        internal readonly ConfigEntry<float> NecroVoiceReverbHFReference;
+        internal ConfigEntry<int> NecroVoiceMode;
 
-        private readonly Dictionary<TutorialId, ConfigEntry<bool>> _tutorialSeen;
-        internal readonly ConfigEntry<bool> ResetTutorials;
-        internal readonly ConfigEntry<float> TutorialFontScale;
+        internal ConfigEntry<float> NecroVoiceVolume;
+        internal ConfigEntry<float> NecroVoiceLowPassCutoffHz;
+        internal ConfigEntry<float> NecroVoiceEchoDelayMs;
+        internal ConfigEntry<float> NecroVoiceEchoDecay;
+        internal ConfigEntry<float> NecroVoiceReverbRoom;
+        internal ConfigEntry<float> NecroVoiceReverbRoomHF;
+        internal ConfigEntry<float> NecroVoiceReverbDecayTime;
+        internal ConfigEntry<float> NecroVoiceReverbDecayHFRatio;
+        internal ConfigEntry<float> NecroVoiceReverbReflections;
+        internal ConfigEntry<float> NecroVoiceReverbReflectionsDelay;
+        internal ConfigEntry<float> NecroVoiceReverbLevel;
+        internal ConfigEntry<float> NecroVoiceReverbDelay;
+        internal ConfigEntry<float> NecroVoiceReverbDiffusion;
+        internal ConfigEntry<float> NecroVoiceReverbDensity;
+        internal ConfigEntry<float> NecroVoiceReverbHFReference;
 
-        internal readonly ConfigEntry<float> CursorMirrorScale;
+        private Dictionary<TutorialId, ConfigEntry<bool>> _tutorialSeen;
+        internal ConfigEntry<bool> ResetTutorials;
+        internal ConfigEntry<float> TutorialFontScale;
 
-        internal readonly ConfigEntry<int> HudOffsetX;
-        internal readonly ConfigEntry<int> HudOffsetY;
+        internal ConfigEntry<bool> StreamerSafeMode;
 
-        internal readonly ConfigEntry<int> StartLevelNumber;
+        internal ConfigEntry<float> CursorMirrorScale;
+
+        internal ConfigEntry<int> HudOffsetX;
+        internal ConfigEntry<int> HudOffsetY;
+
+        internal ConfigEntry<int> StartLevelNumber;
         internal ConfigEntry<string> StartMapName;
-        internal readonly ConfigEntry<int> StartEnergyPct;
-        internal readonly ConfigEntry<int> OrbDropMax;
+        internal ConfigEntry<int> StartEnergyPct;
+        internal ConfigEntry<int> OrbDropMax;
 
-        private readonly Dictionary<string, ConfigEntry<int>> _startUpgrades;
+        private Dictionary<string, ConfigEntry<int>> _startUpgrades;
 
         internal Func<string> ItemsSpecProvider { get; set; }
 
@@ -147,6 +155,26 @@ namespace Werewolf
             var defaults = new GameConfig();
             _valuableMapModeDefault = defaults.ValuableMapMode;
             _necroVoiceModeDefault = defaults.NecroVoiceMode;
+
+            BindGeneral(config, defaults);
+            BindMeeting(config, defaults);
+            BindRoleAssignment(config, defaults);
+            BindShaman(config, defaults);
+            BindWerewolf(config, defaults);
+            BindBlackCat(config, defaults);
+            BindBomber(config, defaults);
+            BindStage(config, defaults);
+            BindPlayerUpgrades(config, defaults);
+            BindClientKeybinds(config, defaults);
+            BindClientUi(config, defaults);
+            BindStreamer(config, defaults);
+            BindTutorial(config, defaults);
+            BindVoice(config, defaults);
+            BindDebug(config, defaults);
+        }
+
+        private void BindGeneral(ConfigFile config, GameConfig defaults)
+        {
 
             WerewolfModeEnabled = config.Bind(
                 SecGeneral, "WerewolfModeEnabled", true,
@@ -176,6 +204,11 @@ namespace Werewolf
                 SecGeneral, "MinimapHideEnabled", defaults.MinimapHideEnabled,
                 "Hide valuables and corpses from the minimap / 貴重品・死体のミニマップ非表示設定");
 
+            OutfitChangeAllowed = config.Bind(
+                SecGeneral, "OutfitChangeAllowed", defaults.OutfitChangeAllowed,
+                "Allow appearance (cosmetic) changes during a match (impersonation play) / " +
+                "試合中の見た目（コスメ）変更を許可する（着替えなりすましを遊びとして認める）");
+
             ValuableMapMode = config.Bind(
                 SecGeneral, "ValuableMapMode", (int)defaults.ValuableMapMode,
                 new ConfigDescription(
@@ -201,6 +234,10 @@ namespace Werewolf
                     "Fallback: seconds until the result screen auto-returns to the lobby when the host does not press the return key (0 = never) / " +
                     "ホストが帰還キーを押さない場合に結果画面から自動でロビーへ戻るまでの保険秒数（0=自動で戻らない）",
                     new AcceptableValueRange<int>(0, 60)));
+        }
+
+        private void BindMeeting(ConfigFile config, GameConfig defaults)
+        {
 
             MeetingRightsPerPlayer = config.Bind(
                 SecMeeting, "MeetingRightsPerPlayer", defaults.MeetingRightsPerPlayer,
@@ -235,6 +272,23 @@ namespace Werewolf
                     "開票結果の表示保持時間（秒）。この経過後に通常プレイへ復帰する",
                     new AcceptableValueRange<int>(0, 60)));
 
+            MeetingScatterEnabled = config.Bind(
+                SecMeeting, "MeetingScatterEnabled", defaults.MeetingScatterEnabled,
+                "Reshuffle surviving players into random groups of 3+ and warp each group to its own destination (truck / completed extraction points) when a meeting ends. Groups are announced to everyone, destinations stay hidden. No scatter below 6 survivors or before the first completed extraction (prevents fixed patrol groups) / " +
+                "会議終了時に生存者を3人以上の組へ無作為に組み替え、組ごとにトラック＋納品済み抽出地点の別行き先へ分散ワープさせるか（固定グループ巡回の防止。組分けは全員へ発表・行き先は非公開。生存6人未満・最初の納品完了前は分散なし）");
+
+            ScatterGuardSec = config.Bind(
+                SecMeeting, "ScatterGuardSec", defaults.ScatterGuardSec,
+                new ConfigDescription(
+                    "Guard window after a scatter warp (seconds). If anyone dies within this window right after " +
+                    "groups scattered, the host auto-convenes an immediate meeting (no warning countdown, no meeting " +
+                    "right consumed) shown as a \"handover incident\" — punishes spawn-kills right after warp-in. " +
+                    "0 = off. Not triggered during the last run / " +
+                    "散開ワープ後の監視時間（秒）。分散直後のこの時間内に死亡が発生するとホストが即時会議" +
+                    "（予告なし＝即時ワープ・開催権消費なし・「引き継ぎのトラブル」表示）を自動召集する" +
+                    "＝着地直後の即キルの逃げ得防止。0=無効。ラストラン中は発火しない",
+                    new AcceptableValueRange<int>(0, 60)));
+
             ConveneSuppressStartSec = config.Bind(
                 SecMeeting, "ConveneSuppressStartSec", defaults.ConveneSuppressStartSec,
                 new ConfigDescription(
@@ -248,6 +302,10 @@ namespace Werewolf
                     "Time right after a meeting ends during which the next meeting cannot be called (seconds) / " +
                     "会議終了直後に次の会議召集を抑止する時間（秒）",
                     new AcceptableValueRange<int>(0, 60)));
+        }
+
+        private void BindRoleAssignment(ConfigFile config, GameConfig defaults)
+        {
 
             ShamanChancePercent = config.Bind(
                 SecRoleAssignment, "ShamanChancePercent", defaults.ShamanChancePercent,
@@ -276,6 +334,10 @@ namespace Werewolf
                     "Bomber appearance chance P_bomber (0..100%). The Bomber mutates from one werewolf slot (needs werewolves >= 2) / " +
                     "爆弾魔の出現確率 P_bomber（0..100%）。爆弾魔は人狼枠から変異する（人狼の人数2以上で抽選）",
                     new AcceptableValueRange<int>(0, 100)));
+        }
+
+        private void BindShaman(ConfigFile config, GameConfig defaults)
+        {
 
             ShamanGazeFullSec = config.Bind(
                 SecShaman, "ShamanGazeFullSec", defaults.ShamanGazeFullSec,
@@ -307,6 +369,10 @@ namespace Werewolf
                 new ConfigDescription(
                     "Radius of the strong haunting ring (m) / 霊障（強）の発動半径（m）",
                     new AcceptableValueRange<int>(1, 100)));
+        }
+
+        private void BindWerewolf(ConfigFile config, GameConfig defaults)
+        {
 
             StaminaUnlockPct = config.Bind(
                 SecWerewolf, "StaminaUnlockPct", defaults.StaminaUnlockPct,
@@ -372,6 +438,10 @@ namespace Werewolf
                     "Time right after a meeting ends during which the beacon cannot be used (seconds) / " +
                     "会議終了直後のビーコン使用抑止時間（秒）",
                     new AcceptableValueRange<int>(0, 180)));
+        }
+
+        private void BindBlackCat(ConfigFile config, GameConfig defaults)
+        {
 
             BlackCatRevealDelaySec = config.Bind(
                 SecBlackCat, "BlackCatRevealDelaySec", defaults.BlackCatRevealDelaySec,
@@ -399,6 +469,10 @@ namespace Werewolf
                     "Meeting start/end always refreshes regardless of the interval) / " +
                     "黒猫へのゲージ配信間隔（秒。0=リアルタイム配信。人狼へは常にリアルタイム。会議開始・終了時は間隔に関係なく更新される）",
                     new AcceptableValueRange<int>(0, 600)));
+        }
+
+        private void BindBomber(ConfigFile config, GameConfig defaults)
+        {
 
             BomberProximityMeters = config.Bind(
                 SecBomber, "BomberProximityMeters", defaults.BomberProximityMeters,
@@ -450,6 +524,10 @@ namespace Werewolf
                 new ConfigDescription(
                     "Damage to enemies / 敵ダメージ",
                     new AcceptableValueRange<int>(1, 999)));
+        }
+
+        private void BindStage(ConfigFile config, GameConfig defaults)
+        {
 
             StartLevelNumber = config.Bind(
                 SecStage, "StartLevelNumber", defaults.StartLevelNumber,
@@ -473,7 +551,10 @@ namespace Werewolf
                 new ConfigDescription(
                     "Number of valuable orbs dropped when an enemy dies (vanilla = 3) / 敵撃破時にドロップする貴重品オーブの数（バニラ = 3）",
                     new AcceptableValueRange<int>(0, 20)));
+        }
 
+        private void BindPlayerUpgrades(ConfigFile config, GameConfig defaults)
+        {
             var startUpgradeDefaults = new Dictionary<string, int> { ["Health"] = 1, ["Strength"] = 2 };
             _startUpgrades = new Dictionary<string, ConfigEntry<int>>(WorldgenUpgrades.Names.Count);
             foreach (var name in WorldgenUpgrades.Names)
@@ -485,6 +566,10 @@ namespace Werewolf
                         $"Starting upgrade level shared by all players ({name}). 0 = no upgrade / 全プレイヤー共通の開始時強化段階（{name}）。0 = 強化なし",
                         new AcceptableValueRange<int>(0, 20)));
             }
+        }
+
+        private void BindClientKeybinds(ConfigFile config, GameConfig defaults)
+        {
 
             WolfModeKey = config.Bind(
                 SecClientKeybinds, "WolfModeKey", KeyCode.F,
@@ -548,6 +633,17 @@ namespace Werewolf
                     "Host only: key binding to return to the lobby from the match result screen / " +
                     "ホスト専用: 試合結果画面からロビーへ戻るキーバインド",
                     null, "HideFromREPOConfig"));
+
+            VoidMatchKey = config.Bind(
+                SecClientKeybinds, "VoidMatchKey", KeyCode.F5,
+                new ConfigDescription(
+                    "Host only: hold this key to declare the match a no contest / " +
+                    "ホスト専用: 長押しで試合を無効試合にするキーバインド",
+                    null, "HideFromREPOConfig"));
+        }
+
+        private void BindClientUi(ConfigFile config, GameConfig defaults)
+        {
 
             ButtonOffsetX = config.Bind(
                 SecClientUi, "ButtonOffsetX", defaults.ButtonOffsetX,
@@ -644,6 +740,27 @@ namespace Werewolf
                     "Adjust if it overlaps the vanilla health/stamina display on your resolution / " +
                     "左上役職バッジの縦オフセット（1920x1080基準px・＋で下）。バニラの体力/スタミナ表示と重なる環境で調整する",
                     new AcceptableValueRange<int>(-1000, 1000)));
+        }
+
+        private void BindStreamer(ConfigFile config, GameConfig defaults)
+        {
+
+            StreamerSafeMode = config.Bind(
+                SecStreamer, "StreamerSafeMode", false,
+                new ConfigDescription(
+                    "Streamer-safe mode: replaces some parody visuals and distinctive sound effects " +
+                    "(the Bomber's two ability icons, the meeting-convene chime, and the two execution " +
+                    "sounds) with generic assets or silence, to avoid automated content detection on " +
+                    "streaming platforms and viewer misunderstandings. Local setting (affects only " +
+                    "your own screen and audio); applies after a game restart / " +
+                    "配信者向けセーフモード: 配信プラットフォームの自動判定や視聴者の誤解を避けるため、" +
+                    "一部のパロディ表現や特徴的な効果音（爆弾魔の能力アイコン2種・会議招集チャイム・" +
+                    "処刑演出の合の手2種）を汎用素材・無音に置き換える。ローカル設定（自分の画面と音にだけ効く）・反映はゲーム再起動",
+                    null, "HideFromREPOConfig"));
+        }
+
+        private void BindTutorial(ConfigFile config, GameConfig defaults)
+        {
 
             ResetTutorials = config.Bind(
                 SecTutorial, "ResetTutorials", false,
@@ -668,6 +785,10 @@ namespace Werewolf
                         $"Whether tutorial \"{id}\" has been shown (internal bookkeeping) / チュートリアル「{id}」を表示済みか（内部管理用）",
                         null, "HideFromREPOConfig"));
             }
+        }
+
+        private void BindVoice(ConfigFile config, GameConfig defaults)
+        {
 
             NecroVoiceVolume = config.Bind(
                 SecVoice, "NecroVoiceVolume", defaults.NecroVoiceVolume,
@@ -758,16 +879,20 @@ namespace Werewolf
                 new ConfigDescription(
                     "Eavesdrop voice reverb HF reference frequency (Hz) / 傍聴音声の Reverb 高域基準周波数（Hz）",
                     new AcceptableValueRange<float>(20f, 20000f), "HideFromREPOConfig"));
+        }
+
+        private void BindDebug(ConfigFile config, GameConfig defaults)
+        {
 
             DebugMode = config.Bind(
                 SecDebug, "DebugMode", defaults.DebugMode,
                 new ConfigDescription(
                     "Debug mode. true allows cheat commands (/ww ...), writes secret log lines immediately " +
-                    "(false batches them until the match ends; ADR-0030), and shows a persistent TEST PLAY banner " +
-                    "to every participant when the host enables it (ADR-0058) / " +
+                    "(false batches them until the match ends), and shows a persistent TEST PLAY banner " +
+                    "to every participant when the host enables it / " +
                     "デバッグモード。true でチートコマンド（/ww ...）を許可し、secret ログ行を即時出力する" +
-                    "（false は試合終了時に一括出力。ADR-0030）。ホストが有効にすると全参加者に" +
-                    "テストプレイ常設バナーが表示される（ADR-0058）",
+                    "（false は試合終了時に一括出力）。ホストが有効にすると全参加者に" +
+                    "テストプレイ常設バナーが表示される",
                     null, "HideFromREPOConfig"));
         }
 
@@ -802,6 +927,8 @@ namespace Werewolf
                 MeetingDurationSec = MeetingDurationSec.Value,
                 VoteTimeCutEnabled = VoteTimeCutEnabled.Value,
                 ResultDisplaySec = ResultDisplaySec.Value,
+                MeetingScatterEnabled = MeetingScatterEnabled.Value,
+                ScatterGuardSec = ScatterGuardSec.Value,
                 ButtonOffsetX = ButtonOffsetX.Value,
                 ButtonOffsetY = ButtonOffsetY.Value,
                 ButtonOffsetZ = ButtonOffsetZ.Value,
@@ -822,6 +949,7 @@ namespace Werewolf
                 OrbGaugeEnabled = OrbGaugeEnabled.Value,
                 WerewolfModeEnabled = WerewolfModeEnabled.Value,
                 MinimapHideEnabled = MinimapHideEnabled.Value,
+                OutfitChangeAllowed = OutfitChangeAllowed.Value,
                 ValuableMapMode = valuableMapMode,
                 GameOverAutoReturnSec = GameOverAutoReturnSec.Value,
                 ToastDurationSec = ToastDurationSec.Value,

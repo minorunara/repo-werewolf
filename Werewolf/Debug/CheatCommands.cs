@@ -13,7 +13,7 @@ namespace Werewolf.Debugging
             "checkmate|reveal <selfcat|mates>|kill <actor> [vote]|phase <play|meeting|gameover>|" +
             "meeting|vote <actor|skip> [asActor]|leave <actor>|meetingstatus|status|selftest|" +
             "gauge <pct>|beacon <charge [n]|use>|perk <stamina|jump|ghost|heal|all>|informant|curse [actor]|" +
-            "body [clear]|spawnbag [dollars]|bomb <gauge|plant <actor>|detonate|ammo [n]>|" +
+            "body [clear]|spawnbag [dollars]|scatter [diag|warp]|bomb <gauge|plant <actor>|detonate|ammo [n]>|" +
             "fx <reveal [villager|werewolf|blackcat]|toast [message]|countdown [sec]|" +
             "result|sfx [countdown|howl|toast]|clear>|" +
             "cfg <inject <id=value;...>|clear>|echo|lang export|" +
@@ -161,6 +161,10 @@ namespace Werewolf.Debugging
 
                 case "curse":
                     HandleCurse(director, args);
+                    break;
+
+                case "scatter":
+                    HandleScatter(director, args);
                     break;
 
                 case "bomb":
@@ -442,6 +446,26 @@ namespace Werewolf.Debugging
             director.DebugRolesCurse(target);
         }
 
+        private static void HandleScatter(WerewolfDirector director, string[] args)
+        {
+            string sub = args.Length >= 1 ? args[0].ToLowerInvariant() : "diag";
+            switch (sub)
+            {
+                case "diag":
+                    director.DebugScatterDiag();
+                    break;
+
+                case "warp":
+                    director.DebugScatterWarp();
+                    break;
+
+                default:
+                    WLog.Line("cmd_error", secret: false,
+                        ("name", "scatter"), ("reason", "bad_op"), ("usage", Usage));
+                    break;
+            }
+        }
+
         private static void HandleBomb(WerewolfDirector director, string[] args)
         {
             string sub = args.Length >= 1 ? args[0].ToLowerInvariant() : "";
@@ -562,7 +586,9 @@ namespace Werewolf.Debugging
                 case "howl": clipKey = "sfx_howl"; break;
                 case "toast": clipKey = NoticeSfx.DefaultClipKey; break;
                 case "notice_convene": clipKey = NoticeSfx.ConveneStartedClipKey; break;
-                case "bell": clipKey = "sfx_bell"; break;
+                case "bell": clipKey = BellSchedule.DefaultClipKey; break;
+                case "bell5": clipKey = BellSchedule.FiveMinuteClipKey; break;
+                case "chat": clipKey = "sfx_chat_message"; break;
                 default:
                     WLog.Line("cmd_error", secret: false, ("name", "fx"), ("reason", "bad_sfx_kind"), ("arg", kind));
                     return;

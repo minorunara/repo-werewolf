@@ -225,13 +225,13 @@ namespace Werewolf.Tests
         [Fact]
         public void CheckmateRevealCode_IsPublicBroadcastWithSchema()
         {
-            Assert.Equal(187, EventCodes.CheckmateReveal);
-            Assert.True(EventCodes.IsInRange(EventCodes.CheckmateReveal));
-            Assert.False(EventCodes.IsTargetOnly(EventCodes.CheckmateReveal));
-            Assert.False(EventCodes.IsMasterInbound(EventCodes.CheckmateReveal));
-            Assert.False(EventCodes.IsSecret(EventCodes.CheckmateReveal));
+            Assert.Equal(187, MessageCodes.CheckmateReveal);
+            Assert.True(MessageCodes.IsInRange(MessageCodes.CheckmateReveal));
+            Assert.False(MessageCodes.IsTargetOnly(MessageCodes.CheckmateReveal));
+            Assert.False(MessageCodes.IsMasterInbound(MessageCodes.CheckmateReveal));
+            Assert.False(MessageCodes.IsSecret(MessageCodes.CheckmateReveal));
             Assert.Equal(new[] { typeof(int[]), typeof(long) },
-                EventCodes.Schema(EventCodes.CheckmateReveal));
+                MessageCodes.Schema(MessageCodes.CheckmateReveal));
         }
 
         [Fact]

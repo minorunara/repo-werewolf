@@ -13,9 +13,12 @@ namespace Werewolf.Tests
             bool nearMeetingButton = false,
             int rightsRemaining = 0,
             long nowUnixMs = 0,
-            bool debugSession = false)
+            bool debugSession = false,
+            int selfParticipantId = 0,
+            bool scatterGuardActive = false)
             => new HudInput(phase, role, roundEndUnixMs, rolesClient, nearMeetingButton, rightsRemaining, nowUnixMs,
-                debugSession: debugSession);
+                debugSession: debugSession, selfParticipantId: selfParticipantId,
+                scatterGuardActive: scatterGuardActive);
 
         [Theory]
         [InlineData(GamePhase.Lobby)]
@@ -26,13 +29,35 @@ namespace Werewolf.Tests
 
             var state = model.Compute(Input(phase, Role.Werewolf,
                 rolesClient: MakeGaugeReceivedState(), nearMeetingButton: true, rightsRemaining: 2,
-                debugSession: true));
+                debugSession: true, scatterGuardActive: true));
 
             Assert.False(state.ShowBadge);
             Assert.False(state.ShowTimer);
             Assert.False(state.ShowGauge);
             Assert.False(state.ShowRights);
             Assert.False(state.ShowTestPlay);
+            Assert.False(state.ShowSelfId);
+            Assert.False(state.ShowScatterGuard);
+        }
+
+        [Fact]
+        public void Compute_ScatterGuardArmed_ShowsGuardBanner()
+        {
+            var model = new HudModel();
+
+            var state = model.Compute(Input(GamePhase.Play, Role.Villager, scatterGuardActive: true));
+
+            Assert.True(state.ShowScatterGuard);
+        }
+
+        [Fact]
+        public void Compute_ScatterGuardNotArmed_HidesGuardBanner()
+        {
+            var model = new HudModel();
+
+            var state = model.Compute(Input(GamePhase.Play, Role.Villager));
+
+            Assert.False(state.ShowScatterGuard);
         }
 
         [Fact]
@@ -162,12 +187,15 @@ namespace Werewolf.Tests
 
             var before = model.Compute(Input(GamePhase.Play, Role.Villager, roundEndUnixMs: 400_000, nowUnixMs: 99_000));
             Assert.Equal(0f, before.BellVolumeScale);
+            Assert.Equal(0, before.BellMarkSec);
 
             var atMark = model.Compute(Input(GamePhase.Play, Role.Villager, roundEndUnixMs: 400_000, nowUnixMs: 100_000));
-            Assert.Equal(BellSchedule.BaseVolumeScale, atMark.BellVolumeScale);
+            Assert.Equal(BellSchedule.FiveMinuteVolumeScale, atMark.BellVolumeScale);
+            Assert.Equal(BellSchedule.AlertThresholdSec, atMark.BellMarkSec);
 
             var after = model.Compute(Input(GamePhase.Play, Role.Villager, roundEndUnixMs: 400_000, nowUnixMs: 100_100));
             Assert.Equal(0f, after.BellVolumeScale);
+            Assert.Equal(0, after.BellMarkSec);
         }
 
         [Fact]
@@ -185,7 +213,7 @@ namespace Werewolf.Tests
 
             model.Compute(Input(GamePhase.Play, Role.Villager, roundEndUnixMs: 550_000, nowUnixMs: 200_000));
             var resumedMark = model.Compute(Input(GamePhase.Play, Role.Villager, roundEndUnixMs: 550_000, nowUnixMs: 250_000));
-            Assert.Equal(BellSchedule.BaseVolumeScale, resumedMark.BellVolumeScale);
+            Assert.Equal(BellSchedule.FiveMinuteVolumeScale, resumedMark.BellVolumeScale);
         }
 
         [Fact]
@@ -194,14 +222,14 @@ namespace Werewolf.Tests
             var model = new HudModel();
             model.Compute(Input(GamePhase.Play, Role.Villager, roundEndUnixMs: 310_000, nowUnixMs: 0));
             var firstRing = model.Compute(Input(GamePhase.Play, Role.Villager, roundEndUnixMs: 310_000, nowUnixMs: 10_000));
-            Assert.Equal(BellSchedule.BaseVolumeScale, firstRing.BellVolumeScale);
+            Assert.Equal(BellSchedule.FiveMinuteVolumeScale, firstRing.BellVolumeScale);
 
             model.Compute(Input(GamePhase.GameOver, Role.Villager));
 
             var rearm = model.Compute(Input(GamePhase.Play, Role.Villager, roundEndUnixMs: 500_000, nowUnixMs: 100_000));
             Assert.Equal(0f, rearm.BellVolumeScale);
             var secondRing = model.Compute(Input(GamePhase.Play, Role.Villager, roundEndUnixMs: 500_000, nowUnixMs: 200_000));
-            Assert.Equal(BellSchedule.BaseVolumeScale, secondRing.BellVolumeScale);
+            Assert.Equal(BellSchedule.FiveMinuteVolumeScale, secondRing.BellVolumeScale);
         }
 
         [Theory]
@@ -302,6 +330,31 @@ namespace Werewolf.Tests
             var state = model.Compute(Input(GamePhase.Play, Role.Villager, debugSession: false));
 
             Assert.False(state.ShowTestPlay);
+        }
+
+        [Theory]
+        [InlineData(GamePhase.Play)]
+        [InlineData(GamePhase.Meeting)]
+        public void Compute_SelfParticipantId_ShownWhileSessionActive(GamePhase phase)
+        {
+            var model = new HudModel();
+
+            var state = model.Compute(Input(phase, Role.Villager, selfParticipantId: 3));
+
+            Assert.True(state.ShowSelfId);
+            Assert.Equal(3, state.SelfId);
+        }
+
+        [Fact]
+        public void Compute_SelfParticipantIdZero_HidesIdRow()
+        {
+            var model = new HudModel();
+
+            var state = model.Compute(Input(GamePhase.Play, Role.Villager, selfParticipantId: 0));
+
+            Assert.False(state.ShowSelfId);
+            Assert.Equal(0, state.SelfId);
+            Assert.True(state.ShowBadge);
         }
 
         private static RolesClientState MakeGaugeReceivedState(int ratioPermille = 0)

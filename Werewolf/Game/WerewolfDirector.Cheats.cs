@@ -153,6 +153,26 @@ namespace Werewolf.Game
             return true;
         }
 
+        public void DebugScatterDiag()
+        {
+            (_extractionScatter ??= new ExtractionScatter()).LogDiagnostics();
+        }
+
+        public void DebugScatterWarp()
+        {
+            ExtractionScatter scatter = _extractionScatter ??= new ExtractionScatter();
+            Func<PlayerAvatar, bool> isAlive = _session != null
+                ? IsSessionAlive
+                : (Func<PlayerAvatar, bool>)VanillaAlive;
+            bool ok = scatter.WarpScatter(isAlive, warpTruckSlot: true, uniformDebug: true);
+            WLog.Line("cmd_scatter", secret: false,
+                ("result", ok ? "ok" : "failed"),
+                ("assignments", scatter.LastAssignments.Count));
+        }
+
+        private static bool VanillaAlive(PlayerAvatar avatar) =>
+            avatar != null && !GameRefs.PlayerAvatar_isDisabled(avatar);
+
         public void DebugToggleSelfEcho()
         {
             if (_voiceDriver == null)

@@ -7,6 +7,8 @@ namespace Werewolf.Core
         PlayerDied = 1,
 
         WinnerConfirmed = 2,
+
+        MatchVoided = 3,
     }
 
     public sealed class SessionEvent
@@ -36,5 +38,8 @@ namespace Werewolf.Core
 
         public static SessionEvent ForWinnerConfirmed(WinResult winner)
             => new SessionEvent(SessionEventKind.WinnerConfirmed) { Winner = winner };
+
+        public static SessionEvent ForMatchVoided()
+            => new SessionEvent(SessionEventKind.MatchVoided);
     }
 }

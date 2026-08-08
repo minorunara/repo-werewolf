@@ -3,11 +3,11 @@ using Werewolf.Core;
 
 namespace Werewolf.Net
 {
-    public static class EventCodes
+    public static class MessageCodes
     {
         public const byte MinCode = 160;
 
-        public const byte MaxCode = 189;
+        public const byte MaxCode = 190;
 
         public const byte AssignRole = WWEventCodes.AssignRole;
 
@@ -57,6 +57,10 @@ namespace Werewolf.Net
 
         public const byte ResultDigest = 188;
 
+        public const byte ScatterGroups = 189;
+
+        public const byte ScatterGuardWindow = 190;
+
         public const byte ModManifestRequest = 182;
 
         public const byte ModManifestReport = 183;
@@ -89,7 +93,7 @@ namespace Werewolf.Net
                 case RevealTeammates: return new[] { typeof(int[]), typeof(byte[]) };
                 case PlayerDied:      return new[] { typeof(int), typeof(byte) };
                 case GameOver:        return new[] { typeof(byte), typeof(int[]), typeof(byte[]) };
-                case GameStart:       return new[] { typeof(long), typeof(int), typeof(byte), typeof(byte), typeof(int), typeof(byte) };
+                case GameStart:       return new[] { typeof(long), typeof(int), typeof(byte), typeof(byte), typeof(int), typeof(byte), typeof(int[]) };
                 case PhaseChanged:    return new[] { typeof(byte), typeof(long), typeof(long) };
                 case StartMeeting:    return new[] { typeof(int), typeof(long), typeof(long), typeof(byte) };
                 case CastVote:        return new[] { typeof(int) };
@@ -109,6 +113,8 @@ namespace Werewolf.Net
                 case CheckmateReveal: return new[] { typeof(int[]), typeof(long) };
                 case ResultDigest:
                     return new[] { typeof(byte[]), typeof(int[]), typeof(int[]), typeof(int[]), typeof(int[]) };
+                case ScatterGroups:   return new[] { typeof(int[]), typeof(byte[]) };
+                case ScatterGuardWindow: return new[] { typeof(int) };
                 case ModManifestRequest:
                     return new[] { typeof(int), typeof(byte), typeof(string) };
                 case ModManifestReport:

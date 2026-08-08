@@ -19,7 +19,7 @@ namespace Werewolf.Tests
             var queue = new ToastQueue(durationSec);
             bus.OnReceived += msg =>
             {
-                if (msg.Code != EventCodes.ConveneDenied) return;
+                if (msg.Code != MessageCodes.ConveneDenied) return;
                 var reason = ConveneDeniedWire.FromWire((byte)msg.Payload[0]);
                 string text = NoticeCatalog.Format(SessionNotice.ForConveneDenied(reason));
                 queue.Push(text, nowUnixMs);
@@ -48,7 +48,7 @@ namespace Werewolf.Tests
             var reason = h.Session.TryConvene(callerActor: 3, nowUnixMs: Now);
 
             Assert.Equal(ConveneRejectReason.NoRight, reason);
-            var denied = Assert.Single(h.ByCode(EventCodes.ConveneDenied).ToArray());
+            var denied = Assert.Single(h.ByCode(MessageCodes.ConveneDenied).ToArray());
             Assert.Equal(MessageTarget.Actors, denied.Target);
             Assert.Equal(new[] { 3 }, denied.TargetActors);
             Assert.Single(denied.Payload);
@@ -63,7 +63,7 @@ namespace Werewolf.Tests
             var reason = h.Session.TryConvene(3, Now + 10_000);
 
             Assert.Equal(ConveneRejectReason.Suppressed, reason);
-            var denied = Assert.Single(h.ByCode(EventCodes.ConveneDenied).ToArray());
+            var denied = Assert.Single(h.ByCode(MessageCodes.ConveneDenied).ToArray());
             Assert.Equal((byte)2, denied.Payload[0]);
         }
 
@@ -84,7 +84,7 @@ namespace Werewolf.Tests
 
             Assert.Equal(ConveneRejectReason.WrongPhase, session.TryConvene(1, 100_000));
 
-            var denied = Assert.Single(sent.FindAll(m => m.Code == EventCodes.ConveneDenied));
+            var denied = Assert.Single(sent.FindAll(m => m.Code == MessageCodes.ConveneDenied));
             Assert.Equal(MessageTarget.Actors, denied.Target);
             Assert.Equal(new[] { 1 }, denied.TargetActors);
             Assert.Equal((byte)3, denied.Payload[0]);
@@ -98,7 +98,7 @@ namespace Werewolf.Tests
 
             Assert.Equal(ConveneRejectReason.CallerDead, h.Session.TryConvene(3, Now));
 
-            var denied = Assert.Single(h.ByCode(EventCodes.ConveneDenied).ToArray());
+            var denied = Assert.Single(h.ByCode(MessageCodes.ConveneDenied).ToArray());
             Assert.Equal((byte)0, denied.Payload[0]);
         }
 
@@ -109,7 +109,7 @@ namespace Werewolf.Tests
 
             Assert.Equal(ConveneRejectReason.None, h.Session.TryConvene(3, Now));
 
-            Assert.Empty(h.ByCode(EventCodes.ConveneDenied));
+            Assert.Empty(h.ByCode(MessageCodes.ConveneDenied));
         }
 
         [Fact]

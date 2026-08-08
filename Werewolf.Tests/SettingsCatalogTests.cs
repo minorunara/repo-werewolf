@@ -12,10 +12,11 @@ namespace Werewolf.Tests
 
         private static readonly string[] ExpectedRegisteredIds =
         {
-            "WerewolfModeEnabled", "RoundSeconds", "MinimapHideEnabled", "ValuableMapMode",
+            "WerewolfModeEnabled", "RoundSeconds", "MinimapHideEnabled", "OutfitChangeAllowed", "ValuableMapMode",
             "OrbGaugeEnabled", "NecroVoiceMode", "GameOverAutoReturnSec",
             "MeetingRightsPerPlayer", "ConveneSuppressStartSec", "ConveneSuppressAfterSec",
             "MeetingCountdownSec", "MeetingDurationSec", "VoteTimeCutEnabled", "ResultDisplaySec",
+            "MeetingScatterEnabled", "ScatterGuardSec",
             "ShamanChancePercent", "WerewolfCount",
             "BlackCatChancePercent", "BomberChancePercent",
             "ShamanGazeFullSec", "ShamanGhostCooldownSec",
@@ -63,8 +64,8 @@ namespace Werewolf.Tests
             var bySection = SettingsCatalog.Entries
                 .GroupBy(e => e.Section)
                 .ToDictionary(g => g.Key, g => g.Count());
-            Assert.Equal(7, bySection["基本"]);
-            Assert.Equal(7, bySection["会議"]);
+            Assert.Equal(8, bySection["基本"]);
+            Assert.Equal(9, bySection["会議"]);
             Assert.Equal(4, bySection["役職 - 役職配分"]);
             Assert.Equal(10, bySection["役職 - 人狼"]);
             Assert.Equal(4, bySection["役職 - 黒猫"]);
@@ -504,6 +505,8 @@ namespace Werewolf.Tests
                 MeetingDurationSec = 90,
                 VoteTimeCutEnabled = false,
                 ResultDisplaySec = 4,
+                MeetingScatterEnabled = false,
+                ScatterGuardSec = 25,
                 StaminaUnlockPct = 20,
                 JumpUnlockPct = 35,
                 EnemyIgnoreUnlockPct = 55,
@@ -519,6 +522,7 @@ namespace Werewolf.Tests
                 OrbGaugeEnabled = false,
                 WerewolfModeEnabled = true,
                 MinimapHideEnabled = false,
+                OutfitChangeAllowed = true,
                 ValuableMapMode = ValuableMapMode.Realtime,
                 GameOverAutoReturnSec = 120,
                 NecroVoiceMode = NecroVoiceMode.AllDead,

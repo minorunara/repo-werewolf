@@ -75,6 +75,8 @@ namespace Werewolf.Core
 
         public WinResult Winner { get; private set; }
 
+        public bool Voided { get; private set; }
+
         public long StartUnixMs { get; private set; }
 
         public event Action<OutboundMessage> OnSend;
@@ -117,6 +119,7 @@ namespace Werewolf.Core
             _config = config;
             _players = new List<WPlayer>(players);
             Winner = null;
+            Voided = false;
             _checkmateLocked = false;
             _voteMarked.Clear();
 
@@ -144,6 +147,7 @@ namespace Werewolf.Core
                     (byte)(blackCatPossible ? 1 : 0),
                     config.BlackCatRevealDelaySec,
                     (byte)(config.DebugMode ? 1 : 0),
+                    ParticipantIds.AssignOrder(_players),
                 },
                 MessageTarget.All, null));
 
@@ -171,9 +175,9 @@ namespace Werewolf.Core
             }
         }
 
-        public void RecordDeath(int actorNumber, long nowUnixMs)
+        public bool RecordDeath(int actorNumber, long nowUnixMs)
         {
-            if (Winner != null || (Phase != GamePhase.Play && Phase != GamePhase.Meeting)) return;
+            if (Winner != null || (Phase != GamePhase.Play && Phase != GamePhase.Meeting)) return false;
 
             WPlayer player = null;
             foreach (var candidate in _players)
@@ -188,9 +192,9 @@ namespace Werewolf.Core
             {
                 WLog.Line("drop", secret: false,
                     ("reason", "death_unknown_actor"), ("actor", actorNumber));
-                return;
+                return false;
             }
-            if (!player.Alive) return;
+            if (!player.Alive) return false;
 
             var cause = _voteMarked.Remove(actorNumber) ? DeathCause.Vote : DeathCause.Other;
             player.Alive = false;
@@ -207,6 +211,7 @@ namespace Werewolf.Core
             {
                 ConfirmWinner(result, "death", nowUnixMs);
             }
+            return true;
         }
 
         public void NotifyPlayerLeft(int actorNumber, long nowUnixMs)
@@ -332,8 +337,40 @@ namespace Werewolf.Core
             return PhaseChangeResult.Ok();
         }
 
+        public void VoidMatch(long nowUnixMs)
+        {
+            if (Winner != null || Voided) return;
+            if (Phase != GamePhase.Play && Phase != GamePhase.Meeting) return;
+
+            Voided = true;
+            WLog.Line("match_voided", secret: false, ("phase", Phase));
+
+            var actors = new int[_players.Count];
+            var roles = new byte[_players.Count];
+            for (int i = 0; i < _players.Count; i++)
+            {
+                actors[i] = _players[i].ActorNumber;
+                roles[i] = (byte)_players[i].Role;
+            }
+
+            Send(new OutboundMessage(
+                WWEventCodes.GameOver,
+                new object[] { TeamCodes.VoidMatch, actors, roles },
+                MessageTarget.All, null));
+            OnSessionEvent?.Invoke(SessionEvent.ForMatchVoided());
+
+            SetPhase(GamePhase.GameOver, "void_match", nowUnixMs);
+        }
+
         private void ConfirmWinner(WinResult result, string reason, long nowUnixMs)
         {
+            if (Voided)
+            {
+                WLog.Line("win_suppressed_by_void", secret: false,
+                    ("team", result.WinningTeam), ("reason", result.Reason), ("trigger", reason));
+                return;
+            }
+
             if (_checkmateLocked && result.Reason != WinReason.ValueCheckmate)
             {
                 WLog.Line("win_suppressed_by_checkmate", secret: false,

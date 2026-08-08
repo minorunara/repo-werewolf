@@ -86,6 +86,15 @@ namespace Werewolf.Tests
         }
 
         [Fact]
+        public void ScatterSlogan_HasIntendedJapaneseAndEnglishCopy()
+        {
+            Assert.Equal("サイロ化を解消しよう",
+                Texts.TableFor(Language.Japanese)[TextId.NoticeScatterSlogan]);
+            Assert.Equal("Let's maximize our bus factor.",
+                Texts.TableFor(Language.English)[TextId.NoticeScatterSlogan]);
+        }
+
+        [Fact]
         public void Format_SubstitutesPlaceholders()
         {
             string result = Texts.Format(TextId.NoticeExecutedFormat, "Alice");
