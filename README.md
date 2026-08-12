@@ -1,67 +1,61 @@
-# REPO Werewolf（REPO人狼）
+# REPO Werewolf (REPO人狼)
 
-![Match results screen](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/game-result.png)
+![Meeting, voting, execution, and match results](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/match-flow-en.gif)
 
-A mod that adds an Among Us-style werewolf (social deduction) mode to R.E.P.O.
+REPO Werewolf turns a normal R.E.P.O. run into a social deduction game. It takes some ideas from Among Us, but valuables and the extraction quota still decide the match.
 
+Each player gets a hidden role on either the villager team or the werewolf team. Villagers still have to finish the extractions and leave in the truck. Werewolves have to stop them without giving themselves away. Bodies can be reported, the truck has an emergency meeting button, and suspected werewolves can be voted out. PvP is enabled too, and melee weapons can kill other players.
 
-## Overview
+- Requires at least 3 players
+- Every player in the lobby needs the mod
+- English is the default language; Japanese is also included
 
-Players are secretly assigned to either the villager team or the werewolf team, and the mind games unfold while everyone explores, collects, and delivers valuables as usual.
-Werewolves sabotage from the shadows; villagers report bodies, call emergency meetings, and execute the werewolves by vote (or by force) before the quota becomes impossible to reach.
+## What's included
 
-- Playable with 3 or more players
-- Both the host and every client must have this mod installed
-- UI languages: English (default) and Japanese
+- Five roles: Villager, Shaman, Werewolf, Black Cat, and Bomber
+- Win conditions tied directly to valuable damage and deliveries
+- Body reports, emergency meetings, discussion, voting, and executions handled inside the game
+- After some meetings, survivors are shuffled and sent back out in random groups
+- Participant numbers for public lobbies, so "No. 3 looks suspicious" is enough to identify someone
+- A valuable loss gauge and a meeting map with a coordinate grid
+- Settings for the stage, level, starting items, player upgrades, the truck's starting charge, and other match rules
+- A lobby check for room settings and differences between players' mod lists
+- A 28-page manual explaining all of the rules and roles, available at any time
+- Meeting chat, result screen chat, and a replay that can be saved and watched in a browser
 
-## Features
-
-- Social deduction built on five roles — Villager, Shaman, Werewolf, Black Cat, and Bomber — each with its own team and special abilities
-- Original rules where destroying and delivering valuables decides the match, built on R.E.P.O.'s core gameplay
-- A meeting system that handles everything in-game: body reports, emergency meetings, discussion, voting, and executions
-- Reshuffles the survivors into random groups after a meeting and scatters them across the map while enough of them are left
-- Participant IDs, so you can say "No. 3 looks suspicious" in a public lobby
-- A valuable loss gauge tracking deaths and valuables, plus a full meeting map with a coordinate grid
-- Room settings for the stage, level, starting items, player upgrades, the truck's initial charge, and more
-- Guests can review the host's room settings, and everyone's mod lineup is easy to check in the lobby
-- A 28-page in-game manual covering the rules and every role's abilities, available at any time
-
-## Meetings and Voting
+## Meetings and voting
 
 ![Meeting and voting screen](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/meeting-voting.png)
 
-Meetings can be called by reporting a body or with the truck's emergency button.
-Deaths and valuable losses/deliveries since the previous meeting are shared, and you can discuss and vote while checking the full map with its coordinate grid.
+Report a body or use the red button in the truck to call a meeting. The meeting screen shows deaths and changes to valuables since the last meeting. Players can open the full map, compare what they know, and vote without leaving the game.
 
 ![Full map with coordinate grid](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/meeting-map-grid.png)
 
-## Reviewing Room Settings and Mod Lineups in the Lobby
+## Room settings and mod checks
 
-![Room settings and mod lineup check in the lobby](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/lobby-settings-and-mods.png)
+![Room settings and mod lineup check in the lobby](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/lobby-settings-and-mods-en.png)
 
-Guests can review the room settings chosen by the host — stage, level, roles, starting items, and more — from the lobby.
-The host's mod lineup also serves as the room baseline: every participant is compared against it, and missing mods, extra mods, version mismatches, and content differences are surfaced before the match starts.
+Guests can see the host's room settings in the lobby. The mod also compares each player's mod list with the host's and flags missing mods, extra mods, version mismatches, or different file contents before the match starts.
 
 ## Roles
 
 ![Role lineup](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/roles.png)
 
-- Villager (villager team): plays R.E.P.O. as usual — handling enemies, collecting valuables, advancing extractions — while hunting the werewolves through bodies, destroyed valuables, and other players' behavior
-- Shaman (villager team): can stand still and sense whether unreported bodies exist and where, but is completely exposed while using the ability
-- Werewolf (werewolf team): unlocks perks such as infinite stamina and extra jumps as valuables are destroyed, and lures enemies to players with the beacon
-- Black Cat (werewolf team): belongs to the werewolf team but doesn't know who the werewolves are — and the werewolves don't know who the Black Cat is. Depending on the settings, being executed at a meeting takes someone down with them
-- Bomber (werewolf team): secretly turns a player they've spent time near into a bomb, then detonates it from a distance at the perfect moment
+- **Villager:** Plays much like regular R.E.P.O. Collect valuables, finish extractions, and watch for anything that gives a werewolf away
+- **Shaman:** Can stand still to sense unreported bodies and their direction, but is an easy target while doing it
+- **Werewolf:** Gains perks such as infinite stamina and extra jumps when valuables are damaged. The beacon ability calls enemies to a chosen location
+- **Black Cat:** Is on the werewolf team, although the Black Cat and the werewolves do not initially know one another. Depending on the room settings, an executed Black Cat can take one of their voters with them
+- **Bomber:** Stays near another player long enough to plant a bomb on them, then detonates it remotely
 
-## Mind Games
+## Mind games
 
-In REPO Werewolf, what you do while exploring becomes evidence at the meetings.
-Cross-check your memory, everyone's testimony, and the map's records to decide whom to trust.
-Be warned: melee weapons are tuned to reward ambushing other players, so choose carefully whom you let watch your back.
-If meetings alone cannot settle the match, it moves to an endgame where both teams clash with the advantages they've built — weapons secured or confiscated, valuables destroyed.
+What happens during exploration gives players something to argue about at the next meeting. Compare your memory and the other players' stories with the map before deciding whom to trust.
 
-## UI Language
+Melee weapons are stronger against players in this mode, so whoever attacks first usually has the advantage. If voting does not settle the match, the weapons and supplies each team secured earlier can decide the final fight.
 
-The UI is available in English and Japanese, and English is the default — no setup is needed for English players.
+## UI language
+
+The UI is available in English and Japanese. English is selected automatically on a fresh install.
 
 To switch to Japanese:
 
@@ -73,26 +67,34 @@ To switch to Japanese:
 
 You can also edit the config file directly.
 
-## Playing over Text Chat
+## Playing over text chat
 
 ![Meeting chat log](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/meeting-chat-log.png)
 
-REPO Werewolf can be played entirely over text chat, without voice chat.
+You do not need voice chat to play. Press the game's chat key (default `T`) to open the normal chat. Messages sent during a meeting stay in the meeting log, which can be opened from its icon or with its assigned key.
 
-Use the game's chat key (default `T`) to open the normal chat and speak.
-Messages sent during a meeting are recorded in the meeting chat log, which can be shown or hidden by clicking its icon or pressing its assigned key.
-A notification sound plays as each new message arrives, so it is harder to miss one while you are looking at the meeting map.
+New messages play a notification sound. If the log is closed when a message arrives, a red unread dot appears on its icon until you open it. The result screen has a separate post-match chat where messages from dead players are visible to everyone.
 
 To type Japanese, install [JapaneseTextInput](https://thunderstore.io/c/repo/p/sukunabikona/JapaneseTextInput/).
 
+## Match replay
+
+![Top-down match replay](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/match-replay.gif)
+
+The `Replay` button on the result screen opens a top-down view of the match over the game map. It shows players, enemies, items (including valuables and carts), and bodies moving over time. You can also review damage to valuables, valuables that were lost or delivered, extraction point states, and the running loss total.
+
+The viewer has play, pause, speed, and seek controls. Select a marker to follow its trail. During meetings, the replay shows the text chat and vote result. Playback slows down when someone posts a message and speeds through parts of the meeting with no chat.
+
+The save button writes the replay file to your Downloads folder. To watch it later, open the included `replay-viewer.html` in a browser and load the file there. The viewer supports English and Japanese, runs locally, and does not upload replay files.
+
 ## Installation
 
-- Manual install: install the prerequisite mods, then place `Minorunara_Werewolf.dll` in `BepInEx/plugins/Minorunara_Werewolf/` in the game folder.
-- Every player in the lobby must install the mod.
-- To keep everyone's mod lineup identical — for fairness and to avoid trouble — we recommend creating a dedicated profile with your mod manager and sharing it with all participants.
-- This is a large mod and may conflict with others. If you want to run other mods alongside it, add them a few at a time and watch for issues.
+- For a manual install, install the prerequisite mods and place `Minorunara_Werewolf.dll` in `BepInEx/plugins/Minorunara_Werewolf/` in the game folder
+- Every player in the lobby must install the mod
+- If possible, make a separate mod manager profile and share it with your group. That keeps everyone's mods and settings in sync
+- This is a large mod and may conflict with others. Add other mods a few at a time so you can catch problems early
 
-## Suggested Room Settings for Your First Matches
+## Suggested room settings for your first matches
 
 | Players | Shaman | Werewolves | Black Cat | Bomber | Villager team + Werewolf team |
 |---|---:|---:|---:|---:|---:|
@@ -100,20 +102,20 @@ To type Japanese, install [JapaneseTextInput](https://thunderstore.io/c/repo/p/s
 | 4 | 50% | 1 | 0% | 0% | 3 + 1 |
 | 5 | 100% | 1 | 100% (Revenge off) | 0% | 3 + 2 |
 | 6 | 100% | 1 | 100% (Revenge on) | 0% | 4 + 2 |
-| 7–8 | 100% | 2 | 0% | 50% | 5–6 + 2 |
-| 9–10 | 100% | 2 | 100% (Revenge on) | 50% | 6–7 + 3 |
+| 7-8 | 100% | 2 | 0% | 50% | 5-6 + 2 |
+| 9-10 | 100% | 2 | 100% (Revenge on) | 50% | 6-7 + 3 |
 
-Vanilla rooms are capped at 6 players; to play with more you need a MorePlayers-type mod.
-The Bomber appears at the configured probability by converting one of the Werewolves (at least one base Werewolf always remains, so no Bomber appears with only 1 werewolf).
-The Black Cat converts from a Villager at the configured probability and joins the werewolf team (not counted in "Werewolves"; appears only in lineups that leave at least one Villager).
-The Shaman converts from a Villager at the configured probability (the Shaman can never also be the Black Cat).
-The Sledge Hammer and Gun have very high kill power; we recommend leaving them out of the loadout until your group can keep track of who is carrying which weapon.
-As a rule of thumb: fewer upgrades, less stored energy, higher stage levels, and shorter time limits favor the werewolf team — and vice versa.
+Vanilla rooms support up to 6 players. Larger groups need a compatible [MorePlayers mod](https://thunderstore.io/c/repo/p/linkoid/RoboUnion/).
+The Bomber is chosen by converting one of the Werewolves at the configured probability. At least one regular Werewolf always remains, so the Bomber cannot appear when there is only 1 werewolf.
+The Black Cat is converted from a Villager at the configured probability and joins the werewolf team. The role is not included in the "Werewolves" count and only appears when at least one Villager would remain.
+The Shaman is converted from a Villager at the configured probability and cannot also be the Black Cat.
+The Sledge Hammer and Gun deal a lot of damage to players. Consider leaving them out until your group can keep track of who has each weapon.
+Fewer upgrades, less stored energy, higher stage levels, and shorter time limits favor the werewolf team. The opposite settings favor the villagers.
 
-## In-Game Manual
+## In-game manual
 
-> The following is identical to the in-game manual (default key: F1).
-> Use it to review the rules before installing.
+> The following covers the same rules as the in-game manual (default key: F1).
+> You can use it to check the rules before installing.
 
 ### Welcome to REPO Werewolf
 
@@ -161,14 +163,15 @@ If no valuable is at a marker, someone either carried it away or destroyed it.
 The map cannot tell you which.
 Careful villagers take inventory at every meeting and ask where each missing valuable went.
 
-### Not Recording Valuables (Werewolf Team)
+### Valuable Recording Toggle (Werewolf Team)
 
 A marker is added the moment a player sees a valuable.
-By default, the werewolf team (Werewolves, Bombers, and awakened Black Cats) does not record newly discovered valuables.
-If a member of the werewolf team reaches and destroys a valuable before anyone else finds it, the map shows no trace that it ever existed.
+The werewolf team (Werewolves, Bombers, and awakened Black Cats) records newly discovered valuables normally by default.
+Only while recording is turned off by holding the report key do valuables you discover stay off the map.
+If a member of the werewolf team then reaches and destroys a valuable before anyone else finds it, the map shows no trace that it ever existed.
 If a villager has already found and recorded it, however, the marker remains—alerting everyone that something is missing.
 You can switch recording on and off at any time by holding the report key (the icon at the bottom right shows the current state).
-Turn recording on as needed when you want to blend in with villagers while exploring.
+Turn recording off only when attempting a stealthy break, then turn it back on as needed before exploring. It resets to on each round.
 
 ### PvP
 
@@ -373,8 +376,9 @@ Wolf Mode and Plant Bomb, as well as Beacon and Detonate, can each be bound to s
 | G | Werewolf: Beacon | `BeaconKey` |
 | G | Bomber: Detonate | `BomberDetonateKey` |
 | R | Report a body (while near the head) | `CorpseReportKey` |
+| R | Show/hide replay viewer (result screen) | `ReplayViewerKey` |
 | M | Full map (during meetings) | `MeetingMapKey` |
-| L | Meeting chat log (during meetings) | `MeetingChatLogKey` |
+| L | Meeting chat log (during meetings) / post-match chat (result screen) | `MeetingChatLogKey` |
 | F1 | In-game manual | `ManualKey` |
 | F5 | Return to lobby from the match results (host only) | `ResultReturnKey` |
 | F5 | Hold to declare a no contest (host only) | `VoidMatchKey` |
@@ -394,7 +398,7 @@ As a precaution, this mode replaces some parody visuals and distinctive sound ef
 
 - The Bomber's two ability icons (parody visuals) → generic bomb icons
 - The meeting-convene chime → a generic notification sound
-- The two execution chants → silence (the chants themselves are royalty-free assets [see African Mist Voice under "Credits"], but they are widely recognized from a well-known game, so they are included here)
+- The two execution chants → silence (the chants themselves are royalty-free assets [see African Mist Voice under "Credits"], but they are widely recognized from a well-known game, which is why Streamer-Safe Mode silences them)
 
 Gameplay and the timing of every effect stay the same. This is a local setting for each player and only affects your own screen and audio, so it is enough for the streamer alone to turn it on.
 
