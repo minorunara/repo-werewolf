@@ -392,6 +392,7 @@ namespace Werewolf.Game
             _knownWerewolves = null;
             _knownTeammateRoles = null;
             IdRoster.Reset();
+            ReplaySampler.ResetAll();
             _clientRoundEndUnixMs = 0;
             _clientWerewolfCount = 0;
             _deathMirror.Clear();

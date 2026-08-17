@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Werewolf.Core;
 using Xunit;
 
@@ -332,6 +333,44 @@ namespace Werewolf.Tests
 
             Assert.False(s.IsDeadUnannounced(3));
             Assert.False(s.IsDeadUnannounced(4));
+        }
+
+        [Fact]
+        public void MarkAllDeadAnnounced_CollectsOnlyNewlyAnnounced()
+        {
+            var s = new MeetingClientState();
+            s.ApplyStartMeeting(1, 0, 125_000);
+            s.ApplyPlayerDied(2, DeathCause.Other);
+            s.ApplyPlayerDied(3, DeathCause.Vote);
+            s.ApplyPlayerLeft(4);
+
+            var first = new List<int>();
+            s.MarkAllDeadAnnounced(first);
+            first.Sort();
+            Assert.Equal(new[] { 2, 3 }, first);
+
+            s.ApplyPlayerDied(5, DeathCause.Other);
+            var second = new List<int>();
+            s.MarkAllDeadAnnounced(second);
+            Assert.Equal(new[] { 5 }, second);
+        }
+
+        [Fact]
+        public void ApplyPhase_CollectsNewlyAnnouncedOnMeetingEnd()
+        {
+            var s = new MeetingClientState();
+            s.ApplyStartMeeting(1, 0, 125_000);
+            s.MarkAllDeadAnnounced();
+
+            s.ApplyPlayerDied(3, DeathCause.Vote);
+            var announced = new List<int>();
+            s.ApplyPhase(GamePhase.Play, announced);
+            Assert.Equal(new[] { 3 }, announced);
+
+            s.ApplyPlayerDied(6, DeathCause.Other);
+            var inactive = new List<int>();
+            s.ApplyPhase(GamePhase.Play, inactive);
+            Assert.Empty(inactive);
         }
 
         [Fact]

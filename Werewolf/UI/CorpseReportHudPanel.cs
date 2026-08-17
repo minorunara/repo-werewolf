@@ -36,6 +36,10 @@ namespace Werewolf.UI
         private static readonly Color IdleLabelColor = new Color(0.55f, 0.55f, 0.55f, 0.90f);
         private static readonly Color ActiveLabelColor = new Color(1f, 0.55f, 0.45f, 1f);
 
+        private const float BlockedFaceSize = 64f;
+        private static readonly Vector2 BlockedFaceOffset = new Vector2(34f, 34f);
+        private static readonly Color CrossFallbackColor = new Color(0.90f, 0.15f, 0.15f, 0.95f);
+
         private const float PulseAmplitude = 0.15f;
         private const float PulseHz = 1.6f;
 
@@ -47,9 +51,11 @@ namespace Werewolf.UI
         private Sprite _iconSpriteGray;
         private TextMeshProUGUI _iconFallback;
         private TextMeshProUGUI _keyLabel;
+        private GameObject _blockedRoot;
 
         private Layout _lastLayout = (Layout)(-1);
         private bool _lastNear;
+        private bool _lastBlocked;
         private string _lastKeyName;
 
         public bool Exists => _root != null;
@@ -99,6 +105,8 @@ namespace Werewolf.UI
                     "通報", 26f, IdleIconTint, TextAlignmentOptions.Center);
             }
 
+            BuildBlockedOverlay(plate);
+
             _keyLabel = UiKit.CreateText(rect, "KeyLabel",
                 new Vector2(iconCenterX, LabelHeight / 2f),
                 new Vector2(rootWidth + 120f, LabelHeight),
@@ -111,11 +119,12 @@ namespace Werewolf.UI
             WLog.Line("corpse_report_hud_built", secret: false);
         }
 
-        public void Tick(bool visible, bool nearCorpse, string keyName, Layout layout)
+        public void Tick(CorpseReportHudMode mode, bool nearCorpse, string keyName, Layout layout)
         {
             if (_root == null) return;
             try
             {
+                bool visible = mode != CorpseReportHudMode.Hidden;
                 if (_root.activeSelf != visible) _root.SetActive(visible);
                 if (!visible)
                 {
@@ -130,7 +139,10 @@ namespace Werewolf.UI
                     r.anchoredPosition = new Vector2(-RightMargin, BaseY(layout));
                 }
 
-                if (nearCorpse && _iconRect != null)
+                bool blocked = mode == CorpseReportHudMode.Blocked;
+                bool near = nearCorpse && !blocked;
+
+                if (near && _iconRect != null)
                 {
                     float pulse = 1f + PulseAmplitude
                         * Mathf.Sin(Time.unscaledTime * PulseHz * 2f * Mathf.PI);
@@ -141,20 +153,26 @@ namespace Werewolf.UI
                     _iconRect.localScale = Vector3.one;
                 }
 
-                if (nearCorpse == _lastNear && keyName == _lastKeyName)
+                if (near == _lastNear && blocked == _lastBlocked && keyName == _lastKeyName)
                 {
                     return;
                 }
-                _lastNear = nearCorpse;
+                _lastNear = near;
+                _lastBlocked = blocked;
                 _lastKeyName = keyName;
 
-                Color iconTint = nearCorpse ? ActiveIconTint : IdleIconTint;
-                Color labelColor = nearCorpse ? ActiveLabelColor : IdleLabelColor;
+                if (_blockedRoot != null && _blockedRoot.activeSelf != blocked)
+                {
+                    _blockedRoot.SetActive(blocked);
+                }
+
+                Color iconTint = near ? ActiveIconTint : IdleIconTint;
+                Color labelColor = near ? ActiveLabelColor : IdleLabelColor;
 
                 if (_icon != null && _icon.enabled)
                 {
                     _icon.color = iconTint;
-                    Sprite want = nearCorpse
+                    Sprite want = near
                         ? (_iconSpriteColor ?? _iconSpriteGray)
                         : (_iconSpriteGray ?? _iconSpriteColor);
                     if (want != null && _icon.sprite != want) _icon.sprite = want;
@@ -172,6 +190,41 @@ namespace Werewolf.UI
             }
         }
 
+        private void BuildBlockedOverlay(float plate)
+        {
+            var blocked = UiKit.CreateRect(_slotRect, "Blocked", Vector2.zero, new Vector2(plate, plate));
+            _blockedRoot = blocked.gameObject;
+
+            Sprite cross = AssetCatalog.GetSprite("emoji_cross_mark");
+            if (cross != null)
+            {
+                Image x = UiKit.CreateImage(blocked, "Cross", Vector2.zero,
+                    new Vector2(IconSize, IconSize), Color.white);
+                x.sprite = cross;
+                x.preserveAspect = true;
+            }
+            else
+            {
+                foreach (float angle in new[] { 45f, -45f })
+                {
+                    Image bar = UiKit.CreateImage(blocked, "CrossBar", Vector2.zero,
+                        new Vector2(IconSize * 0.95f, 14f), CrossFallbackColor);
+                    bar.rectTransform.localEulerAngles = new Vector3(0f, 0f, angle);
+                }
+            }
+
+            Sprite face = AssetCatalog.GetSprite("img_taxman_death");
+            if (face != null)
+            {
+                Image f = UiKit.CreateImage(blocked, "TaxmanFace", BlockedFaceOffset,
+                    new Vector2(BlockedFaceSize, BlockedFaceSize), Color.white);
+                f.sprite = face;
+                f.preserveAspect = true;
+            }
+
+            _blockedRoot.SetActive(false);
+        }
+
         public void Hide()
         {
             if (_root != null && _root.activeSelf) _root.SetActive(false);
@@ -186,9 +239,10 @@ namespace Werewolf.UI
                 _root = null;
             }
             _slotRect = null; _icon = null; _iconRect = null; _iconFallback = null;
-            _keyLabel = null;
+            _keyLabel = null; _blockedRoot = null;
             _lastLayout = (Layout)(-1);
             _lastNear = false;
+            _lastBlocked = false;
             _lastKeyName = null;
         }
 

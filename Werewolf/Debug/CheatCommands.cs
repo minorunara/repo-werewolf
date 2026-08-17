@@ -13,12 +13,13 @@ namespace Werewolf.Debugging
             "checkmate|reveal <selfcat|mates>|kill <actor> [vote]|phase <play|meeting|gameover>|" +
             "meeting|vote <actor|skip> [asActor]|leave <actor>|meetingstatus|status|selftest|" +
             "gauge <pct>|beacon <charge [n]|use>|perk <stamina|jump|ghost|heal|all>|informant|curse [actor]|" +
-            "body [clear]|spawnbag [dollars]|scatter [diag|warp]|bomb <gauge|plant <actor>|detonate|ammo [n]>|" +
+            "body [clear]|spawnbag [dollars]|scatter [diag|warp]|replay <dump|stat|demo N>|" +
+            "bomb <gauge|plant <actor>|detonate|ammo [n]>|" +
             "fx <reveal [villager|werewolf|blackcat]|toast [message]|countdown [sec]|" +
             "result|sfx [countdown|howl|toast]|clear>|" +
             "cfg <inject <id=value;...>|clear>|echo|lang export|" +
-            "chat <say <text>|as <actor> <text>|name <actor> <name> <text>|spam [n]|vote [actor]|" +
-            "baseline|late [ms] [text]|gate|avatar|state|clear>|res <w> <h>>";
+            "chat <say <text>|as <actor> <text>|name <actor> <name> <text>|spam [n]|auto [n]|" +
+            "vote [actor]|baseline|late [ms] [text]|gate|avatar|state|clear>|res <w> <h>>";
         internal static void Execute(string message)
         {
             if (!CommandGate.TryParse(message, out string command, out string[] args))
@@ -165,6 +166,10 @@ namespace Werewolf.Debugging
 
                 case "scatter":
                     HandleScatter(director, args);
+                    break;
+
+                case "replay":
+                    HandleReplay(args);
                     break;
 
                 case "bomb":
@@ -632,6 +637,64 @@ namespace Werewolf.Debugging
             }
         }
 
+        private static void HandleReplay(string[] args)
+        {
+            string op = args.Length >= 1 ? args[0].ToLowerInvariant() : "";
+            switch (op)
+            {
+                case "dump":
+                    if (ReplaySampler.Recorder.SegmentCount == 0)
+                    {
+                        WLog.Line("cmd_replay", secret: false, ("op", "dump"), ("result", "empty"));
+                        return;
+                    }
+                    try
+                    {
+                        string path = ReplaySampler.DumpToFile();
+                        WLog.Line("cmd_replay", secret: false, ("op", "dump"), ("path", path),
+                            ("segments", ReplaySampler.Recorder.SegmentCount),
+                            ("posEntries", ReplaySampler.Recorder.PositionEntryCount),
+                            ("events", ReplaySampler.Recorder.EventCount));
+                    }
+                    catch (Exception e)
+                    {
+                        WLog.Line("cmd_error", secret: false,
+                            ("name", "replay"), ("reason", "dump_failed"), ("detail", e.GetType().Name));
+                    }
+                    break;
+
+                case "stat":
+                    WLog.Line("cmd_replay", secret: false, ("op", "stat"),
+                        ("segments", ReplaySampler.Recorder.SegmentCount),
+                        ("open", ReplaySampler.Recorder.SegmentOpen),
+                        ("posEntries", ReplaySampler.Recorder.PositionEntryCount),
+                        ("events", ReplaySampler.Recorder.EventCount),
+                        ("intervalSec", ReplaySampler.Recorder.CurrentSampleIntervalSec));
+                    break;
+
+                case "demo":
+                {
+                    int count = 0;
+                    if (args.Length >= 2) int.TryParse(args[1], out count);
+                    WerewolfDirector demoDirector = WerewolfDirector.Instance;
+                    if (demoDirector == null)
+                    {
+                        WLog.Line("cmd_error", secret: false,
+                            ("name", "replay"), ("reason", "no_director"));
+                        break;
+                    }
+                    demoDirector.DebugReplayDemo(count);
+                    WLog.Line("cmd_replay", secret: false, ("op", "demo"), ("count", count));
+                    break;
+                }
+
+                default:
+                    WLog.Line("cmd_error", secret: false,
+                        ("name", "replay"), ("reason", "bad_op"), ("usage", Usage));
+                    break;
+            }
+        }
+
         private static void HandleLang(string[] args)
         {
             string sub = args.Length >= 1 ? args[0].ToLowerInvariant() : "";
@@ -699,6 +762,11 @@ namespace Werewolf.Debugging
 
                 case "spam":
                     director.DebugSpamChat(args.Length >= 2 && int.TryParse(args[1], out int n) ? n : 20);
+                    break;
+
+                case "auto":
+                    director.DebugToggleChatAuto(
+                        args.Length >= 2 && int.TryParse(args[1], out int autoCount) ? autoCount : 0);
                     break;
 
                 case "vote":

@@ -24,9 +24,10 @@ namespace Werewolf.UI
         public const string ManualLayer = "Manual";
 
         internal const int PanelSortingOrder = 9999;
-        internal const int ManualSortingOrder = 10000;
+        internal const int VoidMatchSortingOrder = 10000;
+        internal const int ManualSortingOrder = 10001;
         internal const int TutorialSortingOrder = 10000;
-        internal const int CursorSortingOrder = 10001;
+        internal const int CursorSortingOrder = 10002;
 
         private GameObject _canvasRoot;
         private readonly Dictionary<string, GameObject> _layers = new Dictionary<string, GameObject>();
@@ -276,6 +277,32 @@ namespace Werewolf.UI
             _bubbleTailSprite = Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
             _bubbleTailSprite.name = "WW_BubbleTailSprite";
             return _bubbleTailSprite;
+        }
+
+        private static Sprite _circleSprite;
+
+        internal static Sprite CircleSprite()
+        {
+            if (_circleSprite != null) return _circleSprite;
+            const int size = 32;
+            var tex = new Texture2D(size, size, TextureFormat.ARGB32, false);
+            tex.wrapMode = TextureWrapMode.Clamp;
+            var pixels = new Color[size * size];
+            var center = new Vector2(size / 2f, size / 2f);
+            float radius = size / 2f - 1f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), center);
+                    pixels[y * size + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(radius - d + 0.5f));
+                }
+            }
+            tex.SetPixels(pixels);
+            tex.Apply();
+            _circleSprite = Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
+            _circleSprite.name = "WW_CircleSprite";
+            return _circleSprite;
         }
 
         internal static Image CreateRoundedImage(Transform parent, string name, Vector2 anchoredPos, Vector2 size, Color color)

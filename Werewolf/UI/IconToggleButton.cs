@@ -53,21 +53,27 @@ namespace Werewolf.UI
         private const float HoverOutlineThickness = 4f;
         private static readonly Color HoverOutlineColor = new Color(1f, 0.85f, 0.1f, 1f);
 
+        private const float BadgeSize = 22f;
+        private const float BadgeInset = 14f;
+        private static readonly Color BadgeColor = new Color(0.86f, 0.16f, 0.12f, 1f);
+
         private RectTransform _container;
         private Image _icon;
         private RectTransform _iconRect;
         private TextMeshProUGUI _label;
         private RectTransform _labelRect;
         private Sprite _sprite;
+        private Sprite _hoverSprite;
         private Outline _hoverOutline;
         private bool _hovering;
+        private Image _badge;
 
         public RectTransform Container => _container;
 
         public bool HasIcon => _sprite != null;
 
         public RectTransform Build(Transform parent, string name, IconToggleStyle style,
-                                   string spriteKey, string initialLabel)
+                                   string spriteKey, string initialLabel, string hoverSpriteKey = null)
         {
             float width = Mathf.Max(style.IconSize, style.LabelWidth);
             float height = style.IconSize + IconLabelGap + style.LabelHeight;
@@ -77,6 +83,9 @@ namespace Werewolf.UI
             float labelCenterY = -(height * 0.5f - style.LabelHeight * 0.5f);
 
             _sprite = AssetCatalog.GetSprite(spriteKey);
+            _hoverSprite = _sprite != null && !string.IsNullOrEmpty(hoverSpriteKey)
+                ? AssetCatalog.GetSprite(hoverSpriteKey)
+                : null;
             _icon = UiKit.CreateImage(_container, "Icon", new Vector2(0f, iconCenterY),
                 new Vector2(style.IconSize, style.IconSize), Color.white);
             _iconRect = _icon.rectTransform;
@@ -114,6 +123,20 @@ namespace Werewolf.UI
         public void SetLabel(string text)
         {
             if (_label != null) _label.text = text;
+        }
+
+        public void SetBadgeVisible(bool visible)
+        {
+            if (_iconRect == null) return;
+            if (_badge == null)
+            {
+                if (!visible) return;
+                float offset = _iconRect.sizeDelta.x * 0.5f - BadgeInset;
+                _badge = UiKit.CreateImage(_iconRect, "UnreadBadge",
+                    new Vector2(offset, offset), new Vector2(BadgeSize, BadgeSize), BadgeColor);
+                _badge.sprite = UiKit.CircleSprite();
+            }
+            if (_badge.gameObject.activeSelf != visible) _badge.gameObject.SetActive(visible);
         }
 
         public ToggleHit HitTest(Vector2 screenPoint)
@@ -158,10 +181,14 @@ namespace Werewolf.UI
 
         public void SetHover(bool over)
         {
-            if (_hoverOutline == null) return;
+            if (_sprite == null) return;
             if (_hovering == over) return;
             _hovering = over;
-            _hoverOutline.enabled = over;
+            if (_icon != null)
+            {
+                _icon.sprite = over && _hoverSprite != null ? _hoverSprite : _sprite;
+            }
+            if (_hoverOutline != null) _hoverOutline.enabled = over;
         }
 
         private float SampleIconAlpha(Vector2 screenPoint)
@@ -198,8 +225,10 @@ namespace Werewolf.UI
             _label = null;
             _labelRect = null;
             _sprite = null;
+            _hoverSprite = null;
             _hoverOutline = null;
             _hovering = false;
+            _badge = null;
         }
     }
 }

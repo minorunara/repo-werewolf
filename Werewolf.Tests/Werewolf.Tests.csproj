@@ -30,6 +30,7 @@
              Link="Net\%(RecursiveDir)%(Filename)%(Extension)" />
 
     <Compile Include="..\Werewolf\Debug\CommandGate.cs" Link="Debug\CommandGate.cs" />
+    <Compile Include="..\Werewolf\Debug\DebugChatAuto.cs" Link="Debug\DebugChatAuto.cs" />
     <Compile Include="..\Werewolf\Debug\SecretLogBuffer.cs" Link="Debug\SecretLogBuffer.cs" />
     <Compile Include="..\Werewolf\Debug\SelfTest.cs" Link="Debug\SelfTest.cs" />
   </ItemGroup>

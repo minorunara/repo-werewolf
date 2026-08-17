@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.2.0
+
+### 日本語
+
+- 試合結果画面に「リプレイ再生」を追加しました。ゲーム内マップを背景にプレイヤー・敵・アイテム・死体・貴重品の損失や納品・抽出ポイントの状態を時系列で見返せます。再生・速度・シーク・軌跡追跡に対応し、会議中の発言と開票結果も再現します。リプレイはファイルへ保存でき、MODに同梱した日英対応の外部ビューアで後から再生できます
+- 試合結果画面に、死亡していたプレイヤーも参加できる「感想戦チャット」と、ホスト用の「ロビーへ戻る」ボタンを追加しました。結果画面では敵を退場させ、無効試合の確認画面がチャットより手前に表示されるようにしました。自動帰還の既定時間は60秒から120秒、設定上限は300秒へ延長しました
+- 会議チャットログを閉じている間の新着を赤い未読マークで知らせるようにしました。また、会議招集からTaxManの冒頭投稿までの発言が会議ログやリプレイへ残らないよう、記録・通知の開始を議論開始時に揃えました
+- 死体通報ができない間（会議開催のカウントダウン中・最終納品の直前）、右下の通報アイコンを非表示にする代わりに、バツ印とTaxManの顔を重ねた表示へ切り替えるようにしました（アイコンが消えて「通報はどこ？」と迷わないため）
+- 通信による位置のズレで、爆弾魔が近くに居続けても「爆弾を仕掛けられたかもしれない…」の警告が出ないまま爆弾を仕掛けられることがある問題を修正しました
+- 会議後の分散スポーンの着地点から斜面を除外しました（転倒したままワープすると斜面で転がり続け、操作できないまま転落死する恐れがあるため）
+- 人狼陣営の「貴重品を記録する」をラウンド開始時はONにしました
+
+### English
+
+- Added a match replay to the result screen. It shows players, enemies, items, bodies, valuable losses and deliveries, and extraction point states over the game map. Playback, speed, seek, and trail controls are included, along with meeting chat and vote results. Replays can be saved and watched later in the bundled English/Japanese browser viewer
+- Added post-match chat—including messages from players who died—and a host-only "Return to Lobby" button to the result screen. Enemies are removed while the result screen is open, and the no-contest confirmation now stays in front of the chat panel. The default automatic return time has increased from 60 to 120 seconds, with a new maximum of 300 seconds
+- The meeting chat log now marks unread messages with a red dot while closed. Chat logging, notifications, and replay recording now begin when discussion starts after TaxMan's opening post, so messages from the meeting countdown and intro are not kept
+- While reporting a body is unavailable (during the meeting countdown and right before the final delivery), the report icon in the bottom right now shows a cross mark with TaxMan's face over it instead of disappearing, so you can tell reporting is blocked rather than missing
+- Fixed the "Someone may have planted a bomb on me…" warning sometimes not appearing before a bomb was planted, because of network position drift between players
+- Post-meeting scatter spawns no longer land on slopes (a player warped while tumbling could keep rolling down the slope and fall to their death, unable to recover)
+- Valuable recording for the werewolf team now starts enabled at the beginning of each round
+
 ## 1.1.0
 
 ### 日本語

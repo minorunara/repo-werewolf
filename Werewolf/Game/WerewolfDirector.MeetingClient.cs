@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using HarmonyLib;
 using UnityEngine;
 using Werewolf.Core;
+using Werewolf.Core.Replay;
 using Werewolf.Game.Patches;
 using Werewolf.Net;
 using Werewolf.UI;
@@ -81,7 +82,10 @@ namespace Werewolf.Game
 
             bool active = _meetingClient.MeetingActive;
 
-            if (active && _meetingClient.WarpDone(now)) TrySetLocalInvincibleForMeeting();
+            if (GameOverSafety.ShouldInjectInvincibility(ClientPhase, active, _meetingClient.WarpDone(now)))
+            {
+                TrySetLocalInvincible();
+            }
 
             if (active && !_meetingClient.WarpDone(now))
             {
@@ -110,6 +114,7 @@ namespace Werewolf.Game
                 if (!_warpExecuted)
                 {
                     _warpExecuted = true;
+                    ReplaySampler.NoteMeetingWarp();
                     ExecuteWarpMoment();
                     Patches.ValuableMapSyncPatch.RefreshSnapshot("meeting_warp");
                     if (_deathRevealPending)
@@ -127,11 +132,12 @@ namespace Werewolf.Game
                 }
                 if (!_chatSystemPosted && _meetingClient.VotingUiReady(now))
                 {
-                    _chatSystemPosted = true;
                     List<List<int>> lastGroups = _lastScatterGroups;
                     _lastScatterGroups = null;
                     int lostSince = ConsumeRecapLostDelta();
                     if (MeetingChatLogEnabled) PostMeetingChatSystemLines(lastGroups, lostSince);
+                    _chatSystemPosted = true;
+                    _meetingClient.MarkDiscussionOpen();
                 }
                 if (_pendingMeetingTutorial && _meetingClient.VotingUiReady(now))
                 {
@@ -190,7 +196,17 @@ namespace Werewolf.Game
                 HideDeathReveal();
                 _sfxPlayer.StopStoppable();
                 _movementFreezer.End();
-                _enemyFreezer.End();
+                if (GameOverSafety.ShouldHoldEnemyFreeze(ClientPhase))
+                {
+                    if (SemiFunc.IsMasterClientOrSingleplayer() && !_enemyFreezer.Active)
+                    {
+                        _enemyFreezer.Begin();
+                    }
+                }
+                else
+                {
+                    _enemyFreezer.End();
+                }
                 _truckWarper?.ResetWatchdog();
                 Patches.PlayerSpawnPatch.MeetingActive = false;
                 if (_conveneCountdown.Visible) HideConveneCountdown();
@@ -309,6 +325,7 @@ namespace Werewolf.Game
         {
             if (guardSec > 0) _clientScatterGuard.Arm(NowUnixMs(), guardSec);
             else _clientScatterGuard.Disarm();
+            ReplaySampler.NoteGuardWindow(guardSec);
             WLog.Line("recv_scatter_guard_window", secret: false, ("sec", guardSec));
         }
 
@@ -418,6 +435,7 @@ namespace Werewolf.Game
             }
 
             _lastScatterGroups = groups;
+            ReplaySampler.NoteScatterGroups(groups);
 
             bool animated = false;
             if (_meetingUiActive && _meetingClient.MeetingActive && _votePanel.Exists)
@@ -537,7 +555,9 @@ namespace Werewolf.Game
                     if (_meetingClient.IsDeadUnannounced(player.ActorNumber)) dead.Add(player);
                 }
             }
-            _meetingClient.MarkAllDeadAnnounced();
+            var announcedNow = new List<int>();
+            _meetingClient.MarkAllDeadAnnounced(announcedNow);
+            ReplaySampler.NoteDeathsAnnounced(announcedNow);
 
             _chatRecapDeaths.Clear();
             foreach (WPlayer player in dead)
@@ -709,9 +729,22 @@ namespace Werewolf.Game
         private static bool MeetingChatLogEnabled
             => Plugin.Bindings == null || Plugin.Bindings.MeetingChatLog.Value;
 
+        internal bool IsChatLogWindowOpenClient
+            => MeetingChatGate.IsOpen(ClientPhase, IsMeetingDiscussionOpenClient) || IsResultChatActiveClient;
+
+        private bool IsMeetingWarpDoneClient => _meetingClient.WarpDone(NowUnixMs());
+
+        private bool IsMeetingDiscussionOpenClient => _meetingClient.DiscussionOpen;
+
+        private Func<int, PlayerAvatar> ChatAvatarResolver
+            => _chatDebugAvatarFallback
+                ? (Func<int, PlayerAvatar>)ResolveAvatarForChatDebug
+                : ResolveAvatar;
+
         private void ResetMeetingChat()
         {
             _chatLog.Clear();
+            _chatUnread.Clear();
             _chatRecapDeaths.Clear();
             _chatRecapBeaconUses = MeetingRecap.Unknown;
             _chatVoteBaselinePending = false;
@@ -799,15 +832,45 @@ namespace Werewolf.Game
             try
             {
                 int actor = Registry != null ? Registry.ResolveActor(speaker) : -1;
-                ChatSpeaker kind = _meetingClient.GetRowStatus(actor) == RowStatus.Alive
-                    ? ChatSpeaker.Alive
-                    : ChatSpeaker.Dead;
-                AppendMeetingChatMessageClient(actor, ResolveDisplayName(actor), message, kind, playSfx: true);
+                AppendMeetingChatMessageClient(
+                    actor, ResolveDisplayName(actor), message, ChatSpeakerKindFor(actor), playSfx: true);
             }
             catch (Exception e)
             {
                 WLog.Line("chat_log_record_error", secret: false, ("err", e.Message));
             }
+        }
+
+        public void RecordReplayChatClient(PlayerAvatar speaker, string message)
+        {
+            if (speaker == null) return;
+            try
+            {
+                RecordReplayChatByActor(
+                    Registry != null ? Registry.ResolveActor(speaker) : -1, message);
+            }
+            catch (Exception e)
+            {
+                WLog.Line("replay_chat_record_error", secret: false, ("err", e.Message));
+            }
+        }
+
+        private bool RecordReplayChatByActor(int actor, string message)
+        {
+            bool alive = _meetingClient.GetRowStatus(actor) == RowStatus.Alive;
+            if (!ReplayChatGate.ShouldRecord(ClientPhase, IsMeetingDiscussionOpenClient, alive)) return false;
+            string text = ReplayChatText.SanitizeForRecord(message);
+            if (text.Length == 0) return false;
+            ReplaySampler.NoteChat(actor, text);
+            return true;
+        }
+
+        private ChatSpeaker ChatSpeakerKindFor(int actor)
+        {
+            if (ClientPhase == GamePhase.GameOver) return ChatSpeaker.Alive;
+            return _meetingClient.GetRowStatus(actor) == RowStatus.Alive
+                ? ChatSpeaker.Alive
+                : ChatSpeaker.Dead;
         }
 
         private bool AppendMeetingChatMessageClient(
@@ -818,6 +881,7 @@ namespace Werewolf.Game
             {
                 EnsureSfxBuilt();
                 _sfxPlayer.Play(MeetingChatSfxClipKey, MeetingChatSfxVolumeScale);
+                _chatUnread.OnMessageAppended(actor, LocalActor, _chatPanel.IsOpen);
             }
             return added;
         }
@@ -830,13 +894,13 @@ namespace Werewolf.Game
                 Plugin.MeetingChatLogKey != null ? Plugin.MeetingChatLogKey.Value : KeyCode.L,
                 InputGate.KeysFree);
 
-            _chatPanel.Render(_chatLog, LocalActor,
-                _chatDebugAvatarFallback
-                    ? (Func<int, PlayerAvatar>)ResolveAvatarForChatDebug
-                    : ResolveAvatar,
+            _chatPanel.Render(_chatLog, LocalActor, ChatAvatarResolver,
                 ParticipantIdFor,
                 MarkedTeammateRole,
                 !IsLocalAlive());
+
+            if (_chatPanel.IsOpen) _chatUnread.Clear();
+            _chatPanel.SetUnreadBadge(_chatUnread.HasUnread);
         }
 
         private int LocalActor => _bus != null ? _bus.LocalActorNumber : 1;
@@ -844,7 +908,7 @@ namespace Werewolf.Game
         private bool IsLocalAlive()
             => _meetingClient.GetRowStatus(LocalActor) == RowStatus.Alive;
 
-        private void TrySetLocalInvincibleForMeeting()
+        private void TrySetLocalInvincible()
         {
             try
             {

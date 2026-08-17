@@ -33,6 +33,7 @@ namespace Werewolf.Tests
         [InlineData(MessageCodes.CosmeticGrant)]
         [InlineData(MessageCodes.BombDetonation)]
         [InlineData(MessageCodes.ScatterGuardWindow)]
+        [InlineData(MessageCodes.ReplayLossLedger)]
         [InlineData(MessageCodes.ModIntegritySnapshot)]
         public void HostBroadcastCodes_DropFromNonMaster(byte code)
         {

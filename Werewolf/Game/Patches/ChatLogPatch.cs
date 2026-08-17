@@ -14,8 +14,9 @@ namespace Werewolf.Game.Patches
                 if (__instance == null || string.IsNullOrEmpty(_message)) return;
 
                 WerewolfDirector dir = WerewolfDirector.Instance;
-                if (dir == null || !dir.IsRoundActiveClient) return;
-                if (dir.ClientPhase != GamePhase.Meeting) return;
+                if (dir == null || !dir.IsChatLogWindowOpenClient) return;
+
+                dir.RecordReplayChatClient(__instance, _message);
 
                 if (!DeadTextGuard.ShouldShow(__instance)) return;
 

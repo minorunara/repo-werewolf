@@ -36,6 +36,8 @@ namespace Werewolf
 
         internal static ConfigEntry<KeyCode> MeetingChatLogKey;
 
+        internal static ConfigEntry<KeyCode> ReplayViewerKey;
+
         internal static ConfigEntry<KeyCode> CorpseReportKey;
 
         internal static ConfigEntry<KeyCode> ResultReturnKey;
@@ -71,6 +73,7 @@ namespace Werewolf
             LobbySettingsPanelKey = Bindings.LobbySettingsPanelKey;
             MeetingMapKey = Bindings.MeetingMapKey;
             MeetingChatLogKey = Bindings.MeetingChatLogKey;
+            ReplayViewerKey = Bindings.ReplayViewerKey;
             CorpseReportKey = Bindings.CorpseReportKey;
             ManualKey = Bindings.ManualKey;
             ResultReturnKey = Bindings.ResultReturnKey;

@@ -50,6 +50,10 @@ namespace Werewolf.UI
             rect.offsetMax = Vector2.zero;
             _root = go;
 
+            var canvas = go.AddComponent<Canvas>();
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = WerewolfUIManager.VoidMatchSortingOrder;
+
             var confirm = new GameObject("Confirm", typeof(RectTransform));
             var confirmRect = (RectTransform)confirm.transform;
             confirmRect.SetParent(rect, false);

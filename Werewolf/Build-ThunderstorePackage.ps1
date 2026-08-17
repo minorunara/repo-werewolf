@@ -19,6 +19,11 @@ $metadataDirectory = if ($Channel -eq "Beta") {
 $manifestPath = Join-Path $metadataDirectory "manifest.json"
 $outputDirectory = Join-Path $projectDirectory "out"
 $iconPath = Join-Path $metadataDirectory "icon.png"
+$replayViewerPath = Join-Path (Split-Path -Parent $projectDirectory) "tools\replay-viewer.html"
+
+if (-not (Test-Path -LiteralPath $replayViewerPath -PathType Leaf)) {
+    throw "Replay viewer was not found: $replayViewerPath"
+}
 
 if (-not (Test-Path -LiteralPath $iconPath -PathType Leaf)) {
     throw "Thumbnail was not found: $iconPath"
@@ -95,6 +100,9 @@ $utf8NoBom = New-Object Text.UTF8Encoding($false)
 [IO.File]::WriteAllText((Join-Path $stageDirectory "README.md"), $readmeSource, $utf8NoBom)
 
 Copy-Item -LiteralPath $assemblyPath -Destination $pluginDirectory
+# 外部リプレイビューアはDLLと同じフォルダへ置く（プロファイル配下へ展開され、保存先の
+# フォールバック Replays\ と同居する。単一HTMLで依存なし＝ブラウザで直接開ける）
+Copy-Item -LiteralPath $replayViewerPath -Destination $pluginDirectory
 
 Compress-Archive -Path (Join-Path $stageDirectory "*") -DestinationPath $zipPath -CompressionLevel Optimal
 
@@ -108,7 +116,8 @@ try {
         "CHANGELOG.md",
         "icon.png",
         "LICENSE",
-        "BepInEx/plugins/$pluginFolderName/Minorunara_Werewolf.dll"
+        "BepInEx/plugins/$pluginFolderName/Minorunara_Werewolf.dll",
+        "BepInEx/plugins/$pluginFolderName/replay-viewer.html"
     )
     foreach ($requiredEntry in $requiredEntries) {
         if ($requiredEntry -notin $entries) {

@@ -103,6 +103,7 @@ namespace Werewolf
 
         internal ConfigEntry<KeyCode> MeetingMapKey;
         internal ConfigEntry<KeyCode> MeetingChatLogKey;
+        internal ConfigEntry<KeyCode> ReplayViewerKey;
         internal ConfigEntry<float> MeetingMapOrthoSize;
         internal ConfigEntry<int> MeetingMapResolution;
         internal ConfigEntry<bool> MeetingMapGrid;
@@ -233,7 +234,7 @@ namespace Werewolf
                 new ConfigDescription(
                     "Fallback: seconds until the result screen auto-returns to the lobby when the host does not press the return key (0 = never) / " +
                     "ホストが帰還キーを押さない場合に結果画面から自動でロビーへ戻るまでの保険秒数（0=自動で戻らない）",
-                    new AcceptableValueRange<int>(0, 60)));
+                    new AcceptableValueRange<int>(0, 300)));
         }
 
         private void BindMeeting(ConfigFile config, GameConfig defaults)
@@ -613,6 +614,13 @@ namespace Werewolf
                 SecClientKeybinds, "MeetingChatLogKey", KeyCode.L,
                 new ConfigDescription(
                     "Key binding to toggle the chat log panel during meetings / 会議チャットログのトグルキー",
+                    null, "HideFromREPOConfig"));
+
+            ReplayViewerKey = config.Bind(
+                SecClientKeybinds, "ReplayViewerKey", KeyCode.R,
+                new ConfigDescription(
+                    "Key binding to toggle the replay viewer on the match result screen / " +
+                    "試合結果画面でリプレイビューアを開閉するキーバインド",
                     null, "HideFromREPOConfig"));
 
             LobbySettingsPanelKey = config.Bind(

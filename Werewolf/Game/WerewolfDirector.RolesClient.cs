@@ -86,9 +86,9 @@ namespace Werewolf.Game
             }
 
             GamePhase crPhase = _session != null ? _session.Phase : _clientPhase;
-            bool crVisible = crPhase == GamePhase.Play && IsLocalAlive()
-                && !_meetingClient.MeetingActive
-                && !LastRunGate.IsLastRunActive();
+            CorpseReportHudMode crMode = CorpseReportHudGate.Compute(
+                crPhase, IsLocalAlive(), _meetingClient.MeetingActive, warpedInMeeting,
+                LastRunGate.IsLastRunActive());
             CorpseReportHudPanel.Layout crLayout = RolesClient != null && RolesClient.PlayGauge != null
                 ? CorpseReportHudPanel.Layout.AboveMiniGauge
                 : CorpseReportHudPanel.Layout.AtGaugeSlot;
@@ -96,15 +96,15 @@ namespace Werewolf.Game
             {
                 string crKey = Plugin.CorpseReportKey != null
                     ? Plugin.CorpseReportKey.Value.ToString() : "?";
-                _corpseReportHud.Tick(crVisible, LocalIsNearUnannouncedCorpse,
+                _corpseReportHud.Tick(crMode, LocalIsNearUnannouncedCorpse,
                     crKey, crLayout);
             }
 
-            TickValuableRecord(crPhase, warpedInMeeting, crVisible, crLayout);
+            TickValuableRecord(crPhase, warpedInMeeting, crLayout);
         }
 
         private void TickValuableRecord(GamePhase phase, bool warpedInMeeting,
-                                        bool corpseHudVisible, CorpseReportHudPanel.Layout corpseHudLayout)
+                                        CorpseReportHudPanel.Layout corpseHudLayout)
         {
             bool canOperate = ValuableRecordGate.CanOperate(
                 _localRole, IsLocalAlive(), phase, warpedInMeeting);
@@ -132,7 +132,7 @@ namespace Werewolf.Game
                 _valuableRecordHud.Tick(canOperate, RolesClient.ValuableRecordOn,
                     _valuableRecordHold.Ratio, _valuableRecordHold.IsCharging,
                     Plugin.CorpseReportKey != null ? Plugin.CorpseReportKey.Value.ToString() : "?",
-                    corpseHudLayout, corpseHudVisible);
+                    corpseHudLayout);
             }
         }
 
@@ -516,6 +516,7 @@ namespace Werewolf.Game
                     : null;
                 _resultScreen.Show(winningTeam, rows, ResolveAvatar,
                     digestLines, BuildResultFooterText(), ParticipantIdFor);
+                CaptureResultChatContext(actors, roles);
                 PlayResultSfx(winningTeam);
             }
             catch (Exception e)
@@ -686,6 +687,8 @@ namespace Werewolf.Game
             _wolfStatusPanel?.Hide();
             _wolfStatusModel.Reset();
         }
+
+        internal string DisplayNameForActor(int actorNumber) => ResolveDisplayName(actorNumber);
 
         private string ResolveDisplayName(int actorNumber)
         {

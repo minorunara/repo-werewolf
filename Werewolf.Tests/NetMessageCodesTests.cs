@@ -77,8 +77,9 @@ namespace Werewolf.Tests
         [InlineData(180, true)]
         [InlineData(189, true)]
         [InlineData(190, true)]
+        [InlineData(191, true)]
         [InlineData(159, false)]
-        [InlineData(191, false)]
+        [InlineData(192, false)]
         [InlineData(0, false)]
         [InlineData(200, false)]
         public void IsInRange_MatchesReservedBand(int code, bool expected)
@@ -123,9 +124,9 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void MaxCode_ExtendedTo190()
+        public void MaxCode_ExtendedTo191()
         {
-            Assert.Equal(190, MessageCodes.MaxCode);
+            Assert.Equal(191, MessageCodes.MaxCode);
         }
 
         [Fact]
@@ -392,6 +393,24 @@ namespace Werewolf.Tests
         public void ScatterGuardWindow_Schema_IsGuardSeconds()
         {
             Assert.Equal(new[] { typeof(int) }, MessageCodes.Schema(MessageCodes.ScatterGuardWindow));
+        }
+
+        [Fact]
+        public void ReplayLossLedger_Is191_PublicBroadcast()
+        {
+            Assert.Equal(191, MessageCodes.ReplayLossLedger);
+            Assert.True(MessageCodes.IsInRange(MessageCodes.ReplayLossLedger));
+            Assert.False(MessageCodes.IsTargetOnly(MessageCodes.ReplayLossLedger));
+            Assert.False(MessageCodes.IsMasterInbound(MessageCodes.ReplayLossLedger));
+            Assert.False(MessageCodes.IsSecret(MessageCodes.ReplayLossLedger));
+        }
+
+        [Fact]
+        public void ReplayLossLedger_Schema_IsSegCountAndFourParallelArrays()
+        {
+            Assert.Equal(
+                new[] { typeof(int), typeof(int[]), typeof(int[]), typeof(int[]), typeof(byte[]) },
+                MessageCodes.Schema(MessageCodes.ReplayLossLedger));
         }
 
         [Fact]

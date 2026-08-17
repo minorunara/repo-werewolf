@@ -109,6 +109,7 @@ namespace Werewolf.Game
                 var players = GameDirector.instance != null ? GameDirector.instance.PlayerList : null;
                 float proximity = ClientBomberProximityMeters;
                 if (proximity <= 0f) proximity = 8f;
+                float selfDefenseProximity = proximity + GameConfig.SelfDefenseProximityMarginMeters;
 
                 List<(int actor, Vector3 pos)> bodies = null;
                 if (localAvatar != null
@@ -148,7 +149,7 @@ namespace Werewolf.Game
                             continue;
                         }
                         float dist = Vector3.Distance(localPos.Value, bodyPos);
-                        bool within = dist <= proximity
+                        bool within = dist <= selfDefenseProximity
                             && VisionProbe.BodyToBodyClear(localPos.Value, bodyPos);
                         _selfDefenseProximity.Tick(actor, within, delta, bomberGaugeSuspended);
                     }

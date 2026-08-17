@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using UnityEngine;
 using Werewolf.Core;
 using Werewolf.Game.Patches;
 using Werewolf.Net;
+using Werewolf.UI;
 
 namespace Werewolf.Game
 {
@@ -12,6 +14,8 @@ namespace Werewolf.Game
         private readonly ResultDigest _matchDigest = new ResultDigest();
 
         private System.Collections.Generic.IReadOnlyList<DigestEntry> _clientDigestEntries;
+
+        private Dictionary<int, Role> _resultRolesByActor;
 
         private void ObserveForDigest(OutboundMessage msg)
         {
@@ -24,6 +28,7 @@ namespace Werewolf.Game
                     TryRecordFinalBalance();
                     _bus.SendToAll(MessageCodes.ResultDigest, _matchDigest.ToWire());
                     WLog.Line("digest_sent", secret: false, ("entries", _matchDigest.Entries.Count));
+                    SendReplayLossLedger();
                 }
             }
             catch (Exception e)
@@ -51,7 +56,10 @@ namespace Werewolf.Game
         }
 
         private void HandlePerkUnlockedDigest(PerkId perk)
-            => _matchDigest.RecordPerkUnlocked((byte)perk, NowUnixMs());
+        {
+            _matchDigest.RecordPerkUnlocked((byte)perk, NowUnixMs());
+            ReplaySampler.NotePerkUnlocked(perk.ToString());
+        }
 
         private void HandleInformantDigest()
             => _matchDigest.RecordInformant(NowUnixMs());
@@ -79,6 +87,15 @@ namespace Werewolf.Game
             }
         }
 
+        private void SendReplayLossLedger()
+        {
+            object[] wire = ReplaySampler.BuildLossLedgerWire();
+            if (wire == null) return;
+            _bus.SendToAll(MessageCodes.ReplayLossLedger, wire);
+            WLog.Line("replay_ledger_sent", secret: false,
+                ("segments", (int)wire[0]), ("entries", ((int[])wire[1]).Length));
+        }
+
         private void ApplyResultDigest(object[] payload)
         {
             _clientDigestEntries = ResultDigest.FromWire(payload);
@@ -89,13 +106,17 @@ namespace Werewolf.Game
         private void ClearClientDigest()
         {
             _clientDigestEntries = null;
+            _resultRolesByActor = null;
         }
 
         private void TickResultReturn()
         {
+            TickResultChat();
+            TickReplayViewer();
+
             if (!_resultScreen.Visible) return;
 
-            _resultScreen.Tick();
+            _resultScreen.Tick(ResultChatPointerBlocksWheel());
 
             int? remaining = _resultCountdown.RemainingSeconds(NowUnixMs());
             int displaySecond = remaining ?? -1;
@@ -108,15 +129,47 @@ namespace Werewolf.Game
             if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
             if (!_resultSequence.Active) return;
 
-            if (NowUnixMs() < _resultReturnArmedAtUnixMs) return;
+            long now = NowUnixMs();
+            TickReturnButton(now);
+
+            if (now < _resultReturnArmedAtUnixMs) return;
 
             KeyCode key = Plugin.ResultReturnKey != null ? Plugin.ResultReturnKey.Value : KeyCode.F5;
             if (key == KeyCode.None) return;
             if (!SemiFunc.NoTextInputsActive()) return;
             if (Input.GetKeyDown(key))
             {
-                WLog.Line("result_return_requested", secret: false);
+                WLog.Line("result_return_requested", secret: false, ("via", "key"));
                 _resultSequence.RequestReturn();
+            }
+        }
+
+        private void TickReturnButton(long nowUnixMs)
+        {
+            bool onButton = _resultReturnFlow.ReadyAt(nowUnixMs)
+                && !ResultChatPointerBlocksWheel()
+                && _resultScreen.IsPointerOverReturnButton((Vector2)Input.mousePosition);
+            ResultReturnButtonEvent ev = _resultReturnFlow.Tick(
+                nowUnixMs, Input.GetMouseButtonDown(0), onButton);
+            KeyCode key = Plugin.ResultReturnKey != null ? Plugin.ResultReturnKey.Value : KeyCode.F5;
+            _resultScreen.SetReturnButton(
+                visible: true,
+                alpha: _resultReturnFlow.AlphaAt(nowUnixMs),
+                armed: _resultReturnFlow.Armed,
+                hover: onButton,
+                keyName: key != KeyCode.None ? key.ToString() : null);
+            switch (ev)
+            {
+                case ResultReturnButtonEvent.Armed:
+                    WLog.Line("result_return_armed", secret: false);
+                    break;
+                case ResultReturnButtonEvent.Disarmed:
+                    WLog.Line("result_return_disarmed", secret: false);
+                    break;
+                case ResultReturnButtonEvent.Confirmed:
+                    WLog.Line("result_return_requested", secret: false, ("via", "button"));
+                    _resultSequence.RequestReturn();
+                    break;
             }
         }
 
@@ -163,6 +216,79 @@ namespace Werewolf.Game
                 key);
         }
 
+        internal bool IsResultChatActiveClient
+            => ResultChatGate.IsOpen(ClientPhase, _resultScreen.Visible, MeetingChatLogEnabled);
+
+        private void TickResultChat()
+        {
+            bool active = IsResultChatActiveClient;
+            if (active) EnsurePanelBuilt(_resultChatPanel);
+            if (_resultChatPanel.Exists) _resultChatPanel.SetVisible(active);
+            if (!active || !_resultChatPanel.Exists) return;
+
+            UiKit.KeepCursorFree();
+            _resultChatPanel.Tick(
+                Plugin.MeetingChatLogKey != null ? Plugin.MeetingChatLogKey.Value : KeyCode.L,
+                InputGate.KeysFree);
+            _resultChatPanel.Render(_chatLog, LocalActor, ChatAvatarResolver,
+                ParticipantIdFor, ResultChatMarkedRole, localDead: false);
+
+            if (_resultChatPanel.IsOpen) _chatUnread.Clear();
+            _resultChatPanel.SetUnreadBadge(_chatUnread.HasUnread);
+        }
+
+        private bool ResultChatPointerBlocksWheel()
+            => IsResultChatActiveClient && _resultChatPanel.Exists
+               && _resultChatPanel.IsPointerOverPanel((Vector2)Input.mousePosition);
+
+        private void TickReplayViewer()
+        {
+            bool window = _resultScreen.Visible || _replayViewer.DemoActive;
+            if (window && !_replayViewer.Exists)
+            {
+                EnsurePanelBuilt(_replayViewer);
+                if (_resultChatPanel.Exists) _resultChatPanel.EnsureTopSibling();
+            }
+            if (!_replayViewer.Exists) return;
+
+            _replayViewer.Tick(
+                _resultScreen.Visible,
+                ReplaySampler.Recorder,
+                Plugin.Bindings != null ? Plugin.Bindings.MeetingMapOrthoSize.Value : 15f,
+                Plugin.Bindings != null ? Plugin.Bindings.MeetingMapResolution.Value : 1,
+                Plugin.ReplayViewerKey != null ? Plugin.ReplayViewerKey.Value : KeyCode.R,
+                InputGate.KeysFree,
+                p => IsResultChatActiveClient && _resultChatPanel.Exists
+                    && _resultChatPanel.IsPointerOverPanel(p),
+                ReplaySampler.ExportForUser);
+        }
+
+        internal void DebugReplayDemo(int count)
+        {
+            EnsurePanelBuilt(_replayViewer);
+            if (_resultChatPanel.Exists) _resultChatPanel.EnsureTopSibling();
+            if (_replayViewer.Exists) _replayViewer.SetDemo(count);
+        }
+
+        private void CaptureResultChatContext(int[] actors, byte[] roles)
+        {
+            var map = new Dictionary<int, Role>(actors.Length);
+            for (int i = 0; i < actors.Length && i < roles.Length; i++)
+            {
+                map[actors[i]] = (Role)roles[i];
+            }
+            _resultRolesByActor = map;
+
+            _chatLog.Clear();
+            _chatUnread.Clear();
+            if (_resultChatPanel.Exists) _resultChatPanel.ResetView();
+        }
+
+        private Role? ResultChatMarkedRole(int actor)
+            => _resultRolesByActor != null && _resultRolesByActor.TryGetValue(actor, out Role role)
+                ? role
+                : (Role?)null;
+
         private void ResetVoidMatch()
         {
             _voidMatchHold.Reset();
@@ -208,18 +334,14 @@ namespace Werewolf.Game
 
         private static string BuildResultFooterText(int? remainingSeconds = null)
         {
-            string baseText;
             if (SemiFunc.IsMasterClientOrSingleplayer())
             {
-                string keyName = Plugin.ResultReturnKey != null
-                    ? Plugin.ResultReturnKey.Value.ToString() : KeyCode.F5.ToString();
-                baseText = Texts.Format(TextId.ResultReturnPromptFormat, keyName);
-            }
-            else
-            {
-                baseText = Texts.Get(TextId.ResultWaitingHost);
+                return remainingSeconds.HasValue
+                    ? Texts.Format(TextId.ResultAutoReturnCountdownFormat, remainingSeconds.Value)
+                    : string.Empty;
             }
 
+            string baseText = Texts.Get(TextId.ResultWaitingHost);
             return remainingSeconds.HasValue
                 ? Texts.Format(TextId.ResultFooterWithCountdownFormat, baseText, remainingSeconds.Value)
                 : baseText;
@@ -241,19 +363,22 @@ namespace Werewolf.Game
             _roundGameOverAutoReturnSec = Math.Max(0, seconds);
         }
 
-        private const long ResultReturnArmDelayMs = 2000L;
+        private readonly ResultReturnButtonFlow _resultReturnFlow = new ResultReturnButtonFlow();
 
         private void BeginResultCountdown()
         {
             long now = NowUnixMs();
             _resultCountdown.Begin(now, _roundGameOverAutoReturnSec);
-            _resultReturnArmedAtUnixMs = now + ResultReturnArmDelayMs;
+            _resultReturnFlow.Begin(now);
+            _resultReturnArmedAtUnixMs = now + ResultReturnButtonFlow.ArmDelayMs;
             _lastResultCountdownSecond = -1;
         }
 
         private void ClearResultCountdown()
         {
             _resultCountdown.Clear();
+            _resultReturnFlow.Reset();
+            _resultScreen.SetReturnButton(visible: false, alpha: 0f, armed: false, hover: false, keyName: null);
             _roundGameOverAutoReturnSec = 0;
             _resultReturnArmedAtUnixMs = 0L;
             _lastResultCountdownSecond = -1;

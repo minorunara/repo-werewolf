@@ -524,7 +524,7 @@ namespace Werewolf.Tests
                 MinimapHideEnabled = false,
                 OutfitChangeAllowed = true,
                 ValuableMapMode = ValuableMapMode.Realtime,
-                GameOverAutoReturnSec = 120,
+                GameOverAutoReturnSec = 240,
                 NecroVoiceMode = NecroVoiceMode.AllDead,
                 StartLevelNumber = 5,
                 StartMapName = "Headman Manor",

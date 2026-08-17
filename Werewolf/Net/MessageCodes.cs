@@ -7,7 +7,7 @@ namespace Werewolf.Net
     {
         public const byte MinCode = 160;
 
-        public const byte MaxCode = 190;
+        public const byte MaxCode = 191;
 
         public const byte AssignRole = WWEventCodes.AssignRole;
 
@@ -60,6 +60,8 @@ namespace Werewolf.Net
         public const byte ScatterGroups = 189;
 
         public const byte ScatterGuardWindow = 190;
+
+        public const byte ReplayLossLedger = 191;
 
         public const byte ModManifestRequest = 182;
 
@@ -115,6 +117,8 @@ namespace Werewolf.Net
                     return new[] { typeof(byte[]), typeof(int[]), typeof(int[]), typeof(int[]), typeof(int[]) };
                 case ScatterGroups:   return new[] { typeof(int[]), typeof(byte[]) };
                 case ScatterGuardWindow: return new[] { typeof(int) };
+                case ReplayLossLedger:
+                    return new[] { typeof(int), typeof(int[]), typeof(int[]), typeof(int[]), typeof(byte[]) };
                 case ModManifestRequest:
                     return new[] { typeof(int), typeof(byte), typeof(string) };
                 case ModManifestReport:

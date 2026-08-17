@@ -1,5 +1,6 @@
 using System;
 using Werewolf.Core;
+using Werewolf.Debugging;
 
 namespace Werewolf.Game
 {
@@ -13,36 +14,44 @@ namespace Werewolf.Game
 
         private bool _chatDebugAvatarFallback;
 
-        public bool DebugInjectChat(int actor, string name, string text)
-            => DebugInjectChatCore(actor, name, text, playSfx: true);
+        private readonly DebugChatAuto _chatAuto = new DebugChatAuto();
 
-        private bool DebugInjectChatCore(int actor, string name, string text, bool playSfx)
+        public bool DebugInjectChat(int actor, string name, string text)
+            => DebugInjectChatCore(actor, name, text, playSfx: true, recordReplay: true);
+
+        private bool DebugInjectChatCore(
+            int actor, string name, string text, bool playSfx, bool recordReplay)
         {
-            if (!MeetingChatLogEnabled)
-            {
-                WLog.Line("chat_debug_inject", secret: false, ("result", "disabled_by_cfg"));
-                return false;
-            }
-            if (ClientPhase != GamePhase.Meeting)
+            if (!IsChatLogWindowOpenClient)
             {
                 WLog.Line("chat_debug_inject", secret: false,
-                    ("result", "not_meeting"), ("phase", ClientPhase));
+                    ("result", "out_of_window"), ("phase", ClientPhase),
+                    ("warpDone", IsMeetingWarpDoneClient),
+                    ("discussionOpen", IsMeetingDiscussionOpenClient));
+                return false;
+            }
+            bool recorded = recordReplay && RecordReplayChatByActor(actor, text);
+
+            if (!MeetingChatLogEnabled)
+            {
+                WLog.Line("chat_debug_inject", secret: false,
+                    ("result", "disabled_by_cfg"), ("replay", recorded));
                 return false;
             }
             if (!ShouldShowDeadTextClient(actor))
             {
                 WLog.Line("chat_debug_inject", secret: false,
-                    ("result", "blocked_dead_text"), ("actor", actor), ("localAlive", IsLocalAlive()));
+                    ("result", "blocked_dead_text"), ("actor", actor),
+                    ("localAlive", IsLocalAlive()), ("replay", recorded));
                 return false;
             }
 
-            ChatSpeaker kind = _meetingClient.GetRowStatus(actor) == RowStatus.Alive
-                ? ChatSpeaker.Alive
-                : ChatSpeaker.Dead;
+            ChatSpeaker kind = ChatSpeakerKindFor(actor);
             bool added = AppendMeetingChatMessageClient(
                 actor, name ?? ResolveDisplayName(actor), text, kind, playSfx);
             WLog.Line("chat_debug_inject", secret: false,
-                ("result", added ? "logged" : "rejected_empty"), ("actor", actor), ("speaker", kind));
+                ("result", added ? "logged" : "rejected_empty"), ("actor", actor),
+                ("speaker", kind), ("replay", recorded));
             return added;
         }
 
@@ -68,11 +77,29 @@ namespace Werewolf.Game
             for (int i = 0; i < count; i++)
             {
                 int actor = speakers[(i / 2) % speakers.Length];
-                if (DebugInjectChatCore(actor, null, $"テスト発言 {i + 1}", playSfx: false)) added++;
+                if (DebugInjectChatCore(actor, null, $"テスト発言 {i + 1}",
+                        playSfx: false, recordReplay: false)) added++;
             }
             WLog.Line("chat_debug_spam", secret: false,
                 ("requested", count), ("added", added), ("total", _chatLog.Count));
             return added;
+        }
+
+        public bool DebugToggleChatAuto(int count)
+        {
+            if (_chatAuto.Active)
+            {
+                _chatAuto.Stop();
+                WLog.Line("chat_debug_auto", secret: false,
+                    ("state", "off"), ("reason", "toggle"), ("posted", _chatAuto.Posted));
+                return false;
+            }
+
+            _chatAuto.Start(NowUnixMs(), count);
+            WLog.Line("chat_debug_auto", secret: false,
+                ("state", "on"), ("count", count > 0 ? count : -1),
+                ("steps", DebugChatAuto.StepCount), ("speakers", BuildDebugSpeakerActors().Length));
+            return true;
         }
 
         private int[] BuildDebugSpeakerActors()
@@ -124,6 +151,7 @@ namespace Werewolf.Game
         public void DebugClearChat()
         {
             _chatLog.Clear();
+            _chatUnread.Clear();
             if (_chatPanel.Exists) _chatPanel.ResetView();
             WLog.Line("chat_debug_clear", secret: false);
         }
@@ -133,17 +161,24 @@ namespace Werewolf.Game
             WLog.Line("chat_debug_state", secret: false,
                 ("enabled", MeetingChatLogEnabled),
                 ("phase", ClientPhase),
+                ("warpDone", IsMeetingWarpDoneClient),
+                ("discussionOpen", IsMeetingDiscussionOpenClient),
                 ("count", _chatLog.Count),
                 ("appended", _chatLog.AppendedTotal),
                 ("dropped", _chatLog.DroppedTotal),
                 ("panelBuilt", _chatPanel.Exists),
                 ("panelOpen", _chatPanel.Exists && _chatPanel.IsOpen),
                 ("localAlive", IsLocalAlive()),
-                ("keysFree", InputGate.KeysFree));
+                ("keysFree", InputGate.KeysFree),
+                ("auto", _chatAuto.Active),
+                ("autoPosted", _chatAuto.Posted),
+                ("autoRemaining", _chatAuto.Remaining));
         }
 
         private void TickChatDebug(long now)
         {
+            TickChatAuto(now);
+
             if (_chatDebugDueUnixMs >= 0 && now >= _chatDebugDueUnixMs)
             {
                 long due = _chatDebugDueUnixMs;
@@ -160,6 +195,23 @@ namespace Werewolf.Game
             if (free == _inputGateLastFree) return;
             _inputGateLastFree = free;
             WLog.Line("chat_debug_input_gate", secret: false, ("keysFree", free));
+        }
+
+        private void TickChatAuto(long now)
+        {
+            if (!_chatAuto.IsDue(now)
+                || !MeetingChatGate.IsOpen(ClientPhase, IsMeetingDiscussionOpenClient)) return;
+
+            int[] speakers = BuildDebugSpeakerActors();
+            for (int i = 0; i < DebugChatAuto.MaxPostsPerFrame; i++)
+            {
+                if (!_chatAuto.TryTakeDue(now, speakers.Length, out int slot, out string text)) break;
+                DebugInjectChatCore(speakers[slot], null, text, playSfx: true, recordReplay: true);
+            }
+
+            if (_chatAuto.Active) return;
+            WLog.Line("chat_debug_auto", secret: false,
+                ("state", "off"), ("reason", "count_reached"), ("posted", _chatAuto.Posted));
         }
     }
 }

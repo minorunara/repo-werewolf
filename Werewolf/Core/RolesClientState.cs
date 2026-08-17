@@ -57,7 +57,7 @@ namespace Werewolf.Core
             return true;
         }
 
-        public bool ValuableRecordOn { get; private set; }
+        public bool ValuableRecordOn { get; private set; } = true;
 
         public bool ToggleValuableRecord(Role? localRole)
         {
@@ -160,7 +160,7 @@ namespace Werewolf.Core
             CurseCandidates = null;
             MeetingGauge = null;
             WolfMode = false;
-            ValuableRecordOn = false;
+            ValuableRecordOn = true;
         }
     }
 

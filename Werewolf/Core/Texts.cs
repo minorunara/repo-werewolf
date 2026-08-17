@@ -117,7 +117,9 @@ namespace Werewolf.Core
         ResultStatusDead,
         ResultStatusExecuted,
         ResultStatusDisconnected,
-        ResultReturnPromptFormat,
+        ResultReturnButtonLabel,
+        ResultReturnButtonWithKeyFormat,
+        ResultAutoReturnCountdownFormat,
         ResultWaitingHost,
         ResultFooterWithCountdownFormat,
 
@@ -170,6 +172,36 @@ namespace Werewolf.Core
         ChatLogSystemName,
         ChatLogScatterTitle,
         ChatLogScatterLineFormat,
+
+        ResultChatTitle,
+        ResultChatToggleLabelFormat,
+        ResultChatHint,
+
+        ReplayToggleLabel,
+        ReplayPlay,
+        ReplayPause,
+        ReplaySpeedFormat,
+        ReplaySaveButton,
+        ReplaySavedButton,
+        ReplaySavedToDownloads,
+        ReplaySavedToModFolder,
+        ReplayAlreadySaved,
+        ReplaySaveFailed,
+        ReplayNoData,
+        ReplayGaugeLossFormat,
+        ReplayGaugeDeliveredFormat,
+        ReplayEpStateNone,
+        ReplayEpStateIdle,
+        ReplayEpStateActive,
+        ReplayEpStateSuccess,
+        ReplayEpStateWarning,
+        ReplayEpStateCancel,
+        ReplayEpStateExtracting,
+        ReplayEpStateComplete,
+        ReplayEpStateSurplus,
+        ReplayEpStateTaxReturn,
+        ReplayStampNoExecution,
+        ReplayStampExecutedFormat,
 
         RecapNameSeparator,
         RecapDeathsFormat,
@@ -678,7 +710,9 @@ namespace Werewolf.Core
             [TextId.ResultStatusDead] = "死亡",
             [TextId.ResultStatusExecuted] = "処刑",
             [TextId.ResultStatusDisconnected] = "切断",
-            [TextId.ResultReturnPromptFormat] = "[{0}] ロビーへ戻る",
+            [TextId.ResultReturnButtonLabel] = "ロビーへ戻る",
+            [TextId.ResultReturnButtonWithKeyFormat] = "ロビーへ戻る [{0}]",
+            [TextId.ResultAutoReturnCountdownFormat] = "自動帰還まで約 {0} 秒",
             [TextId.ResultWaitingHost] = "ホストの操作を待っています…",
             [TextId.ResultFooterWithCountdownFormat] = "{0}　｜　自動帰還まで約 {1} 秒",
 
@@ -724,6 +758,36 @@ namespace Werewolf.Core
             [TextId.ChatLogSystemName] = "Taxman",
             [TextId.ChatLogScatterTitle] = "前回の組分け",
             [TextId.ChatLogScatterLineFormat] = "【{0}】{1}",
+
+            [TextId.ResultChatTitle] = "感想戦チャット",
+            [TextId.ResultChatToggleLabelFormat] = "感想戦チャット [{0}]",
+            [TextId.ResultChatHint] = "発言は全員に見えます",
+
+            [TextId.ReplayToggleLabel] = "リプレイ再生",
+            [TextId.ReplayPlay] = "再生",
+            [TextId.ReplayPause] = "停止",
+            [TextId.ReplaySpeedFormat] = "{0}倍速",
+            [TextId.ReplaySaveButton] = "保存",
+            [TextId.ReplaySavedButton] = "保存済み",
+            [TextId.ReplaySavedToDownloads] = "リプレイを保存しました（ダウンロード）",
+            [TextId.ReplaySavedToModFolder] = "リプレイを保存しました（MODフォルダ内 Replays）",
+            [TextId.ReplayAlreadySaved] = "この試合は保存済みです",
+            [TextId.ReplaySaveFailed] = "保存に失敗しました",
+            [TextId.ReplayNoData] = "リプレイデータがありません",
+            [TextId.ReplayGaugeLossFormat] = "減額 ${0} / 総額 ${1}",
+            [TextId.ReplayGaugeDeliveredFormat] = "納品 ${0}",
+            [TextId.ReplayEpStateNone] = "未起動",
+            [TextId.ReplayEpStateIdle] = "待機",
+            [TextId.ReplayEpStateActive] = "受付中",
+            [TextId.ReplayEpStateSuccess] = "ノルマ達成",
+            [TextId.ReplayEpStateWarning] = "作動中",
+            [TextId.ReplayEpStateCancel] = "中止",
+            [TextId.ReplayEpStateExtracting] = "吸い込み中",
+            [TextId.ReplayEpStateComplete] = "完了",
+            [TextId.ReplayEpStateSurplus] = "余剰",
+            [TextId.ReplayEpStateTaxReturn] = "お釣り",
+            [TextId.ReplayStampNoExecution] = "投票結果／処刑なし",
+            [TextId.ReplayStampExecutedFormat] = "処刑／{0}. {1}",
 
             [TextId.RecapNameSeparator] = "、",
             [TextId.RecapDeathsFormat] = "死亡: {0}",
@@ -1097,9 +1161,9 @@ namespace Werewolf.Core
 
             [TextId.TutorialValuableRecordSuppressed] =
                 "貴重品を見つけたが、地図には記録しなかった。\n" +
-                "人狼陣営は既定で貴重品を発見しない。誰にも知られていない貴重品なら、\n" +
+                "記録をOFFにしている間は貴重品を発見しない。誰にも知られていない貴重品なら、\n" +
                 "壊しても「あったはずの物が無い」と気づかれずに済む。\n" +
-                "記録したくなったら、通報キーの長押しで切り替えろ。",
+                "記録を再開したくなったら、通報キーの長押しで切り替えろ。",
 
             [TextId.ManualToggleLabelFormat] = "説明書 [{0}]",
             [TextId.ManualPageFooterFormat] = "{0}　　{1} / {2}",
@@ -1161,15 +1225,15 @@ namespace Werewolf.Core
                 "マップからは区別できません。\n" +
                 "注意深い村人は、会議のたびに「あの貴重品はどこへ行ったのか」を棚卸しして推理します。",
 
-            [TextId.ManualValuableRecordTitle] = "貴重品を記録しない（人狼陣営）",
+            [TextId.ManualValuableRecordTitle] = "貴重品の記録切り替え（人狼陣営）",
             [TextId.ManualValuableRecordBody] =
                 "貴重品マーカーがマップに登録されるのは「誰かがその貴重品を視界に捉えた」瞬間です。\n" +
-                "人狼陣営（人狼・爆弾魔・自覚した黒猫）は、この記録を既定で行いません。\n" +
+                "人狼陣営（人狼・爆弾魔・自覚した黒猫）は、記録をOFFにしている間、見つけた貴重品をマップへ登録しません。\n" +
                 "そのため、まだ誰にも見つかっていない貴重品を人狼陣営が先回りして壊した場合、マップには最初から何も残りません。\n" +
                 "逆に、村人が先に見つけて記録済みの貴重品を壊せば、マーカーだけが残り「あったはずの物が無い」と気づかれます。",
             [TextId.ManualValuableRecordToggle] =
                 "記録するかどうかは、通報キーの長押しでいつでも切り替えられます（右下のアイコンが現在の状態です）。\n" +
-                "村人に紛れて探索するときなど、必要に応じて記録をONにしましょう。",
+                "ステルス破壊を狙うときだけ記録をOFFにし、探索へ戻る前に必要に応じてONへ戻しましょう。",
 
             [TextId.ManualCombatTitle] = "PvP",
             [TextId.ManualCombatBody] =
@@ -1471,7 +1535,9 @@ namespace Werewolf.Core
             [TextId.ResultStatusDead] = "Dead",
             [TextId.ResultStatusExecuted] = "Executed",
             [TextId.ResultStatusDisconnected] = "Disconnected",
-            [TextId.ResultReturnPromptFormat] = "[{0}] Return to Lobby",
+            [TextId.ResultReturnButtonLabel] = "Return to Lobby",
+            [TextId.ResultReturnButtonWithKeyFormat] = "Return to Lobby [{0}]",
+            [TextId.ResultAutoReturnCountdownFormat] = "Auto-return in about {0}s",
             [TextId.ResultWaitingHost] = "Waiting for the host…",
             [TextId.ResultFooterWithCountdownFormat] = "{0}  |  Auto-return in about {1}s",
 
@@ -1517,6 +1583,36 @@ namespace Werewolf.Core
             [TextId.ChatLogSystemName] = "Taxman",
             [TextId.ChatLogScatterTitle] = "Previous groups",
             [TextId.ChatLogScatterLineFormat] = "{0}: {1}",
+
+            [TextId.ResultChatTitle] = "Post-Match Chat",
+            [TextId.ResultChatToggleLabelFormat] = "Post-Match Chat [{0}]",
+            [TextId.ResultChatHint] = "Messages are visible to everyone",
+
+            [TextId.ReplayToggleLabel] = "Replay",
+            [TextId.ReplayPlay] = "Play",
+            [TextId.ReplayPause] = "Pause",
+            [TextId.ReplaySpeedFormat] = "{0}x",
+            [TextId.ReplaySaveButton] = "Save",
+            [TextId.ReplaySavedButton] = "Saved",
+            [TextId.ReplaySavedToDownloads] = "Replay saved (Downloads)",
+            [TextId.ReplaySavedToModFolder] = "Replay saved (Replays in the MOD folder)",
+            [TextId.ReplayAlreadySaved] = "This match is already saved",
+            [TextId.ReplaySaveFailed] = "Failed to save",
+            [TextId.ReplayNoData] = "No replay data",
+            [TextId.ReplayGaugeLossFormat] = "Lost ${0} / Total ${1}",
+            [TextId.ReplayGaugeDeliveredFormat] = "Delivered ${0}",
+            [TextId.ReplayEpStateNone] = "Inactive",
+            [TextId.ReplayEpStateIdle] = "Idle",
+            [TextId.ReplayEpStateActive] = "Open",
+            [TextId.ReplayEpStateSuccess] = "Goal met",
+            [TextId.ReplayEpStateWarning] = "Closing",
+            [TextId.ReplayEpStateCancel] = "Cancelled",
+            [TextId.ReplayEpStateExtracting] = "Extracting",
+            [TextId.ReplayEpStateComplete] = "Complete",
+            [TextId.ReplayEpStateSurplus] = "Surplus",
+            [TextId.ReplayEpStateTaxReturn] = "Tax return",
+            [TextId.ReplayStampNoExecution] = "Vote result / No execution",
+            [TextId.ReplayStampExecutedFormat] = "Executed / {0}. {1}",
 
             [TextId.RecapNameSeparator] = ", ",
             [TextId.RecapDeathsFormat] = "Deaths: {0}",
@@ -1890,7 +1986,7 @@ namespace Werewolf.Core
 
             [TextId.TutorialValuableRecordSuppressed] =
                 "You spotted a valuable, but did not record it on the map.\n" +
-                "The werewolf team does not record newly discovered valuables by default. If nobody else knows\n" +
+                "While recording is off, the werewolf team does not record newly discovered valuables. If nobody else knows\n" +
                 "about a valuable, you can destroy it without leaving a marker to show that something is missing.\n" +
                 "Hold the report key whenever you want to turn recording on.",
 
@@ -1954,15 +2050,15 @@ namespace Werewolf.Core
                 "The map cannot tell you which.\n" +
                 "Careful villagers take inventory at every meeting and ask where each missing valuable went.",
 
-            [TextId.ManualValuableRecordTitle] = "Not Recording Valuables (Werewolf Team)",
+            [TextId.ManualValuableRecordTitle] = "Valuable Recording Toggle (Werewolf Team)",
             [TextId.ManualValuableRecordBody] =
                 "A marker is added the moment a player sees a valuable.\n" +
-                "By default, the werewolf team (Werewolves, Bombers, and awakened Black Cats) does not record newly discovered valuables.\n" +
+                "While recording is off, the werewolf team (Werewolves, Bombers, and awakened Black Cats) does not add valuables it discovers to the map.\n" +
                 "If a member of the werewolf team reaches and destroys a valuable before anyone else finds it, the map shows no trace that it ever existed.\n" +
                 "If a villager has already found and recorded it, however, the marker remains—alerting everyone that something is missing.",
             [TextId.ManualValuableRecordToggle] =
                 "You can switch recording on and off at any time by holding the report key (the icon at the bottom right shows the current state).\n" +
-                "Turn recording on as needed when you want to blend in with villagers while exploring.",
+                "Turn recording off only when attempting a stealthy break, then turn it back on as needed before exploring.",
 
             [TextId.ManualCombatTitle] = "PvP",
             [TextId.ManualCombatBody] =

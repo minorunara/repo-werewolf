@@ -328,6 +328,8 @@ namespace Werewolf.Game
 
         private const float EdgeSafetyMargin = 1.0f;
 
+        private const float MaxFloorSlopeDeg = 10f;
+
         private static bool TrySampleDestination(Vector3 anchor, out Vector3 dest)
         {
             return TrySampleDestination(anchor, EdgeSafetyMargin, out dest)
@@ -340,7 +342,8 @@ namespace Werewolf.Game
             {
                 Vector3 probe = anchor + UnityEngine.Random.insideUnitSphere * SampleRadius;
                 if (!NavMesh.SamplePosition(probe, out NavMeshHit hit, SampleMaxDistance, -1)) continue;
-                if (!Physics.Raycast(hit.position, Vector3.down, 5f, LayerMask.GetMask("Default"))) continue;
+                if (!Physics.Raycast(hit.position, Vector3.down, out RaycastHit floor, 5f, LayerMask.GetMask("Default"))) continue;
+                if (Vector3.Angle(floor.normal, Vector3.up) > MaxFloorSlopeDeg) continue;
                 if (edgeMargin > 0f
                     && NavMesh.FindClosestEdge(hit.position, out NavMeshHit edge, -1)
                     && edge.distance < edgeMargin)

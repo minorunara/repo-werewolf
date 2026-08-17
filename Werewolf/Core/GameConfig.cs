@@ -82,7 +82,7 @@ namespace Werewolf.Core
 
         public ValuableMapMode ValuableMapMode = ValuableMapMode.MeetingSync;
 
-        public int GameOverAutoReturnSec = 60;
+        public int GameOverAutoReturnSec = 120;
 
         public int ToastDurationSec = 9;
 
@@ -138,6 +138,8 @@ namespace Werewolf.Core
             => BomberChancePercent > 0 && RoleAssigner.CorrectedWerewolfSlots(this, playerCount) >= 2;
 
         public int BomberProximityMeters = 9;
+
+        public const float SelfDefenseProximityMarginMeters = 2f;
 
         public int BomberGaugeFullSec = 20;
 

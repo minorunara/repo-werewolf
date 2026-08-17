@@ -19,6 +19,7 @@ namespace Werewolf.Core
 
         private bool _active;
         private bool _votingClosed;
+        private bool _discussionOpen;
         private long _warpUnixMs;
         private long _endUnixMs;
         private readonly Dictionary<int, RowStatus> _rows = new Dictionary<int, RowStatus>();
@@ -28,6 +29,8 @@ namespace Werewolf.Core
         private readonly HashSet<int> _announcedDead = new HashSet<int>();
 
         public bool MeetingActive => _active;
+
+        public bool DiscussionOpen => _active && _discussionOpen;
 
         public int CallerActor { get; private set; } = -1;
 
@@ -55,6 +58,11 @@ namespace Werewolf.Core
         public bool VotingUiReady(long nowUnixMs)
             => _active && nowUnixMs - _votingUiOffsetMs >= _warpUnixMs;
 
+        public void MarkDiscussionOpen()
+        {
+            if (_active) _discussionOpen = true;
+        }
+
         public bool GaugeIntroReady(long nowUnixMs)
             => _active && nowUnixMs - (_votingUiOffsetMs == 0 ? 0 : MeetingIntro.GaugeRevealOffsetMs) >= _warpUnixMs;
 
@@ -71,13 +79,13 @@ namespace Werewolf.Core
             return !_announcedDead.Contains(actorNumber);
         }
 
-        public void MarkAllDeadAnnounced()
+        public void MarkAllDeadAnnounced(List<int> newlyAnnounced = null)
         {
             foreach (var pair in _rows)
             {
                 if (pair.Value == RowStatus.Dead || pair.Value == RowStatus.Executed)
                 {
-                    _announcedDead.Add(pair.Key);
+                    if (_announcedDead.Add(pair.Key)) newlyAnnounced?.Add(pair.Key);
                 }
             }
         }
@@ -99,6 +107,7 @@ namespace Werewolf.Core
         {
             _active = true;
             _votingClosed = false;
+            _discussionOpen = false;
             CallerActor = caller;
             Kind = kind;
             _warpUnixMs = warpUnixMs;
@@ -138,18 +147,20 @@ namespace Werewolf.Core
         {
             _active = false;
             _votingClosed = false;
+            _discussionOpen = false;
             CallerActor = -1;
             Kind = ConveneKind.Button;
             _voted.Clear();
             Result = null;
         }
 
-        public void ApplyPhase(GamePhase phase)
+        public void ApplyPhase(GamePhase phase, List<int> newlyAnnounced = null)
         {
             if (phase == GamePhase.Play || phase == GamePhase.GameOver)
             {
-                if (_active) MarkAllDeadAnnounced();
+                if (_active) MarkAllDeadAnnounced(newlyAnnounced);
                 _active = false;
+                _discussionOpen = false;
             }
         }
 
@@ -157,6 +168,7 @@ namespace Werewolf.Core
         {
             _active = true;
             _votingClosed = false;
+            _discussionOpen = true;
             CallerActor = caller;
             Kind = ConveneKind.Button;
             _warpUnixMs = WarpAlreadyDone;
@@ -170,6 +182,7 @@ namespace Werewolf.Core
         {
             _active = false;
             _votingClosed = false;
+            _discussionOpen = false;
             CallerActor = -1;
             Kind = ConveneKind.Button;
             _warpUnixMs = 0;

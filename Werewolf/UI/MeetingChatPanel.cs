@@ -6,8 +6,24 @@ using Werewolf.Core;
 
 namespace Werewolf.UI
 {
+    public enum ChatPanelSurface : byte
+    {
+        Meeting = 0,
+
+        Result = 1,
+    }
+
     public sealed class MeetingChatPanel : IClientPanel
     {
+        private readonly ChatPanelSurface _surface;
+
+        public MeetingChatPanel() : this(ChatPanelSurface.Meeting) { }
+
+        public MeetingChatPanel(ChatPanelSurface surface)
+        {
+            _surface = surface;
+        }
+
         private const float PanelWidth = 330f;
         private const float PanelHeight = 690f;
         private const float PanelMarginRight = 24f;
@@ -81,7 +97,17 @@ namespace Werewolf.UI
 
         public bool IsOpen => _open;
 
-        public string LayerName => WerewolfUIManager.MeetingLayer;
+        public string LayerName => _surface == ChatPanelSurface.Result
+            ? ResultScreen.Layer
+            : WerewolfUIManager.MeetingLayer;
+
+        private TextId TitleTextId => _surface == ChatPanelSurface.Result
+            ? TextId.ResultChatTitle
+            : TextId.ChatLogTitle;
+
+        private TextId ToggleLabelFormatId => _surface == ChatPanelSurface.Result
+            ? TextId.ResultChatToggleLabelFormat
+            : TextId.ChatLogToggleLabelFormat;
 
         private static float ContentWidth => PanelWidth - ScrollbarWidth;
 
@@ -104,8 +130,11 @@ namespace Werewolf.UI
             rootRect.sizeDelta = new Vector2(PanelWidth, PanelHeight);
 
             var subCanvas = panelGo.AddComponent<Canvas>();
-            subCanvas.overrideSorting = true;
-            subCanvas.sortingOrder = WerewolfUIManager.PanelSortingOrder;
+            if (_surface == ChatPanelSurface.Meeting)
+            {
+                subCanvas.overrideSorting = true;
+                subCanvas.sortingOrder = WerewolfUIManager.PanelSortingOrder;
+            }
             panelGo.AddComponent<GraphicRaycaster>();
             _panel = panelGo;
             _panelRect = rootRect;
@@ -118,7 +147,7 @@ namespace Werewolf.UI
                 new Vector2(PanelWidth, HeaderHeight), HeaderBgColor);
             UiKit.CreateText(rootRect, "Title", new Vector2(0f, headerY),
                 new Vector2(PanelWidth - 16f, HeaderHeight - 8f),
-                Texts.Get(TextId.ChatLogTitle), TitleFontSize, TitleTextColor, TextAlignmentOptions.Center);
+                Texts.Get(TitleTextId), TitleFontSize, TitleTextColor, TextAlignmentOptions.Center);
 
             var scrollGo = new GameObject("Scroll", typeof(RectTransform));
             var scrollRect = (RectTransform)scrollGo.transform;
@@ -167,7 +196,8 @@ namespace Werewolf.UI
             _footerHint = UiKit.CreateText(rootRect, "DeadHint",
                 new Vector2(0f, -PanelHeight * 0.5f + FooterHeight * 0.5f),
                 new Vector2(PanelWidth - 12f, FooterHeight),
-                string.Empty, HintFontSize, HintTextColor, TextAlignmentOptions.Center);
+                _surface == ChatPanelSurface.Result ? Texts.Get(TextId.ResultChatHint) : string.Empty,
+                HintFontSize, HintTextColor, TextAlignmentOptions.Center);
             _footerHint.enableWordWrapping = true;
 
             _rows.Build(containerRect);
@@ -178,13 +208,26 @@ namespace Werewolf.UI
             _panel.SetActive(_open);
 
             WLog.Line("chat_panel_built", secret: false,
-                ("icon", _toggle.HasIcon ? 1 : 0));
+                ("icon", _toggle.HasIcon ? 1 : 0), ("surface", _surface));
+        }
+
+        public void EnsureTopSibling()
+        {
+            if (_root != null) _root.transform.SetAsLastSibling();
+        }
+
+        public void SetVisible(bool visible)
+        {
+            if (_root == null || _root.activeSelf == visible) return;
+            _root.SetActive(visible);
+            if (visible) _scrollToBottomPending = true;
+            else ClearLiveBlocks();
         }
 
         private void BuildToggleButton(RectTransform containerRect)
         {
             RectTransform toggleRoot = _toggle.Build(containerRect, "ToggleButton", ToggleStyle,
-                "icon_chat_log", Texts.Format(TextId.ChatLogToggleLabelFormat, "L"));
+                "icon_chat_log", Texts.Format(ToggleLabelFormatId, "L"));
             Vector2 size = toggleRoot.sizeDelta;
             toggleRoot.anchoredPosition = new Vector2(
                 (1920f * 0.5f) - size.x * 0.5f - ToggleButtonMargin,
@@ -250,7 +293,7 @@ namespace Werewolf.UI
             if (_labelKey != key)
             {
                 _labelKey = key;
-                _toggle.SetLabel(Texts.Format(TextId.ChatLogToggleLabelFormat, FormatKey(key)));
+                _toggle.SetLabel(Texts.Format(ToggleLabelFormatId, FormatKey(key)));
             }
 
             bool hover = _toggle.IsPointerOverHitArea();
@@ -279,6 +322,12 @@ namespace Werewolf.UI
             return _toggle.ContainsRect(screenPoint);
         }
 
+        public void SetUnreadBadge(bool visible)
+        {
+            if (_root == null) return;
+            _toggle.SetBadgeVisible(visible);
+        }
+
         private static string FormatKey(KeyCode key) => key == KeyCode.None ? "-" : key.ToString();
 
         public void Render(MeetingChatLog log,
@@ -293,7 +342,7 @@ namespace Werewolf.UI
 
             bool stickToBottom = _open && _view.IsAtBottom();
 
-            if (localDead != _renderedLocalDead)
+            if (_surface == ChatPanelSurface.Meeting && localDead != _renderedLocalDead)
             {
                 _renderedLocalDead = localDead;
                 if (_footerHint != null)

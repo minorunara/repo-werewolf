@@ -108,7 +108,7 @@ namespace Werewolf.UI
         }
 
         public void Tick(bool visible, bool recordOn, float holdRatio, bool holdCharging,
-                         string keyName, CorpseReportHudPanel.Layout corpseLayout, bool corpseVisible)
+                         string keyName, CorpseReportHudPanel.Layout corpseLayout)
         {
             if (_root == null) return;
             try
@@ -121,7 +121,7 @@ namespace Werewolf.UI
                 }
 
                 float y = CorpseReportHudPanel.BaseY(corpseLayout)
-                    + (corpseVisible ? CorpseReportHudPanel.StackHeight + StackGap : 0f);
+                    + CorpseReportHudPanel.StackHeight + StackGap;
                 if (!Mathf.Approximately(y, _lastY))
                 {
                     _lastY = y;

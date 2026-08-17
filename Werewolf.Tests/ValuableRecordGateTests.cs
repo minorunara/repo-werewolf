@@ -71,15 +71,23 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void ToggleValuableRecord_StartsOffAndFlipsForWerewolfTeam()
+        public void ToggleValuableRecord_StartsOnAndFlipsForWerewolfTeam()
         {
             var state = new RolesClientState();
-            Assert.False(state.ValuableRecordOn);
+            Assert.True(state.ValuableRecordOn);
 
             Assert.True(state.ToggleValuableRecord(Role.Werewolf));
-            Assert.True(state.ValuableRecordOn);
-            Assert.True(state.ToggleValuableRecord(Role.Werewolf));
             Assert.False(state.ValuableRecordOn);
+            Assert.True(state.ToggleValuableRecord(Role.Werewolf));
+            Assert.True(state.ValuableRecordOn);
+        }
+
+        [Fact]
+        public void DefaultState_DoesNotSuppressWerewolfDiscover()
+        {
+            var state = new RolesClientState();
+            Assert.False(ValuableRecordGate.ShouldSuppressDiscover(
+                Role.Werewolf, alive: true, roundActive: true, recordOn: state.ValuableRecordOn));
         }
 
         [Theory]
@@ -89,7 +97,7 @@ namespace Werewolf.Tests
         {
             var state = new RolesClientState();
             Assert.True(state.ToggleValuableRecord(role));
-            Assert.True(state.ValuableRecordOn);
+            Assert.False(state.ValuableRecordOn);
         }
 
         [Theory]
@@ -99,7 +107,7 @@ namespace Werewolf.Tests
         {
             var state = new RolesClientState();
             Assert.False(state.ToggleValuableRecord(role));
-            Assert.False(state.ValuableRecordOn);
+            Assert.True(state.ValuableRecordOn);
         }
 
         [Fact]
@@ -107,27 +115,26 @@ namespace Werewolf.Tests
         {
             var state = new RolesClientState();
             Assert.False(state.ToggleValuableRecord(null));
-            Assert.False(state.ValuableRecordOn);
+            Assert.True(state.ValuableRecordOn);
         }
 
         [Fact]
         public void ForceValuableRecordOff_ReportsTransitionOnce()
         {
             var state = new RolesClientState();
-            Assert.False(state.ForceValuableRecordOff());
-            state.ToggleValuableRecord(Role.Werewolf);
             Assert.True(state.ForceValuableRecordOff());
             Assert.False(state.ValuableRecordOn);
             Assert.False(state.ForceValuableRecordOff());
         }
 
         [Fact]
-        public void Reset_ClearsRecordToggle()
+        public void Reset_RestoresRecordToggleToOn()
         {
             var state = new RolesClientState();
             state.ToggleValuableRecord(Role.Werewolf);
-            state.Reset();
             Assert.False(state.ValuableRecordOn);
+            state.Reset();
+            Assert.True(state.ValuableRecordOn);
         }
     }
 }

@@ -1,0 +1,2235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Werewolf Replay Viewer</title>
+<style>
+  :root {
+    --bg: #14161a;
+    --panel: #1d2026;
+    --panel2: #23262d;
+    --border: #33373f;
+    --text: #d8dbe0;
+    --dim: #8b909a;
+    --accent: #e8b23a;
+    --meeting: #caa3ff;
+    --danger: #e5534b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 13px/1.5 "Segoe UI", "Yu Gothic UI", sans-serif;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 12px; background: var(--panel); border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  header h1 { font-size: 14px; font-weight: 600; margin-right: 8px; white-space: nowrap; }
+  header .meta { color: var(--dim); font-size: 12px; }
+  button, select, label.toggle {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 4px; padding: 3px 10px; font-size: 12px; cursor: pointer; user-select: none;
+  }
+  button:hover, label.toggle:hover { border-color: var(--dim); }
+  label.toggle { display: inline-flex; align-items: center; gap: 4px; }
+  label.toggle input { accent-color: var(--accent); }
+  #main { flex: 1; display: flex; min-height: 0; }
+  #mapWrap { flex: 1; position: relative; min-width: 0; }
+  #map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+  #map.panning { cursor: grabbing; }
+  #tooltip {
+    position: absolute; pointer-events: none; display: none;
+    background: rgba(20,22,26,.92); border: 1px solid var(--border); border-radius: 4px;
+    padding: 4px 8px; font-size: 12px; white-space: pre; z-index: 5;
+  }
+  #side {
+    width: 320px; border-left: 1px solid var(--border); background: var(--panel);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  #gauges { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  #gauges table { width: 100%; border-collapse: collapse; }
+  #gauges td { padding: 1px 0; font-size: 12px; }
+  #gauges td:first-child { color: var(--dim); width: 45%; }
+  #gauges td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  /* 減額・納品バー（ゲーム内リプレイの減額ゲージ帯と同じ配色・同じ左右原点） */
+  #gaugeBars { display: flex; flex-direction: column; gap: 3px; margin-bottom: 6px; }
+  #gaugeBars .grow { display: flex; align-items: center; gap: 6px; }
+  #gaugeBars .grow img { width: 20px; height: 20px; object-fit: contain; flex: none; }
+  #gaugeBars .gspace { width: 20px; flex: none; }
+  #gaugeBars .gtrack {
+    flex: 1; position: relative; height: 8px; overflow: hidden;
+    background: #15171c; border: 1px solid var(--border); border-radius: 4px;
+  }
+  #gaugeBars .gfill { position: absolute; top: 0; bottom: 0; left: 0; width: 0%; background: #d9a626; }
+  #gaugeBars #gDeliverFill { left: auto; right: 0; background: #4dccf2; }
+  #gaugeBars .glabels {
+    display: flex; justify-content: space-between; gap: 8px;
+    font-size: 11px; font-variant-numeric: tabular-nums;
+  }
+  #gaugeBars #gDeliverBarText { color: #4dccf2; }
+  #roster { padding: 6px 12px; border-bottom: 1px solid var(--border); font-size: 12px; max-height: 40%; overflow-y: auto; }
+  #roster .row { display: flex; gap: 6px; align-items: center; padding: 1px 4px; cursor: pointer; border-radius: 3px; }
+  #roster .row:hover { background: var(--panel2); }
+  #roster .row.sel { background: var(--panel2); box-shadow: inset 2px 0 0 var(--accent); }
+  #roster .swatch { width: 9px; height: 9px; border-radius: 1px; transform: rotate(45deg); flex: none; }
+  #roster .dead { text-decoration: line-through; color: var(--dim); }
+  #roster .role { margin-left: auto; color: var(--dim); }
+  #roster .role.wolf { color: var(--danger); }
+  #events { flex: 1; overflow-y: auto; min-height: 0; }
+  #events .ev {
+    display: flex; gap: 8px; padding: 2px 12px; cursor: pointer; font-size: 12px;
+    border-left: 3px solid transparent;
+  }
+  #events .ev:hover { background: var(--panel2); }
+  #events .ev.current { background: var(--panel2); border-left-color: var(--accent); }
+  #events .ev .t { color: var(--dim); font-variant-numeric: tabular-nums; flex: none; width: 52px; }
+  #events .ev.death { color: var(--danger); }
+  #events .ev.meet { color: var(--meeting); }
+  #events .ev.gameover { color: var(--accent); }
+  footer { background: var(--panel); border-top: 1px solid var(--border); padding: 6px 12px 10px; }
+  #controls { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  #playBtn { width: 64px; }
+  #timeLabel { font-variant-numeric: tabular-nums; min-width: 130px; }
+  #seek { position: relative; height: 26px; cursor: pointer; touch-action: none; }
+  #seekCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #drop {
+    position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
+    background: rgba(20,22,26,.94); flex-direction: column; gap: 12px; text-align: center;
+  }
+  #drop.hidden { display: none; }
+  #drop .box {
+    border: 2px dashed var(--border); border-radius: 10px; padding: 40px 60px; color: var(--dim);
+  }
+  #drop .box b { color: var(--text); font-size: 15px; }
+  #drop.armed .box { border-color: var(--accent); color: var(--text); }
+  #warn { color: var(--danger); font-size: 12px; }
+  #langSel { margin-left: auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1 data-i18n="appTitle">Werewolf Replay Viewer</h1>
+  <button id="openBtn" data-i18n="open">Open file</button>
+  <select id="segSel" data-i18n-title="segTitle" title="Segment (level)"></select>
+  <label class="toggle"><input type="checkbox" id="tEnemies" checked><span data-i18n="tgEnemies">Enemies</span></label>
+  <label class="toggle"><input type="checkbox" id="tVals" checked><span data-i18n="tgVals">Valuables</span></label>
+  <label class="toggle"><input type="checkbox" id="tItems"><span data-i18n="tgItems">Items</span></label>
+  <label class="toggle"><input type="checkbox" id="tNames" checked><span data-i18n="tgNames">Names</span></label>
+  <label class="toggle"><input type="checkbox" id="tTrail" checked><span data-i18n="tgTrail">Trails</span></label>
+  <label class="toggle"><input type="checkbox" id="tBg" checked><span data-i18n="tgBg">All trails as background</span></label>
+  <label class="toggle"><input type="checkbox" id="tYFade" checked><span data-i18n="tgYFade">Fade by height</span></label>
+  <label class="toggle"><input type="checkbox" id="tRoles"><span data-i18n="tgRoles">Roles</span></label>
+  <span class="meta" id="fileMeta"></span>
+  <span id="warn"></span>
+  <select id="langSel" title="Language / 言語">
+    <option value="en">English</option>
+    <option value="ja">日本語</option>
+  </select>
+</header>
+<div id="main">
+  <div id="mapWrap">
+    <canvas id="map"></canvas>
+    <div id="tooltip"></div>
+    <div id="drop">
+      <div class="box">
+        <b data-i18n="dropTitle">Drop a replay .jsonl file here</b><br>
+        <span data-i18n="dropHint">Or use “Open file” at the top left. Load a file saved from the in-game replay viewer, or dumped with /ww replay dump.</span>
+      </div>
+    </div>
+  </div>
+  <div id="side">
+    <div id="gauges">
+      <div id="gaugeBars" style="display:none">
+        <div class="grow">
+          <img alt="" src="data:image/png;base64,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">
+          <div class="gtrack"><div id="gLossFill" class="gfill"></div></div>
+          <span class="gspace"></span>
+        </div>
+        <div class="grow" id="gDeliverRow" style="display:none">
+          <span class="gspace"></span>
+          <div class="gtrack"><div id="gDeliverFill" class="gfill"></div></div>
+          <img alt="" src="data:image/png;base64,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">
+        </div>
+        <div class="glabels"><span id="gLossBarText"></span><span id="gDeliverBarText"></span></div>
+      </div>
+      <table>
+        <tr><td data-i18n="gPhase">Phase</td><td id="gPhase">-</td></tr>
+        <tr><td data-i18n="gValCount">Valuables left</td><td id="gValCount">-</td></tr>
+        <tr><td data-i18n="gRemain">Value left</td><td id="gRemain">-</td></tr>
+        <tr><td data-i18n="gLoss">Confirmed loss (host)</td><td id="gLoss">-</td></tr>
+        <tr><td data-i18n="gExtract">Extraction points</td><td id="gExtract">-</td></tr>
+        <tr><td data-i18n="gDeaths">Deaths</td><td id="gDeaths">-</td></tr>
+      </table>
+    </div>
+    <div id="roster"></div>
+    <div id="events"></div>
+  </div>
+</div>
+<footer>
+  <div id="controls">
+    <button id="playBtn">▶ Play</button>
+    <select id="speedSel">
+      <option value="0.5">0.5×</option>
+      <option value="1">1×</option>
+      <option value="2">2×</option>
+      <option value="4" selected>4×</option>
+      <option value="8">8×</option>
+      <option value="16">16×</option>
+      <option value="32">32×</option>
+    </select>
+    <span class="meta" id="paceLabel" data-i18n="paceLabel" data-i18n-title="paceTitle"
+      title="Meetings play at an absolute speed (4× around chat, 16× while silent; 16×+ selections use 16×/32×)">Auto pace in meetings</span>
+    <span id="timeLabel">0:00.0 / 0:00.0</span>
+    <span class="meta" data-i18n="keyHint">Space = play/pause · ←→ = ±5s (Shift ±30s) · Wheel = zoom · Drag = pan · Click/roster = track player (Esc clears)</span>
+  </div>
+  <div id="seek"><canvas id="seekCanvas"></canvas></div>
+</footer>
+<input type="file" id="fileInput" accept=".jsonl,.txt,application/jsonl" hidden>
+
+<script>
+"use strict";
+/* ---------------- パース・導出コア ----------------
+ * DOM非依存。replay-viewer.test.mjs はこのブロックだけを抜き出してテストする */
+/*__CORE_BEGIN__*/
+const TAU = Math.PI * 2;
+const WOLF_ROLES = new Set([1, 2, 3]);
+
+/* 言語辞書。既定は en で、UI層が保存値／navigator.language で切り替える。
+ * 役職・陣営・EP状態の語彙は MOD 本体の表記に揃える。値が関数のキーは tx(key, ...args) で呼ぶ */
+const TEXTS = {
+  en: {
+    appTitle: "Werewolf Replay Viewer",
+    open: "Open file",
+    segTitle: "Segment (level)",
+    tgEnemies: "Enemies", tgVals: "Valuables", tgItems: "Items", tgNames: "Names",
+    tgTrail: "Trails", tgBg: "All trails as background", tgYFade: "Fade by height", tgRoles: "Roles",
+    dropTitle: "Drop a replay .jsonl file here",
+    dropHint: "Or use “Open file” at the top left. Load a file saved from the in-game replay viewer, or dumped with /ww replay dump.",
+    gPhase: "Phase", gValCount: "Valuables left", gRemain: "Value left",
+    gLoss: "Confirmed loss (host)", gExtract: "Extraction points", gDeaths: "Deaths",
+    play: "▶ Play", pause: "⏸ Pause",
+    paceLabel: "Auto pace in meetings",
+    paceTitle: "Meetings play at an absolute speed (4× around chat, 16× while silent; 16×+ selections use 16×/32×)",
+    keyHint: "Space = play/pause · ←→ = ±5s (Shift ±30s) · Wheel = zoom · Drag = pan · Click/roster = track player (Esc clears)",
+    rosterRowTitle: "Click to track this player",
+    selfSuffix: " (you)",
+    noSegments: "No segments found (the file has no seg records)",
+    warnCount: n => `${n} warning(s) — see console`,
+    warnBadJson: line => `Line ${line}: not valid JSON`,
+    warnFormatVersion: (line, fv) => `Line ${line}: unsupported format version fv=${fv} (this viewer reads fv=1)`,
+    warnUnknownRecord: (line, kind) => `Line ${line}: unknown record type "${kind}"`,
+    mapImgDecodeFailed: "Failed to decode mapimg (falling back to the NavMesh / trail background)",
+    segOption: (no, level, duration) => `${no}: ${level} (${duration})`,
+    gaugeLossBar: (lost, base) => `Lost ${lost} / Total ${base}`,
+    gaugeDeliveredBar: delivered => `Delivered ${delivered}`,
+    countValuables: n => String(n),
+    countDeaths: n => String(n),
+    listSep: ", ",
+    scatterMemberSep: ", ",
+    scatterGroupSep: " | ",
+    roleBadge: role => ` (${role})`,
+    roles: { 0: "Villager", 1: "Werewolf", 2: "Black Cat", 3: "Bomber", 4: "Shaman" },
+    teams: { 0: "Villager Team", 1: "Werewolf Team", 255: "No Contest" },
+    causes: { Vote: "Voted out", Other: "Other" },
+    phases: { Lobby: "Lobby", Play: "Play", Meeting: "Meeting", GameOver: "Game over" },
+    epStates: {
+      None: "Inactive", Idle: "Idle", Active: "Open", Success: "Goal met", Warning: "Closing",
+      Cancel: "Cancelled", Extracting: "Extracting", Complete: "Complete", Surplus: "Surplus",
+      TaxReturn: "Tax return",
+    },
+    stampNoExecution: "Vote result / No execution",
+    stampExecuted: who => `Executed / ${who}`,
+    evMeet: (who, kind) => `Meeting called by ${who} (${kind})`,
+    meetKinds: { Button: "Button", Report: "Body report", Guard: "Scatter guard" },
+    evMeetWarp: "Meeting begins (everyone gathered at the truck)",
+    evMeetCancel: reason => `Meeting cancelled (reason=${reason})`,
+    evChat: (who, text) => `💬 ${who}: “${text}”`,
+    evResultNone: "Vote result: no execution",
+    evResultExecuted: who => `Vote result: ${who} executed`,
+    evPhase: phase => `Phase → ${phase}`,
+    evDeath: (who, cause) => `☠ ${who} died (${cause})`,
+    deathMarkHover: who => `❌ ${who} died here`,
+    evAnnounced: list => `📢 Deaths announced: ${list}`,
+    evScatter: groups => `Scatter warp: ${groups}`,
+    evGuardOn: sec => `Scatter guard armed (${sec}s)`,
+    evGuardOff: "Scatter guard ended",
+    evGameOver: (team, roles) => `Game over — winner: ${team} | ${roles}`,
+    evLoss: (amount, orb) => `Confirmed loss -${amount}${orb ? " (orb)" : ""}`,
+    evValGone: name => `${name} gone / collected`,
+    evItemGone: name => `${name} gone`,
+    evExtract: (done, total) => `Extraction points complete ${done}/${total}`,
+    evPerk: perk => `Perk unlocked: ${perk}`,
+  },
+  ja: {
+    appTitle: "Werewolf リプレイビューア",
+    open: "ファイルを開く",
+    segTitle: "セグメント（レベル）",
+    tgEnemies: "敵", tgVals: "貴重品", tgItems: "アイテム", tgNames: "名前",
+    tgTrail: "軌跡", tgBg: "背景に全軌跡", tgYFade: "高さで淡色化", tgRoles: "役職",
+    dropTitle: "リプレイ .jsonl をここへドロップ",
+    dropHint: "または左上の「ファイルを開く」。ゲーム内リプレイビューアの「保存」、または /ww replay dump で書き出したファイルを読み込めます。",
+    gPhase: "フェーズ", gValCount: "現存貴重品", gRemain: "現存総額",
+    gLoss: "確定実損（ホスト）", gExtract: "抽出ポイント", gDeaths: "死亡",
+    play: "▶ 再生", pause: "⏸ 停止",
+    paceLabel: "会議自動変速",
+    paceTitle: "会議中は絶対速度へ自動変速（発言周辺4×・無言16×。選択16×以上は16×/32×）",
+    keyHint: "Space=再生/停止・←→=±5秒（Shiftで±30秒）・ホイール=ズーム・ドラッグ=パン・クリック/名簿=追跡選択（Esc解除）",
+    rosterRowTitle: "クリックで追跡選択",
+    selfSuffix: "（自分）",
+    noSegments: "セグメントが見つかりません（seg行のないファイル）",
+    warnCount: n => `警告${n}件（console参照）`,
+    warnBadJson: line => `${line}行目: JSONとして読めない`,
+    warnFormatVersion: (line, fv) => `${line}行目: 未対応のフォーマット版 fv=${fv}（このビューアは fv=1）`,
+    warnUnknownRecord: (line, kind) => `${line}行目: 未知のレコード種別 "${kind}"`,
+    mapImgDecodeFailed: "mapimg のデコードに失敗（NavMesh/軌跡背景へ縮退）",
+    segOption: (no, level, duration) => `${no}: ${level}（${duration}）`,
+    gaugeLossBar: (lost, base) => `減額 ${lost} / 総額 ${base}`,
+    gaugeDeliveredBar: delivered => `納品 ${delivered}`,
+    countValuables: n => `${n}個`,
+    countDeaths: n => `${n}人`,
+    listSep: "、",
+    scatterMemberSep: "・",
+    scatterGroupSep: " ／ ",
+    roleBadge: role => `〔${role}〕`,
+    roles: { 0: "村人", 1: "人狼", 2: "黒猫", 3: "爆弾魔", 4: "祈祷師" },
+    teams: { 0: "村人陣営", 1: "人狼陣営", 255: "無効試合" },
+    causes: { Vote: "投票追放", Other: "その他" },
+    phases: { Lobby: "ロビー", Play: "探索", Meeting: "会議", GameOver: "終局" },
+    epStates: {
+      None: "未起動", Idle: "待機", Active: "受付中", Success: "ノルマ達成", Warning: "作動中",
+      Cancel: "中止", Extracting: "吸い込み中", Complete: "完了", Surplus: "余剰",
+      TaxReturn: "お釣り",
+    },
+    stampNoExecution: "投票結果／処刑なし",
+    stampExecuted: who => `処刑／${who}`,
+    evMeet: (who, kind) => `会議召集 ${who}（${kind}）`,
+    meetKinds: { Button: "ボタン", Report: "死体通報", Guard: "散開ガード" },
+    evMeetWarp: "会議開始（トラックへ集合完了）",
+    evMeetCancel: reason => `会議中止（reason=${reason}）`,
+    evChat: (who, text) => `💬 ${who}「${text}」`,
+    evResultNone: "開票 処刑なし",
+    evResultExecuted: who => `開票 処刑 ${who}`,
+    evPhase: phase => `フェーズ → ${phase}`,
+    evDeath: (who, cause) => `☠ ${who} 死亡（${cause}）`,
+    deathMarkHover: who => `❌ ${who} の死亡地点`,
+    evAnnounced: list => `📢 死亡発表: ${list}`,
+    evScatter: groups => `分散ワープ: ${groups}`,
+    evGuardOn: sec => `散開ガード監視開始（${sec}秒）`,
+    evGuardOff: "散開ガード監視終了",
+    evGameOver: (team, roles) => `終局 勝者=${team}｜${roles}`,
+    evLoss: (amount, orb) => `確定実損 -${amount}${orb ? "（オーブ）" : ""}`,
+    evValGone: name => `${name} 消滅/回収`,
+    evItemGone: name => `${name} 消滅`,
+    evExtract: (done, total) => `抽出ポイント完了 ${done}/${total}`,
+    evPerk: perk => `特典解禁 ${perk}`,
+  },
+};
+let LANG = "en";
+function setLang(lang) { LANG = TEXTS[lang] ? lang : "en"; }
+function tx(key, ...args) {
+  const v = TEXTS[LANG][key] !== undefined ? TEXTS[LANG][key] : TEXTS.en[key];
+  return typeof v === "function" ? v(...args) : v;
+}
+/* 保存値が有効ならそれを使い、無ければブラウザ言語が日本語のときだけ ja（入出力は UI 層） */
+function pickLang(storedLang, browserLang) {
+  if (storedLang && TEXTS[storedLang]) return storedLang;
+  return /^ja\b/i.test(browserLang || "") ? "ja" : "en";
+}
+/* 未知値（本体の enum 追加・旧録画）は生の値へ縮退する */
+const roleName = r => tx("roles")[r] ?? r;
+const teamName = n => tx("teams")[n] ?? n;
+const causeName = c => tx("causes")[c] ?? c;
+const phaseName = p => tx("phases")[p] ?? p;
+const epStateName = s => tx("epStates")[s] ?? s;
+
+function parseReplay(text) {
+  const segments = [];
+  const warnings = [];
+  let seg = null;
+  const lines = text.replace(/^﻿/, "").split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    let rec;
+    try { rec = JSON.parse(line); }
+    catch { warnings.push(tx("warnBadJson", i + 1)); continue; }
+    switch (rec.k) {
+      case "seg":
+        if (rec.fv !== 1) warnings.push(tx("warnFormatVersion", i + 1, rec.fv));
+        seg = { header: rec, samples: [], events: [], entityNames: new Map(), vidToId: new Map(), endT: -1 };
+        for (const v of rec.vals || []) {
+          seg.entityNames.set("V" + v.v, v.n);
+          if (typeof v.vid === "number") seg.vidToId.set(v.vid, v.v);
+        }
+        segments.push(seg);
+        break;
+      case "p":
+        if (seg) seg.samples.push(rec);
+        break;
+      case "map":
+        if (seg) seg.map = { verts: rec.verts || [], tris: rec.tris || [] };
+        break;
+      case "mapimg":
+        // マップ静止画: png=base64・x0/x1/z0/z1=ワールドXZ被覆矩形（上端が+Z）
+        if (seg) seg.mapImage = { w: rec.w, h: rec.h, x0: rec.x0, x1: rec.x1, z0: rec.z0, z1: rec.z1, png: rec.png };
+        break;
+      case "ledger":
+        // 確定実損の全数 [[vid,$,orb01,destroyed01],...]。行があれば実損はこれで全部（n:[] はゼロ確定）
+        if (seg) seg.ledger = rec.n || [];
+        break;
+      case "ent":
+        if (seg) {
+          seg.entityNames.set(rec.kind + rec.id, rec.n);
+          if (rec.kind === "V" && typeof rec.vid === "number") seg.vidToId.set(rec.vid, rec.id);
+        }
+        break;
+      case "ev":
+        if (seg) seg.events.push(rec);
+        break;
+      case "segend":
+        if (seg) { seg.endT = rec.t; seg = null; }
+        break;
+      default:
+        warnings.push(tx("warnUnknownRecord", i + 1, rec.k));
+    }
+  }
+  for (const s of segments) {
+    let last = 0;
+    for (const p of s.samples) last = Math.max(last, p.t);
+    for (const e of s.events) last = Math.max(last, e.t);
+    s.duration = s.endT >= 0 ? s.endT : last;
+  }
+  return { segments, warnings };
+}
+
+/* 位置トラック: kind別に id → [{t,x,y,z}] へ展開する（D=死体〔死者頭部〕・idはactor） */
+function buildTracks(seg) {
+  const tracks = { P: new Map(), E: new Map(), C: new Map(), V: new Map(), I: new Map(), D: new Map() };
+  for (const p of seg.samples) {
+    for (const kind of ["P", "E", "C", "V", "I", "D"]) {
+      const arr = p[kind];
+      if (!arr) continue;
+      for (const [id, x, y, z] of arr) {
+        let track = tracks[kind].get(id);
+        if (!track) { track = []; tracks[kind].set(id, track); }
+        track.push({ t: p.t, x, y, z });
+      }
+    }
+  }
+  return tracks;
+}
+
+/* イベント列からの導出インデックス（ゲージ類は記録されておらず、すべてここから復元する） */
+function buildDerived(seg) {
+  const valueSteps = new Map();   // valId → [{t,$}]（ヘッダ初期値がt:0）
+  const goneAt = new Map();       // valId → t
+  const itemGoneAt = new Map();   // itemId → t（破壊・奈落による個体消滅）
+  const epSteps = new Map();      // epId → [{t,s,n}]（ヘッダ初期状態がt:0）
+  const epIndex = new Map();      // epId → 1始まりの表示番号
+  const lossCum = [];             // [{t,cum}]
+  const deaths = [];              // [{t,a,cause}]
+  const announcedAt = new Map();  // actor → t（死亡発表＝以降その死体は盤面から退場）
+  const extracts = [];            // [{t,completed,total}]
+  const phases = [];              // [{t,to}]
+  const meetings = [];            // [{t,a,kind}]
+  const meetWarps = [];           // [{t}]（集合完了＝会議区間の起点）
+  const haulRanges = new Map();   // valId → [{from,to}]（抽出ポイント圏内に居た区間）
+  const destroyedByVid = new Map(); // vid → 破壊確定額（loss d=true / ledger destroyed）
+  const idToVid = new Map();      // valId → vid（vidToId の逆引き）
+  const chats = [];               // [{t,a,text}]（会議中の公開発言＝議論ショット）
+  const meetingResults = [];      // [{t,a}]（開票結果。-1=処刑なし）
+  let gameover = null;
+
+  for (const [vid, id] of seg.vidToId || []) idToVid.set(id, vid);
+  for (const [vid, $, , d] of seg.ledger || []) {
+    if (d && !destroyedByVid.has(vid)) destroyedByVid.set(vid, $);
+  }
+
+  for (const v of seg.header.vals || []) valueSteps.set(v.v, [{ t: 0, $: v.$ }]);
+  (seg.header.eps || []).forEach((ep, i) => {
+    epSteps.set(ep.e, [{ t: 0, s: ep.s, n: ep.n }]);
+    epIndex.set(ep.e, i + 1);
+  });
+
+  let cum = 0;
+  for (const ev of seg.events) {
+    switch (ev.e) {
+      case "val_value": {
+        let steps = valueSteps.get(ev.v);
+        if (!steps) { steps = []; valueSteps.set(ev.v, steps); }
+        steps.push({ t: ev.t, $: ev.$ });
+        break;
+      }
+      case "val_gone":
+        if (!goneAt.has(ev.v)) goneAt.set(ev.v, ev.t);
+        break;
+      case "item_gone":
+        if (!itemGoneAt.has(ev.i)) itemGoneAt.set(ev.i, ev.t);
+        break;
+      case "ep_state": {
+        let steps = epSteps.get(ev.ep);
+        if (!steps) { steps = []; epSteps.set(ev.ep, steps); epIndex.set(ev.ep, epIndex.size + 1); }
+        steps.push({ t: ev.t, s: ev.s, n: ev.n });
+        break;
+      }
+      case "loss":
+        cum += ev.$;
+        lossCum.push({ t: ev.t, cum });
+        // 個体ID付き（ホスト録画）は破壊確定の照合元にもなる
+        if (ev.d && typeof ev.vid === "number" && !destroyedByVid.has(ev.vid)) {
+          destroyedByVid.set(ev.vid, ev.$);
+        }
+        break;
+      case "haul": {
+        for (const id of ev.add || []) {
+          let ranges = haulRanges.get(id);
+          if (!ranges) { ranges = []; haulRanges.set(id, ranges); }
+          ranges.push({ from: ev.t, to: Infinity });
+        }
+        for (const id of ev.del || []) {
+          const ranges = haulRanges.get(id);
+          const open = ranges && ranges[ranges.length - 1];
+          if (open && open.to === Infinity) open.to = ev.t;
+        }
+        break;
+      }
+      case "death": deaths.push(ev); break;
+      case "announced":
+        for (const a of ev.actors || []) {
+          if (!announcedAt.has(a)) announcedAt.set(a, ev.t);
+        }
+        break;
+      case "extract": extracts.push(ev); break;
+      case "phase": phases.push(ev); break;
+      case "meet": meetings.push(ev); break;
+      case "meet_warp": meetWarps.push(ev); break;
+      case "chat": chats.push(ev); break;
+      case "meeting_result": meetingResults.push(ev); break;
+      case "gameover": gameover = ev; break;
+    }
+  }
+
+  // 会議の網掛け範囲（ゲーム内リプレイの MeetingRangeBuilder と同一規則）。集合完了
+  // （meet_warp）から、Meeting を離れる最初のフェーズ遷移まで（無ければ末尾まで）
+  const meetingRanges = [];
+  for (const w of meetWarps) {
+    const open = meetingRanges[meetingRanges.length - 1];
+    if (open && w.t < open.to) continue; // 同一会議の2つ目以降は先頭が勝つ
+    const end = phases.find(p => p.t >= w.t && p.to !== "Meeting");
+    const to = end ? end.t : seg.duration;
+    if (w.t < to) meetingRanges.push({ from: w.t, to });
+  }
+  return { valueSteps, goneAt, itemGoneAt, epSteps, epIndex, lossCum, deaths, announcedAt, extracts,
+    phases, meetings, gameover, meetingRanges, haulRanges, destroyedByVid, idToVid,
+    chats, meetingResults };
+}
+
+/* レベル形状（map行＝NavMesh三角形分割）をY(平均)2m刻みのバケットへ分類する
+ * （階層別フェード描画用。戻り値はY昇順・trisは各三角形の先頭index） */
+function groupMapTriangles(verts, tris) {
+  const buckets = new Map();
+  for (let i = 0; i + 2 < tris.length; i += 3) {
+    const avgY = (verts[tris[i] * 3 + 1] + verts[tris[i + 1] * 3 + 1] + verts[tris[i + 2] * 3 + 1]) / 3;
+    const key = Math.round(avgY / 2) * 2;
+    let b = buckets.get(key);
+    if (!b) { b = { y: key, tris: [] }; buckets.set(key, b); }
+    b.tris.push(i);
+  }
+  return [...buckets.values()].sort((a, b) => a.y - b.y);
+}
+
+/* [{t,...}] の昇順配列から t 以下で最後の要素（なければ null） */
+function stepAt(steps, t) {
+  let lo = 0, hi = steps.length - 1, ans = null;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (steps[mid].t <= t) { ans = steps[mid]; lo = mid + 1; }
+    else hi = mid - 1;
+  }
+  return ans;
+}
+
+/* 位置トラックの t 時点の補間位置。maxGapSec 超の隙間は「不在」として null を返す
+ * （敵のデスポーン区間・容量降格後の粗い周期に対応。V/Iは hold=true で保持） */
+function trackAt(track, t, maxGapSec, hold) {
+  if (!track.length || t < track[0].t - 0.3) return null;
+  let lo = 0, hi = track.length - 1, idx = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (track[mid].t <= t) { idx = mid; lo = mid + 1; }
+    else hi = mid - 1;
+  }
+  if (idx < 0) return null;
+  const a = track[idx];
+  const b = track[idx + 1];
+  if (!b) return (hold || t - a.t <= maxGapSec) ? a : null;
+  if (b.t - a.t > maxGapSec) return hold ? a : (t - a.t <= maxGapSec ? a : null);
+  const f = (t - a.t) / Math.max(b.t - a.t, 1e-9);
+  return { t, x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, z: a.z + (b.z - a.z) * f };
+}
+
+function remainingValue(derived, t) {
+  let total = 0, count = 0;
+  for (const [id, steps] of derived.valueSteps) {
+    const gone = derived.goneAt.get(id);
+    if (gone !== undefined && gone <= t) continue;
+    const s = stepAt(steps, t);
+    if (!s) continue;
+    total += s.$;
+    count++;
+  }
+  return { total, count };
+}
+
+function formatTime(t) {
+  const m = Math.floor(t / 60);
+  const s = (t - m * 60).toFixed(1).padStart(4, "0");
+  return `${m}:${s}`;
+}
+const formatAmount = n => n.toLocaleString("en-US");
+const formatMoney = n => "$" + formatAmount(n);
+
+/* 貴重品の金額イベント → ポップアップ列（t昇順・位置は最終観測サンプルで補間なし）。kind は
+ * damage=壊れによる減額 / deliver=納品 / lost=破壊喪失。val_gone（消滅）は次の優先度で分類する:
+ *  1. 破壊確定（loss台帳 / vid付きlossイベントの destroyed）→ lost（額も確定値）
+ *  2. 消滅直前まで抽出ポイント圏内 ∧ どこかのEPがプレス中 → deliver
+ *  3. それ以外（荷箱吸収等の金額移動）→ ポップアップなし */
+const EP_PRESS_STATES = new Set(["Warning", "Extracting", "TaxReturn", "Complete"]);
+const HAUL_LOOKBACK_S = 3; // 圏内から外れてから消滅が観測されるまでの猶予
+function buildValuePopups(seg, tracks, derived) {
+  const posOf = (id, t) => {
+    const p = trackAt(tracks.V.get(id) || [], t, 0, true);
+    if (p) return p;
+    const v = (seg.header.vals || []).find(v => v.v === id);
+    return v ? { x: v.x, y: v.y, z: v.z } : null;
+  };
+  const inHaulNear = (id, t) => {
+    const ranges = derived.haulRanges.get(id);
+    if (!ranges) return false;
+    return ranges.some(r => r.from <= t && t - r.to <= HAUL_LOOKBACK_S);
+  };
+  const anyEpPressing = t => (seg.header.eps || []).some(ep => {
+    const st = stepAt(derived.epSteps.get(ep.e) || [], t);
+    return st && EP_PRESS_STATES.has(st.n);
+  });
+  const popups = [];
+  for (const [id, steps] of derived.valueSteps) {
+    for (let i = 1; i < steps.length; i++) {
+      const delta = steps[i - 1].$ - steps[i].$;
+      if (delta <= 0) continue;
+      const pos = posOf(id, steps[i].t);
+      if (pos) popups.push({ t: steps[i].t, x: pos.x, z: pos.z, amount: delta, kind: "damage" });
+    }
+  }
+  for (const ev of seg.events) {
+    if (ev.e !== "val_gone") continue;
+    const last = stepAt(derived.valueSteps.get(ev.v) || [], ev.t);
+    const lastSeen = last ? last.$ : 0;
+    const pos = posOf(ev.v, ev.t);
+    if (!pos) continue;
+
+    const vid = derived.idToVid.get(ev.v);
+    const destroyedAmount = vid !== undefined ? derived.destroyedByVid.get(vid) : undefined;
+    let kind, amount;
+    if (destroyedAmount !== undefined) {
+      kind = "lost";
+      amount = destroyedAmount > 0 ? destroyedAmount : lastSeen;
+    } else if (inHaulNear(ev.v, ev.t) && anyEpPressing(ev.t)) {
+      kind = "deliver";
+      amount = lastSeen;
+    } else {
+      continue; // 破壊確定なしの消滅＝荷箱吸収等の金額移動（実損ではない）
+    }
+    if (amount <= 0) continue; // $0での消滅は減額側で計上済み（二重計上しない）
+    popups.push({ t: ev.t, x: pos.x, z: pos.z, amount, kind });
+  }
+  popups.sort((a, b) => a.t - b.t);
+  return popups;
+}
+
+/* 減額・納品バーの導出（ゲーム内リプレイと同一規則）。分母はセグメント開始時の貴重品総額。
+ * 実損はホスト録画なら loss イベントの累計＝会議で見えていたゲージと同じ値、
+ * loss を持たない録画は damage/lost ポップアップの累計へ縮退する。
+ * 納品は deliver ポップアップの累計。どちらも stepAt でそのまま引ける {t,cum} 昇順 */
+function buildGaugeIndex(seg, derived, popups) {
+  const base = (seg.header.vals || []).reduce((sum, v) => sum + (v.$ || 0), 0);
+  let lostSteps = derived.lossCum;
+  if (!lostSteps.length) {
+    lostSteps = [];
+    let cum = 0;
+    for (const p of popups) {
+      if (p.kind !== "deliver") lostSteps.push({ t: p.t, cum: cum += p.amount });
+    }
+  }
+  const deliverSteps = [];
+  let cum = 0;
+  for (const p of popups) {
+    if (p.kind === "deliver") deliverSteps.push({ t: p.t, cum: cum += p.amount });
+  }
+  return { base, lostSteps, deliverSteps };
+}
+
+/* 死亡地点マーク（❌）。死亡の瞬間から、その死が議論された会議の終了まで殺害地点へ固定表示する
+ * （ゲーム内リプレイと同一規則）
+ * - 会議フェーズ中の死（処刑・黒猫の呪殺＝その場で全員へ公表される）は対象外
+ * - 位置は死亡直後0.5秒のアバター位置。死体（D）トラックは使わない（死者頭部は場外の待機座標
+ *   から出現するため直後のサンプルが場外を指す。アバターは死亡でその場に静止する）
+ * - 会議が来ないまま終局した死は末尾まで表示（hideT=Infinity） */
+const DEATH_POS_LOOKAHEAD_S = 0.5;
+function buildDeathMarks(seg, tracks, derived) {
+  const marks = [];
+  for (const ev of derived.deaths) {
+    if (derived.meetingRanges.some(r => r.from <= ev.t && ev.t < r.to)) continue;
+    const track = tracks.P.get(ev.a) || [];
+    const pos = trackAt(track, ev.t + DEATH_POS_LOOKAHEAD_S, 0, true) || track[0] || null;
+    if (!pos) continue;
+    const next = derived.meetingRanges.find(r => r.from >= ev.t);
+    marks.push({ t: ev.t, hideT: next ? next.to : Infinity, x: pos.x, z: pos.z, a: ev.a });
+  }
+  return marks;
+}
+
+/* 死体（D）トラック冒頭の場外待機座標サンプルを削る（ゲーム内リプレイと同一規則）。放置すると
+ * 死亡マーカーと追跡軌跡が原点方向へ跳ねる。死亡地点から10m（3D）超の冒頭サンプルを近傍サンプル
+ * が現れるまで削り、全部遠ければ安全側で削らない。tracks.D を直接書き換える */
+const CORPSE_SPAWN_NEAR_M = 10;
+function pruneCorpseSpawnGlitch(tracks, derived) {
+  for (const ev of derived.deaths) {
+    const corpse = tracks.D.get(ev.a);
+    const track = tracks.P.get(ev.a) || [];
+    if (!corpse || !corpse.length || !track.length) continue;
+    const pos = trackAt(track, ev.t + DEATH_POS_LOOKAHEAD_S, 0, true) || track[0];
+    let keep = 0;
+    while (keep < corpse.length) {
+      const dx = corpse[keep].x - pos.x, dy = corpse[keep].y - pos.y, dz = corpse[keep].z - pos.z;
+      if (dx * dx + dy * dy + dz * dz <= CORPSE_SPAWN_NEAR_M * CORPSE_SPAWN_NEAR_M) break;
+      keep++;
+    }
+    if (keep > 0 && keep < corpse.length) corpse.splice(0, keep);
+  }
+}
+
+/* カートは固定周期のC(PhysGrabCart)とオンチェンジのI(ItemAttributes)の両方に
+ * 載る＝同名かつ初期位置1m以内のI側を隠す（Item Cart Cannon のようなC無し
+ * アイテムは残る） */
+function buildCartItemHides(seg, tracks) {
+  const hide = new Set();
+  for (const [cid, ctrack] of tracks.C) {
+    const cname = seg.entityNames.get("C" + cid);
+    if (!ctrack.length) continue;
+    for (const [iid, itrack] of tracks.I) {
+      if (hide.has(iid) || !itrack.length) continue;
+      if (seg.entityNames.get("I" + iid) !== cname) continue;
+      const dx = itrack[0].x - ctrack[0].x;
+      const dy = itrack[0].y - ctrack[0].y;
+      const dz = itrack[0].z - ctrack[0].z;
+      if (dx * dx + dy * dy + dz * dz < 1) { hide.add(iid); break; }
+    }
+  }
+  return hide;
+}
+/* ---- 議論ショットの文字処理（ゲーム内リプレイと同一規則） ---- */
+const CHAT_SINGLE_LINE_MAX = 30;
+const CHAT_WRAP_TARGET = 25;      // 禁則により 24〜26 の範囲でずらす
+const CHAT_SLIDE_IN = 0.22, CHAT_SLIDE_OUT = 0.28;
+const CHAT_DWELL_BASE = 1.25, CHAT_DWELL_PER_CHAR = 0.025, CHAT_DWELL_MAX = 2.5;
+const CHAT_HEAD_FORBIDDEN = "、。，．！？：；）」』】〉》・ーぁぃぅぇぉっゃゅょゎ々ゝゞ…‥!?,.:;)";
+const CHAT_TAIL_FORBIDDEN = "（「『【〈《(";
+
+/* index から始まる表示文字1つのUTF-16単位長。サロゲートは割らず、結合記号・異体字セレクタ・
+ * 肌色修飾・ZWJ結合は直前の文字へ付ける */
+function chatDisplayCharLength(s, i) {
+  const cpLen = j => s.codePointAt(j) > 0xFFFF ? 2 : 1;
+  let k = i + cpLen(i);
+  while (k < s.length) {
+    const cp = s.codePointAt(k);
+    const extender = (cp >= 0xFE00 && cp <= 0xFE0F) || (cp >= 0xE0100 && cp <= 0xE01EF)
+      || (cp >= 0x1F3FB && cp <= 0x1F3FF) || /\p{M}/u.test(String.fromCodePoint(cp));
+    if (extender) { k += cp > 0xFFFF ? 2 : 1; continue; }
+    if (cp === 0x200D && k + 1 < s.length) { k += 1 + cpLen(k + 1); continue; }
+    break;
+  }
+  return k - i;
+}
+function chatDisplayLength(s) {
+  let n = 0;
+  for (let i = 0; i < (s || "").length; i += chatDisplayCharLength(s, i)) n++;
+  return n;
+}
+/* 折り返し: 30表示文字まで1行、31以上は25±1（25→26→24の順で禁則違反のない候補、全滅なら25） */
+function chatWrap(text) {
+  if (!text) return { line1: "", line2: null };
+  const starts = [];
+  for (let i = 0; i < text.length; i += chatDisplayCharLength(text, i)) starts.push(i);
+  starts.push(text.length);
+  const n = starts.length - 1;
+  if (n <= CHAT_SINGLE_LINE_MAX) return { line1: text, line2: null };
+  const violates = split => CHAT_HEAD_FORBIDDEN.includes(text[starts[split]])
+    || CHAT_TAIL_FORBIDDEN.includes(text[starts[split - 1]]);
+  let split = CHAT_WRAP_TARGET;
+  for (const cand of [CHAT_WRAP_TARGET, CHAT_WRAP_TARGET + 1, CHAT_WRAP_TARGET - 1]) {
+    if (!violates(cand)) { split = cand; break; }
+  }
+  return { line1: text.slice(0, starts[split]), line2: text.slice(starts[split]) };
+}
+function chatDwellSec(n) {
+  return Math.min(CHAT_DWELL_MAX, Math.max(CHAT_DWELL_BASE, CHAT_DWELL_BASE + n * CHAT_DWELL_PER_CHAR));
+}
+function chatTotalSec(n) { return CHAT_SLIDE_IN + chatDwellSec(n) + CHAT_SLIDE_OUT; }
+
+/* ---- 再生速度プロファイル（ゲーム内リプレイと同一規則）。探索は speedSel の選択値、
+ * 会議は絶対速度で発言周辺4倍・無言16倍（選択値16以上なら早送り段の16/32倍）。
+ * chat境界では必ず一度クランプし、複数発言を同一フレームで通過させない ---- */
+const PACE_TALK_WINDOW = 5.0;
+function paceZoneAt(ranges, chatTimes, t) {
+  const m = ranges.find(r => t >= r.from && t < r.to);
+  if (!m) return 0; // Explore
+  let lastChat = -Infinity;
+  for (const ct of chatTimes) { if (ct <= t) lastChat = ct; else break; }
+  return t - Math.max(m.from, lastChat) < PACE_TALK_WINDOW ? 1 : 2; // Talk : Silent
+}
+function paceSpeedOf(zone, exploreSpeed) {
+  const fast = exploreSpeed >= 16;
+  if (zone === 1) return fast ? 16 : 4;
+  if (zone === 2) return fast ? 32 : 16;
+  return exploreSpeed;
+}
+function paceNextBoundary(ranges, chatTimes, t) {
+  let next = Infinity, isChat = false;
+  for (const ct of chatTimes) { if (ct > t) { next = ct; isChat = true; break; } }
+  const m = ranges.find(r => t >= r.from && t < r.to);
+  if (m) {
+    if (m.to < next) { next = m.to; isChat = false; }
+    let lastChat = -Infinity;
+    for (const ct of chatTimes) { if (ct <= t) lastChat = ct; else break; }
+    const onset = Math.max(m.from, lastChat) + PACE_TALK_WINDOW;
+    if (onset > t && onset < next) { next = onset; isChat = false; }
+  } else {
+    const nm = ranges.find(r => r.from > t);
+    if (nm && nm.from < next) { next = nm.from; isChat = false; }
+  }
+  return { next, isChat };
+}
+function paceAdvance(ranges, chatTimes, t, dtReal, exploreSpeed) {
+  let remaining = dtReal;
+  for (let guard = 0; guard < 10000 && remaining > 0; guard++) {
+    const speed = paceSpeedOf(paceZoneAt(ranges, chatTimes, t), exploreSpeed);
+    const { next, isChat } = paceNextBoundary(ranges, chatTimes, t);
+    const target = t + remaining * speed;
+    if (target < next) return target;
+    remaining -= (next - t) / speed;
+    t = next;
+    if (isChat) return t;
+  }
+  return t;
+}
+function paceRealSecondsBetween(ranges, chatTimes, t0, t1, exploreSpeed) {
+  if (t1 <= t0) return 0;
+  let total = 0, t = t0;
+  for (let guard = 0; guard < 10000 && t < t1; guard++) {
+    const speed = paceSpeedOf(paceZoneAt(ranges, chatTimes, t), exploreSpeed);
+    const { next } = paceNextBoundary(ranges, chatTimes, t);
+    const end = Math.min(next, t1);
+    total += (end - t) / speed;
+    t = end;
+  }
+  return total;
+}
+
+/* ---- 議論ショットの配置（ゲーム内リプレイと同一規則）。新着を Depth 0 の主役、直前3件を
+ * Depth 1/2/3 の残像にし、横へ流さず主役交代で奥へ送る ---- */
+const DANMAKU_HANDOFF = 0.26;
+const DANMAKU_FOCUS_X = 0.10, DANMAKU_ECHO_STEP_X = 0.065, DANMAKU_EDGE_MARGIN = 0.025;
+const clamp01 = t => Math.max(0, Math.min(1, t));
+const smoothstep = t => { t = clamp01(t); return t * t * (3 - 2 * t); };
+const lerp = (a, b, t) => a + (b - a) * t;
+function danmakuFontScale(c) {
+  return c.displayChars <= 8 ? 1.55 : c.displayChars <= 20 ? 1.27
+    : c.displayChars <= 34 ? 1.09 : 0.95;
+}
+function danmakuVisualDepth(c) {
+  if ((c.depth || 0) <= 0) return 0;
+  const tau = smoothstep((c.handoffElapsed || 0) / DANMAKU_HANDOFF);
+  return lerp(c.depthFrom || 0, c.depth, tau);
+}
+function danmakuDepthScale(depth) {
+  depth = clamp01(depth / 3) * 3;
+  if (depth <= 1) return lerp(1, 0.82, depth);
+  if (depth <= 2) return lerp(0.82, 0.68, depth - 1);
+  return lerp(0.68, 0.56, depth - 2);
+}
+function danmakuEntrySign(c) { return (c.a & 1) === 0 ? -1 : 1; }
+function danmakuStartX(c) { return danmakuEntrySign(c) * (0.55 + c.widthRatio * 0.5); }
+function danmakuCenterX(c, elapsed) {
+  const sign = danmakuEntrySign(c), depth = danmakuVisualDepth(c);
+  const maxCenter = Math.max(0, 0.5 - c.widthRatio * danmakuDepthScale(depth) * 0.5 - DANMAKU_EDGE_MARGIN);
+  const focus = sign * Math.min(DANMAKU_FOCUS_X, maxCenter);
+  let target = focus + sign * DANMAKU_ECHO_STEP_X * depth;
+  target = sign * Math.min(Math.abs(target), maxCenter);
+  let x;
+  if (elapsed <= 0) x = danmakuStartX(c);
+  else if (elapsed < CHAT_SLIDE_IN) {
+    const rest = 1 - clamp01(elapsed / CHAT_SLIDE_IN);
+    x = lerp(danmakuStartX(c), target, 1 - rest * rest * rest);
+  } else x = target;
+  const outStart = CHAT_SLIDE_IN + c.dwell;
+  if (elapsed > outStart) {
+    const tau = clamp01((elapsed - outStart) / CHAT_SLIDE_OUT);
+    x += sign * 0.16 * tau * tau;
+  }
+  return x;
+}
+function danmakuCenterY(c, elapsed) {
+  let y = c.slot === 0 ? 0.30 : c.slot === 1 ? 0.10 : c.slot === 2 ? -0.10 : -0.30;
+  const outward = Math.sign(y);
+  y += outward * 0.025 * danmakuVisualDepth(c);
+  if (elapsed < CHAT_SLIDE_IN) {
+    y += danmakuTiltSign(c) * 0.055 * (1 - smoothstep(elapsed / CHAT_SLIDE_IN));
+  }
+  return y;
+}
+function danmakuOpacity(c, elapsed) {
+  const dwellEnd = CHAT_SLIDE_IN + c.dwell;
+  let base;
+  if (elapsed <= 0) base = 0;
+  else if (elapsed < CHAT_SLIDE_IN) base = smoothstep(elapsed / CHAT_SLIDE_IN);
+  else if (elapsed <= dwellEnd) base = 1;
+  else if (elapsed >= c.total) base = 0;
+  else base = 1 - smoothstep((elapsed - dwellEnd) / CHAT_SLIDE_OUT);
+  const visualDepth = danmakuVisualDepth(c);
+  const evictionOpacity = visualDepth <= 3 ? 1 : 1 - smoothstep(visualDepth - 3);
+  return base * evictionOpacity;
+}
+/* 発言ごとの演出シード（FNV-1a） */
+function danmakuVisualSeed(actor, spawnT, displayChars) {
+  let h = 0x811c9dc5;
+  const mix = v => { h = Math.imul((h ^ (v >>> 0)) >>> 0, 16777619) >>> 0; };
+  const millis = Math.round(spawnT * 1000);
+  mix(actor); mix(millis); mix(Math.floor(millis / 4294967296)); mix(displayChars);
+  return h >>> 0;
+}
+function danmakuProfileForClaim(text, displayChars) {
+  if (displayChars >= 31) return 2; // Cool: 長い説明
+  if ((displayChars > 0 && displayChars <= 8) || /[!?！？]\s*$/u.test(text || "")) return 1;
+  return 0; // Slash: 通常の応酬
+}
+function danmakuProfileOf(c) {
+  return c.profile !== undefined ? c.profile : danmakuProfileForClaim(c.text || "", c.displayChars || 0);
+}
+// 話者の定位置。発言ごとのシードとは分離し、同じ話者は常に同じ上下象限から打ち込む
+function danmakuSpeakerTrajectorySeed(actor) { return danmakuVisualSeed(actor, 0, 0); }
+function danmakuHomeSlot(actor) { return (danmakuSpeakerTrajectorySeed(actor) >>> 8) & 3; }
+function danmakuTiltSign(c) { return danmakuHomeSlot(c.a) <= 1 ? 1 : -1; }
+function danmakuSlotOrder(preferred) {
+  return preferred === 0 ? [0, 1, 2, 3]
+    : preferred === 1 ? [1, 0, 2, 3]
+    : preferred === 2 ? [2, 3, 1, 0]
+    : [3, 2, 1, 0];
+}
+function danmakuTrajectoryTiltSign(c) { return danmakuTiltSign(c) * danmakuEntrySign(c); }
+function danmakuRestingTilt(c) {
+  const unit = ((c.seed >>> 5) & 1023) / 1023;
+  return danmakuTrajectoryTiltSign(c) * lerp(2.5, 3.5, unit);
+}
+function danmakuScale(c, elapsed) {
+  const profile = danmakuProfileOf(c);
+  const start = profile === 1 ? 0.70 : profile === 2 ? 0.88 : 0.79;
+  const peak = profile === 1 ? 1.18 : profile === 2 ? 1.05 : 1.11;
+  let arrival = 1;
+  if (elapsed <= 0) arrival = start;
+  else if (elapsed < CHAT_SLIDE_IN) {
+    const peakAt = 0.70, tau = elapsed / CHAT_SLIDE_IN;
+    arrival = tau < peakAt
+      ? lerp(start, peak, smoothstep(tau / peakAt))
+      : lerp(peak, 1, smoothstep((tau - peakAt) / (1 - peakAt)));
+  }
+  const outStart = CHAT_SLIDE_IN + c.dwell;
+  if (elapsed > outStart) {
+    arrival *= 1 - 0.10 * smoothstep((elapsed - outStart) / CHAT_SLIDE_OUT);
+  }
+  return arrival * danmakuDepthScale(danmakuVisualDepth(c));
+}
+const DANMAKU_LANDING_SHAKE_SEC = 0.14;
+const DANMAKU_ARRIVAL_TILT_SETTLE_SEC = 0.24;
+function danmakuLandingShake(c, elapsed) {
+  const u = elapsed - CHAT_SLIDE_IN;
+  if (u < 0 || u >= DANMAKU_LANDING_SHAKE_SEC || danmakuVisualDepth(c) >= 0.95) {
+    return { x: 0, y: 0 };
+  }
+  const remaining = 1 - u / DANMAKU_LANDING_SHAKE_SEC;
+  const decay = remaining * remaining;
+  const profile = danmakuProfileOf(c);
+  const amplitude = profile === 1 ? 1.35 : profile === 2 ? 0.45 : 1;
+  const phase = ((c.seed >>> 8) & 1023) / 1023 * TAU;
+  return {
+    x: Math.sin(phase + u * TAU * 27) * decay * amplitude,
+    y: Math.sin(phase * 1.7 + u * TAU * 35) * decay * amplitude * 0.65,
+  };
+}
+/* 滞留中の微動。固定4位置の周囲だけを小さく動かす。再生時計から求める決定的なオフセット
+ * なので、一時停止・シーク後も同じ発言は同じ姿勢へ復元される。
+ * x/y はCanvasピクセル、rotation は現在の滞留角へ加える度数 */
+const DANMAKU_IDLE_FADE_IN_SEC = 0.24;
+const DANMAKU_IDLE_STILL = 0, DANMAKU_IDLE_GLIDE = 1, DANMAKU_IDLE_FLOAT = 2;
+const DANMAKU_IDLE_STYLES = 3;
+function danmakuIdleDepthFactor(c) {
+  const depth = danmakuVisualDepth(c);
+  if (depth <= 1) return lerp(1, 0.65, depth);
+  if (depth <= 2) return lerp(0.65, 0.40, depth - 1);
+  if (depth <= 3) return lerp(0.40, 0.25, depth - 2);
+  if (depth <= 4) return lerp(0.25, 0, depth - 3);
+  return 0;
+}
+function danmakuIdleStyleFor(c) {
+  return c.idleStyle !== undefined ? c.idleStyle : ((c.seed >>> 0) % DANMAKU_IDLE_STYLES);
+}
+function danmakuIdleMotion(c, elapsed) {
+  const idleT = elapsed - CHAT_SLIDE_IN;
+  const remaining = (c.total || 0) - elapsed;
+  if (idleT <= 0 || remaining <= 0) return { x: 0, y: 0, rotation: 0 };
+
+  const fadeIn = smoothstep(idleT / DANMAKU_IDLE_FADE_IN_SEC);
+  const depthGain = danmakuIdleDepthFactor(c);
+  if (fadeIn <= 0 || depthGain <= 0) return { x: 0, y: 0, rotation: 0 };
+
+  const seed = c.seed >>> 0;
+  const phase = (seed & 1023) / 1023 * TAU;
+  const unitA = ((seed >>> 10) & 1023) / 1023;
+  const unitB = ((seed >>> 20) & 1023) / 1023;
+  const style = danmakuIdleStyleFor(c);
+
+  // Glide: 文字の傾きと平行に、突入方向を保ったまま一方向へ進み続ける
+  if (style === DANMAKU_IDLE_GLIDE) {
+    const angle = danmakuRestingTilt(c) * Math.PI / 180;
+    const direction = -danmakuEntrySign(c);
+    const speed = 10 + unitA * 3;
+    const distance = speed * idleT * fadeIn * depthGain;
+    return {
+      x: Math.cos(angle) * direction * distance,
+      y: Math.sin(angle) * direction * distance,
+      rotation: 0,
+    };
+  }
+
+  // Float: 低周波の異なる2軸で、固定位置の周囲だけをふらふら漂う
+  if (style === DANMAKU_IDLE_FLOAT) {
+    const fadeOut = remaining >= CHAT_SLIDE_OUT ? 1 : smoothstep(remaining / CHAT_SLIDE_OUT);
+    const gain = fadeIn * fadeOut * depthGain;
+    const waveX = Math.sin(phase + idleT * TAU / (1.55 + unitA * 0.30));
+    const waveY = Math.sin(phase * 1.31 + idleT * TAU / (2.05 + unitB * 0.40));
+    return {
+      x: waveX * 7.0 * gain,
+      y: waveY * 4.0 * gain,
+      rotation: 0,
+    };
+  }
+
+  // Still: 突入と着地後は完全に止め、他の動きとの対比を作る
+  return { x: 0, y: 0, rotation: 0 };
+}
+function danmakuRotation(c, elapsed) {
+  const sign = danmakuTrajectoryTiltSign(c), profile = danmakuProfileOf(c);
+  const start = profile === 1 ? 5 : profile === 2 ? 3 : 7;
+  const resting = danmakuRestingTilt(c);
+  let arrival = resting;
+  if (elapsed < CHAT_SLIDE_IN) {
+    const tau = smoothstep(elapsed / CHAT_SLIDE_IN);
+    arrival = sign * lerp(start, Math.abs(resting), tau);
+  } else if (elapsed < CHAT_SLIDE_IN + DANMAKU_ARRIVAL_TILT_SETTLE_SEC) {
+    const tau = (elapsed - CHAT_SLIDE_IN) / DANMAKU_ARRIVAL_TILT_SETTLE_SEC;
+    arrival += danmakuLandingShake(c, elapsed).x * 0.45 * (1 - smoothstep(tau));
+  }
+  return arrival;
+}
+function danmakuAccentOpacity(c, elapsed) {
+  if (elapsed <= 0) return 0;
+  const profile = danmakuProfileOf(c);
+  const peak = profile === 1 ? 0.42 : profile === 2 ? 0.22 : 0.32;
+  let alpha;
+  if (elapsed < CHAT_SLIDE_IN) {
+    alpha = peak * smoothstep(elapsed / 0.06);
+  } else if (elapsed >= CHAT_SLIDE_IN + DANMAKU_ARRIVAL_TILT_SETTLE_SEC) alpha = 0;
+  else alpha = peak * (1 - smoothstep(
+    (elapsed - CHAT_SLIDE_IN) / DANMAKU_ARRIVAL_TILT_SETTLE_SEC));
+  return alpha * (1 - clamp01(danmakuVisualDepth(c)));
+}
+function danmakuAccentWidthScale(c, elapsed) {
+  const profile = danmakuProfileOf(c);
+  const initial = profile === 1 ? 0.14 : profile === 2 ? 0.28 : 0.20;
+  const wipeSec = profile === 1 ? 0.07 : profile === 2 ? 0.14 : 0.10;
+  if (elapsed <= 0) return initial;
+  if (elapsed >= wipeSec) return 1;
+  const rest = 1 - clamp01(elapsed / wipeSec);
+  return lerp(initial, 1, 1 - rest * rest * rest);
+}
+function danmakuAccentCenterOffsetFactor(c, elapsed) {
+  return danmakuEntrySign(c) * (1 - danmakuAccentWidthScale(c, elapsed)) * 0.5;
+}
+/*__CORE_END__*/
+
+/* ---------------- UI（DOM・Canvas） ---------------- */
+const $ = id => document.getElementById(id);
+const isOn = id => $(id).checked;
+/* プレイヤー色は識別ID起点のゴールデンアングル色相。同一性はマーカー内のID数字が担うので、
+ * 人数が増えたときの色相衝突は許容する */
+function playerColor(n) {
+  const hue = ((n * 137.508) % 360 + 360) % 360;
+  return `hsl(${hue.toFixed(1)}, 62%, 60%)`;
+}
+/* プレイヤーマーカーの輪郭＝菱形。ID文字の内接域が狭いぶん外接半径を大きく取る */
+function tracePlayerMarker(ctx, cx, cy, r) {
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r);
+  ctx.lineTo(cx + r, cy);
+  ctx.lineTo(cx, cy + r);
+  ctx.lineTo(cx - r, cy);
+  ctx.closePath();
+}
+function traceCross(ctx, cx, cy, r) {
+  ctx.beginPath();
+  ctx.moveTo(cx - r, cy - r); ctx.lineTo(cx + r, cy + r);
+  ctx.moveTo(cx + r, cy - r); ctx.lineTo(cx - r, cy + r);
+}
+const EP_COLORS = {
+  None: "#3a3f47", Idle: "#5c6470", Active: "#e8b23a", Success: "#4fc06b", Warning: "#e07b39",
+  Cancel: "#e5534b", Extracting: "#4fa6c0", Complete: "#3f8f55", Surplus: "#4fc06b", TaxReturn: "#4fa6c0",
+};
+
+const state = {
+  replay: null, segIdx: 0, tracks: null, derived: null,
+  t: 0, playing: false, speed: 4, lastFrame: 0,
+  view: { scale: 1, tx: 0, ty: 0, fitted: false },
+  bounds: null, eventRows: [],
+  bgPaths: [], mapLayers: null, mapBitmap: null, fixedRefY: null,
+  popups: [], gaugeIndex: null, deathMarks: [], cartItemHides: new Set(),
+  selected: new Set(), hoverables: [], playerHits: [], actorToId: new Map(),
+  chatTimes: [], danmaku: { active: [], stamp: null, chatCursor: 0, resultCursor: 0 },
+};
+
+function seg() { return state.replay ? state.replay.segments[state.segIdx] : null; }
+
+/* 高さ淡色化: 基準Yから3mまで等倍・5mで0.3へ落ちるソフトエッジ */
+const fadeCurve = dy => dy <= 3 ? 1 : dy >= 5 ? 0.3 : 1 - 0.7 * (dy - 3) / 2;
+function heightAlpha(y) {
+  return (!isOn("tYFade") || state.fixedRefY === null) ? 1 : fadeCurve(Math.abs(y - state.fixedRefY));
+}
+/* 終局イベントは全員の役職を持つ（それ以前は誰の役職も分からない） */
+function roleOf(actor) {
+  const go = state.derived.gameover;
+  if (!go) return null;
+  const idx = go.actors.indexOf(actor);
+  return idx >= 0 ? go.roles[idx] : null;
+}
+/* 影付き文字。背景がマップでも軌跡でも読めるように必ずこの2度描きを通す */
+function outlinedText(ctx, text, x, y, fill, offset = 1) {
+  ctx.fillStyle = "#000c";
+  ctx.fillText(text, x + offset, y + offset);
+  ctx.fillStyle = fill;
+  ctx.fillText(text, x, y);
+}
+/* 画面座標(mx,my)に最も近いヒット領域。{sx,sy,r} を持つ配列から選ぶ */
+function pickNearest(hits, mx, my) {
+  let best = null, bestDist = Infinity;
+  for (const hit of hits) {
+    const dist = Math.hypot(hit.sx - mx, hit.sy - my);
+    if (dist <= hit.r + 4 && dist < bestDist) { best = hit; bestDist = dist; }
+  }
+  return best;
+}
+
+function playerOf(a) {
+  const s = seg();
+  return s ? (s.header.players || []).find(p => p.a === a) || null : null;
+}
+function actorName(a) {
+  const p = playerOf(a);
+  if (p) return `${p.id}. ${p.n}`;
+  return a < 0 ? `Bot(${a})` : `#${a}`;
+}
+/* マーカーに入れる識別ID（名簿に居ない actor は色だけ actor 値から作り「?」表示） */
+function actorIdText(a) {
+  const pid = state.actorToId.get(a);
+  return pid !== undefined ? String(pid) : "?";
+}
+function actorColor(a) {
+  const pid = state.actorToId.get(a);
+  return playerColor(pid !== undefined ? pid : a);
+}
+/* 録画に載っている表示名（kind は P/E/C/V/I/D） */
+function entityName(kind, id, fallback) {
+  const s = seg();
+  return (s && s.entityNames.get(kind + id)) || fallback;
+}
+function valName(id) {
+  const n = entityName("V", id, null);
+  return n ? n.replace(/^Valuable /, "") : `V${id}`;
+}
+
+/* ---------------- 読み込み ---------------- */
+function loadText(text, fileName) {
+  const replay = parseReplay(text);
+  if (!replay.segments.length) {
+    $("warn").textContent = tx("noSegments");
+    return;
+  }
+  state.replay = replay;
+  state.segIdx = 0; // buildSegOptions が選択位置を復元するので、前のファイルの位置を先に落とす
+  $("warn").textContent = replay.warnings.length ? tx("warnCount", replay.warnings.length) : "";
+  replay.warnings.forEach(w => console.warn(w));
+  $("fileMeta").textContent = fileName;
+  buildSegOptions();
+  state.selected.clear();
+  selectSegment(0);
+  $("drop").classList.add("hidden");
+}
+
+function buildSegOptions() {
+  const sel = $("segSel");
+  sel.innerHTML = "";
+  state.replay.segments.forEach((s, i) => {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = tx("segOption", i + 1, s.header.lvl, formatTime(s.duration));
+    sel.appendChild(opt);
+  });
+  sel.value = String(state.segIdx);
+}
+
+function selectSegment(i) {
+  state.segIdx = i;
+  const s = seg();
+  state.actorToId = new Map((s.header.players || []).map(p => [p.a, p.id]));
+  state.tracks = buildTracks(s);
+  state.derived = buildDerived(s);
+  pruneCorpseSpawnGlitch(state.tracks, state.derived);
+  state.chatTimes = state.derived.chats.map(c => c.t);
+  state.danmaku = { active: [], stamp: null, chatCursor: 0, resultCursor: 0 };
+  state.popups = buildValuePopups(s, state.tracks, state.derived);
+  state.gaugeIndex = buildGaugeIndex(s, state.derived, state.popups);
+  state.deathMarks = buildDeathMarks(s, state.tracks, state.derived);
+  // バーは貴重品のあるセグメントだけ、納品バーは納品が1件以上ある録画だけ
+  $("gaugeBars").style.display = state.gaugeIndex.base > 0 ? "" : "none";
+  $("gDeliverRow").style.display = state.gaugeIndex.deliverSteps.length ? "" : "none";
+  $("gDeliverBarText").textContent = "";
+  state.cartItemHides = buildCartItemHides(s, state.tracks);
+  state.bgPaths = buildBackgroundPaths(state.tracks);
+  state.mapLayers = buildMapLayers(s.map);
+  // base64→Image のデコードは非同期。読了時にまだ同じセグメントを見ていれば描き直す
+  state.mapBitmap = null;
+  if (s.mapImage && s.mapImage.png) {
+    const img = new Image();
+    img.onload = () => { if (seg() === s) { state.mapBitmap = img; requestDraw(); } };
+    img.onerror = () => console.warn(tx("mapImgDecodeFailed"));
+    img.src = "data:image/png;base64," + s.mapImage.png;
+  }
+  state.fixedRefY = segmentStartY();
+  // 実マップ（静止画 or NavMesh）があれば軌跡背景は要らない
+  $("tBg").checked = !state.mapLayers && !(s.mapImage && s.mapImage.png);
+  state.t = 0;
+  state.playing = false;
+  state.view.fitted = false;
+  computeBounds();
+  buildEventList();
+  buildRosterStatic();
+  updatePlayButton();
+  drawSeek();
+  requestDraw();
+}
+
+/* 全期間のP/E/C軌跡をワールド座標のPath2Dへ焼く。マップ未録画時の代用背景で、1試合ぶんの
+ * 徘徊跡が通路・部屋の形を浮かび上がらせる。2.5秒超のギャップはデスポーン/ワープとみなし線を切る */
+function buildBackgroundPaths(tracks) {
+  const paths = [];
+  for (const kind of ["P", "E", "C"]) {
+    for (const track of tracks[kind].values()) {
+      const path = new Path2D();
+      let prev = null;
+      for (const k of track) {
+        if (prev && k.t - prev.t <= 2.5) path.lineTo(k.x, -k.z);
+        else path.moveTo(k.x, -k.z);
+        prev = k;
+      }
+      paths.push(path);
+    }
+  }
+  return paths;
+}
+
+/* map行（Y2mバケット）を階層ごとのPath2Dへ焼く（ワールド座標(x,-z)） */
+function buildMapLayers(map) {
+  if (!map || !map.tris.length) return null;
+  return groupMapTriangles(map.verts, map.tris).map(g => {
+    const path = new Path2D();
+    for (const i of g.tris) {
+      const [a, b, c] = [map.tris[i], map.tris[i + 1], map.tris[i + 2]];
+      path.moveTo(map.verts[a * 3], -map.verts[a * 3 + 2]);
+      path.lineTo(map.verts[b * 3], -map.verts[b * 3 + 2]);
+      path.lineTo(map.verts[c * 3], -map.verts[c * 3 + 2]);
+      path.closePath();
+    }
+    return { y: g.y, path };
+  });
+}
+
+/* 高さ淡色化の基準Y＝レベル開始時の自機の高さ。以後は自機が動いても固定する */
+function segmentStartY() {
+  const s = seg();
+  const track = state.tracks.P.get(s.header.me) || state.tracks.P.values().next().value;
+  return track && track.length ? track[0].y : null;
+}
+
+function computeBounds() {
+  const s = seg();
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  const add = (x, z) => {
+    if (x < minX) minX = x; if (x > maxX) maxX = x;
+    if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+  };
+  if (s.map) {
+    for (let i = 0; i + 2 < s.map.verts.length; i += 3) add(s.map.verts[i], s.map.verts[i + 2]);
+  }
+  if (s.mapImage) { add(s.mapImage.x0, s.mapImage.z0); add(s.mapImage.x1, s.mapImage.z1); }
+  for (const ep of s.header.eps || []) add(ep.x, ep.z);
+  for (const v of s.header.vals || []) add(v.x, v.z);
+  for (const tr of state.tracks.P.values()) for (const k of tr) add(k.x, k.z);
+  for (const tr of state.tracks.E.values()) for (const k of tr) add(k.x, k.z);
+  if (!isFinite(minX)) { minX = -10; maxX = 10; minZ = -10; maxZ = 10; }
+  state.bounds = { minX: minX - 5, maxX: maxX + 5, minZ: minZ - 5, maxZ: maxZ + 5 };
+}
+
+/* ---------------- 座標変換 ---------------- */
+function fitView(w, h) {
+  const b = state.bounds;
+  const scale = Math.min(w / (b.maxX - b.minX), h / (b.maxZ - b.minZ));
+  state.view.scale = scale;
+  state.view.tx = (w - (b.maxX - b.minX) * scale) / 2 - b.minX * scale;
+  state.view.ty = (h + (b.maxZ - b.minZ) * scale) / 2 + b.minZ * scale;
+  state.view.fitted = true;
+}
+function toScreen(x, z) {
+  return [x * state.view.scale + state.view.tx, -z * state.view.scale + state.view.ty];
+}
+function toWorld(sx, sy) {
+  return [(sx - state.view.tx) / state.view.scale, -(sy - state.view.ty) / state.view.scale];
+}
+
+/* ---------------- 描画 ---------------- */
+let drawQueued = false;
+function requestDraw() {
+  if (drawQueued) return;
+  drawQueued = true;
+  requestAnimationFrame(() => { drawQueued = false; draw(); });
+}
+
+function draw() {
+  const canvas = $("map");
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+    canvas.width = w * dpr; canvas.height = h * dpr;
+  }
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  if (!state.replay) return;
+  if (!state.view.fitted) fitView(w, h);
+
+  // 奥から手前へ。各レイヤーはツールチップ用のヒット領域を hits へ積む
+  const hits = [];
+  drawGrid(ctx, w, h);
+  drawBackground(ctx);
+  drawExtractionPoints(ctx, hits);
+  drawDeathMarks(ctx, hits);
+  drawCarts(ctx, hits);
+  drawValuables(ctx, hits);
+  drawItems(ctx, hits);
+  drawEnemies(ctx, hits);
+  drawPlayerTrails(ctx);
+  drawPlayers(ctx, hits);
+  drawValuePopups(ctx);
+  drawDanmaku(ctx, w, h);
+  state.hoverables = hits;
+  state.playerHits = hits.filter(hit => hit.actor !== undefined);
+
+  updateGauges();
+  updateRoster();
+  highlightCurrentEvent();
+  drawSeekCursor();
+}
+
+/* ワールド座標で焼いた Path2D を画面へ乗せる（一様スケール＋平行移動だけ） */
+function withWorldTransform(ctx, body) {
+  ctx.save();
+  ctx.transform(state.view.scale, 0, 0, state.view.scale, state.view.tx, state.view.ty);
+  body();
+  ctx.restore();
+}
+
+/* 背景の優先順位は マップ静止画 ＞ NavMesh の歩行可能面。軌跡は静止画もNavMeshも無い録画の代用 */
+function drawBackground(ctx) {
+  if (state.mapBitmap) {
+    const mi = seg().mapImage;
+    // ワールドXZ被覆矩形へ線形に敷く（画像の上端が+Z）
+    withWorldTransform(ctx, () =>
+      ctx.drawImage(state.mapBitmap, mi.x0, -mi.z1, mi.x1 - mi.x0, mi.z1 - mi.z0));
+  } else if (state.mapLayers) {
+    withWorldTransform(ctx, () => {
+      ctx.fillStyle = "#333945";
+      for (const layer of state.mapLayers) {
+        ctx.globalAlpha = heightAlpha(layer.y) * 0.6;
+        ctx.fill(layer.path);
+      }
+      ctx.globalAlpha = 1;
+    });
+  }
+  if (isOn("tBg")) {
+    withWorldTransform(ctx, () => {
+      ctx.lineWidth = 1.2 / state.view.scale;
+      ctx.strokeStyle = "#2c3038";
+      for (const path of state.bgPaths) ctx.stroke(path);
+    });
+  }
+}
+
+function drawExtractionPoints(ctx, hits) {
+  const d = state.derived;
+  for (const ep of seg().header.eps || []) {
+    const st = stepAt(d.epSteps.get(ep.e), state.t);
+    const [sx, sy] = toScreen(ep.x, ep.z);
+    const color = EP_COLORS[st.n] || "#888";
+    ctx.fillStyle = color;
+    ctx.strokeStyle = "#0008";
+    ctx.beginPath();
+    ctx.rect(sx - 7, sy - 7, 14, 14);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#0c0d10";
+    ctx.font = "bold 9px sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(String(d.epIndex.get(ep.e)), sx, sy + 0.5);
+    const label = `EP${d.epIndex.get(ep.e)} ${epStateName(st.n)}`;
+    if (isOn("tNames")) {
+      ctx.font = "10px sans-serif";
+      ctx.textBaseline = "bottom";
+      ctx.fillStyle = color;
+      ctx.fillText(label, sx, sy - 9);
+    }
+    hits.push({ sx, sy, r: 10, text: `${label}\ny=${ep.y}` });
+  }
+}
+
+/* 死亡地点の❌。死体マーカーが運搬で動いても❌は殺害地点に留まる（規則は buildDeathMarks） */
+function drawDeathMarks(ctx, hits) {
+  const r = 5;
+  for (const mark of state.deathMarks) {
+    if (state.t < mark.t || state.t >= mark.hideT) continue;
+    const [sx, sy] = toScreen(mark.x, mark.z);
+    ctx.lineCap = "round";
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = "#000c";
+    traceCross(ctx, sx + 1, sy + 1, r); ctx.stroke();
+    ctx.strokeStyle = "#e5534b";
+    traceCross(ctx, sx, sy, r); ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.lineCap = "butt";
+    hits.push({ sx, sy, r: 7, text: tx("deathMarkHover", actorName(mark.a)) });
+  }
+}
+
+/* カートは貴重品・アイテムより下層に敷く */
+function drawCarts(ctx, hits) {
+  for (const [id, track] of state.tracks.C) {
+    const pos = trackAt(track, state.t, 2.0, false);
+    if (!pos) continue;
+    const [sx, sy] = toScreen(pos.x, pos.z);
+    ctx.globalAlpha = heightAlpha(pos.y);
+    ctx.fillStyle = "#c07a3f";
+    ctx.strokeStyle = "#0008";
+    ctx.beginPath(); ctx.rect(sx - 5, sy - 4, 10, 8); ctx.fill(); ctx.stroke();
+    ctx.globalAlpha = 1;
+    hits.push({ sx, sy, r: 8, text: `${entityName("C", id, "Cart")}\ny=${pos.y.toFixed(1)}` });
+  }
+}
+
+/* 現存する貴重品だけ。半径は価値の平方根スケール */
+function drawValuables(ctx, hits) {
+  if (!isOn("tVals")) return;
+  const d = state.derived, t = state.t;
+  for (const [id, track] of state.tracks.V) {
+    if (goneBy(d.goneAt, id)) continue;
+    const pos = trackAt(track, t, 1.0, true);
+    if (!pos) continue;
+    const val = stepAt(d.valueSteps.get(id) || [], t);
+    const dollars = val ? val.$ : 0;
+    const r = Math.max(2, Math.min(7, Math.sqrt(dollars) / 40));
+    const [sx, sy] = toScreen(pos.x, pos.z);
+    ctx.globalAlpha = heightAlpha(pos.y);
+    ctx.fillStyle = "#d9c06a";
+    ctx.beginPath(); ctx.arc(sx, sy, r, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 1;
+    hits.push({ sx, sy, r: r + 3, text: `${valName(id)}\n${formatMoney(dollars)}  y=${pos.y.toFixed(1)}` });
+  }
+}
+
+/* アイテムはバニラマップと同じシアン丸。カート重複分は隠し、消滅以降は出さない */
+function drawItems(ctx, hits) {
+  if (!isOn("tItems")) return;
+  const d = state.derived, t = state.t;
+  for (const [id, track] of state.tracks.I) {
+    if (state.cartItemHides.has(id)) continue;
+    if (goneBy(d.itemGoneAt, id)) continue;
+    const pos = trackAt(track, t, 1.0, true);
+    if (!pos) continue;
+    const [sx, sy] = toScreen(pos.x, pos.z);
+    ctx.globalAlpha = heightAlpha(pos.y) * 0.9;
+    ctx.fillStyle = "#3fd2e6";
+    ctx.beginPath(); ctx.arc(sx, sy, 3, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 1;
+    hits.push({ sx, sy, r: 5, text: `${entityName("I", id, "item")}\ny=${pos.y.toFixed(1)}` });
+  }
+}
+
+function drawEnemies(ctx, hits) {
+  if (!isOn("tEnemies")) return;
+  for (const [id, track] of state.tracks.E) {
+    const pos = trackAt(track, state.t, 2.0, false);
+    if (!pos) continue;
+    const [sx, sy] = toScreen(pos.x, pos.z);
+    const name = entityName("E", id, "enemy");
+    ctx.globalAlpha = heightAlpha(pos.y);
+    ctx.fillStyle = "#e5534b";
+    ctx.strokeStyle = "#0008";
+    ctx.beginPath(); ctx.arc(sx, sy, 5, 0, TAU); ctx.fill(); ctx.stroke();
+    if (isOn("tNames")) {
+      ctx.font = "10px sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+      outlinedText(ctx, name, sx, sy - 7, "#e5534b");
+    }
+    ctx.globalAlpha = 1;
+    hits.push({ sx, sy, r: 8, text: `${name}\ny=${pos.y.toFixed(1)}` });
+  }
+}
+
+/* 消滅台帳（id → 消滅時刻）を引いて、いま再生位置ですでに消えているか */
+function goneBy(ledger, id) {
+  const t = ledger.get(id);
+  return t !== undefined && state.t >= t;
+}
+/* 死亡発表の済んだ死体は盤面から退場させる（通報できず試合上の意味を失うため。名簿には残る） */
+const hasDeparted = actor => goneBy(state.derived.announcedAt, actor);
+
+/* 直近15秒の移動跡。追跡選択中は選択者だけを描く */
+function drawPlayerTrails(ctx) {
+  if (!isOn("tTrail")) return;
+  const t = state.t, tracking = state.selected.size > 0;
+  for (const [actor, track] of state.tracks.P) {
+    if (tracking && !state.selected.has(actor)) continue;
+    if (hasDeparted(actor)) continue;
+    ctx.strokeStyle = actorColor(actor);
+    ctx.lineWidth = tracking ? 2.2 : 1.5;
+    ctx.globalAlpha = tracking ? 0.8 : 0.5;
+    ctx.beginPath();
+    const addPath = samples => {
+      let started = false;
+      for (const k of samples) {
+        if (k.t > t) break;
+        if (k.t < t - 15) continue;
+        const [sx, sy] = toScreen(k.x, k.z);
+        if (started) ctx.lineTo(sx, sy); else { ctx.moveTo(sx, sy); started = true; }
+      }
+    };
+    addPath(track);
+    const corpse = state.tracks.D.get(actor);
+    if (corpse) addPath(corpse); // 死亡後に運ばれた経路（アバターは死亡地点で静止する）
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 1;
+  }
+}
+
+/* 同一性はマーカー内のID数字が担い、色は補助。追跡選択中の非選択者は減光してラベルを省く */
+function drawPlayers(ctx, hits) {
+  const s = seg(), t = state.t, tracking = state.selected.size > 0;
+  const radius = 9.5;
+  for (const [actor, track] of state.tracks.P) {
+    if (hasDeparted(actor)) continue;
+    const dead = state.derived.deaths.some(dv => dv.a === actor && dv.t <= t);
+    // 死亡中は死体（D=死者頭部）の実位置を優先＝運搬・隠蔽・会議の頭部ワープが映る。
+    // 頭部生成前でDが無い区間は最終アバター位置へ縮退
+    const corpse = dead ? state.tracks.D.get(actor) : null;
+    const pos = (corpse && trackAt(corpse, t, 2.0, true)) || trackAt(track, t, 2.0, true);
+    if (!pos) continue;
+    const color = actorColor(actor);
+    const dimmed = tracking && !state.selected.has(actor);
+    const [sx, sy] = toScreen(pos.x, pos.z);
+    ctx.globalAlpha = (dead ? 0.45 : 1) * (dimmed ? 0.35 : 1);
+    const role = isOn("tRoles") ? roleOf(actor) : null;
+    const wolf = role !== null && WOLF_ROLES.has(role);
+    ctx.fillStyle = color;
+    ctx.strokeStyle = actor === s.header.me ? "#f5f6f8" : "#000c";
+    tracePlayerMarker(ctx, sx, sy, radius);
+    ctx.fill(); ctx.stroke();
+    if (wolf) {
+      ctx.strokeStyle = "#e5534b";
+      ctx.lineWidth = 2;
+      tracePlayerMarker(ctx, sx, sy, radius + 2.5);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+    const idText = actorIdText(actor);
+    ctx.fillStyle = "#0c0d10";
+    ctx.font = `bold ${idText.length >= 3 ? 7.5 : 9.5}px sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(idText, sx, sy + 0.5);
+    const name = actorName(actor);
+    if (isOn("tNames") && !dimmed) {
+      let label = dead ? "☠ " + name : name;
+      if (role !== null) label += tx("roleBadge", roleName(role));
+      ctx.font = "11px sans-serif";
+      ctx.textBaseline = "bottom";
+      outlinedText(ctx, label, sx, sy - radius - 3, wolf ? "#e5534b" : (dead ? "#8b909a" : color));
+    }
+    ctx.globalAlpha = 1;
+    hits.push({ sx, sy, r: radius + 3, actor, text: `${name}\ny=${pos.y.toFixed(1)}` });
+  }
+}
+
+/* 金額ポップアップ（減額・喪失=赤／納品=緑）。出現位置から浮かび上がって消える */
+const POPUP_LIFE_SEC = 2.5;
+function drawValuePopups(ctx) {
+  ctx.font = "bold 11px sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+  for (const p of state.popups) {
+    if (p.t > state.t) break;
+    const age = state.t - p.t;
+    if (age > POPUP_LIFE_SEC) continue;
+    const f = age / POPUP_LIFE_SEC;
+    const [sx, sy] = toScreen(p.x, p.z);
+    const text = (p.kind === "deliver" ? "+" : "-") + formatMoney(p.amount);
+    ctx.globalAlpha = 1 - f * f;
+    outlinedText(ctx, text, sx, sy - 10 - f * 18, p.kind === "deliver" ? "#4fc06b" : "#e5534b");
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawGrid(ctx, w, h) {
+  const [wx0, wz1] = toWorld(0, 0);
+  const [wx1, wz0] = toWorld(w, h);
+  const step = state.view.scale > 18 ? 5 : 10;
+  ctx.strokeStyle = "#22252b";
+  ctx.beginPath();
+  for (let x = Math.ceil(wx0 / step) * step; x <= wx1; x += step) {
+    const [sx] = toScreen(x, 0);
+    ctx.moveTo(sx, 0); ctx.lineTo(sx, h);
+  }
+  for (let z = Math.ceil(wz0 / step) * step; z <= wz1; z += step) {
+    const [, sy] = toScreen(0, z);
+    ctx.moveTo(0, sy); ctx.lineTo(w, sy);
+  }
+  ctx.stroke();
+}
+
+/* ---------------- ゲージ・名簿 ---------------- */
+function updateGauges() {
+  const d = state.derived, t = state.t;
+  const gi = state.gaugeIndex;
+  if (gi && gi.base > 0) {
+    const lostStep = stepAt(gi.lostSteps, t);
+    const lost = lostStep ? lostStep.cum : 0;
+    $("gLossFill").style.width = `${clamp01(lost / gi.base) * 100}%`;
+    $("gLossBarText").textContent = tx("gaugeLossBar", formatMoney(lost), formatMoney(gi.base));
+    if (gi.deliverSteps.length) {
+      const delStep = stepAt(gi.deliverSteps, t);
+      const delivered = delStep ? delStep.cum : 0;
+      $("gDeliverFill").style.width = `${clamp01(delivered / gi.base) * 100}%`;
+      $("gDeliverBarText").textContent = tx("gaugeDeliveredBar", formatMoney(delivered));
+    }
+  }
+  const phase = stepAt(d.phases, t);
+  $("gPhase").textContent = phaseName(phase ? phase.to : "Play");
+  const rem = remainingValue(d, t);
+  $("gValCount").textContent = tx("countValuables", rem.count);
+  $("gRemain").textContent = formatMoney(rem.total);
+  const loss = stepAt(d.lossCum, t);
+  $("gLoss").textContent = formatMoney(loss ? loss.cum : 0);
+  const ext = stepAt(d.extracts, t);
+  const total = ext ? ext.total : (d.extracts[0] ? d.extracts[0].total : (seg().header.eps || []).length);
+  $("gExtract").textContent = `${ext ? ext.completed : 0} / ${total}`;
+  const deadCount = d.deaths.filter(dv => dv.t <= t).length;
+  $("gDeaths").textContent = tx("countDeaths", deadCount);
+}
+
+function buildRosterStatic() {
+  const s = seg();
+  const el = $("roster");
+  el.innerHTML = "";
+  (s.header.players || []).forEach(p => {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.dataset.actor = p.a;
+    row.title = tx("rosterRowTitle");
+    const sw = document.createElement("span");
+    sw.className = "swatch";
+    sw.style.background = playerColor(p.id);
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = `${p.id}. ${p.n}` + (p.a === s.header.me ? tx("selfSuffix") : "");
+    const role = document.createElement("span");
+    role.className = "role";
+    row.append(sw, name, role);
+    row.addEventListener("click", () => {
+      if (state.selected.has(p.a)) state.selected.delete(p.a);
+      else state.selected.add(p.a);
+      requestDraw();
+    });
+    el.appendChild(row);
+  });
+}
+
+function updateRoster() {
+  const d = state.derived, t = state.t;
+  for (const row of $("roster").children) {
+    const actor = Number(row.dataset.actor);
+    const dead = d.deaths.some(dv => dv.a === actor && dv.t <= t);
+    row.classList.toggle("sel", state.selected.has(actor));
+    row.querySelector(".name").classList.toggle("dead", dead);
+    const role = isOn("tRoles") ? roleOf(actor) : null;
+    const roleEl = row.querySelector(".role");
+    roleEl.textContent = role !== null ? roleName(role) : "";
+    roleEl.classList.toggle("wolf", role !== null && WOLF_ROLES.has(role));
+  }
+}
+
+/* ---------------- イベントリスト ---------------- */
+function describeEvent(ev) {
+  switch (ev.e) {
+    case "meet":
+      return { cls: "meet", text: tx("evMeet", actorName(ev.a), tx("meetKinds")[ev.kind] || ev.kind) };
+    case "meet_warp": return { cls: "meet", text: tx("evMeetWarp") };
+    case "meet_cancel": return { cls: "meet", text: tx("evMeetCancel", ev.reason) };
+    case "chat": return { cls: "", text: tx("evChat", actorName(ev.a), ev.text) };
+    case "meeting_result":
+      return { cls: "meet", text: ev.a === -1 ? tx("evResultNone") : tx("evResultExecuted", actorName(ev.a)) };
+    case "phase": return { cls: ev.to === "Meeting" ? "meet" : "", text: tx("evPhase", phaseName(ev.to)) };
+    case "death": return { cls: "death", text: tx("evDeath", actorName(ev.a), causeName(ev.cause)) };
+    case "announced":
+      return { cls: "death", text: tx("evAnnounced", (ev.actors || []).map(actorName).join(tx("listSep"))) };
+    case "scatter": {
+      const g = (ev.groups || [])
+        .map(grp => grp.map(a => actorName(a)).join(tx("scatterMemberSep")))
+        .join(tx("scatterGroupSep"));
+      return { cls: "meet", text: tx("evScatter", g) };
+    }
+    case "guard": return { cls: "meet", text: ev.sec > 0 ? tx("evGuardOn", ev.sec) : tx("evGuardOff") };
+    case "gameover": {
+      const roles = ev.actors
+        .map((a, i) => `${actorName(a)}=${roleName(ev.roles[i])}`)
+        .join(tx("listSep"));
+      return { cls: "gameover", text: tx("evGameOver", teamName(ev.team), roles) };
+    }
+    case "loss": return { cls: "", text: tx("evLoss", formatAmount(ev.$), ev.orb) };
+    case "val_value": return { cls: "", text: `${valName(ev.v)} → ${formatMoney(ev.$)}` };
+    case "val_gone": return { cls: "", text: tx("evValGone", valName(ev.v)) };
+    case "item_gone":
+      return { cls: "", text: tx("evItemGone", entityName("I", ev.i, "I" + ev.i)) };
+    case "ep_state":
+      return { cls: "", text: `EP${state.derived.epIndex.get(ev.ep) ?? "?"} → ${epStateName(ev.n)}` };
+    case "extract": return { cls: "gameover", text: tx("evExtract", ev.completed, ev.total) };
+    case "perk": return { cls: "", text: tx("evPerk", ev.perk) };
+    default: return { cls: "", text: JSON.stringify(ev) };
+  }
+}
+
+function buildEventList() {
+  const el = $("events");
+  el.innerHTML = "";
+  state.eventRows = [];
+  for (const ev of seg().events) {
+    const { cls, text } = describeEvent(ev);
+    const row = document.createElement("div");
+    row.className = "ev " + cls;
+    const tEl = document.createElement("span");
+    tEl.className = "t";
+    tEl.textContent = formatTime(ev.t);
+    const txt = document.createElement("span");
+    txt.textContent = text;
+    row.append(tEl, txt);
+    row.addEventListener("click", () => { setTime(ev.t); });
+    el.appendChild(row);
+    state.eventRows.push({ t: ev.t, row });
+  }
+}
+
+let lastCurrentRow = null;
+function highlightCurrentEvent() {
+  let current = null;
+  for (const r of state.eventRows) {
+    if (r.t <= state.t) current = r.row; else break;
+  }
+  if (current === lastCurrentRow) return;
+  if (lastCurrentRow) lastCurrentRow.classList.remove("current");
+  if (current) {
+    current.classList.add("current");
+    current.scrollIntoView({ block: "nearest" });
+  }
+  lastCurrentRow = current;
+}
+
+/* ---------------- シークバー ---------------- */
+/* 目盛りに出すイベントと、その色・上端y・丈 */
+const SEEK_MARKS = {
+  death: { color: "#e5534b", y: 2, h: 22 },
+  meet: { color: "#caa3ff", y: 2, h: 22 },
+  extract: { color: "#4fc06b", y: 2, h: 22 },
+  gameover: { color: "#e8b23a", y: 2, h: 22 },
+  meeting_result: { color: "#caa3ff", y: 7, h: 12 },
+  ep_state: { color: "#4fa6c0", y: 7, h: 12 },
+};
+function drawSeek() {
+  const canvas = $("seekCanvas");
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  if (!state.replay) return;
+  const s = seg(), d = state.derived;
+  const X = t => (t / Math.max(s.duration, 1e-9)) * w;
+
+  ctx.fillStyle = "#2a2d34";
+  ctx.fillRect(0, 9, w, 8);
+  ctx.fillStyle = "rgba(202,163,255,.35)";
+  for (const r of d.meetingRanges) ctx.fillRect(X(r.from), 9, Math.max(X(r.to) - X(r.from), 2), 8);
+  for (const ev of s.events) {
+    const mark = SEEK_MARKS[ev.e];
+    if (!mark) continue;
+    ctx.fillStyle = mark.color;
+    ctx.fillRect(X(ev.t) - 1, mark.y, 2, mark.h);
+  }
+}
+
+function drawSeekCursor() {
+  drawSeek(); // 目盛りごと引き直す（イベント数は高々百件台なので毎フレームでも軽い）
+  const canvas = $("seekCanvas");
+  const ctx = canvas.getContext("2d");
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  const x = (state.t / Math.max(seg().duration, 1e-9)) * w;
+  ctx.fillStyle = "#f5f6f8";
+  ctx.fillRect(x - 1, 0, 2, h);
+  $("timeLabel").textContent = `${formatTime(state.t)} / ${formatTime(seg().duration)}`;
+}
+
+/* ---------------- 再生制御 ---------------- */
+function setTime(t) {
+  state.t = Math.max(0, Math.min(t, seg().duration));
+  rebuildDanmakuAt(state.t); // シークでは表示中の発言を返却し、実時間換算で組み直す
+  requestDraw();
+}
+function updatePlayButton() {
+  $("playBtn").textContent = state.playing ? tx("pause") : tx("play");
+}
+function togglePlay() {
+  if (!state.replay) return;
+  // 終端からの再開は setTime 経由で先頭へ戻す（議論ショットの前進カーソルも組み直る）
+  if (!state.playing && state.t >= seg().duration - 0.05) setTime(0);
+  state.playing = !state.playing;
+  state.lastFrame = performance.now();
+  updatePlayButton();
+  if (state.playing) requestAnimationFrame(tick);
+}
+function tick(now) {
+  if (!state.playing) return;
+  // rAFのタイムスタンプはフレーム開始時刻で直前の performance.now() より過去になりうるため、
+  // dt は0で下限クランプする
+  const dt = Math.max(0, now - state.lastFrame) / 1000;
+  state.lastFrame = now;
+  const prevT = state.t;
+  state.t = paceAdvance(state.derived.meetingRanges, state.chatTimes, state.t, dt, state.speed);
+  if (state.t >= seg().duration) {
+    state.t = seg().duration;
+    state.playing = false;
+    updatePlayButton();
+  }
+  updateDanmaku(prevT, state.t, dt);
+  draw();
+  if (state.playing) requestAnimationFrame(tick);
+}
+
+/* ---------------- 議論ショット・開票結果スタンプ ---------------- */
+const DANMAKU_VISIBLE_CAP = 4;
+const DANMAKU_STAMP_LIFE = 1.5;
+const DANMAKU_BODY_BASE_PX = 32, DANMAKU_META_PX = 18;
+const UI_FONT = "'Segoe UI', 'Yu Gothic UI', sans-serif";
+const danmakuBodyFont = c => `bold ${DANMAKU_BODY_BASE_PX * danmakuFontScale(c)}px ${UI_FONT}`;
+const DANMAKU_META_FONT = `${DANMAKU_META_PX}px ${UI_FONT}`;
+
+function danmakuMeasureWidth(c) {
+  const ctx = $("map").getContext("2d");
+  const w = $("map").clientWidth || 1;
+  ctx.font = danmakuBodyFont(c);
+  let width = ctx.measureText(c.prefix + c.line1).width;
+  if (c.line2 !== null) {
+    width = Math.max(width, ctx.measureText(c.prefix).width + ctx.measureText(c.line2).width);
+  }
+  return (width + 12) / w;
+}
+
+/* 話者の定位置を第一候補に、まだ主役圏に居る発言と重ならないスロットを取る */
+function danmakuAssignSlot(c) {
+  const active = state.danmaku.active;
+  const preferred = danmakuHomeSlot(c.a);
+  for (const slot of danmakuSlotOrder(preferred)) {
+    if (!active.some(o => o.depth < DANMAKU_VISIBLE_CAP && o.slot === slot)) return slot;
+  }
+  return preferred;
+}
+
+function spawnComment(chat, elapsed) {
+  const text = chat.text || "";
+  const { line1, line2 } = chatWrap(text);
+  const n = chatDisplayLength(text);
+  const prefix = (state.actorToId.get(chat.a) ?? "?") + ": ";
+  const c = {
+    a: chat.a, text, line1, line2, prefix,
+    displayChars: n, spawnT: chat.t || 0,
+    dwell: chatDwellSec(n), total: chatTotalSec(n),
+    widthRatio: 0.2, elapsed, slot: 0, depth: 0, depthFrom: 0,
+    handoffElapsed: DANMAKU_HANDOFF,
+  };
+  c.seed = danmakuVisualSeed(c.a, c.spawnT, c.displayChars);
+  c.profile = danmakuProfileForClaim(c.text, c.displayChars);
+  c.widthRatio = Math.max(0.01, Math.min(2, danmakuMeasureWidth(c)));
+  for (const old of state.danmaku.active) {
+    if (old.depth >= DANMAKU_VISIBLE_CAP) continue;
+    old.depthFrom = danmakuVisualDepth(old);
+    old.depth++;
+    old.handoffElapsed = 0;
+  }
+  c.slot = danmakuAssignSlot(c);
+  state.danmaku.active.push(c);
+}
+
+/* [prevT→newT] の前向き通過でスポーンし、経過を実時間dtだけ進める（再生中のみ呼ばれる） */
+function updateDanmaku(prevT, newT, dt) {
+  const dm = state.danmaku;
+  if (dt > 0) {
+    let focusExpired = false;
+    for (let i = dm.active.length - 1; i >= 0; i--) {
+      const c = dm.active[i];
+      c.elapsed += dt;
+      c.handoffElapsed += dt;
+      const evicted = c.depth >= DANMAKU_VISIBLE_CAP && c.handoffElapsed >= DANMAKU_HANDOFF;
+      if (evicted || c.elapsed >= c.total) {
+        if (c.depth === 0) focusExpired = true;
+        dm.active.splice(i, 1);
+      }
+    }
+    if (focusExpired) dm.active = []; // 主役が消えたら残像も残さない
+    if (dm.stamp) {
+      dm.stamp.elapsed += dt;
+      if (dm.stamp.elapsed >= DANMAKU_STAMP_LIFE) dm.stamp = null;
+    }
+  }
+  if (newT <= prevT) return;
+  const chats = state.derived.chats;
+  while (dm.chatCursor < chats.length && chats[dm.chatCursor].t <= prevT) dm.chatCursor++;
+  while (dm.chatCursor < chats.length && chats[dm.chatCursor].t <= newT) {
+    spawnComment(chats[dm.chatCursor++], 0);
+  }
+  const results = state.derived.meetingResults;
+  while (dm.resultCursor < results.length && results[dm.resultCursor].t <= prevT) dm.resultCursor++;
+  while (dm.resultCursor < results.length && results[dm.resultCursor].t <= newT) {
+    dm.stamp = { a: results[dm.resultCursor++].a, elapsed: 0 };
+  }
+}
+
+/* シーク先の表示状態を組み直す。直前の発言は速度プロファイルの実時間換算で復元し、
+ * スタンプは復元しない（結果時刻を飛び越えただけでは出さない） */
+function rebuildDanmakuAt(t) {
+  const dm = state.danmaku;
+  if (!state.derived) return;
+  dm.active = [];
+  dm.stamp = null;
+  const chats = state.derived.chats;
+  dm.chatCursor = chats.findIndex(c => c.t > t);
+  if (dm.chatCursor < 0) dm.chatCursor = chats.length;
+  const results = state.derived.meetingResults;
+  dm.resultCursor = results.findIndex(rv => rv.t > t);
+  if (dm.resultCursor < 0) dm.resultCursor = results.length;
+
+  if (dm.chatCursor > 0) {
+    const latest = chats[dm.chatCursor - 1];
+    const latestElapsed = paceRealSecondsBetween(
+      state.derived.meetingRanges, state.chatTimes, latest.t, t, state.speed);
+    if (latestElapsed >= chatTotalSec(chatDisplayLength(latest.text || ""))) return;
+  }
+
+  const maxTotal = CHAT_SLIDE_IN + CHAT_DWELL_MAX + CHAT_SLIDE_OUT;
+  const restore = [];
+  for (let i = dm.chatCursor - 1; i >= 0; i--) {
+    const elapsed = paceRealSecondsBetween(
+      state.derived.meetingRanges, state.chatTimes, chats[i].t, t, state.speed);
+    if (elapsed >= maxTotal) break;
+    if (elapsed >= chatTotalSec(chatDisplayLength(chats[i].text || ""))) continue;
+    restore.push({ chat: chats[i], elapsed });
+    if (restore.length >= DANMAKU_VISIBLE_CAP) break;
+  }
+  restore.reverse();
+  for (const r of restore) spawnComment(r.chat, r.elapsed);
+  if (dm.active.length) {
+    const newestT = dm.active[dm.active.length - 1].spawnT;
+    const sinceNewest = paceRealSecondsBetween(
+      state.derived.meetingRanges, state.chatTimes, newestT, t, state.speed);
+    for (let i = 0; i < dm.active.length; i++) {
+      const c = dm.active[i], depth = dm.active.length - 1 - i;
+      c.depth = depth;
+      c.depthFrom = depth > 0 ? depth - 1 : 0;
+      c.handoffElapsed = depth > 0 ? sinceNewest : DANMAKU_HANDOFF;
+    }
+  }
+}
+
+/* 開票結果のスタンプ。画面中央に一度だけ大きく出して薄れる */
+function drawResultStamp(ctx, w, h) {
+  const stamp = state.danmaku.stamp;
+  const f = stamp.elapsed / DANMAKU_STAMP_LIFE;
+  const text = stamp.a === -1 ? tx("stampNoExecution") : tx("stampExecuted", actorName(stamp.a));
+  ctx.globalAlpha = 1 - f * f;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  let px = 102;
+  ctx.font = `bold ${px}px ${UI_FONT}`;
+  const width = ctx.measureText(text).width;
+  if (width > w * 0.94) { // 長い名前でも画面内へ収める
+    px = Math.max(34, px * w * 0.94 / width);
+    ctx.font = `bold ${px}px ${UI_FONT}`;
+  }
+  outlinedText(ctx, text, w / 2, h / 2, stamp.a === -1 ? "#f5f6f8" : "#e5534b", 4);
+  ctx.globalAlpha = 1;
+}
+
+/* 会議の発言。マーカー・ポップアップより手前、スタンプよりさらに手前へ重ねる */
+function drawDanmaku(ctx, w, h) {
+  const dm = state.danmaku;
+  if (dm.stamp) drawResultStamp(ctx, w, h);
+  if (!dm.active.length) return;
+  ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  for (const c of dm.active) {
+    const opacity = danmakuOpacity(c, c.elapsed);
+    const idle = danmakuIdleMotion(c, c.elapsed);
+    const shake = danmakuLandingShake(c, c.elapsed);
+    const cx = (0.5 + danmakuCenterX(c, c.elapsed)) * w + idle.x;
+    const cy = (0.5 - danmakuCenterY(c, c.elapsed)) * h + shake.y * 3 + idle.y;
+    const left = -c.widthRatio * w * 0.5;
+    const color = actorColor(c.a);
+    const bodyPx = DANMAKU_BODY_BASE_PX * danmakuFontScale(c);
+    ctx.save();
+    ctx.translate(cx + shake.x * 3, cy);
+    ctx.rotate((danmakuRotation(c, c.elapsed) + idle.rotation) * Math.PI / 180);
+    const scale = danmakuScale(c, c.elapsed);
+    ctx.scale(scale, scale);
+    ctx.font = danmakuBodyFont(c);
+    const prefixW = ctx.measureText(c.prefix).width;
+
+    // 話者色の斜め帯は突入〜着地直後だけ。帯と文字は同じ回転座標系で常に平行を保つ
+    const accentAlpha = danmakuAccentOpacity(c, c.elapsed);
+    if (accentAlpha > 0) {
+      const profile = danmakuProfileOf(c);
+      const bandHeight = profile === 1 ? 14 : profile === 2 ? 6 : 10;
+      const bandFullWidth = c.widthRatio * w + 60;
+      const bandWidth = bandFullWidth * danmakuAccentWidthScale(c, c.elapsed);
+      const bandCenter = bandFullWidth * danmakuAccentCenterOffsetFactor(c, c.elapsed);
+      ctx.save();
+      ctx.globalAlpha = opacity * accentAlpha;
+      ctx.fillStyle = color;
+      ctx.fillRect(bandCenter - bandWidth * 0.5, -bandHeight * 0.5, bandWidth, bandHeight);
+      ctx.restore();
+    }
+
+    ctx.globalAlpha = opacity;
+    // 名前〔役職〕は本文開始位置の上へ小さく薄く。ここは名簿・マーカーと違い役職トグルで隠さない
+    const player = playerOf(c.a);
+    const role = roleOf(c.a);
+    let meta = player ? player.n : "";
+    if (role !== null) meta += tx("roleBadge", roleName(role));
+    if (meta) {
+      ctx.font = DANMAKU_META_FONT;
+      outlinedText(ctx, meta, left + prefixW, -(bodyPx * 0.92 + 8),
+        role !== null && WOLF_ROLES.has(role) ? "#e5534baa" : "#d8dbe0aa");
+    }
+    ctx.font = danmakuBodyFont(c);
+    outlinedText(ctx, c.prefix + c.line1, left, 0, color);
+    // 2行目は識別番号ぶん字下げして1行目の本文開始位置へ揃える
+    if (c.line2 !== null) outlinedText(ctx, c.line2, left + prefixW, bodyPx * 1.10, color);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ---------------- 言語切替 ---------------- */
+const LANG_STORAGE_KEY = "wwReplayViewerLang";
+/* file:// で開くとオリジンが不透明で localStorage が投げる環境があるため、失敗は握り潰して
+ * 自動判定へ委ねる */
+function readStoredLang() {
+  try { return localStorage.getItem(LANG_STORAGE_KEY); } catch { return null; }
+}
+function storeLang(lang) {
+  try { localStorage.setItem(LANG_STORAGE_KEY, lang); } catch { /* 次回も自動判定でよい */ }
+}
+const detectLang = () => pickLang(readStoredLang(), navigator.language);
+/* 静的ラベルは data-i18n / data-i18n-title を差し替え、動的テキスト（セグメント名・
+ * イベント行・名簿・キャンバス）は作り直す */
+function applyLang(lang) {
+  setLang(lang);
+  document.documentElement.lang = LANG;
+  document.title = tx("appTitle");
+  for (const el of document.querySelectorAll("[data-i18n]")) el.textContent = tx(el.dataset.i18n);
+  for (const el of document.querySelectorAll("[data-i18n-title]")) el.title = tx(el.dataset.i18nTitle);
+  $("langSel").value = LANG;
+  updatePlayButton();
+  if (!state.replay) return;
+  buildSegOptions();
+  $("warn").textContent = state.replay.warnings.length ? tx("warnCount", state.replay.warnings.length) : "";
+  buildEventList();
+  buildRosterStatic();
+  drawSeek();
+  requestDraw();
+}
+$("langSel").addEventListener("change", e => {
+  applyLang(e.target.value);
+  storeLang(LANG);
+  e.target.blur(); // 他のコントロールと同じく、Spaceをセレクトへ吸わせない
+});
+applyLang(detectLang());
+
+/* ---------------- 入力 ---------------- */
+$("openBtn").addEventListener("click", () => $("fileInput").click());
+$("fileInput").addEventListener("change", async e => {
+  const f = e.target.files[0];
+  if (f) loadText(await f.text(), f.name);
+});
+const drop = $("drop");
+window.addEventListener("dragover", e => { e.preventDefault(); drop.classList.remove("hidden"); drop.classList.add("armed"); });
+window.addEventListener("dragleave", e => {
+  if (e.relatedTarget === null) { drop.classList.remove("armed"); if (state.replay) drop.classList.add("hidden"); }
+});
+window.addEventListener("drop", async e => {
+  e.preventDefault();
+  drop.classList.remove("armed");
+  const f = e.dataTransfer.files[0];
+  if (f) loadText(await f.text(), f.name);
+  else if (state.replay) drop.classList.add("hidden");
+});
+$("segSel").addEventListener("change", e => selectSegment(Number(e.target.value)));
+$("speedSel").addEventListener("change", e => { state.speed = Number(e.target.value); });
+$("playBtn").addEventListener("click", togglePlay);
+const TOGGLE_IDS = ["tEnemies", "tVals", "tItems", "tNames", "tTrail", "tBg", "tYFade", "tRoles"];
+for (const id of TOGGLE_IDS) {
+  // blur しないと直後の Space がチェックボックスへ吸われて再生が始まらない
+  $(id).addEventListener("change", e => { e.target.blur(); requestDraw(); });
+}
+document.addEventListener("keydown", e => {
+  if (e.code === "Space") {
+    // どのコントロールにフォーカスがあっても再生/停止。blur でネイティブのSpace動作
+    // （チェックトグル・ボタン再押下）も同時に封じる
+    e.preventDefault();
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    togglePlay();
+    return;
+  }
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.code === "ArrowRight") setTime(state.t + (e.shiftKey ? 30 : 5));
+  else if (e.code === "ArrowLeft") setTime(state.t - (e.shiftKey ? 30 : 5));
+  else if (e.code === "Escape" && state.selected.size) { state.selected.clear(); requestDraw(); }
+});
+
+/* シーク・パンは setPointerCapture でポインタを掴み、要素外・ウィンドウ外で離しても
+ * pointerup を必ずこの要素で受ける */
+const seekEl = $("seek");
+let seeking = false;
+function seekFromPointer(e) {
+  const rect = seekEl.getBoundingClientRect();
+  const f = clamp01((e.clientX - rect.left) / rect.width);
+  setTime(f * seg().duration);
+}
+seekEl.addEventListener("pointerdown", e => {
+  if (!state.replay) return;
+  seeking = true;
+  seekEl.setPointerCapture(e.pointerId);
+  seekFromPointer(e);
+});
+seekEl.addEventListener("pointermove", e => { if (seeking) seekFromPointer(e); });
+seekEl.addEventListener("pointerup", () => { seeking = false; });
+seekEl.addEventListener("pointercancel", () => { seeking = false; });
+
+const map = $("map");
+const mapPoint = e => {
+  const rect = map.getBoundingClientRect();
+  return [e.clientX - rect.left, e.clientY - rect.top];
+};
+let panning = null;
+map.addEventListener("pointerdown", e => {
+  panning = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false };
+  map.setPointerCapture(e.pointerId);
+  map.classList.add("panning");
+});
+map.addEventListener("pointermove", e => {
+  if (panning) {
+    if (Math.hypot(e.clientX - panning.sx, e.clientY - panning.sy) > 4) panning.moved = true;
+    state.view.tx += e.clientX - panning.x;
+    state.view.ty += e.clientY - panning.y;
+    panning.x = e.clientX;
+    panning.y = e.clientY;
+    requestDraw();
+    return;
+  }
+  if (!state.replay) return;
+  const [mx, my] = mapPoint(e);
+  const best = pickNearest(state.hoverables, mx, my);
+  const tip = $("tooltip");
+  if (best) {
+    tip.style.display = "block";
+    tip.style.left = (mx + 14) + "px";
+    tip.style.top = (my + 14) + "px";
+    tip.textContent = best.text;
+  } else {
+    tip.style.display = "none";
+  }
+});
+const endPan = () => { panning = null; map.classList.remove("panning"); };
+// 動かさず離した＝クリック: プレイヤーマーカーの追跡選択をトグル。空振りは全解除
+map.addEventListener("pointerup", e => {
+  const wasClick = panning && !panning.moved;
+  endPan();
+  if (!wasClick || !state.replay) return;
+  const best = pickNearest(state.playerHits, ...mapPoint(e));
+  if (best) {
+    if (state.selected.has(best.actor)) state.selected.delete(best.actor);
+    else state.selected.add(best.actor);
+  } else if (state.selected.size) {
+    state.selected.clear();
+  } else {
+    return;
+  }
+  requestDraw();
+});
+map.addEventListener("pointercancel", endPan);
+map.addEventListener("pointerleave", () => { $("tooltip").style.display = "none"; });
+map.addEventListener("wheel", e => {
+  if (!state.replay) return;
+  e.preventDefault();
+  const [mx, my] = mapPoint(e);
+  const factor = e.deltaY < 0 ? 1.2 : 1 / 1.2;
+  const [wx, wz] = toWorld(mx, my);
+  state.view.scale *= factor;
+  state.view.tx = mx - wx * state.view.scale;
+  state.view.ty = my + wz * state.view.scale;
+  requestDraw();
+}, { passive: false });
+new ResizeObserver(() => { drawSeek(); requestDraw(); }).observe($("mapWrap"));
+</script>
+</body>
+</html>

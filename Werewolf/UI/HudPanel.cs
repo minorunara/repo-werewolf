@@ -365,18 +365,7 @@ namespace Werewolf.UI
             return go;
         }
 
-        private static string RoleLabel(Role role)
-        {
-            switch (role)
-            {
-                case Role.Werewolf: return Texts.Get(TextId.RoleNameWerewolf);
-                case Role.BlackCat: return Texts.Get(TextId.RoleNameBlackCat);
-                case Role.Villager: return Texts.Get(TextId.RoleNameVillager);
-                case Role.Bomber: return Texts.Get(TextId.RoleNameBomber);
-                case Role.Shaman: return Texts.Get(TextId.RoleNameShaman);
-                default: return role.ToString();
-            }
-        }
+        private static string RoleLabel(Role role) => RoleText.Label(role);
 
         private static Sprite ResolveRoleIcon(Role role)
         {

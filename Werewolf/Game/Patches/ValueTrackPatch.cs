@@ -117,6 +117,7 @@ namespace Werewolf.Game.Patches
                 ValueTrackPatch.CloseHaulFreeze();
                 WerewolfDirector.Instance?.HostRecordExtractionDone();
                 WerewolfDirector.Instance?.HostRequestCheckmateScan();
+                ReplaySampler.NoteExtractionCompleted();
             }
             catch (Exception e)
             {
@@ -164,9 +165,9 @@ namespace Werewolf.Game.Patches
                 if (realLoss <= 0f) return;
 
                 bool isOrb = __instance.GetComponent<EnemyValuable>() != null;
-                dir.HostAddValueLoss(realLoss, isOrb);
-
                 bool fatal = (before - valueLost) < original * 0.15f;
+                dir.HostAddValueLoss(realLoss, isOrb, ReplaySampler.ReplayVid(valuable), destroyed: fatal);
+
                 if (fatal) ValueTrackPatch.MarkBreakAccounted(valuable.GetInstanceID());
             }
             catch (Exception e)
@@ -205,7 +206,7 @@ namespace Werewolf.Game.Patches
                 if (residual <= 0f) return;
 
                 bool isOrb = __instance.GetComponent<EnemyValuable>() != null;
-                dir.HostAddValueLoss(residual, isOrb);
+                dir.HostAddValueLoss(residual, isOrb, ReplaySampler.ReplayVid(valuable), destroyed: true);
             }
             catch (Exception e)
             {
@@ -222,7 +223,7 @@ namespace Werewolf.Game.Patches
             float residual = box.CurrentValue;
             if (residual <= 0f) return;
 
-            dir.HostAddValueLoss(residual, isOrb: false);
+            dir.HostAddValueLoss(residual, isOrb: false, vid: 0, destroyed: false);
             ValueTrackPatch.MarkBoxAccounted(box.GetInstanceID());
         }
     }
@@ -243,7 +244,7 @@ namespace Werewolf.Game.Patches
                 if (ValueTrackPatch.ConsumeBoxAccounted(__instance.GetInstanceID())) return;
                 if (residual <= 0f) return;
 
-                dir.HostAddValueLoss(residual, isOrb: false);
+                dir.HostAddValueLoss(residual, isOrb: false, vid: 0, destroyed: false);
             }
             catch (Exception e)
             {

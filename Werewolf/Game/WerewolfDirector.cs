@@ -81,6 +81,12 @@ namespace Werewolf.Game
         private bool _chatVoteBaselinePending;
 
         private readonly MeetingChatPanel _chatPanel = new MeetingChatPanel();
+
+        private readonly MeetingChatPanel _resultChatPanel = new MeetingChatPanel(ChatPanelSurface.Result);
+
+        private readonly ReplayViewerPanel _replayViewer = new ReplayViewerPanel();
+
+        private readonly ChatUnread _chatUnread = new ChatUnread();
         private readonly List<string> _chatRecapDeaths = new List<string>();
         private int _chatRecapBeaconUses = MeetingRecap.Unknown;
 
@@ -342,10 +348,11 @@ namespace Werewolf.Game
             _roles.FreezeBase(totalDollars);
         }
 
-        public void HostAddValueLoss(float lostDollars, bool isOrb)
+        public void HostAddValueLoss(float lostDollars, bool isOrb, int vid, bool destroyed)
         {
             if (_roles == null || !SemiFunc.IsMasterClientOrSingleplayer()) return;
             _roles.AddValueLoss(lostDollars, isOrb);
+            ReplaySampler.NoteValueLoss(lostDollars, isOrb, vid, destroyed);
             HostRequestCheckmateScan();
         }
 
@@ -406,6 +413,8 @@ namespace Werewolf.Game
                 _startHoldOverlay,
                 _conveneHoldGauge,
                 _chatPanel,
+                _resultChatPanel,
+                _replayViewer,
                 _idBadgePresenter,
             };
         }
@@ -489,6 +498,8 @@ namespace Werewolf.Game
 
                 EnemyMapIcons.Tick();
 
+                ReplaySampler.Tick();
+
                 MapHidePatch.Tick();
 
                 Patches.ValuableMapSyncPatch.Tick();
@@ -554,7 +565,9 @@ namespace Werewolf.Game
                              || _modIntegrityHeader.Visible
                              || _modIntegrityPanel.Visible
                              || _lobbyStartWarning.Visible
-                             || _manualOverlay.IsOpen;
+                             || _manualOverlay.IsOpen
+                             || _resultScreen.Visible
+                             || _replayViewer.DemoActive;
             bool active = panelOpen && Cursor.lockState == CursorLockMode.None;
             if (active) EnsurePanelBuilt(_cursorMirror);
             _cursorMirror.Tick(active);

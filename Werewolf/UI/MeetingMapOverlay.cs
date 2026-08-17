@@ -12,8 +12,6 @@ namespace Werewolf.UI
     {
         public string LayerName => WerewolfUIManager.MeetingMapLayer;
 
-        private const string DirtFinderCameraName = "Dirt Finder Map Camera";
-
         private const float PanelWidth = 1200f;
         private const float PanelHeight = 720f;
 
@@ -38,28 +36,11 @@ namespace Werewolf.UI
         private RawImage _mapImage;
         private readonly IconToggleButton _toggle = new IconToggleButton();
 
+        private readonly MapRtView _rt = new MapRtView("meeting");
+
         private bool _open;
         private bool _prevMeetingActive;
         private KeyCode _lastLabelKey = KeyCode.None;
-        private Camera _cachedCamera;
-
-        private Vector3 _origCamLocalPosition;
-        private Quaternion _origCamLocalRotation;
-        private float _originalOrthoSize;
-        private bool _cameraOverrideApplied;
-
-        private RenderTexture _overrideRt;
-        private RenderTexture _origTargetTexture;
-        private bool _targetTextureSaved;
-
-        private bool _boundsResolved;
-        private Vector2 _boundsCenterXZ;
-        private float _boundsHalfW;
-        private float _boundsHalfH;
-
-        private CameraClearFlags _origClearFlags;
-        private Color _origBackgroundColor;
-        private bool _origClearSaved;
 
         private Texture _placeholderTex;
         private bool _placeholderResolved;
@@ -149,7 +130,7 @@ namespace Werewolf.UI
 
             try
             {
-                bool toolActive = IsMapToolActive();
+                bool toolActive = MapRtView.IsMapToolActive();
                 if (toolActive)
                 {
                     _toggle.SetHover(false);
@@ -169,33 +150,14 @@ namespace Werewolf.UI
 
                 if (_open)
                 {
-                    if (Map.Instance != null && !Map.Instance.Active)
-                    {
-                        Map.Instance.ActiveSet(true);
-                    }
-
-                    RefreshMapTexture();
-                    ApplyCameraOverride(orthoSize);
+                    Texture tex = _rt.Tick(orthoSize);
+                    if (_mapImage != null) _mapImage.texture = tex != null ? tex : ResolvePlaceholder();
                     UpdateGrid(gridEnabled);
                 }
             }
             catch (Exception e)
             {
                 WLog.Line("mapoverlay_tick_error", secret: false, ("err", e.Message));
-            }
-        }
-
-        private static bool IsMapToolActive()
-        {
-            try
-            {
-                MapToolController tool = MapToolController.instance;
-                if (tool == null) return false;
-                return GameRefs.MapToolController_Active(tool);
-            }
-            catch
-            {
-                return false;
             }
         }
 
@@ -207,6 +169,7 @@ namespace Werewolf.UI
         public void Destroy()
         {
             if (_open) CloseInternal();
+            _rt.Reset();
             if (_root != null)
             {
                 UnityEngine.Object.Destroy(_root);
@@ -218,18 +181,6 @@ namespace Werewolf.UI
             _toggle.Clear();
             _prevMeetingActive = false;
             _lastLabelKey = KeyCode.None;
-            _cachedCamera = null;
-            _origCamLocalPosition = Vector3.zero;
-            _origCamLocalRotation = Quaternion.identity;
-            _originalOrthoSize = 0f;
-            _cameraOverrideApplied = false;
-            _origClearFlags = default;
-            _origBackgroundColor = default;
-            _origClearSaved = false;
-            _boundsResolved = false;
-            _boundsCenterXZ = Vector2.zero;
-            _boundsHalfW = 0f;
-            _boundsHalfH = 0f;
             _placeholderTex = null;
             _placeholderResolved = false;
             _gridRoot = null;
@@ -246,256 +197,29 @@ namespace Werewolf.UI
             _open = true;
             if (_mapPanel != null) _mapPanel.SetActive(true);
 
-            EnsureCameraResolved();
-            if (_cachedCamera != null && !_cameraOverrideApplied)
-            {
-                Transform camT = _cachedCamera.transform;
-                _origCamLocalPosition = camT.localPosition;
-                _origCamLocalRotation = camT.localRotation;
-                _originalOrthoSize = _cachedCamera.orthographicSize;
-                _cameraOverrideApplied = true;
-            }
-            if (_cachedCamera != null && !_origClearSaved)
-            {
-                _origClearFlags = _cachedCamera.clearFlags;
-                _origBackgroundColor = _cachedCamera.backgroundColor;
-                _origClearSaved = true;
-                _cachedCamera.clearFlags = CameraClearFlags.SolidColor;
-                _cachedCamera.backgroundColor = new Color(0f, 0f, 0f, 1f);
-                WLog.Line("mapoverlay_clear_override", secret: false,
-                    ("origFlags", _origClearFlags.ToString()),
-                    ("origBgA", _origBackgroundColor.a));
-            }
-            ApplyTargetTextureOverride(resolutionPreset);
-            ApplyCameraOverride(orthoSizeConfig);
-            RefreshMapTexture();
+            _rt.Open(orthoSizeConfig, resolutionPreset);
+            Texture tex = _rt.Tick(orthoSizeConfig);
+            if (_mapImage != null) _mapImage.texture = tex != null ? tex : ResolvePlaceholder();
             WLog.Line("mapoverlay_open", secret: false,
                 ("orthoConfig", orthoSizeConfig),
-                ("orthoApplied", _cachedCamera != null ? _cachedCamera.orthographicSize : -1f),
-                ("rtW", _overrideRt != null ? _overrideRt.width : -1),
-                ("rtH", _overrideRt != null ? _overrideRt.height : -1));
-        }
-
-        private void ApplyTargetTextureOverride(int resolutionPreset)
-        {
-            if (_cachedCamera == null) return;
-            if (_targetTextureSaved) return;
-
-            int w, h;
-            switch (resolutionPreset)
-            {
-                case 0: w = 1280; h = 768; break;
-                case 2: w = 1920; h = 1152; break;
-                default: w = 1600; h = 960; break;
-            }
-
-            try
-            {
-                var rt = new RenderTexture(w, h, 16, RenderTextureFormat.ARGB32);
-                rt.name = "WW_MeetingMapOverlay_RT";
-                rt.antiAliasing = 1;
-                rt.filterMode = FilterMode.Bilinear;
-                rt.wrapMode = TextureWrapMode.Clamp;
-                if (!rt.Create())
-                {
-                    UnityEngine.Object.Destroy(rt);
-                    WLog.Line("mapoverlay_rt_create_failed", secret: false, ("w", w), ("h", h));
-                    return;
-                }
-                _origTargetTexture = _cachedCamera.targetTexture;
-                _cachedCamera.targetTexture = rt;
-                _overrideRt = rt;
-                _targetTextureSaved = true;
-            }
-            catch (Exception e)
-            {
-                WLog.Line("mapoverlay_rt_override_error", secret: false, ("err", e.Message));
-            }
-        }
-
-        private void RestoreTargetTexture()
-        {
-            if (_cachedCamera == null || !_targetTextureSaved) return;
-            try
-            {
-                _cachedCamera.targetTexture = _origTargetTexture;
-            }
-            catch (Exception e)
-            {
-                WLog.Line("mapoverlay_rt_restore_error", secret: false, ("err", e.Message));
-            }
-            if (_overrideRt != null)
-            {
-                _overrideRt.Release();
-                UnityEngine.Object.Destroy(_overrideRt);
-                _overrideRt = null;
-            }
-            _origTargetTexture = null;
-            _targetTextureSaved = false;
+                ("orthoApplied", _rt.Camera != null ? _rt.Camera.orthographicSize : -1f));
         }
 
         private void CloseInternal()
         {
             _open = false;
             if (_mapPanel != null) _mapPanel.SetActive(false);
-            if (_cachedCamera != null && _cameraOverrideApplied)
-            {
-                Transform camT = _cachedCamera.transform;
-                camT.localPosition = _origCamLocalPosition;
-                camT.localRotation = _origCamLocalRotation;
-                _cachedCamera.orthographicSize = _originalOrthoSize;
-            }
-            if (_cachedCamera != null && _origClearSaved)
-            {
-                _cachedCamera.clearFlags = _origClearFlags;
-                _cachedCamera.backgroundColor = _origBackgroundColor;
-            }
-            RestoreTargetTexture();
-            _origClearSaved = false;
-            _cameraOverrideApplied = false;
-            _boundsResolved = false;
+            _rt.Close();
             _gridModuleRangeResolved = false;
             _gridModuleRange = null;
             if (_gridRoot != null) _gridRoot.gameObject.SetActive(false);
             WLog.Line("mapoverlay_close", secret: false);
         }
 
-        private void ApplyCameraOverride(float orthoSizeConfig)
-        {
-            if (_cachedCamera == null) return;
-            Transform camT = _cachedCamera.transform;
-
-            camT.rotation = Quaternion.Euler(90f, 0f, 0f);
-
-            TryResolveMiniatureBounds();
-            if (_boundsResolved)
-            {
-                Vector3 cur = camT.position;
-                camT.position = new Vector3(_boundsCenterXZ.x, cur.y, _boundsCenterXZ.y);
-            }
-            else
-            {
-                Map map = Map.Instance;
-                if (map != null && map.OverLayerParent != null)
-                {
-                    Vector3 center = map.OverLayerParent.position;
-                    Vector3 cur = camT.position;
-                    camT.position = new Vector3(center.x, cur.y, center.z);
-                }
-            }
-
-            _cachedCamera.orthographicSize = ComputeOrthoSize(orthoSizeConfig);
-        }
-
-        private float ComputeOrthoSize(float fallback)
-        {
-            if (_cachedCamera == null) return fallback;
-            float aspect = Mathf.Max(0.01f, _cachedCamera.aspect);
-
-            if (_boundsResolved)
-            {
-                float required = Mathf.Max(_boundsHalfH, _boundsHalfW / aspect);
-                return required * 1.05f;
-            }
-
-            try
-            {
-                LevelGenerator lg = LevelGenerator.Instance;
-                Map m = Map.Instance;
-                if (lg == null || m == null) return fallback;
-                if (lg.LevelWidth <= 0 || lg.LevelHeight <= 0) return fallback;
-
-                float moduleWidth = LevelGenerator.ModuleWidth * LevelGenerator.TileSize;
-                float worldW = (float)lg.LevelWidth * moduleWidth;
-                float worldH = (float)lg.LevelHeight * moduleWidth;
-                float scale = m.Scale;
-                float miniW = worldW * scale;
-                float miniH = worldH * scale;
-                float required = Mathf.Max(miniH * 0.5f, miniW / (2f * aspect));
-                return required * 1.05f;
-            }
-            catch
-            {
-                return fallback;
-            }
-        }
-
-        private void TryResolveMiniatureBounds()
-        {
-            if (_boundsResolved) return;
-            try
-            {
-                Map map = Map.Instance;
-                if (map == null || map.OverLayerParent == null) return;
-
-                bool has = false;
-                float minX = 0f, maxX = 0f, minZ = 0f, maxZ = 0f;
-                int overCount = AccumulateBoundsXZ(map.OverLayerParent,
-                    ref has, ref minX, ref maxX, ref minZ, ref maxZ);
-                int layerCount = 0;
-                if (map.Layers != null)
-                {
-                    for (int i = 0; i < map.Layers.Count; i++)
-                    {
-                        MapLayer layer = map.Layers[i];
-                        if (layer == null) continue;
-                        layerCount += AccumulateBoundsXZ(layer.transform,
-                            ref has, ref minX, ref maxX, ref minZ, ref maxZ);
-                    }
-                }
-                if (!has) return;
-
-                _boundsCenterXZ = new Vector2((minX + maxX) * 0.5f, (minZ + maxZ) * 0.5f);
-                _boundsHalfW = (maxX - minX) * 0.5f;
-                _boundsHalfH = (maxZ - minZ) * 0.5f;
-                _boundsResolved = true;
-                WLog.Line("mapoverlay_bounds_resolved", secret: false,
-                    ("cx", _boundsCenterXZ.x), ("cz", _boundsCenterXZ.y),
-                    ("hw", _boundsHalfW), ("hh", _boundsHalfH),
-                    ("rcOver", overCount), ("rcLayers", layerCount));
-            }
-            catch (Exception e)
-            {
-                WLog.Line("mapoverlay_bounds_error", secret: false, ("err", e.Message));
-            }
-        }
-
-        private static int AccumulateBoundsXZ(Transform root, ref bool has,
-            ref float minX, ref float maxX, ref float minZ, ref float maxZ)
-        {
-            if (root == null) return 0;
-            Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
-            if (renderers == null) return 0;
-            int counted = 0;
-            for (int i = 0; i < renderers.Length; i++)
-            {
-                Renderer r = renderers[i];
-                if (r == null || !r.enabled || !r.gameObject.activeInHierarchy) continue;
-                Bounds b = r.bounds;
-                Vector3 lo = b.min;
-                Vector3 hi = b.max;
-                if (!has)
-                {
-                    minX = lo.x; maxX = hi.x;
-                    minZ = lo.z; maxZ = hi.z;
-                    has = true;
-                }
-                else
-                {
-                    if (lo.x < minX) minX = lo.x;
-                    if (hi.x > maxX) maxX = hi.x;
-                    if (lo.z < minZ) minZ = lo.z;
-                    if (hi.z > maxZ) maxZ = hi.z;
-                }
-                counted++;
-            }
-            return counted;
-        }
-
         private void UpdateGrid(bool show)
         {
             if (_gridRoot == null) return;
-            if (!show || !_boundsResolved)
+            if (!show || !_rt.BoundsResolved)
             {
                 _gridRoot.gameObject.SetActive(false);
                 return;
@@ -516,23 +240,24 @@ namespace Werewolf.UI
             {
                 LevelGenerator lg = LevelGenerator.Instance;
                 Map map = Map.Instance;
-                if (lg == null || map == null || map.OverLayerParent == null || _cachedCamera == null) return null;
+                Camera cam = _rt.Camera;
+                if (lg == null || map == null || map.OverLayerParent == null || cam == null) return null;
                 Vector3 origin = map.OverLayerParent.position;
-                Vector3 cam = _cachedCamera.transform.position;
+                Vector3 camPos = cam.transform.position;
 
                 EnsureGridModuleRange(lg);
                 MapGridCellRange? range = _gridModuleRange ?? MapGridMath.RangeFromBounds(
                     lg.LevelWidth, lg.LevelHeight,
                     map.Scale, origin.x, origin.z,
-                    _boundsCenterXZ.x - _boundsHalfW, _boundsCenterXZ.x + _boundsHalfW,
-                    _boundsCenterXZ.y - _boundsHalfH, _boundsCenterXZ.y + _boundsHalfH);
+                    _rt.BoundsCenterXZ.x - _rt.BoundsHalfW, _rt.BoundsCenterXZ.x + _rt.BoundsHalfW,
+                    _rt.BoundsCenterXZ.y - _rt.BoundsHalfH, _rt.BoundsCenterXZ.y + _rt.BoundsHalfH);
                 if (range == null) return null;
 
                 return MapGridMath.Compute(
                     lg.LevelWidth, range.Value,
                     map.Scale, origin.x, origin.z,
-                    cam.x, cam.z,
-                    _cachedCamera.orthographicSize, Mathf.Max(0.01f, _cachedCamera.aspect),
+                    camPos.x, camPos.z,
+                    cam.orthographicSize, Mathf.Max(0.01f, cam.aspect),
                     PanelWidth, PanelHeight);
             }
             catch (Exception e)
@@ -650,48 +375,6 @@ namespace Werewolf.UI
         {
             if (!_open || _mapPanelRect == null) return false;
             return RectTransformUtility.RectangleContainsScreenPoint(_mapPanelRect, screenPoint, null);
-        }
-
-        private void EnsureCameraResolved()
-        {
-            if (_cachedCamera != null) return;
-            try
-            {
-                Camera[] cameras = UnityEngine.Object.FindObjectsOfType<Camera>(true);
-                for (int i = 0; i < cameras.Length; i++)
-                {
-                    if (cameras[i] != null && cameras[i].name == DirtFinderCameraName)
-                    {
-                        _cachedCamera = cameras[i];
-                        break;
-                    }
-                }
-                if (_cachedCamera == null)
-                {
-                    WLog.Line("mapoverlay_camera_missing", secret: false);
-                }
-            }
-            catch (Exception e)
-            {
-                WLog.Line("mapoverlay_camera_error", secret: false, ("err", e.Message));
-                _cachedCamera = null;
-            }
-        }
-
-        private void RefreshMapTexture()
-        {
-            if (_mapImage == null) return;
-
-            Texture tex = null;
-            if (_cachedCamera != null)
-            {
-                tex = _cachedCamera.activeTexture;
-            }
-            if (tex == null)
-            {
-                tex = ResolvePlaceholder();
-            }
-            _mapImage.texture = tex;
         }
 
         private Texture ResolvePlaceholder()

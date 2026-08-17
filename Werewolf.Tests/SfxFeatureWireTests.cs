@@ -104,6 +104,23 @@ namespace Werewolf.Tests
                 ins => ins.OpCode.FlowControl == FlowControl.Cond_Branch);
         }
 
+        [Fact]
+        public void TickMeetingClient_OpensDiscussionOnlyAfterTaxmanPost()
+        {
+            using var module = ModuleDefinition.ReadModule(Meta("Werewolf.ModDllPath"));
+            MethodDefinition method = DirectorMethod(module, "TickMeetingClient");
+            var instructions = method.Body.Instructions;
+
+            int taxmanPost = IndexOfCall(instructions,
+                "Werewolf.Game.WerewolfDirector", "PostMeetingChatSystemLines");
+            int openDiscussion = IndexOfCall(instructions,
+                "Werewolf.Core.MeetingClientState", "MarkDiscussionOpen");
+
+            Assert.True(taxmanPost >= 0, "会議冒頭のTaxman投稿配線が消えている");
+            Assert.True(openDiscussion > taxmanPost,
+                "議論受付がTaxman投稿より前、または明示的に開かれていない");
+        }
+
         [Theory]
         [InlineData("RecordMeetingChatClient")]
         [InlineData("DebugInjectChatCore")]

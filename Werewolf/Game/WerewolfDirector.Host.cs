@@ -796,7 +796,7 @@ namespace Werewolf.Game
                         if (SemiFunc.IsMasterClientOrSingleplayer())
                         {
                             int autoReturnSec = Plugin.GameConfig != null
-                                ? Plugin.GameConfig.GameOverAutoReturnSec : 60;
+                                ? Plugin.GameConfig.GameOverAutoReturnSec : 120;
                             _resultSequence.Begin(NowUnixMs(), autoReturnSec);
                         }
                         break;
@@ -809,7 +809,7 @@ namespace Werewolf.Game
                         if (SemiFunc.IsMasterClientOrSingleplayer())
                         {
                             int voidAutoReturnSec = Plugin.GameConfig != null
-                                ? Plugin.GameConfig.GameOverAutoReturnSec : 60;
+                                ? Plugin.GameConfig.GameOverAutoReturnSec : 120;
                             _resultSequence.Begin(NowUnixMs(), voidAutoReturnSec);
                         }
                         break;

@@ -60,6 +60,7 @@ namespace Werewolf.Game
                         int deadActor = (int)p[0];
                         var deadCause = (DeathCause)(byte)p[1];
                         _deathMirror[deadActor] = deadCause;
+                        ReplaySampler.NoteDeath(deadActor, deadCause.ToString());
                         _meetingClient.ApplyPlayerDied(deadActor, deadCause);
                         if (deadActor == LocalActor)
                         {
@@ -75,9 +76,17 @@ namespace Werewolf.Game
                     case MessageCodes.ResultDigest:
                         ApplyResultDigest(p);
                         break;
+                    case MessageCodes.ReplayLossLedger:
+                        ReplaySampler.ApplyHostLedger(p);
+                        break;
                     case MessageCodes.GameOver:
                         _clientPhase = GamePhase.GameOver;
-                        _meetingClient.ApplyPhase(GamePhase.GameOver);
+                        ReplaySampler.NoteGameOver((byte)p[0], (int[])p[1], (byte[])p[2]);
+                        {
+                            var announcedAtGameOver = new List<int>();
+                            _meetingClient.ApplyPhase(GamePhase.GameOver, announcedAtGameOver);
+                            ReplaySampler.NoteDeathsAnnounced(announcedAtGameOver);
+                        }
                         _meeting?.AbortForGameOver();
                         ResetRolesClient("gameover");
                         WLog.Line("recv_gameover", secret: false, ("team", (Team)(byte)p[0]));
@@ -114,8 +123,11 @@ namespace Werewolf.Game
                                 _lastMeetingEndUnixMsClient = NowUnixMs();
                             }
                             _clientPhase = newPhase;
+                            ReplaySampler.NotePhase(newPhase.ToString());
                             _clientRoundEndUnixMs = (long)p[2];
-                            _meetingClient.ApplyPhase(_clientPhase);
+                            var announcedAtPhase = new List<int>();
+                            _meetingClient.ApplyPhase(_clientPhase, announcedAtPhase);
+                            ReplaySampler.NoteDeathsAnnounced(announcedAtPhase);
                             if (_clientPhase == GamePhase.GameOver || _clientPhase == GamePhase.Lobby)
                             {
                                 ResetRolesClient("phase");
@@ -133,6 +145,7 @@ namespace Werewolf.Game
                                 : kindByte == 2 ? ConveneKind.ScatterGuard
                                 : ConveneKind.Button;
                             HandleStartMeeting((int)p[0], (long)p[1], (long)p[2], startKind);
+                            ReplaySampler.NoteMeetingStart((int)p[0], startKind.ToString());
                             string startCaller = ResolveDisplayName((int)p[0]);
                             PushToast(startKind == ConveneKind.CorpseReport
                                 ? SessionNotice.ForCorpseReportStarted(startCaller)
@@ -143,6 +156,7 @@ namespace Werewolf.Game
                         break;
                     case MessageCodes.MeetingCancelled:
                         _meetingClient.ApplyCancelled();
+                        ReplaySampler.NoteMeetingCancelled((byte)p[0]);
                         PushToast(SessionNotice.ForMeetingCancelled());
                         WLog.Line("recv_meeting_cancelled", secret: false, ("reason", (byte)p[0]));
                         break;
@@ -175,6 +189,7 @@ namespace Werewolf.Game
                             VoteCounts = (int[])p[2],
                         });
                         WLog.Line("recv_meetingresult", secret: false, ("executed", executedActor));
+                        ReplaySampler.NoteMeetingResult(executedActor);
                         PushToast(executedActor == -1
                             ? SessionNotice.ForNoExecution()
                             : SessionNotice.ForExecuted(ResolveDisplayName(executedActor)));

@@ -9,7 +9,9 @@ namespace Werewolf.UI
 {
     public sealed class ResultScreen : IClientPanel
     {
-        public string LayerName => "Result";
+        public const string Layer = "Result";
+
+        public string LayerName => Layer;
 
         private const float ContentWidth = 1100f;
         private const float PanelWidth = 900f;
@@ -17,7 +19,11 @@ namespace Werewolf.UI
         private const float BannerY = 430f;
         private const float ViewportHeight = 760f;
         private const float ViewportCenterY = -20f;
-        private const float FooterY = -470f;
+        private const float FooterY = -518f;
+        private const float ReturnButtonY = -468f;
+        private const float ReturnButtonWidth = 300f;
+        private const float ReturnButtonHeight = 48f;
+        private const float ReturnButtonFontSize = 24f;
         private const float RowHeight = 56f;
         private const float RowSpacing = 4f;
         private const float RowInnerMargin = 24f;
@@ -46,11 +52,19 @@ namespace Werewolf.UI
 
         private static readonly Color VoidMatchColor = new Color(0.72f, 0.72f, 0.72f, 1f);
 
+        private static readonly ButtonPalette ReturnButtonPalette = new ButtonPalette(
+            new Color(0.26f, 0.26f, 0.3f, 0.9f), new Color(0.42f, 0.42f, 0.48f, 1f),
+            new Color(0.15f, 0.15f, 0.17f, 0.6f), new Color(0.55f, 0.55f, 0.55f));
+
         private GameObject _root;
         private TextMeshProUGUI _bannerText;
         private Image _bannerImage;
         private RectTransform _content;
         private TextMeshProUGUI _footerText;
+        private Image _returnButtonBg;
+        private TextMeshProUGUI _returnButtonLabel;
+        private CanvasGroup _returnButtonGroup;
+        private string _returnButtonLabelText;
         private readonly List<Slot> _slots = new List<Slot>();
         private readonly List<GameObject> _digestObjects = new List<GameObject>();
         private float _contentHeight;
@@ -112,8 +126,22 @@ namespace Werewolf.UI
             _content.pivot = new Vector2(0.5f, 1f);
             _content.anchoredPosition = Vector2.zero;
 
+            _returnButtonBg = UiKit.CreateImage(rect, "ReturnButton",
+                new Vector2(0f, ReturnButtonY), new Vector2(ReturnButtonWidth, ReturnButtonHeight),
+                ReturnButtonPalette.EnabledBg);
+            _returnButtonBg.raycastTarget = false;
+            _returnButtonGroup = _returnButtonBg.gameObject.AddComponent<CanvasGroup>();
+            _returnButtonGroup.alpha = 0f;
+            _returnButtonLabel = UiKit.CreateText(_returnButtonBg.rectTransform, "Label",
+                Vector2.zero, new Vector2(ReturnButtonWidth, ReturnButtonHeight),
+                Texts.Get(TextId.ResultReturnButtonLabel), ReturnButtonFontSize,
+                Color.white, TextAlignmentOptions.Center);
+            _returnButtonLabel.enableWordWrapping = false;
+            _returnButtonBg.gameObject.SetActive(false);
+            _returnButtonLabelText = null;
+
             _footerText = UiKit.CreateText(rect, "Footer",
-                new Vector2(0f, FooterY), new Vector2(ContentWidth, 48f),
+                new Vector2(0f, FooterY), new Vector2(ContentWidth, 40f),
                 string.Empty, FooterFontSize,
                 new Color(1f, 0.95f, 0.6f, 1f), TextAlignmentOptions.Center);
 
@@ -197,9 +225,9 @@ namespace Werewolf.UI
                 ("team", winningTeam), ("rows", count), ("digest", digestCount));
         }
 
-        public void Tick()
+        public void Tick(bool wheelBlocked = false)
         {
-            if (!Visible || _content == null) return;
+            if (!Visible || _content == null || wheelBlocked) return;
             float wheel = Input.mouseScrollDelta.y;
             if (wheel == 0f) return;
 
@@ -212,6 +240,38 @@ namespace Werewolf.UI
         {
             if (_footerText != null) _footerText.text = footerText ?? string.Empty;
         }
+
+        public void SetReturnButton(bool visible, float alpha, bool armed, bool hover, string keyName)
+        {
+            if (_returnButtonBg == null) return;
+            if (_returnButtonBg.gameObject.activeSelf != visible)
+            {
+                _returnButtonBg.gameObject.SetActive(visible);
+            }
+            if (!visible) return;
+
+            _returnButtonGroup.alpha = alpha;
+            string labelText = armed
+                ? Texts.Get(TextId.VoteConfirmLabel)
+                : string.IsNullOrEmpty(keyName)
+                    ? Texts.Get(TextId.ResultReturnButtonLabel)
+                    : Texts.Format(TextId.ResultReturnButtonWithKeyFormat, keyName);
+            if (_returnButtonLabelText != labelText)
+            {
+                _returnButtonLabelText = labelText;
+                _returnButtonLabel.text = labelText;
+            }
+            ButtonVisual.Resolve(ReturnButtonPalette,
+                armed: armed, hover: hover, selected: false, enabled: true,
+                out Color bg, out Color label);
+            _returnButtonBg.color = bg;
+            _returnButtonLabel.color = label;
+        }
+
+        public bool IsPointerOverReturnButton(Vector2 screenPoint)
+            => _returnButtonBg != null && _returnButtonBg.gameObject.activeSelf
+               && RectTransformUtility.RectangleContainsScreenPoint(
+                   _returnButtonBg.rectTransform, screenPoint, null);
 
         public void Hide()
         {
@@ -231,6 +291,10 @@ namespace Werewolf.UI
             _bannerImage = null;
             _content = null;
             _footerText = null;
+            _returnButtonBg = null;
+            _returnButtonLabel = null;
+            _returnButtonGroup = null;
+            _returnButtonLabelText = null;
         }
 
         private void EnsureSlots(int count)
@@ -291,18 +355,7 @@ namespace Werewolf.UI
             }
         }
 
-        private static string RoleLabel(Role role)
-        {
-            switch (role)
-            {
-                case Role.Werewolf: return Texts.Get(TextId.RoleNameWerewolf);
-                case Role.BlackCat: return Texts.Get(TextId.RoleNameBlackCat);
-                case Role.Villager: return Texts.Get(TextId.RoleNameVillager);
-                case Role.Bomber: return Texts.Get(TextId.RoleNameBomber);
-                case Role.Shaman: return Texts.Get(TextId.RoleNameShaman);
-                default: return role.ToString();
-            }
-        }
+        private static string RoleLabel(Role role) => RoleText.Label(role);
 
         private static Color RoleColor(Role role, bool alive)
         {

@@ -1,8 +1,86 @@
+# REPO Werewolf / REPO人狼
+
+## English
+
+REPO Werewolf turns a normal R.E.P.O. run into a social deduction game. It takes some ideas from Among Us, but valuables and the extraction quota still decide the match.
+
+Each player gets a hidden role on either the villager team or the werewolf team. Villagers still have to finish the extractions and leave in the truck. Werewolves have to stop them without giving themselves away. Bodies can be reported, the truck has an emergency meeting button, and suspected werewolves can be voted out. PvP is enabled too, and melee weapons can kill other players.
+
+- Requires at least 3 players
+- Every player in the lobby needs the mod
+- English is the default language; Japanese is also included
+
+> The screenshots and gameplay preview currently show the Japanese UI. The same screens are available in English.
+
+![Meeting, voting, execution, and match results](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/match-flow-en.gif)
+
+### What's included
+
+- Five roles: Villager, Shaman, Werewolf, Black Cat, and Bomber
+- Win conditions tied directly to valuable damage and deliveries
+- Body reports, emergency meetings, discussion, voting, and executions handled inside the game
+- After some meetings, survivors are shuffled and sent back out in random groups
+- Participant numbers for public lobbies, so "No. 3 looks suspicious" is enough to identify someone
+- A valuable loss gauge and a meeting map with a coordinate grid
+- Settings for the stage, level, starting items, player upgrades, the truck's starting charge, and other match rules
+- A lobby check for room settings and differences between players' mod lists
+- A 28-page manual explaining all of the rules and roles, available at any time
+- Meeting chat, result screen chat, and a replay that can be saved and watched in a browser
+
+### Meetings and voting
+
+Report a body or use the red button in the truck to call a meeting. The meeting screen shows deaths and changes to valuables since the last meeting. Players can open the full map, compare what they know, and vote without leaving the game.
+
+![Full map with coordinate grid](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/meeting-map-grid.png)
+
+### Room settings and mod checks
+
+![Room settings and mod lineup check](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/lobby-settings-and-mods-en.png)
+
+Guests can see the host's room settings in the lobby. The mod also compares each player's mod list with the host's and flags missing mods, extra mods, version mismatches, or different file contents before the match starts.
+
+### Roles
+
+![Role lineup](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/roles.png)
+
+- **Villager:** Plays much like regular R.E.P.O. Collect valuables, finish extractions, and watch for anything that gives a werewolf away
+- **Shaman:** Can stand still to sense unreported bodies and their direction, but is an easy target while doing it
+- **Werewolf:** Gains perks such as infinite stamina and extra jumps when valuables are damaged. The beacon ability calls enemies to a chosen location
+- **Black Cat:** Is on the werewolf team, although the Black Cat and the werewolves do not initially know one another. Depending on the room settings, an executed Black Cat can take one of their voters with them
+- **Bomber:** Stays near another player long enough to plant a bomb on them, then detonates it remotely
+
+### Playing over text chat
+
+![Meeting chat log](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/meeting-chat-log.png)
+
+Voice chat is optional. Messages sent during a meeting stay in the meeting log, and new messages play a sound and mark the log as unread. There is another chat on the result screen, where messages from dead players are visible to everyone.
+
+### Match replay
+
+![Top-down match replay](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/match-replay.gif)
+
+The `Replay` button on the result screen opens a top-down view of the match over the game map. It shows players, enemies, items (including valuables and carts), and bodies moving over time. You can also review damage to valuables, valuables that were lost or delivered, extraction point states, and the running loss total.
+
+The viewer has play, pause, speed, and seek controls. Select a marker to follow its trail. During meetings, the replay shows the text chat and vote result. Playback slows down when someone posts a message and speeds through parts of the meeting with no chat.
+
+The save button writes the replay file to your Downloads folder. To watch it later, open the included `replay-viewer.html` in a browser and load the file there. The viewer supports English and Japanese, runs locally, and does not upload replay files.
+
+### Before installing
+
+- Every player in the lobby must use the same version of the mod
+- Vanilla rooms support up to 6 players. Larger groups need a compatible [MorePlayers mod](https://thunderstore.io/c/repo/p/linkoid/RoboUnion/)
+- If possible, make a separate mod manager profile and share it with your group. That keeps everyone's mods and settings in sync
+- Werewolf Mode is a one-level match. Starting it from an existing save replaces that save with the match state, so use a dedicated save slot
+
+English is selected automatically on a fresh install. Press `F1` to open the manual with the default keybind.
+
+The [full English guide on GitHub](https://github.com/minorunara/repo-werewolf/blob/main/README.md) has the complete rules, suggested room settings, default controls, streamer-safe mode, credits, and license information.
+
+---
+
 # REPO人狼
 
-![試合結果画面](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/game-result.png)
-
-> **For English players:** This mod adds an Among Us-style werewolf (social deduction) mode to R.E.P.O. The in-game UI — including the 28-page in-game manual — is fully available in English, and English is the default language. Due to Thunderstore's 32,768-character README limit, this page is Japanese-only. An English README is available on GitHub: [README.md](https://github.com/minorunara/repo-werewolf/blob/main/README.md)
+![会議・投票・処刑・試合結果](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/match-flow-ja.gif)
 
 R.E.P.O.にAmong Us風の人狼モードを追加するMODです。
 
@@ -26,10 +104,9 @@ R.E.P.O.にAmong Us風の人狼モードを追加するMODです。
 - ステージ、レベル、初期アイテム、プレイヤーのアップグレード、トラックの初期充電器容量などを調整できるルーム設定
 - ホストのルーム設定を参加者も確認でき、ロビーでは全員のMOD構成も簡単にチェック可能
 - ルールや各役職の能力をいつでも確認できる、全28ページのゲーム内説明書
+- プレイヤー・敵・アイテムの動きや会議での発言・開票結果を全体マップ上で見返せる試合リプレイ
 
 ## 会議・投票
-
-![会議・投票画面](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/meeting-voting.png)
 
 死体の通報やトラックの緊急ボタンから会議を開けます。  
 前回の会議以降の死者や貴重品の損失・納品状況が共有され、座標グリッド付きの全体マップを確認しながら議論・投票できます。
@@ -82,9 +159,27 @@ REPO人狼は、ボイスチャットを使用せずにテキストチャット�
 
 ゲーム本体でチャットに割り当てたキー（初期設定では`T`）で通常のチャットを開いて発言できます。  
 会議中の発言は「会議チャットログ」に記録され、アイコンクリックか、会議チャットログに割り当てたキーで表示・非表示を切り替えられます。  
-新しい発言が届くと着信音が鳴るため、全体マップを見ている間も見落としにくくなっています。
+新しい発言が届くと着信音が鳴るため、全体マップを見ている間も見落としにくくなっています。  
+ログを閉じている間に他のプレイヤーの発言が届くと、アイコンの右上に未読を示す赤丸が表示されます（ログを開くと消えます）。  
+
+試合結果画面には同じ操作の「感想戦チャット」が表示され、試合終了後の感想戦にテキストで参加できます。  
+ここでは死亡していたプレイヤーの発言も全員に見えます。  
 
 日本語を入力する場合は、[JapaneseTextInput](https://thunderstore.io/c/repo/p/sukunabikona/JapaneseTextInput/)を導入してください。
+
+## 試合リプレイ
+
+![試合リプレイ](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/match-replay.gif)
+
+試合結果画面の左下の「リプレイ再生」ボタンからは、終わった試合の全体マップリプレイをその場で見返せます。  
+ゲーム内マップを背景に、プレイヤー・敵・貴重品・カートを含むアイテム・死体（頭部）の動きを俯瞰で再生できます。貴重品の減額・喪失・納品、抽出ポイントの状態、損失額の推移も時系列で確認できます。  
+再生・一時停止・速度変更・シークに対応し、マーカーを選ぶとその対象の移動軌跡を追跡できます。  
+会議中のテキストチャットは発言者のマーカー色のコメントとして表示され、開票時には処刑された参加者、または「処刑なし」の結果がマップ中央に表示されます。  
+テキストチャットがある場面では再生速度が下がり、発言のない会議区間は自動で早送りします。  
+保存ボタンでリプレイファイルをダウンロードフォルダへ書き出して、外部ビューワーで後から見返すこともできます。  
+
+外部ビューワーはMODと同じフォルダに`replay-viewer.html`として同梱しています。  
+ブラウザで開いて保存したファイルをドラッグ＆ドロップするだけで再生でき、表示は日本語と英語を切り替えられます。ローカルで動作し、リプレイファイルが外部へ送信されることはありません。  
 
 ## インストール
 
@@ -105,7 +200,7 @@ REPO人狼は、ボイスチャットを使用せずにテキストチャット�
 | 7～8人 | 100% | 2 | 0% | 50% | 5~6 + 2 |
 | 9～10人 | 100% | 2 | 100%（道連れ有り） | 50% | 6~7 + 3 |
 
-バニラではルーム上限が6人までなので、それ以上の人数で遊ぶ場合は別途MorePlayer系のMODが必要です。  
+バニラではルーム上限が6人までなので、それ以上の人数で遊ぶ場合は別途[MorePlayers](https://thunderstore.io/c/repo/p/linkoid/RoboUnion/)系のMODが必要です。  
 爆弾魔は指定された確率で人狼の1人が変化して出現します（素の人狼が最低1人は残るので、人狼が1人では出現しません）。  
 黒猫は指定された確率で村人から変異して人狼陣営に加わります（「人狼の人数」には含まれません。村人が最低1人残る人数構成でのみ出現します）。  
 祈祷師は指定された確率で村人の1人が変化して出現します（祈祷師が黒猫を兼ねることはありません）。  
@@ -169,14 +264,15 @@ REPO人狼を遊ぶには最低3人のプレイヤーが必要です。
 マップからは区別できません。  
 注意深い村人は、会議のたびに「あの貴重品はどこへ行ったのか」を棚卸しして推理します。
 
-### 貴重品を記録しない（人狼陣営）
+### 貴重品の記録切り替え（人狼陣営）
 
-貴重品マーカーがマップに登録されるのは「誰かがその貴重品を視界に捉えた」瞬間です。  
-人狼陣営（人狼・爆弾魔・自覚した黒猫）は、この記録を既定で行いません。  
-そのため、まだ誰にも見つかっていない貴重品を人狼陣営が先回りして壊した場合、マップには最初から何も残りません。  
-逆に、村人が先に見つけて記録済みの貴重品を壊せば、マーカーだけが残り「あったはずの物が無い」と気づかれます。  
-記録するかどうかは、通報キーの長押しでいつでも切り替えられます（右下のアイコンが現在の状態です）。  
-村人に紛れて探索するときなど、必要に応じて記録をONにしましょう。
+貴重品マーカーがマップに登録されるのは「誰かがその貴重品を視界に捉えた」瞬間です。<br>
+人狼陣営（人狼・爆弾魔・自覚した黒猫）も、初期状態では通常どおり記録します。<br>
+通報キーを長押しして記録をOFFにしている間だけ、見つけた貴重品をマップへ登録しません。<br>
+その状態で、まだ誰にも見つかっていない貴重品を先回りして壊した場合、マップには最初から何も残りません。<br>
+逆に、村人が先に見つけて記録済みの貴重品を壊せば、マーカーだけが残り「あったはずの物が無い」と気づかれます。<br>
+記録するかどうかは、通報キーの長押しでいつでも切り替えられます（右下のアイコンが現在の状態です）。<br>
+ステルス破壊を狙うときだけ記録をOFFにし、探索へ戻る前に必要に応じてONへ戻しましょう。状態はラウンドごとにONへ戻ります。
 
 ### PvP
 
@@ -406,8 +502,9 @@ MODが追加する操作キーは、Mod Managerの設定ファイル編集機能
 | G | 人狼: ビーコン | `BeaconKey` |
 | G | 爆弾魔: 起爆 | `BomberDetonateKey` |
 | R | 死体の通報（頭部に近づいた状態で） | `CorpseReportKey` |
+| R | リプレイ再生の表示・非表示（結果画面） | `ReplayViewerKey` |
 | M | 全体マップ（会議中） | `MeetingMapKey` |
-| L | 会議チャットログ（会議中） | `MeetingChatLogKey` |
+| L | 会議チャットログ（会議中）・感想戦チャット（結果画面） | `MeetingChatLogKey` |
 | F1 | ゲーム内説明書 | `ManualKey` |
 | F5 | 試合結果からロビーへ戻る（ホストのみ） | `ResultReturnKey` |
 | F5 | 長押しで無効試合にする（ホストのみ） | `VoidMatchKey` |
