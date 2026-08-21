@@ -57,6 +57,10 @@ namespace Werewolf.Tests
 
             h.Game.RecordDeath(5, Now + 12_500);
 
+            Assert.Null(h.Game.Winner);
+            Assert.True(h.Game.WinLocked);
+            h.Game.ConfirmPendingWin(Now + 12_500 + EradicationCeremony.CeremonyMs);
+
             Assert.NotNull(h.Game.Winner);
             Assert.Equal(Team.Werewolves, h.Game.Winner.WinningTeam);
             Assert.Equal(WinReason.VillagersEradicated, h.Game.Winner.Reason);
@@ -83,6 +87,10 @@ namespace Werewolf.Tests
             var h = CreateFixedRoles();
 
             h.Game.RecordDeath(1, Now + 11_000);
+            Assert.True(h.Game.WinLocked);
+            h.Game.NotifyExtractionOutcome(completed: true, failed: false, nowUnixMs: Now + 11_500);
+            Assert.Null(h.Game.Winner);
+            h.Game.ConfirmPendingWin(Now + 11_000 + EradicationCeremony.CeremonyMs);
 
             Assert.NotNull(h.Game.Winner);
             Assert.Equal(Team.Villagers, h.Game.Winner.WinningTeam);

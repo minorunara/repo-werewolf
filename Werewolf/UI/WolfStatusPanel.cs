@@ -121,7 +121,7 @@ namespace Werewolf.UI
             var glowRootGo = new GameObject("MainGlow", typeof(RectTransform));
             _glowRoot = (RectTransform)glowRootGo.transform;
             _glowRoot.SetParent(rect, false);
-            SetAnchorsBottomLeft(_glowRoot, _glowCenter, Vector2.zero);
+            UiKit.SetAnchorsBottomLeft(_glowRoot, _glowCenter, Vector2.zero);
 
             _glowBall = UiKit.CreateImage(_glowRoot, "GlowBall", Vector2.zero,
                 new Vector2(GlowSizePx, GlowSizePx), GlowColor);
@@ -438,7 +438,7 @@ namespace Werewolf.UI
 
             slot.Root = UiKit.CreateRect(parent, name + "Slot", Vector2.zero,
                 new Vector2(slotSize, slotSize));
-            SetAnchorsBottomLeft(slot.Root, centerPos, new Vector2(slotSize, slotSize));
+            UiKit.SetAnchorsBottomLeft(slot.Root, centerPos, new Vector2(slotSize, slotSize));
 
             slot.Icon = UiKit.CreateImage(slot.Root, name + "Icon", Vector2.zero,
                 new Vector2(iconSize, iconSize), LockedIconTint);
@@ -499,17 +499,10 @@ namespace Werewolf.UI
             TextMeshProUGUI label = UiKit.CreateText(parent, name,
                 new Vector2(centerX, LabelHeight / 2f), new Vector2(220f, LabelHeight),
                 string.Empty, LabelFontSize, ReadyLabelColor, TextAlignmentOptions.Center);
-            SetAnchorsBottomLeft(label.rectTransform, new Vector2(centerX, LabelHeight / 2f),
+            UiKit.SetAnchorsBottomLeft(label.rectTransform, new Vector2(centerX, LabelHeight / 2f),
                 new Vector2(220f, LabelHeight));
             return label;
         }
 
-        private static void SetAnchorsBottomLeft(RectTransform rect, Vector2 centerPos, Vector2 size)
-        {
-            rect.anchorMin = rect.anchorMax = new Vector2(0f, 0f);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = centerPos;
-            rect.sizeDelta = size;
-        }
     }
 }

@@ -214,7 +214,7 @@ During a meeting, enemies disappear and no new ones spawn, so you are safe.
 Deaths since the previous meeting are announced first, followed by changes to the valuable loss gauge.
 Voting begins afterward. During the meeting, you can open the full map to review the updated information on valuables.
 The match time limit is paused during a meeting, so discussion does not eat into your remaining time.
-Enemy respawn timers continue to count down, however, so an overly long meeting brings the enemies back sooner.
+Enemy respawn timers continue to count down, however, so an overly long meeting brings the enemies back sooner (the room settings control how fast).
 Any enemy whose respawn timer has expired by the end of the meeting spawns immediately.
 
 ### Voting and Execution
@@ -408,6 +408,7 @@ Gameplay and the timing of every effect stay the same. This is a local setting f
 - [Sound Effect Lab（効果音ラボ）](https://soundeffect-lab.info/) ([Terms](https://soundeffect-lab.info/agreement/))
 - [Irasutoya（いらすとや）](https://www.irasutoya.com/) ([Terms](https://www.irasutoya.com/p/terms.html))
 - [Vita-chi Sozaikan（びたちー素材館）](http://www.vita-chi.net/sozai1.htm)
+- [Noto Emoji](https://github.com/googlefonts/noto-emoji) (Copyright 2013 Google LLC / [SIL Open Font License 1.1](https://scripts.sil.org/OFL); full text is bundled as `LICENSE-NotoEmoji.txt`)
 - [African Mist Voice | No Copyright Music | Royalty Free Loops |](https://www.youtube.com/watch?v=UvmdiB_7YX0)
 
 ## License

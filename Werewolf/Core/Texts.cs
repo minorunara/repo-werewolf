@@ -14,8 +14,6 @@ namespace Werewolf.Core
     public enum TextId
     {
         NoticeConveneStartedFormat,
-        NoticeBeaconAuditFormat,
-        NoticeBeaconAuditNone,
         NoticeNoExecution,
         NoticeExecutedFormat,
         NoticeBlackCatRevealedFormat,
@@ -105,6 +103,12 @@ namespace Werewolf.Core
         HudTestPlayBanner,
         HudScatterGuardBanner,
 
+        BannerMeetTheDeadline,
+        BannerHurryUp,
+
+        ImpactDiscussLeft,
+        ImpactDiscussRight,
+
         HudSelfIdFormat,
         IdNameFormat,
 
@@ -172,6 +176,8 @@ namespace Werewolf.Core
         ChatLogSystemName,
         ChatLogScatterTitle,
         ChatLogScatterLineFormat,
+        ChatLogMeetingNumberFormat,
+        ChatLogFilteringTitle,
 
         ResultChatTitle,
         ResultChatToggleLabelFormat,
@@ -217,6 +223,11 @@ namespace Werewolf.Core
 
         CheckmateTitle,
 
+        EradicationLastWerewolfDied,
+        EradicationLastVillagerDied,
+        EradicationLastWerewolfVanished,
+        EradicationLastVillagerVanished,
+
         MapOverlayToggleLabelFormat,
 
         LobbySettingsFooterHintFormat,
@@ -258,6 +269,7 @@ namespace Werewolf.Core
         LobbyStartTooFewPlayersBodyFormat,
         LobbyStartTeamOverflowTitle,
         LobbyStartTeamOverflowBodyFormat,
+        LobbyStartBlockedRemedy,
 
         ConveneCountdownDefaultCallerName,
         ConveneCountdownHeaderFormat,
@@ -325,6 +337,7 @@ namespace Werewolf.Core
         SettingsLabelVoteTimeCutEnabled,
         SettingsLabelMeetingScatterEnabled,
         SettingsLabelScatterGuardSec,
+        SettingsLabelMeetingEnemyRespawnScalePct,
         SettingsLabelResultDisplaySec,
         SettingsLabelStaminaUnlockPct,
         SettingsLabelJumpUnlockPct,
@@ -600,8 +613,6 @@ namespace Werewolf.Core
         private static readonly IReadOnlyDictionary<TextId, string> JapaneseTable = new Dictionary<TextId, string>
         {
             [TextId.NoticeConveneStartedFormat] = "{0}が緊急会議を招集しました",
-            [TextId.NoticeBeaconAuditFormat] = "前回の会議以降、ビーコンは{0}回使用されました",
-            [TextId.NoticeBeaconAuditNone] = "前回の会議以降、ビーコンは使用されませんでした",
             [TextId.NoticeNoExecution] = "誰も処刑されませんでした",
             [TextId.NoticeExecutedFormat] = "{0}が処刑されました",
             [TextId.NoticeBlackCatRevealedFormat] = "{0}は黒猫でした",
@@ -690,6 +701,13 @@ namespace Werewolf.Core
             [TextId.HudBeaconLabel] = "ビーコン",
             [TextId.HudTestPlayBanner] = "テストプレイ中：ホストがデバッグモードを有効にしています",
             [TextId.HudScatterGuardBanner] = "引き継ぎ期間中…",
+
+            [TextId.BannerMeetTheDeadline] = "納期は厳守せよ",
+            [TextId.BannerHurryUp] = "Hurry up!!",
+
+            [TextId.ImpactDiscussLeft] = "議論",
+            [TextId.ImpactDiscussRight] = "開始",
+
             [TextId.HudSelfIdFormat] = "No.{0}",
             [TextId.IdNameFormat] = "{0}. {1}",
 
@@ -758,6 +776,8 @@ namespace Werewolf.Core
             [TextId.ChatLogSystemName] = "Taxman",
             [TextId.ChatLogScatterTitle] = "前回の組分け",
             [TextId.ChatLogScatterLineFormat] = "【{0}】{1}",
+            [TextId.ChatLogMeetingNumberFormat] = "第{0}回の会議",
+            [TextId.ChatLogFilteringTitle] = "フィルター中",
 
             [TextId.ResultChatTitle] = "感想戦チャット",
             [TextId.ResultChatToggleLabelFormat] = "感想戦チャット [{0}]",
@@ -803,6 +823,11 @@ namespace Werewolf.Core
 
             [TextId.CheckmateTitle] = "債権はもはや徴収不能だ",
 
+            [TextId.EradicationLastWerewolfDied] = "最後の人狼が死亡した",
+            [TextId.EradicationLastVillagerDied] = "最後の村人が死亡した",
+            [TextId.EradicationLastWerewolfVanished] = "最後の人狼が失踪した",
+            [TextId.EradicationLastVillagerVanished] = "最後の村人が失踪した",
+
             [TextId.MapOverlayToggleLabelFormat] = "全体マップ [{0}]",
 
             [TextId.LobbySettingsFooterHintFormat] = "[{0}]キー : パネルを隠す ／ ホイール : スクロール",
@@ -842,14 +867,14 @@ namespace Werewolf.Core
             [TextId.ModIntegrityButtonClose] = "閉じる",
             [TextId.LobbyStartTooFewPlayersTitle] = "人数が足りません",
             [TextId.LobbyStartTooFewPlayersBodyFormat] =
-                "現在 {0}人 / 人狼で遊ぶには最低でも {1}人 必要です\n"
-                + "通常のREPOとして遊びたい場合は、ルーム設定で人狼モード\n"
-                + "（WerewolfModeEnabled）をOFFにしてください。",
+                "現在 {0}人 / 人狼モードで遊ぶには最低 {1}人 必要です。",
             [TextId.LobbyStartTeamOverflowTitle] = "人狼の人数が多すぎます",
             [TextId.LobbyStartTeamOverflowBodyFormat] =
-                "人狼の設定 {0}人 / 現在の参加者 {1}人\n"
-                + "村人が1人もいない配役は成立しません。ルーム設定で\n"
+                "人狼の設定 {0}人 に対し参加者 {1}人 では村人が1人もいません。\n"
                 + "人狼の人数（WerewolfCount）を下げてください。",
+            [TextId.LobbyStartBlockedRemedy] =
+                "通常のREPOとして遊ぶ場合は、ホストの設定で\n"
+                + "人狼モード（WerewolfModeEnabled）をOFFにしてください。",
 
             [TextId.ConveneCountdownDefaultCallerName] = "誰か",
             [TextId.ConveneCountdownHeaderFormat] = "{0}が会議を招集しました！\nワープまで残り…",
@@ -917,6 +942,7 @@ namespace Werewolf.Core
             [TextId.SettingsLabelVoteTimeCutEnabled] = "投票による会議時間短縮",
             [TextId.SettingsLabelMeetingScatterEnabled] = "会議後の分散ワープ",
             [TextId.SettingsLabelScatterGuardSec] = "分散ワープ後の監視時間",
+            [TextId.SettingsLabelMeetingEnemyRespawnScalePct] = "会議中の敵リスポーン係数",
             [TextId.SettingsLabelResultDisplaySec] = "開票結果の表示保持",
             [TextId.SettingsLabelStaminaUnlockPct] = "無限スタミナ解禁閾値",
             [TextId.SettingsLabelJumpUnlockPct] = "追加ジャンプ解禁閾値",
@@ -1276,7 +1302,7 @@ namespace Werewolf.Core
                 "まず前回の会議以降の死亡者が発表され、続いて貴重品減額ゲージの変化が開示されます。\n" +
                 "その後、投票が始まります。会議中は全体マップを開いて、更新された貴重品の情報を確認できます。\n" +
                 "試合の制限時間は会議中は停止するので、議論で持ち時間は減りません。\n" +
-                "ただし、会議中にも敵のリスポーンタイマーは減っていくので、会議で時間を浪費しすぎると敵が復活してしまいます。\n" +
+                "ただし、会議中にも敵のリスポーンタイマーは減っていくので、会議で時間を浪費しすぎると敵が復活してしまいます（ルーム設定で係数を設定可能）。\n" +
                 "会議終了時点でリスポーンの準備が整っている敵は即座にスポーンします。",
 
             [TextId.ManualVotingTitle] = "投票と処刑",
@@ -1425,8 +1451,6 @@ namespace Werewolf.Core
         private static readonly IReadOnlyDictionary<TextId, string> EnglishTable = new Dictionary<TextId, string>
         {
             [TextId.NoticeConveneStartedFormat] = "{0} called an emergency meeting",
-            [TextId.NoticeBeaconAuditFormat] = "Beacon uses since the last meeting: {0}",
-            [TextId.NoticeBeaconAuditNone] = "The beacon has not been used since the last meeting",
             [TextId.NoticeNoExecution] = "No one was executed",
             [TextId.NoticeExecutedFormat] = "{0} was executed",
             [TextId.NoticeBlackCatRevealedFormat] = "{0} was the Black Cat",
@@ -1515,6 +1539,13 @@ namespace Werewolf.Core
             [TextId.HudBeaconLabel] = "Beacon",
             [TextId.HudTestPlayBanner] = "TEST PLAY: the host has debug mode enabled",
             [TextId.HudScatterGuardBanner] = "Handover in progress…",
+
+            [TextId.BannerMeetTheDeadline] = "Meet the deadline.",
+            [TextId.BannerHurryUp] = "Hurry up!!",
+
+            [TextId.ImpactDiscussLeft] = "DISCUSS",
+            [TextId.ImpactDiscussRight] = "NOW!",
+
             [TextId.HudSelfIdFormat] = "No.{0}",
             [TextId.IdNameFormat] = "{0}. {1}",
 
@@ -1570,7 +1601,7 @@ namespace Werewolf.Core
             [TextId.VoteVoteLabel] = "Vote",
             [TextId.VoteWerewolfMarkerLabel] = "W",
             [TextId.VoteBomberMarkerLabel] = "B",
-            [TextId.VoteCountFormat] = "{0} votes",
+            [TextId.VoteCountFormat] = "×{0}",
             [TextId.VoteExecutedFormat] = "Executed: {0}",
             [TextId.VoteNoExecution] = "No execution",
             [TextId.VoteSkipSuffixFormat] = " (Skip: {0})",
@@ -1583,6 +1614,8 @@ namespace Werewolf.Core
             [TextId.ChatLogSystemName] = "Taxman",
             [TextId.ChatLogScatterTitle] = "Previous groups",
             [TextId.ChatLogScatterLineFormat] = "{0}: {1}",
+            [TextId.ChatLogMeetingNumberFormat] = "Meeting #{0}",
+            [TextId.ChatLogFilteringTitle] = "Filtering",
 
             [TextId.ResultChatTitle] = "Post-Match Chat",
             [TextId.ResultChatToggleLabelFormat] = "Post-Match Chat [{0}]",
@@ -1628,6 +1661,11 @@ namespace Werewolf.Core
 
             [TextId.CheckmateTitle] = "THE DEBT CAN NO LONGER BE COLLECTED",
 
+            [TextId.EradicationLastWerewolfDied] = "THE LAST WEREWOLF HAS DIED",
+            [TextId.EradicationLastVillagerDied] = "THE LAST VILLAGER HAS DIED",
+            [TextId.EradicationLastWerewolfVanished] = "THE LAST WEREWOLF HAS VANISHED",
+            [TextId.EradicationLastVillagerVanished] = "THE LAST VILLAGER HAS VANISHED",
+
             [TextId.MapOverlayToggleLabelFormat] = "Full Map [{0}]",
 
             [TextId.LobbySettingsFooterHintFormat] = "[{0}]: Hide panel  /  Mouse wheel: Scroll",
@@ -1667,14 +1705,14 @@ namespace Werewolf.Core
             [TextId.ModIntegrityButtonClose] = "Close",
             [TextId.LobbyStartTooFewPlayersTitle] = "Not enough players",
             [TextId.LobbyStartTooFewPlayersBodyFormat] =
-                "Current players: {0} / Minimum required: {1}\n"
-                + "To play regular R.E.P.O., turn Werewolf Mode\n"
-                + "(WerewolfModeEnabled) off in the room settings.",
+                "Current players: {0} / Werewolf mode needs at least {1}.",
             [TextId.LobbyStartTeamOverflowTitle] = "Too many werewolves",
             [TextId.LobbyStartTeamOverflowBodyFormat] =
-                "Werewolves: {0} / Current players: {1}\n"
-                + "A game with no villagers cannot start. Lower the\n"
-                + "Werewolf count (WerewolfCount) in the room settings.",
+                "With {0} werewolves among {1} players, no villagers remain.\n"
+                + "Lower the werewolf count (WerewolfCount).",
+            [TextId.LobbyStartBlockedRemedy] =
+                "To play regular R.E.P.O. instead, turn Werewolf Mode\n"
+                + "(WerewolfModeEnabled) off in the host's settings.",
 
             [TextId.ConveneCountdownDefaultCallerName] = "Someone",
             [TextId.ConveneCountdownHeaderFormat] = "{0} called a meeting!\nWarping in…",
@@ -1742,6 +1780,7 @@ namespace Werewolf.Core
             [TextId.SettingsLabelVoteTimeCutEnabled] = "Votes shorten the meeting",
             [TextId.SettingsLabelMeetingScatterEnabled] = "Scatter warp after meetings",
             [TextId.SettingsLabelScatterGuardSec] = "Post-scatter guard window",
+            [TextId.SettingsLabelMeetingEnemyRespawnScalePct] = "Enemy respawn clock during meetings",
             [TextId.SettingsLabelResultDisplaySec] = "Vote result display duration",
             [TextId.SettingsLabelStaminaUnlockPct] = "Infinite stamina unlock",
             [TextId.SettingsLabelJumpUnlockPct] = "Extra jump unlock",
@@ -2101,7 +2140,7 @@ namespace Werewolf.Core
                 "Deaths since the previous meeting are announced first, followed by changes to the valuable loss gauge.\n" +
                 "Voting begins afterward. During the meeting, you can open the full map to review the updated information on valuables.\n" +
                 "The match time limit is paused during a meeting, so discussion does not eat into your remaining time.\n" +
-                "Enemy respawn timers continue to count down, however, so an overly long meeting brings the enemies back sooner.\n" +
+                "Enemy respawn timers continue to count down, however, so an overly long meeting brings the enemies back sooner (the room settings control how fast).\n" +
                 "Any enemy whose respawn timer has expired by the end of the meeting spawns immediately.",
 
             [TextId.ManualVotingTitle] = "Voting and Execution",

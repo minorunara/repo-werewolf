@@ -13,19 +13,22 @@ namespace Werewolf.Game
     public sealed partial class WerewolfDirector
     {
 
+        private bool _pendingMeetingTutorial;
+
+        private long _nextConveneHoldHintUnixMs;
+
+        private readonly MeetingMapOverlay _meetingMapOverlay = new MeetingMapOverlay();
+
+        private long _clientWarpUnixMs;
+        private bool _warpExecuted;
+        private bool _meetingCutByCeremony;
+
+        private bool _votePendulumPlayed;
+
+        private Vector3? _warpVerifyTarget;
+        private long _warpVerifyDeadlineMs;
+
         private readonly ConveneHoldGauge _conveneHoldGauge = new ConveneHoldGauge();
-
-        private long _scatterPlanAtUnixMs;
-
-        private bool _scatterAwaitCurse;
-
-        private const long ScatterPlanNoExecDelayMs = 1500;
-
-        private const long ScatterPlanAfterKillMarginMs = 1000;
-
-        private readonly ScatterGuard _scatterGuard = new ScatterGuard();
-
-        private readonly ScatterGuard _clientScatterGuard = new ScatterGuard();
 
         private void HandleStartMeeting(int caller, long warpUnixMs, long endUnixMs,
                                         ConveneKind kind = ConveneKind.Button)
@@ -41,7 +44,7 @@ namespace Werewolf.Game
             _clientScatterGuard.Disarm();
             Patches.PlayerSpawnPatch.MeetingActive = true;
             _deathRevealPending = true;
-            ResetMeetingChat();
+            ResetMeetingChatView();
             WLog.Line("recv_startmeeting", secret: false,
                 ("caller", caller), ("warpUnixMs", warpUnixMs), ("endUnixMs", endUnixMs));
             BeginMeetingUi();
@@ -82,12 +85,23 @@ namespace Werewolf.Game
 
             bool active = _meetingClient.MeetingActive;
 
-            if (GameOverSafety.ShouldInjectInvincibility(ClientPhase, active, _meetingClient.WarpDone(now)))
+            if (GameOverSafety.ShouldInjectInvincibility(
+                    ClientPhase, active, _meetingClient.WarpDone(now), _winCeremonyActive))
             {
                 TrySetLocalInvincible();
             }
 
-            if (active && !_meetingClient.WarpDone(now))
+            if (active && !_warpExecuted && (_winCeremonyActive || _meetingCutByCeremony))
+            {
+                _meetingCutByCeremony = true;
+                if (_conveneCountdown.Visible) HideConveneCountdown();
+                if (GameOverSafety.ShouldHoldEnemyFreeze(ClientPhase, _winCeremonyActive)
+                    && SemiFunc.IsMasterClientOrSingleplayer() && !_enemyFreezer.Active)
+                {
+                    _enemyFreezer.Begin();
+                }
+            }
+            else if (active && !_meetingClient.WarpDone(now))
             {
                 int remainSec = (int)((_clientWarpUnixMs - now + 999) / 1000);
                 EnsurePanelBuilt(_conveneCountdown);
@@ -126,7 +140,6 @@ namespace Werewolf.Game
                 if (_conveneCountdown.Visible) HideConveneCountdown();
                 if (_pendingBeaconAudit >= 0 && _meetingClient.VotingUiReady(now))
                 {
-                    PushToast(SessionNotice.ForBeaconAudit(_pendingBeaconAudit));
                     _chatRecapBeaconUses = _pendingBeaconAudit;
                     _pendingBeaconAudit = -1;
                 }
@@ -135,9 +148,11 @@ namespace Werewolf.Game
                     List<List<int>> lastGroups = _lastScatterGroups;
                     _lastScatterGroups = null;
                     int lostSince = ConsumeRecapLostDelta();
-                    if (MeetingChatLogEnabled) PostMeetingChatSystemLines(lastGroups, lostSince);
+                    _chatMeetingNumber++;
+                    if (MeetingChatLogEnabled) PostMeetingChatSystemLines(lastGroups, lostSince, _chatMeetingNumber);
                     _chatSystemPosted = true;
                     _meetingClient.MarkDiscussionOpen();
+                    ShowDiscussionImpact();
                 }
                 if (_pendingMeetingTutorial && _meetingClient.VotingUiReady(now))
                 {
@@ -171,12 +186,10 @@ namespace Werewolf.Game
                     _sfxPlayer.StopStoppable();
                 }
 
-                if (_executionSfxWaitTicks >= 0 && ++_executionSfxWaitTicks >= ExecutionSfxCurseWaitTicks)
+                if (_resultCeremonyAtMs > 0 && now >= _resultCeremonyAtMs)
                 {
-                    _executionSfxWaitTicks = -1;
-                    EnsureSfxBuilt();
-                    _sfxPlayer.Play("sfx_execution");
-                    WLog.Line("execution_sfx", secret: false, ("kind", "regular"));
+                    _resultCeremonyAtMs = 0;
+                    FireResultCeremony();
                 }
             }
             else
@@ -188,15 +201,17 @@ namespace Werewolf.Game
                     TryExecuteMeetingScatter();
                 }
                 _warpExecuted = false;
+                _meetingCutByCeremony = false;
                 _votePendulumPlayed = false;
-                _executionSfxWaitTicks = -1;
+                _resultCeremonyAtMs = 0;
+                _pendingCurseCatActor = -1;
                 _deathRevealPending = false;
                 _pendingBeaconAudit = -1;
                 _pendingMeetingTutorial = false;
                 HideDeathReveal();
                 _sfxPlayer.StopStoppable();
                 _movementFreezer.End();
-                if (GameOverSafety.ShouldHoldEnemyFreeze(ClientPhase))
+                if (GameOverSafety.ShouldHoldEnemyFreeze(ClientPhase, _winCeremonyActive))
                 {
                     if (SemiFunc.IsMasterClientOrSingleplayer() && !_enemyFreezer.Active)
                     {
@@ -210,13 +225,14 @@ namespace Werewolf.Game
                 _truckWarper?.ResetWatchdog();
                 Patches.PlayerSpawnPatch.MeetingActive = false;
                 if (_conveneCountdown.Visible) HideConveneCountdown();
+                if (_discussionImpact.Exists) _discussionImpact.Hide();
                 if (_meetingUiActive)
                 {
                     _scatterPlanAtUnixMs = 0;
                     _scatterAwaitCurse = false;
                     _votePanel.StopScatterReveal();
                     _votePanel.EndMeeting();
-                    ResetMeetingChat();
+                    ResetMeetingChatView();
                     _meetingUiActive = false;
                 }
             }
@@ -240,6 +256,28 @@ namespace Werewolf.Game
                     Plugin.Bindings != null ? Plugin.Bindings.MeetingMapOrthoSize.Value : 15f,
                     Plugin.Bindings != null ? Plugin.Bindings.MeetingMapResolution.Value : 1,
                     Plugin.Bindings == null || Plugin.Bindings.MeetingMapGrid.Value);
+            }
+        }
+
+        private void FireResultCeremony()
+        {
+            MeetingOutcome result = _meetingClient.Result;
+            int executedActor = result != null ? result.ExecutedActor : -1;
+            PushToast(executedActor == -1
+                ? SessionNotice.ForNoExecution()
+                : SessionNotice.ForExecuted(ResolveDisplayName(executedActor)));
+            if (_pendingCurseCatActor != -1)
+            {
+                int catActor = _pendingCurseCatActor;
+                long deadline = _pendingCurseDeadlineMs;
+                _pendingCurseCatActor = -1;
+                PresentCurseStarted(catActor, deadline);
+            }
+            else if (executedActor != -1)
+            {
+                EnsureSfxBuilt();
+                _sfxPlayer.Play("sfx_execution");
+                WLog.Line("execution_sfx", secret: false, ("kind", "regular"));
             }
         }
 
@@ -269,208 +307,6 @@ namespace Werewolf.Game
             }
             _movementFreezer.Begin();
         }
-
-        private void TryExecuteMeetingScatter()
-        {
-            if (_session == null) return;
-            Patches.PlayerSpawnPatch.ArmScatterGrace();
-            if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
-            if (_session.Phase != GamePhase.Play)
-            {
-                _extractionScatter?.ClearPlan();
-                return;
-            }
-            if (Plugin.GameConfig == null || !Plugin.GameConfig.MeetingScatterEnabled) return;
-            ExtractionScatter scatter = _extractionScatter ??= new ExtractionScatter();
-            if (scatter.HasPlan)
-            {
-                if (scatter.ExecutePlan(IsSessionAlive))
-                {
-                    ArmScatterGuard(scatter);
-                }
-            }
-            else if (scatter.WarpScatter(IsSessionAlive, warpTruckSlot: false,
-                         botActors: CollectAliveBotActors()))
-            {
-                SendScatterGroups(scatter);
-                ArmScatterGuard(scatter);
-            }
-        }
-
-        private void ArmScatterGuard(ExtractionScatter scatter)
-        {
-            int groups = ScatterGroupsWire.CountGroups(scatter.LastAssignments);
-            if (groups < 2)
-            {
-                _scatterGuard.Disarm();
-                return;
-            }
-            int guardSec = Plugin.GameConfig != null ? Plugin.GameConfig.ScatterGuardSec : 0;
-            _scatterGuard.Arm(NowUnixMs(), guardSec);
-            if (_scatterGuard.ArmedUntilUnixMs != 0)
-            {
-                SendScatterGuardWindow(guardSec);
-                WLog.Line("scatter_guard_armed", secret: false,
-                    ("groups", groups), ("untilUnixMs", _scatterGuard.ArmedUntilUnixMs));
-            }
-        }
-
-        private void SendScatterGuardWindow(int guardSec)
-        {
-            if (_bus == null) return;
-            _bus.SendToAll(MessageCodes.ScatterGuardWindow, new object[] { guardSec });
-        }
-
-        private void HandleScatterGuardWindow(int guardSec)
-        {
-            if (guardSec > 0) _clientScatterGuard.Arm(NowUnixMs(), guardSec);
-            else _clientScatterGuard.Disarm();
-            ReplaySampler.NoteGuardWindow(guardSec);
-            WLog.Line("recv_scatter_guard_window", secret: false, ("sec", guardSec));
-        }
-
-        private void TryFireScatterGuard(int victimActor)
-        {
-            long now = NowUnixMs();
-            if (!_scatterGuard.IsArmed(now)) return;
-            if (_meeting == null || _session == null || _session.Phase != GamePhase.Play) return;
-            if (_checkmate != null && _checkmate.CeremonyStarted) return;
-            if (LastRunGate.IsLastRunActive())
-            {
-                _scatterGuard.Disarm();
-                SendScatterGuardWindow(0);
-                WLog.Line("scatter_guard_skip", secret: false, ("reason", "last_run"));
-                return;
-            }
-            if (_meeting.TryConveneScatterGuard(victimActor, now))
-            {
-                _scatterGuard.Disarm();
-                WLog.Line("scatter_guard_fired", secret: false, ("victim", victimActor));
-            }
-        }
-
-        private void TickScatterPlanHost(long now)
-        {
-            if (_scatterPlanAtUnixMs == 0 || now < _scatterPlanAtUnixMs) return;
-            _scatterPlanAtUnixMs = 0;
-            if (!SemiFunc.IsMasterClientOrSingleplayer() || _session == null) return;
-            if (_session.Phase != GamePhase.Meeting)
-            {
-                WLog.Line("scatter_plan_skip", secret: false,
-                    ("reason", "phase"), ("phase", _session.Phase));
-                return;
-            }
-            if (Plugin.GameConfig == null || !Plugin.GameConfig.MeetingScatterEnabled) return;
-
-            ExtractionScatter scatter = _extractionScatter ??= new ExtractionScatter();
-            if (!scatter.PlanScatter(IsSessionAlive, warpTruckSlot: false,
-                    botActors: CollectAliveBotActors()))
-            {
-                return;
-            }
-
-            object[] wire = scatter.BuildGroupsWire();
-            if (wire == null) return;
-
-            _meeting?.EnsureClosingHoldRemaining(now, VotePanel.ScatterRevealHoldRequiredMs);
-
-            if (_bus != null)
-            {
-                _bus.SendToAll(MessageCodes.ScatterGroups, wire);
-                WLog.Line("scatter_groups_sent", secret: false, ("players", ((int[])wire[0]).Length));
-            }
-        }
-
-        private void HostScheduleScatterPlanFromResult(int executedActor)
-        {
-            if (!SemiFunc.IsMasterClientOrSingleplayer() || _session == null) return;
-            if (Plugin.GameConfig == null || !Plugin.GameConfig.MeetingScatterEnabled) return;
-            if (_scatterAwaitCurse) return;
-            long delayMs = executedActor == -1
-                ? ScatterPlanNoExecDelayMs
-                : MeetingSession.PostResultKillDelaySec * 1000L + ScatterPlanAfterKillMarginMs;
-            _scatterPlanAtUnixMs = NowUnixMs() + delayMs;
-        }
-
-        private void HostMarkScatterAwaitCurse()
-        {
-            _scatterAwaitCurse = true;
-            _scatterPlanAtUnixMs = 0;
-        }
-
-        private void HostScheduleScatterPlanAfterCurse()
-        {
-            if (!_scatterAwaitCurse) return;
-            _scatterAwaitCurse = false;
-            _scatterPlanAtUnixMs = NowUnixMs()
-                + RolesSession.CurseKillDelaySec * 1000L + ScatterPlanAfterKillMarginMs;
-        }
-
-        private List<int> CollectAliveBotActors()
-        {
-            List<int> aliveBots = null;
-            foreach (WPlayer p in _session.Players)
-            {
-                if (p != null && p.IsBot && p.Alive) (aliveBots ??= new List<int>()).Add(p.ActorNumber);
-            }
-            return aliveBots;
-        }
-
-        private void SendScatterGroups(ExtractionScatter scatter)
-        {
-            if (_bus == null) return;
-            object[] wire = scatter.BuildGroupsWire();
-            if (wire == null) return;
-            _bus.SendToAll(MessageCodes.ScatterGroups, wire);
-            WLog.Line("scatter_groups_sent", secret: false, ("players", ((int[])wire[0]).Length));
-        }
-
-        private void HandleScatterGroups(object[] p)
-        {
-            List<List<int>> groups = ScatterGroupsWire.FromWire(p);
-            if (groups == null || groups.Count < 2)
-            {
-                WLog.Line("recv_scatter_groups_invalid", secret: false);
-                return;
-            }
-
-            _lastScatterGroups = groups;
-            ReplaySampler.NoteScatterGroups(groups);
-
-            bool animated = false;
-            if (_meetingUiActive && _meetingClient.MeetingActive && _votePanel.Exists)
-            {
-                EnsureSfxBuilt();
-                animated = _votePanel.StartScatterReveal(groups, NowUnixMs(),
-                    volume => _sfxPlayer.PlayLoop("sfx_scatter_shuffle", volume),
-                    () => _sfxPlayer.StopLoop("sfx_scatter_shuffle"),
-                    () => _sfxPlayer.Play("sfx_scatter_jingle"));
-            }
-
-            if (!animated)
-            {
-                PushScatterToasts(ScatterGroupsText.FormatLines(groups, ScatterMemberLabel));
-            }
-            WLog.Line("recv_scatter_groups", secret: false,
-                ("groups", groups.Count), ("animated", animated));
-        }
-
-        private void PushScatterToasts(List<string> lines)
-        {
-            for (int i = lines.Count - 1; i >= 0; i--)
-            {
-                PushRawToast(lines[i], logKind: "scatter", playSfx: i == 0);
-            }
-        }
-
-        private string ScatterMemberLabel(int actor)
-        {
-            int id = IdRoster.IdOf(actor);
-            return id > 0 ? Texts.Format(TextId.NoticeScatterMemberFormat, id) : ResolveDisplayName(actor);
-        }
-
-        private string ScatterMemberChatLabel(int actor)
-            => ParticipantLabel.Format(IdRoster.IdOf(actor), ResolveDisplayName(actor));
 
         private void TickWarpVerify(long now)
         {
@@ -529,6 +365,8 @@ namespace Werewolf.Game
 
         private void BeginMeetingUi()
         {
+            _deadlineBanner.Hide();
+
             EnsureUiBuilt();
             if (!_votePanel.Exists) return;
 
@@ -724,183 +562,6 @@ namespace Werewolf.Game
             long fromStart = _gameStartUnixMsClient + ClientConveneSuppressStartSec * 1000L;
             long fromLastEnd = _lastMeetingEndUnixMsClient + ClientConveneSuppressAfterSec * 1000L;
             return fromStart > fromLastEnd ? fromStart : fromLastEnd;
-        }
-
-        private static bool MeetingChatLogEnabled
-            => Plugin.Bindings == null || Plugin.Bindings.MeetingChatLog.Value;
-
-        internal bool IsChatLogWindowOpenClient
-            => MeetingChatGate.IsOpen(ClientPhase, IsMeetingDiscussionOpenClient) || IsResultChatActiveClient;
-
-        private bool IsMeetingWarpDoneClient => _meetingClient.WarpDone(NowUnixMs());
-
-        private bool IsMeetingDiscussionOpenClient => _meetingClient.DiscussionOpen;
-
-        private Func<int, PlayerAvatar> ChatAvatarResolver
-            => _chatDebugAvatarFallback
-                ? (Func<int, PlayerAvatar>)ResolveAvatarForChatDebug
-                : ResolveAvatar;
-
-        private void ResetMeetingChat()
-        {
-            _chatLog.Clear();
-            _chatUnread.Clear();
-            _chatRecapDeaths.Clear();
-            _chatRecapBeaconUses = MeetingRecap.Unknown;
-            _chatVoteBaselinePending = false;
-            _chatSystemPosted = false;
-            if (_chatPanel.Exists) _chatPanel.ResetView();
-        }
-
-        private int ConsumeRecapLostDelta()
-        {
-            MeetingGaugeSnapshot gauge = RolesClient != null ? RolesClient.MeetingGauge : null;
-            int total = gauge != null ? gauge.LostDollars : MeetingRecap.Unknown;
-            int delta = MeetingRecap.LostSince(total, _chatRecapLostBaseline);
-            if (total >= 0) _chatRecapLostBaseline = total;
-            return delta;
-        }
-
-        private void PostMeetingChatSystemLines(List<List<int>> lastGroups, int lostSince)
-        {
-            try
-            {
-                string speaker = Texts.Get(TextId.ChatLogSystemName);
-                bool emoji = EmojiSprites.Ready;
-                string face = _chatRecapDeaths.Count > 0 ? "img_taxman_system" : "img_taxman_nodeath";
-                MeetingGaugeSnapshot gauge = RolesClient != null ? RolesClient.MeetingGauge : null;
-                var recap = new MeetingRecapData(
-                    _chatRecapDeaths,
-                    lostSince,
-                    gauge != null ? gauge.ExtractedDollars : MeetingRecap.Unknown,
-                    gauge != null ? gauge.HaulGoalDollars : MeetingRecap.Unknown,
-                    _chatRecapBeaconUses);
-                _chatLog.AppendSystem(speaker, null,
-                    string.Join("\n", MeetingRecap.BuildLines(recap, emoji).ToArray()), face);
-
-                if (lastGroups != null && lastGroups.Count >= 2)
-                {
-                    List<string> lines = ScatterGroupsText.FormatLines(
-                        lastGroups, ScatterMemberChatLabel, TextId.ChatLogScatterLineFormat);
-                    _chatLog.AppendSystem(speaker, ChatEmoji.Get(TextId.ChatLogScatterTitle, emoji),
-                        string.Join("\n", lines.ToArray()), face);
-                }
-            }
-            catch (Exception e)
-            {
-                WLog.Line("chat_log_system_error", secret: false, ("err", e.Message));
-            }
-        }
-
-        private void RecordMeetingVotesClient(int[] votedActors)
-        {
-            if (!MeetingChatLogEnabled || votedActors == null) return;
-            try
-            {
-                if (_chatVoteBaselinePending)
-                {
-                    _chatVoteBaselinePending = false;
-                    return;
-                }
-
-                string voted = Texts.Get(TextId.ChatLogVoted);
-                IReadOnlyCollection<int> known = _meetingClient.VotedActors;
-                foreach (int actor in votedActors)
-                {
-                    if (Contains(known, actor)) continue;
-                    _chatLog.AppendVote(actor, ResolveDisplayName(actor), voted);
-                }
-            }
-            catch (Exception e)
-            {
-                WLog.Line("chat_log_vote_error", secret: false, ("err", e.Message));
-            }
-        }
-
-        private static bool Contains(IReadOnlyCollection<int> values, int value)
-        {
-            foreach (int v in values)
-            {
-                if (v == value) return true;
-            }
-            return false;
-        }
-
-        public void RecordMeetingChatClient(PlayerAvatar speaker, string message)
-        {
-            if (!MeetingChatLogEnabled || speaker == null) return;
-            try
-            {
-                int actor = Registry != null ? Registry.ResolveActor(speaker) : -1;
-                AppendMeetingChatMessageClient(
-                    actor, ResolveDisplayName(actor), message, ChatSpeakerKindFor(actor), playSfx: true);
-            }
-            catch (Exception e)
-            {
-                WLog.Line("chat_log_record_error", secret: false, ("err", e.Message));
-            }
-        }
-
-        public void RecordReplayChatClient(PlayerAvatar speaker, string message)
-        {
-            if (speaker == null) return;
-            try
-            {
-                RecordReplayChatByActor(
-                    Registry != null ? Registry.ResolveActor(speaker) : -1, message);
-            }
-            catch (Exception e)
-            {
-                WLog.Line("replay_chat_record_error", secret: false, ("err", e.Message));
-            }
-        }
-
-        private bool RecordReplayChatByActor(int actor, string message)
-        {
-            bool alive = _meetingClient.GetRowStatus(actor) == RowStatus.Alive;
-            if (!ReplayChatGate.ShouldRecord(ClientPhase, IsMeetingDiscussionOpenClient, alive)) return false;
-            string text = ReplayChatText.SanitizeForRecord(message);
-            if (text.Length == 0) return false;
-            ReplaySampler.NoteChat(actor, text);
-            return true;
-        }
-
-        private ChatSpeaker ChatSpeakerKindFor(int actor)
-        {
-            if (ClientPhase == GamePhase.GameOver) return ChatSpeaker.Alive;
-            return _meetingClient.GetRowStatus(actor) == RowStatus.Alive
-                ? ChatSpeaker.Alive
-                : ChatSpeaker.Dead;
-        }
-
-        private bool AppendMeetingChatMessageClient(
-            int actor, string name, string message, ChatSpeaker kind, bool playSfx)
-        {
-            bool added = _chatLog.Append(actor, name, message, kind);
-            if (added && playSfx)
-            {
-                EnsureSfxBuilt();
-                _sfxPlayer.Play(MeetingChatSfxClipKey, MeetingChatSfxVolumeScale);
-                _chatUnread.OnMessageAppended(actor, LocalActor, _chatPanel.IsOpen);
-            }
-            return added;
-        }
-
-        private void TickMeetingChat()
-        {
-            if (!MeetingChatLogEnabled || !_chatPanel.Exists) return;
-
-            _chatPanel.Tick(
-                Plugin.MeetingChatLogKey != null ? Plugin.MeetingChatLogKey.Value : KeyCode.L,
-                InputGate.KeysFree);
-
-            _chatPanel.Render(_chatLog, LocalActor, ChatAvatarResolver,
-                ParticipantIdFor,
-                MarkedTeammateRole,
-                !IsLocalAlive());
-
-            if (_chatPanel.IsOpen) _chatUnread.Clear();
-            _chatPanel.SetUnreadBadge(_chatUnread.HasUnread);
         }
 
         private int LocalActor => _bus != null ? _bus.LocalActorNumber : 1;

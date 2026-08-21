@@ -258,5 +258,132 @@ namespace Werewolf.Game
             }
         }
 
+        public int DebugSpawnFakeBodies()
+        {
+            PlayerAvatar local = PlayerAvatar.instance;
+            if (local == null || local.transform == null)
+            {
+                WLog.Line("cmd_body", secret: false, ("reason", "no_local_avatar"));
+                return -1;
+            }
+
+            var actors = new List<int>();
+            if (_session != null)
+            {
+                foreach (var p in _session.Players)
+                {
+                    if (p.IsBot) actors.Add(p.ActorNumber);
+                }
+            }
+            else
+            {
+                foreach (var p in _pendingBots) actors.Add(p.ActorNumber);
+            }
+
+            Vector3 origin = local.transform.position;
+            Vector3 forward = local.transform.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 0.01f) forward = Vector3.forward;
+            forward.Normalize();
+
+            int created = 0;
+            for (int i = 0; i < actors.Count; i++)
+            {
+                Vector3 groundPos = origin + forward * (2f + 1.5f * i);
+                if (FakeBodies.SpawnOrMove(actors[i], groundPos)) created++;
+            }
+            WLog.Line("cmd_body", secret: false, ("bots", actors.Count), ("created", created));
+            return created;
+        }
+
+        public bool DebugSpawnMoneyBag(int valueDollars)
+        {
+            if (!SemiFunc.IsMasterClientOrSingleplayer())
+            {
+                WLog.Line("cmd_spawnbag", secret: false, ("reason", "not_host"));
+                return false;
+            }
+            PlayerAvatar local = PlayerAvatar.instance;
+            GameObject prefab = AssetManager.instance != null ? AssetManager.instance.surplusValuableSmall : null;
+            if (local == null || local.transform == null || prefab == null)
+            {
+                WLog.Line("cmd_spawnbag", secret: false, ("reason", "no_avatar_or_prefab"));
+                return false;
+            }
+
+            Vector3 forward = local.transform.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 0.01f) forward = Vector3.forward;
+            forward.Normalize();
+            Vector3 pos = local.transform.position + forward * 1.5f + Vector3.up * 1f;
+
+            GameObject bag = SemiFunc.IsMultiplayer()
+                ? Photon.Pun.PhotonNetwork.InstantiateRoomObject("Valuables/" + prefab.name, pos, Quaternion.identity, 0)
+                : UnityEngine.Object.Instantiate(prefab, pos, Quaternion.identity);
+            if (valueDollars > 0)
+            {
+                ValuableObject valuable = bag.GetComponent<ValuableObject>();
+                if (valuable != null) GameRefs.ValuableObject_dollarValueOverride(valuable) = valueDollars;
+            }
+            WLog.Line("cmd_spawnbag", secret: false, ("value", valueDollars));
+            return true;
+        }
+
+        public int DebugClearFakeBodies()
+        {
+            int removed = FakeBodies.Clear();
+            WLog.Line("cmd_body_clear", secret: false, ("removed", removed));
+            return removed;
+        }
+
+        public void HostForceExpireTimer()
+        {
+            if (_session == null || !SemiFunc.IsMasterClientOrSingleplayer()) return;
+            _session.ForceExpireTimer(NowUnixMs());
+        }
+
+        public void HostNotifyDisclosure(DisclosureKind kind)
+        {
+            if (_session == null || !SemiFunc.IsMasterClientOrSingleplayer()) return;
+            _session.NotifyDisclosureCondition(kind);
+        }
+
+        public void DumpStatus()
+        {
+            var session = _session;
+            if (session == null)
+            {
+                WLog.Line("status", secret: false,
+                    ("session", "none"), ("clientPhase", _clientPhase),
+                    ("clientRoundEnd", _clientRoundEndUnixMs), ("pendingBots", _pendingBots.Count));
+                return;
+            }
+
+            long now = NowUnixMs();
+            WLog.Line("status", secret: false,
+                ("session", "active"), ("phase", session.Phase),
+                ("remainingMs", session.RemainingMs(now)),
+                ("players", session.Players.Count),
+                ("winner", session.Winner == null ? "none" : session.Winner.WinningTeam.ToString()),
+                ("pendingBots", _pendingBots.Count), ("mode", BusMode()));
+
+            var meeting = _meeting;
+            if (meeting != null)
+            {
+                WLog.Line("status_meeting", secret: false,
+                    ("stage", meeting.Stage), ("voted", meeting.VotedCount),
+                    ("endUnixMs", meeting.EndUnixMs), ("caller", meeting.CallerActor),
+                    ("lastEndUnixMs", meeting.LastMeetingEndUnixMs));
+            }
+
+            foreach (var p in session.Players)
+            {
+                WLog.Line("status_player", secret: true,
+                    ("actor", p.ActorNumber), ("name", p.Name), ("bot", p.IsBot),
+                    ("role", p.Role), ("alive", p.Alive),
+                    ("cause", p.DeathCause?.ToString() ?? "none"),
+                    ("meetingRights", meeting?.RightsRemaining(p.ActorNumber) ?? 0));
+            }
+        }
     }
 }

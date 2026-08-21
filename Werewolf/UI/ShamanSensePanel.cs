@@ -57,10 +57,7 @@ namespace Werewolf.UI
             var go = new GameObject("WW_ShamanSense", typeof(RectTransform));
             var rect = (RectTransform)go.transform;
             rect.SetParent(layerRoot, false);
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
+            UiKit.Stretch(rect);
             _root = go;
 
             var group = go.AddComponent<CanvasGroup>();
@@ -70,10 +67,7 @@ namespace Werewolf.UI
             var vignetteGo = new GameObject("Vignette", typeof(RectTransform));
             var vignetteRect = (RectTransform)vignetteGo.transform;
             vignetteRect.SetParent(rect, false);
-            vignetteRect.anchorMin = Vector2.zero;
-            vignetteRect.anchorMax = Vector2.one;
-            vignetteRect.offsetMin = Vector2.zero;
-            vignetteRect.offsetMax = Vector2.zero;
+            UiKit.Stretch(vignetteRect);
             _vignetteImage = vignetteGo.AddComponent<RawImage>();
             _vignetteImage.raycastTarget = false;
             _vignetteImage.texture = EnsureVignetteTexture();
@@ -97,10 +91,7 @@ namespace Werewolf.UI
             var stormGo = new GameObject("Storm", typeof(RectTransform));
             var stormRect = (RectTransform)stormGo.transform;
             stormRect.SetParent(rect, false);
-            stormRect.anchorMin = Vector2.zero;
-            stormRect.anchorMax = Vector2.one;
-            stormRect.offsetMin = Vector2.zero;
-            stormRect.offsetMax = Vector2.zero;
+            UiKit.Stretch(stormRect);
             _stormImage = stormGo.AddComponent<RawImage>();
             _stormImage.raycastTarget = false;
             _stormImage.texture = EnsureNoiseTextures()[0];

@@ -64,7 +64,7 @@ namespace Werewolf.Core
         private readonly Dictionary<int, Role> _forcedRoles = new Dictionary<int, Role>();
         private readonly HashSet<int> _voteMarked = new HashSet<int>();
         private List<WPlayer> _players = new List<WPlayer>();
-        private bool _checkmateLocked;
+        private WinResult _pendingWin;
         private RoundTimer _timer = new RoundTimer();
         private DisclosureManager _disclosures;
         private GameConfig _config;
@@ -74,6 +74,8 @@ namespace Werewolf.Core
         public IReadOnlyList<WPlayer> Players => _players;
 
         public WinResult Winner { get; private set; }
+
+        public bool WinLocked => _pendingWin != null;
 
         public bool Voided { get; private set; }
 
@@ -120,7 +122,7 @@ namespace Werewolf.Core
             _players = new List<WPlayer>(players);
             Winner = null;
             Voided = false;
-            _checkmateLocked = false;
+            _pendingWin = null;
             _voteMarked.Clear();
 
             var assigned = RoleAssigner.Assign(_players, config, rng, _forcedRoles);
@@ -206,10 +208,12 @@ namespace Werewolf.Core
                 MessageTarget.All, null));
             OnSessionEvent?.Invoke(SessionEvent.ForPlayerDied(actorNumber, cause));
 
+            if (_pendingWin != null) return true;
+
             var result = WinJudge.Judge(_players);
             if (result != null)
             {
-                ConfirmWinner(result, "death", nowUnixMs);
+                LockEradication(result, player, vanished: false);
             }
             return true;
         }
@@ -232,11 +236,37 @@ namespace Werewolf.Core
             player.Alive = false;
             WLog.Line("player_left_roster", secret: false, ("actor", actorNumber));
 
+            if (_pendingWin != null) return;
+
             var result = WinJudge.Judge(_players);
             if (result != null)
             {
-                ConfirmWinner(result, "player_left", nowUnixMs);
+                LockEradication(result, player, vanished: true);
             }
+        }
+
+        private void LockEradication(WinResult result, WPlayer decisive, bool vanished)
+        {
+            _pendingWin = result;
+            WLog.Line("eradication_locked", secret: false,
+                ("team", result.WinningTeam), ("reason", result.Reason),
+                ("actor", decisive.ActorNumber), ("vanished", vanished));
+
+            Send(new OutboundMessage(
+                WWEradicationCodes.EradicationReveal,
+                EradicationRevealWire.ToWire(
+                    decisive.ActorNumber, result.WinningTeam, vanished, decisive.Name),
+                MessageTarget.All, null));
+            OnSessionEvent?.Invoke(
+                SessionEvent.ForWinLocked(result, decisive.ActorNumber, vanished));
+        }
+
+        public void ConfirmPendingWin(long nowUnixMs)
+        {
+            if (Winner != null || (Phase != GamePhase.Play && Phase != GamePhase.Meeting)) return;
+            if (_pendingWin == null) return;
+
+            ConfirmWinner(_pendingWin, "eradication_ceremony", nowUnixMs);
         }
 
         public void MarkNextDeathAsVote(int actorNumber)
@@ -285,8 +315,8 @@ namespace Werewolf.Core
         public void LockValueCheckmate()
         {
             if (Winner != null || (Phase != GamePhase.Play && Phase != GamePhase.Meeting)) return;
-            if (_checkmateLocked) return;
-            _checkmateLocked = true;
+            if (_pendingWin != null) return;
+            _pendingWin = new WinResult(Team.Werewolves, WinReason.ValueCheckmate);
             WLog.Line("checkmate_locked", secret: false);
         }
 
@@ -294,9 +324,10 @@ namespace Werewolf.Core
         {
             if (Winner != null || (Phase != GamePhase.Play && Phase != GamePhase.Meeting)) return;
 
-            ConfirmWinner(
-                new WinResult(Team.Werewolves, WinReason.ValueCheckmate),
-                "value_checkmate", nowUnixMs);
+            WinResult result = _pendingWin != null && _pendingWin.Reason == WinReason.ValueCheckmate
+                ? _pendingWin
+                : new WinResult(Team.Werewolves, WinReason.ValueCheckmate);
+            ConfirmWinner(result, "value_checkmate", nowUnixMs);
         }
 
         public void NotifyDisclosureCondition(DisclosureKind kind)
@@ -312,7 +343,7 @@ namespace Werewolf.Core
         public PhaseChangeResult RequestPhaseChange(GamePhase target, long nowUnixMs)
         {
             bool allowed =
-                Winner == null &&
+                Winner == null && _pendingWin == null &&
                 ((Phase == GamePhase.Play && target == GamePhase.Meeting) ||
                  (Phase == GamePhase.Meeting && target == GamePhase.Play) ||
                  (Phase == GamePhase.Play && target == GamePhase.GameOver) ||
@@ -343,6 +374,7 @@ namespace Werewolf.Core
             if (Phase != GamePhase.Play && Phase != GamePhase.Meeting) return;
 
             Voided = true;
+            _pendingWin = null;
             WLog.Line("match_voided", secret: false, ("phase", Phase));
 
             var actors = new int[_players.Count];
@@ -371,14 +403,15 @@ namespace Werewolf.Core
                 return;
             }
 
-            if (_checkmateLocked && result.Reason != WinReason.ValueCheckmate)
+            if (_pendingWin != null && !ReferenceEquals(result, _pendingWin))
             {
-                WLog.Line("win_suppressed_by_checkmate", secret: false,
+                WLog.Line("win_suppressed_by_lock", secret: false,
                     ("team", result.WinningTeam), ("reason", result.Reason), ("trigger", reason));
                 return;
             }
 
             Winner = result;
+            _pendingWin = null;
             WLog.Line("win", secret: false,
                 ("team", result.WinningTeam), ("reason", result.Reason), ("trigger", reason));
 

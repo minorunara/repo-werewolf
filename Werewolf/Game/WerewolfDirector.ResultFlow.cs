@@ -11,6 +11,15 @@ namespace Werewolf.Game
 {
     public sealed partial class WerewolfDirector
     {
+        private readonly ResultCountdown _resultCountdown = new ResultCountdown();
+
+        private int _lastResultCountdownSecond = -1;
+
+        private readonly VoidMatchHold _voidMatchHold = new VoidMatchHold();
+        private readonly VoidMatchPanel _voidMatchPanel = new VoidMatchPanel();
+
+        private long _resultReturnArmedAtUnixMs;
+
         private readonly ResultDigest _matchDigest = new ResultDigest();
 
         private System.Collections.Generic.IReadOnlyList<DigestEntry> _clientDigestEntries;

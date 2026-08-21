@@ -83,19 +83,13 @@ namespace Werewolf.UI
             var go = new GameObject("WW_ResultScreen", typeof(RectTransform));
             var rect = (RectTransform)go.transform;
             rect.SetParent(layerRoot, false);
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
+            UiKit.Stretch(rect);
             _root = go;
 
             var bg = UiKit.CreateImage(rect, "Bg", Vector2.zero,
                 new Vector2(1920f, 1080f), new Color(0f, 0f, 0f, 0.82f));
             var bgRect = bg.rectTransform;
-            bgRect.anchorMin = Vector2.zero;
-            bgRect.anchorMax = Vector2.one;
-            bgRect.offsetMin = Vector2.zero;
-            bgRect.offsetMax = Vector2.zero;
+            UiKit.Stretch(bgRect);
             bg.raycastTarget = false;
 
             _bannerImage = UiKit.CreateImage(rect, "Banner",
@@ -110,10 +104,7 @@ namespace Werewolf.UI
             _bannerText.outlineWidth = 0.25f;
             _bannerText.outlineColor = Color.black;
             var btRect = _bannerText.rectTransform;
-            btRect.anchorMin = Vector2.zero;
-            btRect.anchorMax = Vector2.one;
-            btRect.offsetMin = Vector2.zero;
-            btRect.offsetMax = Vector2.zero;
+            UiKit.Stretch(btRect);
 
             RectTransform viewport = UiKit.CreateRect(rect, "Viewport",
                 new Vector2(0f, ViewportCenterY), new Vector2(ContentWidth, ViewportHeight));

@@ -78,8 +78,9 @@ namespace Werewolf.Tests
         [InlineData(189, true)]
         [InlineData(190, true)]
         [InlineData(191, true)]
+        [InlineData(192, true)]
         [InlineData(159, false)]
-        [InlineData(192, false)]
+        [InlineData(193, false)]
         [InlineData(0, false)]
         [InlineData(200, false)]
         public void IsInRange_MatchesReservedBand(int code, bool expected)
@@ -124,9 +125,9 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void MaxCode_ExtendedTo191()
+        public void MaxCode_ExtendedTo192()
         {
-            Assert.Equal(191, MessageCodes.MaxCode);
+            Assert.Equal(192, MessageCodes.MaxCode);
         }
 
         [Fact]

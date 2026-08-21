@@ -16,7 +16,7 @@ namespace Werewolf.UI
         private static readonly Color BgExecutedColor = new Color(0.25f, 0.02f, 0.02f, 0.7f);
         private static readonly Color BgDisconnectedColor = new Color(0.1f, 0.1f, 0.15f, 0.7f);
         private static readonly Color DeadTextColor = new Color(0.7f, 0.7f, 0.7f, 0.9f);
-        private static readonly Color VotedMarkColor = new Color(0.35f, 0.95f, 0.35f, 0.95f);
+        private static readonly Color VoteMarkColor = new Color(0.35f, 0.95f, 0.35f, 0.95f);
         private static readonly Color VoteButtonEnabledColor = new Color(0.55f, 0.12f, 0.12f, 0.9f);
         private static readonly Color VoteButtonDisabledColor = new Color(0.25f, 0.2f, 0.2f, 0.6f);
         private static readonly Color VoteButtonLabelDisabledColor = new Color(0.6f, 0.6f, 0.6f);
@@ -47,7 +47,7 @@ namespace Werewolf.UI
         private Image _background;
         private TextMeshProUGUI _fallbackName;
         private Image _talkIndicator;
-        private TextMeshProUGUI _votedMark;
+        private GameObject _votedMark;
         private Image _voteButtonBg;
         private TextMeshProUGUI _voteButtonLabel;
         private TextMeshProUGUI _voteCountLabel;
@@ -56,7 +56,8 @@ namespace Werewolf.UI
         private TextMeshProUGUI _idLabel;
         private Image _statusIcon;
         private Image _hostIcon;
-        private Image _myVoteIcon;
+        private TextMeshProUGUI _myVoteMark;
+        private TallyChipStrip _tallyChips;
         private TextMeshProUGUI _scatterBadge;
         private Vector2 _rowSize;
         private MenuPlayerListed _listed;
@@ -120,9 +121,20 @@ namespace Werewolf.UI
 
             float rightX = size.x * 0.5f;
 
-            _votedMark = UiKit.CreateText(rect, "Voted", new Vector2(rightX - 120f, 0f), new Vector2(36f, size.y),
-                "✓", 26f, VotedMarkColor, TextAlignmentOptions.Center);
-            _votedMark.gameObject.SetActive(false);
+            Sprite votedSprite = AssetCatalog.GetSprite("icon_voted");
+            if (votedSprite != null)
+            {
+                Image votedIcon = UiKit.CreateImage(rect, "Voted", new Vector2(rightX - 120f, 0f),
+                    new Vector2(40f, 40f), Color.white);
+                votedIcon.sprite = votedSprite;
+                _votedMark = votedIcon.gameObject;
+            }
+            else
+            {
+                _votedMark = UiKit.CreateText(rect, "Voted", new Vector2(rightX - 120f, 0f),
+                    new Vector2(36f, size.y), "✓", 26f, VoteMarkColor, TextAlignmentOptions.Center).gameObject;
+            }
+            _votedMark.SetActive(false);
 
             Vector2 btnSize = new Vector2(84f, size.y - 16f);
             _voteButtonBg = UiKit.CreateImage(rect, "VoteButton", new Vector2(rightX - 55f, 0f),
@@ -140,7 +152,8 @@ namespace Werewolf.UI
             }
 
             _voteCountLabel = UiKit.CreateText(rect, "Count", new Vector2(rightX - 120f, 0f), new Vector2(56f, size.y),
-                "", 22f, VoteCountColor, TextAlignmentOptions.Center);
+                "", 28f, VoteCountColor, TextAlignmentOptions.Center);
+            _voteCountLabel.enableWordWrapping = false;
             _voteCountLabel.gameObject.SetActive(false);
 
             float leftX2 = -size.x * 0.5f;
@@ -169,14 +182,9 @@ namespace Werewolf.UI
             if (hostSprite != null) _hostIcon.sprite = hostSprite;
             _hostIcon.gameObject.SetActive(false);
 
-            Sprite myVoteSprite = AssetCatalog.GetSprite("icon_my_vote");
-            if (myVoteSprite != null)
-            {
-                _myVoteIcon = UiKit.CreateImage(rect, "MyVoteIcon",
-                    new Vector2(rightX - 212f, 0f), new Vector2(70f, 70f), Color.white);
-                _myVoteIcon.sprite = myVoteSprite;
-                _myVoteIcon.gameObject.SetActive(false);
-            }
+            _myVoteMark = UiKit.CreateText(rect, "MyVoteMark", new Vector2(rightX - 200f, 0f),
+                new Vector2(36f, size.y), "✓", 26f, VoteMarkColor, TextAlignmentOptions.Center);
+            _myVoteMark.gameObject.SetActive(false);
 
             SetVoteButtonVisible(false);
             SetStatus(RowStatus.Alive);
@@ -276,10 +284,10 @@ namespace Werewolf.UI
 
         public void SetMyVoteMarker(bool visible)
         {
-            if (_myVoteIcon == null) return;
-            if (_myVoteIcon.gameObject.activeSelf != visible)
+            if (_myVoteMark == null) return;
+            if (_myVoteMark.gameObject.activeSelf != visible)
             {
-                _myVoteIcon.gameObject.SetActive(visible);
+                _myVoteMark.gameObject.SetActive(visible);
             }
         }
 
@@ -310,7 +318,7 @@ namespace Werewolf.UI
         {
             if (_votedMark == null) return;
             bool countShown = _voteCountLabel != null && _voteCountLabel.gameObject.activeSelf;
-            _votedMark.gameObject.SetActive(voted && !countShown);
+            _votedMark.SetActive(voted && !countShown);
         }
 
         public void SetVoteButtonVisible(bool visible)
@@ -390,7 +398,19 @@ namespace Werewolf.UI
             }
             _voteCountLabel.text = Texts.Format(TextId.VoteCountFormat, count);
             _voteCountLabel.gameObject.SetActive(true);
-            if (_votedMark != null) _votedMark.gameObject.SetActive(false);
+            if (_votedMark != null) _votedMark.SetActive(false);
+        }
+
+        public void SetTallyChips(int visibleCount, bool topVisible, long nowMs)
+        {
+            if (_root == null) return;
+            if (_tallyChips == null)
+            {
+                if (visibleCount <= 0) return;
+                _tallyChips = TallyChipStrip.Create((RectTransform)_root.transform,
+                    new Vector2(_rowSize.x * 0.5f - 97f, 0f));
+            }
+            _tallyChips.Apply(visibleCount, topVisible, nowMs);
         }
 
         public static void SetDeadCueProvider(Func<int, bool> provider)

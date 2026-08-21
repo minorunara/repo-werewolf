@@ -63,5 +63,37 @@ namespace Werewolf.Game
 
             WLog.Line("enemy_freeze_end", secret: false);
         }
+
+        public void Tick(int scalePercent, float deltaSeconds)
+        {
+            if (!_active) return;
+            float comp = EnemyRespawnScale.CompensationSeconds(scalePercent, deltaSeconds);
+            if (comp <= 0f) return;
+            EnemyDirector director = EnemyDirector.instance;
+            if (director == null) return;
+
+            GameRefs.EnemyDirector_despawnedDecreaseTimer(director) += comp;
+
+            bool allFirstSpawnUsed = true;
+            List<EnemyParent> enemies = director.enemiesSpawned;
+            if (enemies != null)
+            {
+                foreach (EnemyParent ep in enemies)
+                {
+                    if (ep == null) continue;
+                    if (!GameRefs.EnemyParent_firstSpawnPointUsed(ep)) allFirstSpawnUsed = false;
+                    if (!GameRefs.EnemyParent_Spawned(ep) && ep.DespawnedTimer > 0f)
+                    {
+                        ep.DespawnedTimer += comp;
+                    }
+                }
+            }
+
+            if (allFirstSpawnUsed && LevelGenerator.Instance != null && LevelGenerator.Instance.Generated)
+            {
+                ref float idlePause = ref GameRefs.EnemyDirector_spawnIdlePauseTimer(director);
+                if (idlePause > 0f) idlePause += comp;
+            }
+        }
     }
 }

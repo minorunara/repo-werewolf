@@ -13,6 +13,12 @@ namespace Werewolf.Game
     public sealed partial class WerewolfDirector
     {
 
+        private CurseTargetSource _curseSource;
+
+        private Dictionary<int, string> _displayNameCache;
+
+        private readonly CatAwakenToastGate _catAwakenGate = new CatAwakenToastGate();
+
         private void TickRolesClient(long now)
         {
             Role? effectiveRole = IsLocalAlive() ? _localRole : null;
@@ -69,7 +75,13 @@ namespace Werewolf.Game
                     EnsureSfxBuilt();
                     _sfxPlayer.Play(BellSchedule.ClipKeyFor(hudState.BellMarkSec), hudState.BellVolumeScale);
                 }
+
+                if (hudState.BellMarkSec == BellSchedule.AlertThresholdSec) ShowDeadlineBanner();
             }
+
+            if (_deadlineBanner.Exists) _deadlineBanner.Tick();
+            if (_discussionImpact.Exists) _discussionImpact.Tick();
+
             if (_toastPanel.Exists && _toastQueue != null) _toastPanel.Tick(_toastQueue, now);
 
             bool warpedInMeeting = _meetingClient.MeetingActive && _meetingClient.WarpDone(now);
@@ -161,199 +173,6 @@ namespace Werewolf.Game
                 _conveneTweenCoroutine = null;
             }
             _conveneCountdown.Hide();
-        }
-
-        public void DebugPlayConveneCountdown(string callerName, int totalSeconds)
-        {
-            try
-            {
-                EnsurePanelBuilt(_conveneCountdown);
-                if (!_conveneCountdown.Exists)
-                {
-                    WLog.Line("cmd_fx_countdown_skipped", secret: false, ("reason", "not_built"));
-                    return;
-                }
-                if (totalSeconds < 0) totalSeconds = 0;
-                if (_conveneTweenCoroutine != null) StopCoroutine(_conveneTweenCoroutine);
-                _conveneTweenCoroutine = StartCoroutine(
-                    _conveneCountdown.PlayStandalone(callerName, totalSeconds));
-                WLog.Line("cmd_fx_countdown", secret: false,
-                    ("caller", callerName ?? ""), ("seconds", totalSeconds));
-            }
-            catch (Exception e)
-            {
-                WLog.Line("cmd_fx_countdown_error", secret: false, ("err", e.Message));
-            }
-        }
-
-        private int DebugRevealSelfId
-        {
-            get
-            {
-                int id = IdRoster.IdOf(LocalActor);
-                return id > 0 ? id : 7;
-            }
-        }
-
-        public void DebugPlayReveal(Role role)
-        {
-            try
-            {
-                string[] dummyTeammates = role == Role.Werewolf
-                    ? new[]
-                    {
-                        ParticipantLabel.Format(3, "テスト太郎"),
-                        ParticipantLabel.Format(12, "テスト次郎"),
-                    }
-                    : Array.Empty<string>();
-                RevealContent content = RevealScript.Build(role, dummyTeammates, blackCatPossible: true,
-                    ClientValuableMapMode, IsBlackCatCurseEnabledForClient(),
-                    DebugRevealSelfId);
-
-                EnsurePanelBuilt(_revealCinematic);
-                if (!_revealCinematic.Exists)
-                {
-                    WLog.Line("cmd_fx_reveal_skipped", secret: false, ("reason", "not_built"));
-                    return;
-                }
-
-                if (_revealCoroutine != null)
-                {
-                    StopCoroutine(_revealCoroutine);
-                    _revealCoroutine = null;
-                }
-                _revealCoroutine = StartCoroutine(_revealCinematic.Play(content));
-                WLog.Line("cmd_fx_reveal", secret: false, ("role", role));
-            }
-            catch (Exception e)
-            {
-                WLog.Line("cmd_fx_reveal_error", secret: false, ("err", e.Message));
-            }
-        }
-
-        public void DebugPlayToast(string message)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(message)) message = "テスト通知";
-
-                EnsureToastQueue();
-                EnsureRolesUiBuilt();
-                _toastQueue.Push(message, NowUnixMs());
-                WLog.Line("cmd_fx_toast", secret: false, ("message", message));
-            }
-            catch (Exception e)
-            {
-                WLog.Line("cmd_fx_toast_error", secret: false, ("err", e.Message));
-            }
-        }
-
-        public void DebugPlayResult()
-        {
-            try
-            {
-                ClearResultCountdown();
-                int[] actors = { 1, 2, 3, 4, 5 };
-                byte[] roles =
-                {
-                    (byte)Role.Villager, (byte)Role.Villager, (byte)Role.Werewolf, (byte)Role.BlackCat, (byte)Role.Villager,
-                };
-                var deathMirror = new Dictionary<int, DeathCause>
-                {
-                    { 2, DeathCause.Other },
-                    { 4, DeathCause.Vote },
-                };
-                var disconnected = new[] { 5 };
-
-                IReadOnlyList<ResultRow> rows = ResultModel.Build(
-                    (byte)Team.Werewolves, actors, roles, deathMirror, a => "デバッグ" + a, disconnected);
-
-                EnsurePanelBuilt(_resultScreen);
-                if (!_resultScreen.Exists)
-                {
-                    WLog.Line("cmd_fx_result_skipped", secret: false, ("reason", "not_built"));
-                    return;
-                }
-                var digest = new List<DigestEntry>
-                {
-                    new DigestEntry(DigestKind.MatchStart, 0, 0, 0, 0),
-                    new DigestEntry(DigestKind.PerkUnlocked, 60, 0,
-                        (int)PerkId.InfiniteStamina, 0),
-                    new DigestEntry(DigestKind.Death, 95, 2, 0, 0),
-                    new DigestEntry(DigestKind.MeetingConvened, 130, 1, 1, 0),
-                    new DigestEntry(DigestKind.InformantEstablished, 180, 0, 0, 0),
-                    new DigestEntry(DigestKind.Executed, 200, 4, 0, 0),
-                    new DigestEntry(DigestKind.CurseStarted, 200, 4, 0, 0),
-                    new DigestEntry(DigestKind.CurseFollow, 210, 3, 0, 0),
-                    new DigestEntry(DigestKind.ExtractionDone, 250, 0, 1, 4),
-                    new DigestEntry(DigestKind.MatchEnd, 300, 0,
-                        (int)Team.Werewolves, (int)WinReason.TimerExpired),
-                    new DigestEntry(DigestKind.FinalBalance, 300, 9_500, 12_000, 8_000),
-                };
-                List<string> digestLines = ResultDigestText.FormatLines(digest, a => "デバッグ" + a);
-                _resultScreen.Show((byte)Team.Werewolves, rows, ResolveAvatar,
-                    digestLines, BuildResultFooterText(), ParticipantIdFor);
-                PlayResultSfx((byte)Team.Werewolves);
-                SetCrownRosterFromRows(rows);
-                WLog.Line("cmd_fx_result", secret: false, ("rows", rows.Count));
-            }
-            catch (Exception e)
-            {
-                WLog.Line("cmd_fx_result_error", secret: false, ("err", e.Message));
-            }
-        }
-
-        public void DebugPlaySfx(string clipKey)
-        {
-            try
-            {
-                EnsureSfxBuilt();
-                _sfxPlayer.Play(clipKey);
-                WLog.Line("cmd_fx_sfx", secret: false, ("key", clipKey), ("canPlay", _sfxPlayer.CanPlay));
-            }
-            catch (Exception e)
-            {
-                WLog.Line("cmd_fx_sfx_error", secret: false, ("err", e.Message));
-            }
-        }
-
-        public void DebugClearFx()
-        {
-            try
-            {
-                if (_revealCoroutine != null)
-                {
-                    StopCoroutine(_revealCoroutine);
-                    _revealCoroutine = null;
-                }
-                if (_revealCinematic.Exists) _revealCinematic.HideNow();
-
-                HideConveneCountdown();
-
-                if (_resultScreen.Exists) _resultScreen.Hide();
-                ClearResultCountdown();
-
-                CrownRoster.Clear();
-
-                WLog.Line("cmd_fx_clear", secret: false);
-            }
-            catch (Exception e)
-            {
-                WLog.Line("cmd_fx_clear_error", secret: false, ("err", e.Message));
-            }
-        }
-
-        public void DebugInjectCfgBlob(string blob)
-        {
-            _debugInjectedBlob = blob;
-            WLog.Line("cmd_cfg_inject", secret: false,
-                ("len", blob == null ? 0 : blob.Length));
-        }
-
-        public void DebugClearCfgBlob()
-        {
-            _debugInjectedBlob = null;
-            WLog.Line("cmd_cfg_clear", secret: false);
         }
 
         private void TryStartRoleReveal()
@@ -554,11 +373,47 @@ namespace Werewolf.Game
             EnsurePanelBuilt(_gaugePanel);
             EnsurePanelBuilt(_playGaugePanel);
             EnsurePanelBuilt(_hudPanel);
+            EnsurePanelBuilt(_deadlineBanner);
+            EnsurePanelBuilt(_discussionImpact);
             EnsurePanelBuilt(_toastPanel);
             EnsurePanelBuilt(_wolfStatusPanel);
             EnsurePanelBuilt(_corpseReportHud);
             EnsurePanelBuilt(_valuableRecordHud);
         }
+
+        public void ShowDeadlineBanner()
+        {
+            EnsurePanelBuilt(_deadlineBanner);
+            if (!_deadlineBanner.Exists)
+            {
+                WLog.Line("deadline_banner_skipped", secret: false, ("reason", "not_built"));
+                return;
+            }
+            _deadlineBanner.Show(
+                Texts.Get(TextId.BannerMeetTheDeadline),
+                Texts.Get(TextId.BannerHurryUp));
+            WLog.Line("deadline_banner_shown", secret: false);
+        }
+
+        public void ShowDiscussionImpact()
+        {
+            EnsurePanelBuilt(_discussionImpact);
+            if (!_discussionImpact.Exists)
+            {
+                WLog.Line("discussion_impact_skipped", secret: false, ("reason", "not_built"));
+                return;
+            }
+            _discussionImpact.Show(
+                Texts.Get(TextId.ImpactDiscussLeft),
+                Texts.Get(TextId.ImpactDiscussRight),
+                () =>
+                {
+                    EnsureSfxBuilt();
+                    _sfxPlayer.Play(DiscussionImpactClipKey);
+                });
+        }
+
+        private const string DiscussionImpactClipKey = "sfx_discussion_start";
 
         private const int ToastDurationFallbackSec = 9;
 
@@ -592,28 +447,15 @@ namespace Werewolf.Game
                 case RoleStateSubtype.CurseStarted:
                     if (data == null || data.Length < 1) return;
                     int catActor = data[0];
-                    RolesClient.ApplyCurseStarted(catActor, timeUnixMs);
-                    PushToast(SessionNotice.ForBlackCatRevealed(ResolveDisplayName(catActor)));
-                    _executionSfxWaitTicks = -1;
-                    EnsureSfxBuilt();
-                    _sfxPlayer.Play("sfx_execution_curse");
                     WLog.Line("recv_cursestart", secret: false,
                         ("cat", catActor), ("deadline", timeUnixMs));
-                    if (catActor == LocalActor)
+                    if (_resultCeremonyAtMs > 0)
                     {
-                        AttachCurseSource();
-                        MaybeShowTutorial(TutorialId.BlackCatSelectedForExecution);
+                        _pendingCurseCatActor = catActor;
+                        _pendingCurseDeadlineMs = timeUnixMs;
+                        break;
                     }
-                    else
-                    {
-                        if (_votePanel.Exists)
-                        {
-                            _votePanel.ShowStatusBanner(
-                                Texts.Format(TextId.CurseBlackCatRevealedFormat, ResolveDisplayName(catActor)));
-                            _votePanel.SetTimeOverride(timeUnixMs);
-                        }
-                        MaybeShowTutorial(TutorialId.BlackCatExecutionRevealed);
-                    }
+                    PresentCurseStarted(catActor, timeUnixMs);
                     break;
                 case RoleStateSubtype.CurseResolved:
                     if (data == null || data.Length < 1) return;
@@ -635,6 +477,29 @@ namespace Werewolf.Game
                     WLog.Line("recv_meetinggauge", secret: false,
                         ("ratio", data != null && data.Length > 0 ? data[0] : -1));
                     break;
+            }
+        }
+
+        private void PresentCurseStarted(int catActor, long timeUnixMs)
+        {
+            RolesClient.ApplyCurseStarted(catActor, timeUnixMs);
+            PushToast(SessionNotice.ForBlackCatRevealed(ResolveDisplayName(catActor)));
+            EnsureSfxBuilt();
+            _sfxPlayer.Play("sfx_execution_curse");
+            if (catActor == LocalActor)
+            {
+                AttachCurseSource();
+                MaybeShowTutorial(TutorialId.BlackCatSelectedForExecution);
+            }
+            else
+            {
+                if (_votePanel.Exists)
+                {
+                    _votePanel.ShowStatusBanner(
+                        Texts.Format(TextId.CurseBlackCatRevealedFormat, ResolveDisplayName(catActor)));
+                    _votePanel.SetTimeOverride(timeUnixMs);
+                }
+                MaybeShowTutorial(TutorialId.BlackCatExecutionRevealed);
             }
         }
 

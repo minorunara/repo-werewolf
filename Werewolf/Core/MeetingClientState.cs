@@ -42,6 +42,8 @@ namespace Werewolf.Core
 
         public MeetingOutcome Result { get; private set; }
 
+        public long MeetingTotalMs { get; private set; }
+
         public RowStatus GetRowStatus(int actorNumber)
             => _rows.TryGetValue(actorNumber, out var status) ? status : RowStatus.Alive;
 
@@ -112,6 +114,7 @@ namespace Werewolf.Core
             Kind = kind;
             _warpUnixMs = warpUnixMs;
             _endUnixMs = endUnixMs;
+            MeetingTotalMs = endUnixMs > warpUnixMs ? endUnixMs - warpUnixMs : 0;
             _votingUiOffsetMs = MeetingIntro.VotingUiDelayMs;
             _voted.Clear();
             Result = null;
@@ -173,6 +176,7 @@ namespace Werewolf.Core
             Kind = ConveneKind.Button;
             _warpUnixMs = WarpAlreadyDone;
             _endUnixMs = endUnixMs;
+            MeetingTotalMs = 0;
             _votingUiOffsetMs = 0;
             _voted.Clear();
             Result = null;
@@ -187,6 +191,7 @@ namespace Werewolf.Core
             Kind = ConveneKind.Button;
             _warpUnixMs = 0;
             _endUnixMs = 0;
+            MeetingTotalMs = 0;
             _votingUiOffsetMs = 0;
             _rows.Clear();
             _voted.Clear();

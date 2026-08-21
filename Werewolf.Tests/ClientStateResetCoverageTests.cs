@@ -52,7 +52,9 @@ namespace Werewolf.Tests
 
             ["_pendingBeaconAudit"] = ReasonMeetingScoped,
             ["_pendingMeetingTutorial"] = ReasonMeetingScoped,
-            ["_executionSfxWaitTicks"] = ReasonMeetingScoped,
+            ["_resultCeremonyAtMs"] = ReasonMeetingScoped,
+            ["_pendingCurseCatActor"] = ReasonMeetingScoped,
+            ["_pendingCurseDeadlineMs"] = ReasonMeetingScoped,
 
             ["_modIntegritySessionActive"] = ReasonLobbyScoped,
             ["_modIntegrityHostActor"] = ReasonLobbyScoped,

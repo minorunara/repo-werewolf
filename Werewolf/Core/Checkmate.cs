@@ -67,14 +67,17 @@ namespace Werewolf.Core
             Detected = true;
         }
 
-        public CheckmateAction Tick(long nowUnixMs, GamePhase phase, bool curseActive)
+        public CheckmateAction Tick(long nowUnixMs, GamePhase phase, bool curseActive,
+            bool meetingCountdown = false)
         {
             if (Confirmed) return CheckmateAction.None;
 
             if (!CeremonyStarted)
             {
                 if (!Detected) return CheckmateAction.None;
-                if (phase != GamePhase.Play || curseActive) return CheckmateAction.None;
+                bool phaseAllows = phase == GamePhase.Play
+                    || (phase == GamePhase.Meeting && meetingCountdown);
+                if (!phaseAllows || curseActive) return CheckmateAction.None;
                 CeremonyStarted = true;
                 _ceremonyStartUnixMs = nowUnixMs;
                 return CheckmateAction.StartCeremony;

@@ -64,7 +64,7 @@ namespace Werewolf.UI
             float iconCenterY = LabelHeight + LabelGap + plate / 2f;
 
             _slotRect = UiKit.CreateRect(rect, "Slot", Vector2.zero, new Vector2(plate, plate));
-            SetAnchorsBottomLeft(_slotRect, new Vector2(iconCenterX, iconCenterY),
+            UiKit.SetAnchorsBottomLeft(_slotRect, new Vector2(iconCenterX, iconCenterY),
                 new Vector2(plate, plate));
 
             _icon = UiKit.CreateImage(_slotRect, "Icon", Vector2.zero,
@@ -99,7 +99,7 @@ namespace Werewolf.UI
                 new Vector2(iconCenterX, LabelHeight / 2f),
                 new Vector2(rootWidth + LabelExtraWidth, LabelHeight),
                 string.Empty, LabelFontSize, IdleLabelColor, TextAlignmentOptions.Center);
-            SetAnchorsBottomLeft(_keyLabel.rectTransform,
+            UiKit.SetAnchorsBottomLeft(_keyLabel.rectTransform,
                 new Vector2(iconCenterX, LabelHeight / 2f),
                 new Vector2(rootWidth + LabelExtraWidth, LabelHeight));
 
@@ -177,12 +177,5 @@ namespace Werewolf.UI
             _lastKeyName = null;
         }
 
-        private static void SetAnchorsBottomLeft(RectTransform rect, Vector2 centerPos, Vector2 size)
-        {
-            rect.anchorMin = rect.anchorMax = new Vector2(0f, 0f);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = centerPos;
-            rect.sizeDelta = size;
-        }
     }
 }

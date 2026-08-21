@@ -36,6 +36,8 @@ namespace Werewolf.Core
 
         public int ScatterGuardSec = 15;
 
+        public int MeetingEnemyRespawnScalePct = 75;
+
         public float ButtonOffsetX = -6.2f;
 
         public float ButtonOffsetY = 0f;

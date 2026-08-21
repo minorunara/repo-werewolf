@@ -61,7 +61,7 @@ namespace Werewolf.Core
             if (players.Count < PlayerCountGate.MinimumPlayers)
             {
                 throw new ArgumentOutOfRangeException(
-                    nameof(players), players.Count, "役職割当は3人以上でのみ定義される（Req 1.4）。");
+                    nameof(players), players.Count, "役職割当は3人以上でのみ定義される。");
             }
 
             var (n, corrected) = CorrectWerewolfSlots(config, players.Count);

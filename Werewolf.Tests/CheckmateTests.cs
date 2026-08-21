@@ -141,6 +141,39 @@ namespace Werewolf.Tests
             Assert.Equal(CheckmateAction.StartCeremony, seq.Tick(Now + 2000, GamePhase.Play, false));
         }
 
+        [Fact]
+        public void Sequence_DetectedDuringConveneCountdown_StartsImmediately()
+        {
+            var seq = new CheckmateSequence();
+            seq.NotifyDetected();
+
+            Assert.Equal(CheckmateAction.StartCeremony,
+                seq.Tick(Now, GamePhase.Meeting, curseActive: false, meetingCountdown: true));
+            Assert.True(seq.CeremonyStarted);
+        }
+
+        [Fact]
+        public void Sequence_ConveneCountdownWithActiveCurse_StillDefers()
+        {
+            var seq = new CheckmateSequence();
+            seq.NotifyDetected();
+
+            Assert.Equal(CheckmateAction.None,
+                seq.Tick(Now, GamePhase.Meeting, curseActive: true, meetingCountdown: true));
+            Assert.False(seq.CeremonyStarted);
+        }
+
+        [Fact]
+        public void Sequence_CountdownFlagOutsideMeetingPhase_DoesNotBypassPhaseGate()
+        {
+            var seq = new CheckmateSequence();
+            seq.NotifyDetected();
+
+            Assert.Equal(CheckmateAction.None,
+                seq.Tick(Now, GamePhase.Lobby, curseActive: false, meetingCountdown: true));
+            Assert.False(seq.CeremonyStarted);
+        }
+
         private GameSession CreateStartedSession()
         {
             var session = new GameSession();
@@ -215,9 +248,10 @@ namespace Werewolf.Tests
             var session = CreateStartedSession();
 
             session.RecordDeath(1, Now + 1000);
+            session.ConfirmPendingWin(Now + 1000 + EradicationCeremony.CeremonyMs);
             Assert.Equal(Team.Villagers, session.Winner.WinningTeam);
 
-            session.NotifyValueCheckmate(Now + 2000);
+            session.NotifyValueCheckmate(Now + 20_000);
             Assert.Equal(WinReason.WerewolvesEradicated, session.Winner.Reason);
             Assert.Single(_sent, m => m.Code == WWEventCodes.GameOver);
         }

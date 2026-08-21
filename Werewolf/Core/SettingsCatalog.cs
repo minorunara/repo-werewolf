@@ -414,6 +414,15 @@ namespace Werewolf.Core
                 RawValue = c => c.ScatterGuardSec.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
+            new SettingEntry
+            {
+                SettingId = "MeetingEnemyRespawnScalePct",
+                Section = SectionMeeting,
+                LabelJa = Texts.Get(TextId.SettingsLabelMeetingEnemyRespawnScalePct),
+                Unit = Texts.Get(TextId.SettingsUnitPercent),
+                RawValue = c => c.MeetingEnemyRespawnScalePct.ToString(CultureInfo.InvariantCulture),
+                Display = raw => raw,
+            },
         };
 
         private static SettingEntry[] BuildRoleAssignmentEntries() => new[]

@@ -1,9 +1,14 @@
 using Werewolf.Core;
+using Werewolf.UI;
 
 namespace Werewolf.Game
 {
     public sealed partial class WerewolfDirector
     {
+        private readonly TutorialPresenter _tutorialPresenter = new TutorialPresenter();
+
+        private readonly TutorialBubblePanel _tutorialBubble = new TutorialBubblePanel();
+
         private bool _wasRoleRevealVisible;
 
         private int _prevBeaconCharges;
@@ -44,7 +49,12 @@ namespace Werewolf.Game
             var bindings = Plugin.Bindings;
             if (bindings != null) _tutorialPresenter.FontScale = bindings.TutorialFontScale.Value;
 
-            TutorialId? shown = _tutorialPresenter.Tick();
+            bool meetingUiVisible = _uiManager != null
+                && _uiManager.IsLayerVisible(WerewolfUIManager.MeetingLayer);
+            if (meetingUiVisible) EnsurePanelBuilt(_tutorialBubble);
+            _tutorialPresenter.Bubble = _tutorialBubble;
+
+            TutorialId? shown = _tutorialPresenter.Tick(meetingUiVisible);
             if (shown.HasValue)
             {
                 bindings?.MarkTutorialSeen(shown.Value);

@@ -1,6 +1,6 @@
 {
     "name": "REPO_Werewolf",
-    "version_number": "1.2.0",
+    "version_number": "1.3.0",
     "website_url": "https://github.com/minorunara/repo-werewolf",
     "description": "Among Us-style werewolf mode for R.E.P.O. Villagers must meet the quota. Werewolves can destroy valuables before the map records them. Meetings, PvP, lobby settings, a full map, and match replays. 3+ players. Same version required. EN/JP. REPO人狼。",
     "dependencies": [

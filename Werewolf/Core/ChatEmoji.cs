@@ -21,11 +21,13 @@ namespace Werewolf.Core
             [0x1F448] = "emoji_backhand_index_left",
             [0x1F479] = "emoji_ogre",
             [0x1F4A8] = "emoji_dashing_away",
+            [0x1F514] = "emoji_bell",
         };
 
         private static readonly Dictionary<TextId, string> _templates = new Dictionary<TextId, string>
         {
             [TextId.ChatLogScatterTitle] = "👥",
+            [TextId.ChatLogMeetingNumberFormat] = "🔔 {0}",
             [TextId.RecapDeathsFormat] = "👻: {0}",
             [TextId.RecapDeathsNone] = "👻: ❌",
             [TextId.RecapLostFormat] = "💔🔨: -${0}",

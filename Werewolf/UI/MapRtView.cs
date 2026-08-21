@@ -134,27 +134,6 @@ namespace Werewolf.UI
             _boundsHalfH = 0f;
         }
 
-        public bool TryGetProjection(float panelWidth, float panelHeight, out MapPanelProjection projection)
-        {
-            projection = default;
-            try
-            {
-                Map map = Map.Instance;
-                if (_cachedCamera == null || map == null || map.OverLayerParent == null) return false;
-                Vector3 origin = map.OverLayerParent.position;
-                Vector3 cam = _cachedCamera.transform.position;
-                projection = new MapPanelProjection(
-                    map.Scale, origin.x, origin.z, cam.x, cam.z,
-                    _cachedCamera.orthographicSize, Mathf.Max(0.01f, _cachedCamera.aspect),
-                    panelWidth, panelHeight);
-                return projection.Valid;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
         public static bool IsMapToolActive()
         {
             try

@@ -206,7 +206,16 @@ namespace Werewolf.Tests
 
             session.RecordDeath(1, Now + 1000);
 
-            Assert.Equal(new[] { 168, 169, 172 }, _sent.Select(m => (int)m.Code).ToArray());
+            Assert.Equal(new[] { 168, 192 }, _sent.Select(m => (int)m.Code).ToArray());
+            Assert.Null(session.Winner);
+            Assert.True(session.WinLocked);
+            Assert.Equal(GamePhase.Play, session.Phase);
+            Assert.Contains(_events, e => e.Kind == SessionEventKind.WinLocked
+                && e.ActorNumber == 1 && !e.Vanished
+                && e.Winner.WinningTeam == Team.Villagers);
+
+            session.ConfirmPendingWin(Now + 1000 + EradicationCeremony.CeremonyMs);
+            Assert.Equal(new[] { 168, 192, 169, 172 }, _sent.Select(m => (int)m.Code).ToArray());
             Assert.Equal(Team.Villagers, session.Winner.WinningTeam);
             Assert.Equal(WinReason.WerewolvesEradicated, session.Winner.Reason);
             Assert.Equal(GamePhase.GameOver, session.Phase);
@@ -243,7 +252,12 @@ namespace Werewolf.Tests
 
             session.NotifyPlayerLeft(1, Now + 1000);
 
-            Assert.Equal(new[] { 169, 172 }, _sent.Select(m => (int)m.Code).ToArray());
+            Assert.Equal(new[] { 192 }, _sent.Select(m => (int)m.Code).ToArray());
+            Assert.Contains(_events, e => e.Kind == SessionEventKind.WinLocked
+                && e.ActorNumber == 1 && e.Vanished);
+
+            session.ConfirmPendingWin(Now + 1000 + EradicationCeremony.CeremonyMs);
+            Assert.Equal(new[] { 192, 169, 172 }, _sent.Select(m => (int)m.Code).ToArray());
             Assert.Equal(Team.Villagers, session.Winner.WinningTeam);
             Assert.Equal(WinReason.WerewolvesEradicated, session.Winner.Reason);
             Assert.Equal(GamePhase.GameOver, session.Phase);
@@ -262,6 +276,8 @@ namespace Werewolf.Tests
 
             session.NotifyPlayerLeft(5, Now + 3000);
 
+            Assert.True(session.WinLocked);
+            session.ConfirmPendingWin(Now + 3000 + EradicationCeremony.CeremonyMs);
             Assert.Equal(Team.Werewolves, session.Winner.WinningTeam);
             Assert.Equal(WinReason.VillagersEradicated, session.Winner.Reason);
             Assert.Equal(GamePhase.GameOver, session.Phase);
@@ -288,6 +304,8 @@ namespace Werewolf.Tests
 
             session.NotifyPlayerLeft(1, Now + 2000);
 
+            Assert.True(session.WinLocked);
+            session.ConfirmPendingWin(Now + 2000 + EradicationCeremony.CeremonyMs);
             Assert.Equal(Team.Villagers, session.Winner.WinningTeam);
             Assert.Equal(GamePhase.GameOver, session.Phase);
         }

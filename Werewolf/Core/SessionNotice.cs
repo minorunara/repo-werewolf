@@ -4,8 +4,6 @@ namespace Werewolf.Core
     {
         ConveneStarted = 0,
 
-        BeaconAudit = 1,
-
         NoExecution = 2,
 
         Executed = 3,
@@ -42,13 +40,8 @@ namespace Werewolf.Core
 
         public ConveneRejectReason DenyReason { get; private set; } = ConveneRejectReason.None;
 
-        public int BeaconUseCount { get; private set; }
-
         public static SessionNotice ForConveneStarted(string callerName)
             => new SessionNotice(NoticeKind.ConveneStarted) { ActorName = callerName };
-
-        public static SessionNotice ForBeaconAudit(int useCount)
-            => new SessionNotice(NoticeKind.BeaconAudit) { BeaconUseCount = useCount };
 
         public static SessionNotice ForNoExecution()
             => new SessionNotice(NoticeKind.NoExecution);

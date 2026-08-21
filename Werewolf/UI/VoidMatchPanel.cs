@@ -44,10 +44,7 @@ namespace Werewolf.UI
             var go = new GameObject("WW_VoidMatch", typeof(RectTransform));
             var rect = (RectTransform)go.transform;
             rect.SetParent(layerRoot, false);
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
+            UiKit.Stretch(rect);
             _root = go;
 
             var canvas = go.AddComponent<Canvas>();
@@ -57,20 +54,14 @@ namespace Werewolf.UI
             var confirm = new GameObject("Confirm", typeof(RectTransform));
             var confirmRect = (RectTransform)confirm.transform;
             confirmRect.SetParent(rect, false);
-            confirmRect.anchorMin = Vector2.zero;
-            confirmRect.anchorMax = Vector2.one;
-            confirmRect.offsetMin = Vector2.zero;
-            confirmRect.offsetMax = Vector2.zero;
+            UiKit.Stretch(confirmRect);
             _confirmRoot = confirm;
 
             Image backdrop = UiKit.CreateImage(confirmRect, "Backdrop", Vector2.zero,
                 new Vector2(1920f, 1080f), new Color(0f, 0f, 0f, BackdropAlpha));
             backdrop.raycastTarget = false;
             var bgRect = backdrop.rectTransform;
-            bgRect.anchorMin = Vector2.zero;
-            bgRect.anchorMax = Vector2.one;
-            bgRect.offsetMin = Vector2.zero;
-            bgRect.offsetMax = Vector2.zero;
+            UiKit.Stretch(bgRect);
 
             Image box = UiKit.CreateImage(confirmRect, "Box", new Vector2(0f, 60f),
                 new Vector2(BoxWidth, BoxHeight), new Color(0.08f, 0.08f, 0.1f, 0.92f));

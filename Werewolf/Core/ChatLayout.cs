@@ -81,6 +81,8 @@ namespace Werewolf.Core
         private long _syncedDropped;
         private int _lastActor = int.MinValue;
 
+        private Func<ChatLogEntry, bool> _filter;
+
         private float _cursor;
         private float _origin;
 
@@ -115,6 +117,13 @@ namespace Werewolf.Core
             if (log.AppendedTotal != _syncedAppended) AppendTail(log, measureBubble);
         }
 
+        public void SetFilter(Func<ChatLogEntry, bool> filter)
+        {
+            if (ReferenceEquals(_filter, filter)) return;
+            _filter = filter;
+            Reset();
+        }
+
         public void Reset()
         {
             _blockHead = 0;
@@ -131,6 +140,22 @@ namespace Werewolf.Core
         public float ContentTop(int index) => this[index].Top - _origin;
 
         public bool IsGroupHead(int index) => index == 0 || this[index - 1].Kind == ChatBlockKind.Speaker;
+
+        public bool TryGetContentTop(long entrySeq, out float top)
+        {
+            top = 0f;
+            int lo = 0;
+            int hi = _blockCount;
+            while (lo < hi)
+            {
+                int mid = (lo + hi) >> 1;
+                if (this[mid].EntrySeq < entrySeq) lo = mid + 1;
+                else hi = mid;
+            }
+            if (lo >= _blockCount || this[lo].EntrySeq != entrySeq) return false;
+            top = this[lo].Top - _origin;
+            return true;
+        }
 
         public void GetVisibleRange(float from, float to, out int first, out int end)
         {
@@ -198,6 +223,8 @@ namespace Werewolf.Core
             {
                 ChatLogEntry entry = log.Entries[i];
                 long seq = log.DroppedTotal + i;
+
+                if (_filter != null && !_filter(entry)) continue;
 
                 if (entry.Kind == ChatEntryKind.Vote)
                 {

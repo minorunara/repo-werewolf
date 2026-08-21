@@ -29,10 +29,7 @@ namespace Werewolf.UI
             var go = new GameObject("WW_StartHold", typeof(RectTransform));
             var rect = (RectTransform)go.transform;
             rect.SetParent(layerRoot, false);
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
+            UiKit.Stretch(rect);
             _root = go;
 
             _group = go.AddComponent<CanvasGroup>();
@@ -43,10 +40,7 @@ namespace Werewolf.UI
             Image backdrop = UiKit.CreateImage(rect, "Backdrop", Vector2.zero,
                 new Vector2(1920f, 1080f), new Color(0f, 0f, 0f, BackdropAlpha));
             var bgRect = backdrop.rectTransform;
-            bgRect.anchorMin = Vector2.zero;
-            bgRect.anchorMax = Vector2.one;
-            bgRect.offsetMin = Vector2.zero;
-            bgRect.offsetMax = Vector2.zero;
+            UiKit.Stretch(bgRect);
 
             UiKit.CreateText(rect, "Message", new Vector2(0f, 0f), new Vector2(1600f, 100f),
                 Texts.Get(TextId.StartHoldWaitingOthers), 44f, Color.white, TextAlignmentOptions.Center);

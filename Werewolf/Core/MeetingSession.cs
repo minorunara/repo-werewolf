@@ -79,6 +79,9 @@ namespace Werewolf.Core
 
         public MeetingOutcome Outcome { get; private set; }
 
+        public long ResultCeremonyDelayMs
+            => Outcome == null ? 0 : VoteTallyTimeline.CeremonyDelayMs(Outcome.VoteCounts);
+
         public long LastMeetingEndUnixMs { get; private set; } = long.MinValue;
 
         public int CallerActor { get; private set; } = -1;
@@ -145,7 +148,7 @@ namespace Werewolf.Core
         public bool TryConveneScatterGuard(int victimActor, long nowUnixMs)
         {
             if (Stage != MeetingStage.Idle || _gameSession.Phase != GamePhase.Play
-                || FindPlayer(victimActor) == null)
+                || _gameSession.WinLocked || FindPlayer(victimActor) == null)
             {
                 WLog.Line("scatter_guard_convene_rejected", secret: false,
                     ("victim", victimActor), ("stage", Stage), ("phase", _gameSession.Phase));
@@ -189,6 +192,8 @@ namespace Werewolf.Core
             if (Stage != MeetingStage.Idle) return ConveneRejectReason.AlreadyMeeting;
 
             if (_gameSession.Phase != GamePhase.Play) return ConveneRejectReason.WrongPhase;
+
+            if (_gameSession.WinLocked) return ConveneRejectReason.WrongPhase;
 
             if (!caller.Alive) return ConveneRejectReason.CallerDead;
 
@@ -254,6 +259,8 @@ namespace Werewolf.Core
 
         public void Tick(long nowUnixMs)
         {
+            if (_gameSession.WinLocked) return;
+
             switch (Stage)
             {
                 case MeetingStage.Countdown:
@@ -339,7 +346,7 @@ namespace Werewolf.Core
         {
             Outcome = _voteBox.Tally(IsEligibleForExecution);
             Stage = MeetingStage.Closing;
-            _closingUntilUnixMs = nowUnixMs
+            _closingUntilUnixMs = nowUnixMs + ResultCeremonyDelayMs
                 + Math.Max(_config.ResultDisplaySec, PostResultKillDelaySec + 1) * 1000L;
 
             Send(new OutboundMessage(

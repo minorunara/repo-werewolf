@@ -16,7 +16,6 @@ namespace Werewolf.UI
         private static readonly Vector2 IconSize = new Vector2(256f, 256f);
         private const float TitleFontSize = 64f;
         private const float BodyFontSize = 34f;
-        private const float BodyLineHeight = 44f;
 
         private const float SelfIdFontSize = 40f;
         private const float SelfIdPosY = 370f;
@@ -53,10 +52,7 @@ namespace Werewolf.UI
             var go = new GameObject("WW_RoleReveal", typeof(RectTransform));
             var rect = (RectTransform)go.transform;
             rect.SetParent(layerRoot, false);
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
+            UiKit.Stretch(rect);
             _root = go;
 
             _group = go.AddComponent<CanvasGroup>();
@@ -67,10 +63,7 @@ namespace Werewolf.UI
             _background = UiKit.CreateImage(rect, "Bg", Vector2.zero,
                 new Vector2(1920f, 1080f), new Color(0f, 0f, 0f, 0.85f));
             var bgRect = _background.rectTransform;
-            bgRect.anchorMin = Vector2.zero;
-            bgRect.anchorMax = Vector2.one;
-            bgRect.offsetMin = Vector2.zero;
-            bgRect.offsetMax = Vector2.zero;
+            UiKit.Stretch(bgRect);
             _background.raycastTarget = false;
 
             _selfIdText = UiKit.CreateText(rect, "SelfId", new Vector2(0f, SelfIdPosY),

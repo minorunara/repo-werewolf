@@ -30,10 +30,7 @@ namespace Werewolf.UI
             var go = new GameObject("WW_IdBadgePresenter", typeof(RectTransform));
             var rect = (RectTransform)go.transform;
             rect.SetParent(layerRoot, false);
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
+            UiKit.Stretch(rect);
             _root = go;
             _root.SetActive(false);
         }

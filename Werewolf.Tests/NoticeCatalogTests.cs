@@ -13,22 +13,6 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void BeaconAudit_IncludesUseCountButNotUserOrLocation()
-        {
-            var notice = SessionNotice.ForBeaconAudit(2);
-            var text = NoticeCatalog.Format(notice);
-
-            Assert.Equal("前回の会議以降、ビーコンは2回使用されました", text);
-        }
-
-        [Fact]
-        public void BeaconAudit_ZeroUses_ShowsExplicitNoneText()
-        {
-            var notice = SessionNotice.ForBeaconAudit(0);
-            Assert.Equal("前回の会議以降、ビーコンは使用されませんでした", NoticeCatalog.Format(notice));
-        }
-
-        [Fact]
         public void NoExecution_ShowsFixedText()
         {
             var notice = SessionNotice.ForNoExecution();
@@ -124,8 +108,6 @@ namespace Werewolf.Tests
             var notices = new[]
             {
                 SessionNotice.ForConveneStarted("Alice"),
-                SessionNotice.ForBeaconAudit(1),
-                SessionNotice.ForBeaconAudit(0),
                 SessionNotice.ForNoExecution(),
                 SessionNotice.ForExecuted("Bob"),
                 SessionNotice.ForBlackCatRevealed("Carol"),

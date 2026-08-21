@@ -243,6 +243,9 @@ namespace Werewolf.Debugging
 
             h.Session.RecordDeath(-1, Now + 1000);
 
+            Check(fails, h.Session.WinLocked, "win not locked after last wolf died");
+            h.Session.ConfirmPendingWin(Now + 1000 + EradicationCeremony.CeremonyMs);
+
             Check(fails, h.Session.Winner != null, "no winner after last wolf died");
             Check(fails, h.Session.Winner != null && h.Session.Winner.WinningTeam == Team.Villagers,
                 "winner is not villagers");
@@ -271,6 +274,8 @@ namespace Werewolf.Debugging
             h.Session.RecordDeath(1, Now + 1000);
             h.Session.RecordDeath(-3, Now + 2000);
             h.Session.RecordDeath(-4, Now + 3000);
+
+            h.Session.ConfirmPendingWin(Now + 3000 + EradicationCeremony.CeremonyMs);
 
             Check(fails, h.Session.Winner != null, "no winner after villagers eradicated");
             Check(fails, h.Session.Winner != null && h.Session.Winner.WinningTeam == Team.Werewolves,
@@ -606,7 +611,7 @@ namespace Werewolf.Debugging
             Check(fails, h.Client.Result != null && h.Client.Result.ExecutedActor == -2,
                 "client result not applied");
 
-            h.Clock += 6_000;
+            h.Clock += h.Meeting.ResultCeremonyDelayMs + 6_000;
             h.Meeting.Tick(h.Clock);
             Check(fails, h.Meeting.Stage == MeetingStage.Idle, "stage is not Idle after ClosingHold");
             var phasePlay = h.LastReceived(WWEventCodes.PhaseChanged);
@@ -712,7 +717,7 @@ namespace Werewolf.Debugging
             }
             Check(fails, h.ExecutedActors.Count == 0, "execute instruction issued unexpectedly");
 
-            h.Clock += 6_000;
+            h.Clock += h.Meeting.ResultCeremonyDelayMs + 6_000;
             h.Meeting.Tick(h.Clock);
             Check(fails, h.Meeting.Stage == MeetingStage.Idle, "stage is not Idle after ClosingHold");
             var phasePlay = h.LastReceived(WWEventCodes.PhaseChanged);
@@ -825,7 +830,8 @@ namespace Werewolf.Debugging
                 };
                 M.Meeting.OnExecutePlayer += actor =>
                 {
-                    if (Roles.TryStartCurse(actor, M.Clock, out long holdMs, M.Meeting.VotersFor(actor)))
+                    if (Roles.TryStartCurse(actor, M.Clock + M.Meeting.ResultCeremonyDelayMs,
+                            out long holdMs, M.Meeting.VotersFor(actor)))
                     {
                         M.Meeting.ExtendClosingHold(holdMs);
                     }
@@ -1156,6 +1162,8 @@ namespace Werewolf.Debugging
             h.M.Clock += 10_000;
             h.Roles.Tick(h.M.Clock);
             Check(fails, h.CurseKills.Count == 1 && h.CurseKills[0] == -1, "curse kill not issued to -1");
+            Check(fails, h.M.Game.WinLocked, "win not locked after curse eradication");
+            h.M.Game.ConfirmPendingWin(h.M.Clock + EradicationCeremony.CeremonyMs);
             Check(fails, h.M.Game.Winner != null && h.M.Game.Winner.WinningTeam == Team.Villagers,
                 "villagers did not win after curse eradication");
             Check(fails, h.CountHostSent(WWRolesCodes.RoleState, RoleStateSubtype.CurseResolved) == 1,
@@ -1275,7 +1283,8 @@ namespace Werewolf.Debugging
                 "curse death not recorded as non-vote");
             Check(fails, h.M.Meeting.Stage == MeetingStage.Closing, "closing ended at resolve time");
 
-            h.M.Clock = meetingStart + (6 + 10 + RolesSession.CurseKillDelaySec
+            h.M.Clock = meetingStart + h.M.Meeting.ResultCeremonyDelayMs
+                + (6 + 10 + RolesSession.CurseKillDelaySec
                 - MeetingSession.PostResultKillDelaySec) * 1000L;
             h.M.Meeting.Tick(h.M.Clock);
             Check(fails, h.M.Meeting.Stage == MeetingStage.Idle, "meeting not finished after hold");
@@ -1415,7 +1424,7 @@ namespace Werewolf.Debugging
             h.M.Meeting.CastVote(-2, -1, h.M.Clock);
             h.M.Meeting.CastVote(-3, -1, h.M.Clock);
             h.M.Meeting.Tick(h.M.Clock);
-            h.M.Clock += 7_000;
+            h.M.Clock += h.M.Meeting.ResultCeremonyDelayMs + 7_000;
             h.M.Meeting.Tick(h.M.Clock);
             Check(fails, h.M.Meeting.Stage == MeetingStage.Idle, "meeting not finished");
             h.M.Clock += 1_000;

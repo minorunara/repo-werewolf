@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.3.0
+
+### 日本語
+
+- 陣営の全滅で勝敗が決まったとき、決め手となったプレイヤーを発表する演出を挟むようにしました
+- ロビー設定「会議中の敵リスポーン係数」を追加しました。会議中に消えた敵の復活と復活間隔の短縮がどれだけ進むかを0〜100%で決められます。0%なら会議の前後で敵の状況が変わらず、100%は従来どおりです
+- 会議開催カウントダウン中にも貴重品詰みによる人狼の勝利が成立するようにしました
+- 残り5分のチャイムと同時に警告演出が流れるようにしました
+- 議論開始時に演出を追加しました
+- 会議開始時に出ていたビーコン使用回数の通知をやめ、会議冒頭のTaxManの要約だけで伝えるようにしました
+- 会議の投票パネルに残り時間バーを追加しました。左端の赤い部分は投票では削れない最後の10秒です
+- 会議チャットログを同じ試合の間は消さずに持ち越すようにしました。過去の会議の発言もスクロールで遡って読め、会議の区切りは見出しとスクロールバーの目盛りで分かります。ヘッダー右端の▲▼ボタンで前後の会議へジャンプできます
+- 会議チャットログ・感想戦チャットに話者フィルタを追加しました。発言者の名前・アバターをクリックするとその人の発言だけが表示され、タイトルの「フィルター中」をクリックすると解除できます
+- 開票演出をリニューアルしました。得票数もより見やすくなっています
+- 会議中のチュートリアルを画面左下のTaxManの吹き出しで表示するようにしました
+
+### English
+
+- When a match is decided by a team being wiped out, the game now shows an announcement of the player who decided it
+- Added the lobby setting "Enemy respawn clock during meetings". It sets how far the respawn of downed enemies and the shortening of the respawn interval progress during a meeting, anywhere from 0 to 100%. At 0% enemies come back exactly as they were before the meeting; 100% works as before
+- A werewolf win by valuables checkmate can now be established during the meeting countdown
+- The five-minute chime is now accompanied by a warning banner sweeping across the screen
+- Added an effect when discussion begins
+- Removed the beacon usage notification shown at the start of a meeting; the count is now only in TaxMan's recap at the top of the meeting
+- The meeting vote panel now shows a remaining-time bar. The red part at the left end is the final 10 seconds that votes cannot cut into
+- The meeting chat log is now kept for the whole match instead of being cleared every meeting, so you can scroll back to what was said in earlier meetings. Headings and gold marks on the scrollbar show where each meeting begins, and the ▲▼ buttons at the right of the header jump between meetings
+- Added a speaker filter to the meeting chat log and post-match chat. Click a speaker's name or avatar to show only that player's messages, and click the "Filtering" title to clear it
+- Reworked the vote reveal. Vote counts are easier to read, too
+- Tutorial tips during meetings are now shown in a speech bubble from TaxMan at the bottom left of the screen
+
 ## 1.2.0
 
 ### 日本語

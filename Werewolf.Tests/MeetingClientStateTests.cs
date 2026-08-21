@@ -31,6 +31,20 @@ namespace Werewolf.Tests
         }
 
         [Fact]
+        public void MeetingTotalMs_SetOnStart_ZeroOnRestoreAndReset()
+        {
+            var s = new MeetingClientState();
+            s.ApplyStartMeeting(caller: 1, warpUnixMs: 5_000, endUnixMs: 185_000);
+            Assert.Equal(180_000, s.MeetingTotalMs);
+
+            s.Reset();
+            Assert.Equal(0, s.MeetingTotalMs);
+
+            s.RestoreFromRoomState(caller: 1, endUnixMs: 90_000);
+            Assert.Equal(0, s.MeetingTotalMs);
+        }
+
+        [Fact]
         public void RemainingMs_WhenInactive_IsZero()
         {
             var s = new MeetingClientState();

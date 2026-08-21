@@ -87,6 +87,8 @@ foreach ($fileName in @("manifest.json", "CHANGELOG.md")) {
 }
 Copy-Item -LiteralPath $iconPath -Destination (Join-Path $stageDirectory "icon.png")
 Copy-Item -LiteralPath (Join-Path $stableMetadataDirectory "github\LICENSE") -Destination (Join-Path $stageDirectory "LICENSE")
+# 埋め込みNoto Emoji（OFL 1.1）は「受領者へライセンス本文の写しを渡す」ためzip直下へ同梱する
+Copy-Item -LiteralPath (Join-Path $stableMetadataDirectory "github\LICENSE-NotoEmoji.txt") -Destination (Join-Path $stageDirectory "LICENSE-NotoEmoji.txt")
 
 $readmeSource = Get-Content -LiteralPath (Join-Path $metadataDirectory "README.md") -Raw -Encoding UTF8
 if ($Channel -eq "Beta") {
@@ -116,6 +118,7 @@ try {
         "CHANGELOG.md",
         "icon.png",
         "LICENSE",
+        "LICENSE-NotoEmoji.txt",
         "BepInEx/plugins/$pluginFolderName/Minorunara_Werewolf.dll",
         "BepInEx/plugins/$pluginFolderName/replay-viewer.html"
     )

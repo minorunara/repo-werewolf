@@ -213,7 +213,7 @@ namespace Werewolf.Tests
             h.Session.Tick(warp);
             long end = warp + MeetingIntro.VotingUiDelayMs + 120_000;
             h.Session.Tick(end);
-            h.Session.Tick(end + 6_000);
+            h.Session.Tick(end + h.Session.ResultCeremonyDelayMs + 6_000);
         }
     }
 }

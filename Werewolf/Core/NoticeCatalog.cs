@@ -11,11 +11,6 @@ namespace Werewolf.Core
                 case NoticeKind.ConveneStarted:
                     return Texts.Format(TextId.NoticeConveneStartedFormat, notice.ActorName);
 
-                case NoticeKind.BeaconAudit:
-                    return notice.BeaconUseCount > 0
-                        ? Texts.Format(TextId.NoticeBeaconAuditFormat, notice.BeaconUseCount)
-                        : Texts.Get(TextId.NoticeBeaconAuditNone);
-
                 case NoticeKind.NoExecution:
                     return Texts.Get(TextId.NoticeNoExecution);
 

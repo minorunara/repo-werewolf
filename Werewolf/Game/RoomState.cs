@@ -103,30 +103,6 @@ namespace Werewolf.Game
             return false;
         }
 
-        public bool TryReadRoundEndTime(out long roundEndUnixMs)
-        {
-            roundEndUnixMs = 0;
-            Room room = PhotonNetwork.CurrentRoom;
-            if (room != null && room.CustomProperties.TryGetValue(KeyRoundEndTime, out object value) && value is long l)
-            {
-                roundEndUnixMs = l;
-                return true;
-            }
-            return false;
-        }
-
-        public bool TryReadAlive(int actorNumber, out bool alive)
-        {
-            alive = true;
-            Player player = PhotonNetwork.CurrentRoom?.GetPlayer(actorNumber);
-            if (player != null && player.CustomProperties.TryGetValue(KeyIsAlive, out object value) && value is byte b)
-            {
-                alive = b != 0;
-                return true;
-            }
-            return false;
-        }
-
         public void PublishSettings(GameConfig config, int playerCount)
         {
             SemiFunc.SetCurrentRoomProperty(KeyMinimapHide, RoomStateKeys.EncodeBool(config.MinimapHideEnabled));

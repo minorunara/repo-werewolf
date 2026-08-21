@@ -245,6 +245,44 @@ namespace Werewolf.Tests
         }
 
         [Fact]
+        public void TryGetContentTop_ReturnsTheSpeakerHeaderTopOfTheEntry()
+        {
+            ChatLayout layout = NewLayout();
+            layout.Sync(LogWith((1, "a"), (1, "b"), (2, "c")), FixedSize);
+
+            Assert.True(layout.TryGetContentTop(2L, out float top));
+            Assert.Equal(ChatBlockKind.Speaker, layout[3].Kind);
+            Assert.Equal(2L, layout[3].EntrySeq);
+            Assert.Equal(layout.ContentTop(3), top, 3);
+        }
+
+        [Fact]
+        public void TryGetContentTop_UnknownOrDroppedSeq_ReturnsFalse()
+        {
+            ChatLayout layout = NewLayout();
+            layout.Sync(LogWith((1, "a")), FixedSize);
+
+            Assert.False(layout.TryGetContentTop(99L, out _));
+            Assert.False(layout.TryGetContentTop(-1L, out _));
+        }
+
+        [Fact]
+        public void TryGetContentTop_AfterLeadingTrim_TracksTheMovedOrigin()
+        {
+            var log = new MeetingChatLog();
+            for (int i = 0; i < MeetingChatLog.MaxEntries + 3; i++)
+            {
+                log.Append(i, "P", $"msg{i}", ChatSpeaker.Alive);
+            }
+            ChatLayout layout = NewLayout();
+            layout.Sync(log, FixedSize);
+
+            Assert.False(layout.TryGetContentTop(0L, out _));
+            Assert.True(layout.TryGetContentTop(log.DroppedTotal, out float top));
+            Assert.Equal(0f, top, 3);
+        }
+
+        [Fact]
         public void Sync_LeadingTrim_DropsOnlyTheOldestBlocksAndBumpsEpoch()
         {
             var log = new MeetingChatLog();
@@ -425,6 +463,140 @@ namespace Werewolf.Tests
             layout.Sync(new MeetingChatLog(), null);
 
             Assert.Equal(0, layout.Count);
+        }
+
+        [Fact]
+        public void SetFilter_KeepsOnlyAllowedEntries()
+        {
+            var log = new MeetingChatLog();
+            log.Append(1, "P1", "a", ChatSpeaker.Alive);
+            log.Append(2, "P2", "b", ChatSpeaker.Alive);
+            log.AppendSystem("Taxman", "🔔 1", "死亡: なし", section: true);
+            log.AppendVote(2, "P2", "投票しました。");
+            log.AppendVote(1, "P1", "投票しました。");
+
+            ChatLayout layout = NewLayout();
+            layout.SetFilter(e => ChatFilter.Allows(e, 1));
+            layout.Sync(log, FixedSize);
+
+            Assert.Equal(5, layout.Count);
+            Assert.Equal(ChatBlockKind.Speaker, layout[0].Kind);
+            Assert.Equal(0L, layout[0].EntrySeq);
+            Assert.Equal(ChatBlockKind.Speaker, layout[2].Kind);
+            Assert.Equal(2L, layout[2].EntrySeq);
+            Assert.Equal(ChatBlockKind.Vote, layout[4].Kind);
+            Assert.Equal(4L, layout[4].EntrySeq);
+        }
+
+        [Fact]
+        public void SetFilter_MergesRunsAcrossHiddenSpeakers()
+        {
+            var log = LogWith((1, "a"), (2, "x"), (1, "b"));
+
+            ChatLayout layout = NewLayout();
+            layout.SetFilter(e => ChatFilter.Allows(e, 1));
+            layout.Sync(log, FixedSize);
+
+            Assert.Equal(3, layout.Count);
+            Assert.Equal(ChatBlockKind.Speaker, layout[0].Kind);
+            Assert.True(layout.IsGroupHead(1));
+            Assert.False(layout.IsGroupHead(2));
+        }
+
+        [Fact]
+        public void SetFilter_NewReference_RebuildsAndBumpsEpoch()
+        {
+            var log = LogWith((1, "a"), (2, "b"));
+            ChatLayout layout = NewLayout();
+            layout.Sync(log, FixedSize);
+            Assert.Equal(4, layout.Count);
+            int epochBefore = layout.Epoch;
+
+            layout.SetFilter(e => ChatFilter.Allows(e, 1));
+            Assert.Equal(0, layout.Count);
+            Assert.True(layout.Epoch > epochBefore);
+
+            layout.Sync(log, FixedSize);
+            Assert.Equal(2, layout.Count);
+        }
+
+        [Fact]
+        public void SetFilter_SameReference_DoesNothing()
+        {
+            Func<ChatLogEntry, bool> filter = e => ChatFilter.Allows(e, 1);
+            var log = LogWith((1, "a"));
+            ChatLayout layout = NewLayout();
+            layout.SetFilter(filter);
+            layout.Sync(log, FixedSize);
+            int epochBefore = layout.Epoch;
+            int versionBefore = layout.Version;
+
+            layout.SetFilter(filter);
+
+            Assert.Equal(epochBefore, layout.Epoch);
+            Assert.Equal(versionBefore, layout.Version);
+            Assert.Equal(2, layout.Count);
+        }
+
+        [Fact]
+        public void SetFilter_Null_RestoresTheFullView()
+        {
+            var log = LogWith((1, "a"), (2, "b"));
+            ChatLayout layout = NewLayout();
+            layout.SetFilter(e => ChatFilter.Allows(e, 1));
+            layout.Sync(log, FixedSize);
+            Assert.Equal(2, layout.Count);
+
+            layout.SetFilter(null);
+            layout.Sync(log, FixedSize);
+
+            Assert.Equal(4, layout.Count);
+        }
+
+        [Fact]
+        public void SetFilter_IncrementalAppends_RespectTheFilterAndSkipMeasuring()
+        {
+            var measured = new List<string>();
+            ChatBlockSize Counting(ChatLogEntry e)
+            {
+                measured.Add(e.Text);
+                return new ChatBlockSize(200f, BubbleHeight);
+            }
+
+            var log = LogWith((1, "a"));
+            ChatLayout layout = NewLayout();
+            layout.SetFilter(e => ChatFilter.Allows(e, 1));
+            layout.Sync(log, Counting);
+
+            log.Append(2, "P2", "x", ChatSpeaker.Alive);
+            layout.Sync(log, Counting);
+            Assert.Equal(2, layout.Count);
+
+            log.Append(1, "P1", "b", ChatSpeaker.Alive);
+            layout.Sync(log, Counting);
+            Assert.Equal(3, layout.Count);
+
+            Assert.Equal(new[] { "a", "b" }, measured);
+        }
+
+        [Fact]
+        public void SetFilter_SectionSeqs_RemainResolvable()
+        {
+            var log = new MeetingChatLog();
+            log.AppendSystem("Taxman", "🔔 1", "死亡: なし", section: true);
+            log.Append(1, "P1", "a", ChatSpeaker.Alive);
+            log.Append(2, "P2", "b", ChatSpeaker.Alive);
+            log.AppendSystem("Taxman", "🔔 2", "死亡: なし", section: true);
+
+            ChatLayout layout = NewLayout();
+            layout.SetFilter(e => ChatFilter.Allows(e, 1));
+            layout.Sync(log, FixedSize);
+
+            foreach (long seq in log.SectionSeqs)
+            {
+                Assert.True(layout.TryGetContentTop(seq, out _));
+            }
+            Assert.False(layout.TryGetContentTop(2L, out _));
         }
     }
 }

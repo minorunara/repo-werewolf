@@ -32,10 +32,7 @@ namespace Werewolf.UI
             var rootGo = new GameObject("WW_LobbyStartWarning", typeof(RectTransform));
             var rootRect = (RectTransform)rootGo.transform;
             rootRect.SetParent(layerRoot, false);
-            rootRect.anchorMin = Vector2.zero;
-            rootRect.anchorMax = Vector2.one;
-            rootRect.offsetMin = Vector2.zero;
-            rootRect.offsetMax = Vector2.zero;
+            UiKit.Stretch(rootRect);
             var canvas = rootGo.AddComponent<Canvas>();
             canvas.overrideSorting = true;
             canvas.sortingOrder = WerewolfUIManager.PanelSortingOrder;
@@ -48,9 +45,13 @@ namespace Werewolf.UI
             RectTransform panel = UiKit.CreateRect(rootRect, "Panel", Vector2.zero, new Vector2(980f, 460f));
             _panelBackground = UiKit.CreateImage(panel, "Bg", Vector2.zero, panel.sizeDelta, new Color(0.26f, 0.16f, 0.03f, 0.99f));
             _title = UiKit.CreateText(panel, "Title", new Vector2(0f, 150f), new Vector2(900f, 70f), string.Empty, 38f, Color.white, TextAlignmentOptions.Center);
-            _body = UiKit.CreateText(panel, "Body", new Vector2(0f, 20f), new Vector2(860f, 190f), string.Empty, 27f, Color.white, TextAlignmentOptions.Center);
+            _body = UiKit.CreateText(panel, "Body", new Vector2(0f, -5f), new Vector2(880f, 220f), string.Empty, 27f, Color.white, TextAlignmentOptions.Center);
             _title.richText = false;
             _body.richText = false;
+            _body.enableWordWrapping = true;
+            _body.enableAutoSizing = true;
+            _body.fontSizeMax = 27f;
+            _body.fontSizeMin = 18f;
 
             _backRect = BuildButton(panel, "Back", new Vector2(-320f, ButtonRowY), new Vector2(220f, 58f), Texts.Get(TextId.ModIntegrityButtonBack));
             _detailsRect = BuildButton(panel, "Details", new Vector2(0f, ButtonRowY), new Vector2(260f, 58f), Texts.Get(TextId.ModIntegrityButtonDetails));
@@ -123,6 +124,11 @@ namespace Werewolf.UI
                 if (body.Length > 0) body += "\n";
                 body += Texts.Format(TextId.ModIntegrityStartBodyFormat,
                     decision.DifferenceCount, decision.UnavailableCount, decision.PendingCount);
+            }
+            if (!decision.AllowsContinue)
+            {
+                if (body.Length > 0) body += "\n";
+                body += Texts.Get(TextId.LobbyStartBlockedRemedy);
             }
             return body;
         }

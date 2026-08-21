@@ -187,6 +187,53 @@ namespace Werewolf.Tests
         }
 
         [Fact]
+        public void AppendSystem_Section_RecordsTheEntrySequence()
+        {
+            var log = new MeetingChatLog();
+            log.Append(1, "Alice", "hi", ChatSpeaker.Alive);
+            log.AppendSystem("Taxman", "🔔 1", "死亡: なし", section: true);
+            log.Append(2, "Bob", "yo", ChatSpeaker.Alive);
+            log.AppendSystem("Taxman", "🔔 2", "死亡: なし", section: true);
+            log.AppendSystem("Taxman", "前回の組分け", "【A】1番");
+
+            Assert.Equal(new long[] { 1L, 3L }, log.SectionSeqs);
+        }
+
+        [Fact]
+        public void AppendSystem_SectionWithEmptyBody_IsNotRecorded()
+        {
+            var log = new MeetingChatLog();
+
+            Assert.False(log.AppendSystem("Taxman", "🔔 1", "  \n  ", section: true));
+            Assert.Empty(log.SectionSeqs);
+        }
+
+        [Fact]
+        public void SectionSeqs_DroppedByOverflow_AreRemoved()
+        {
+            var log = new MeetingChatLog();
+            log.AppendSystem("Taxman", "🔔 1", "死亡: なし", section: true);
+            for (int i = 0; i < MeetingChatLog.MaxEntries; i++)
+            {
+                log.Append(1, "Alice", $"msg{i}", ChatSpeaker.Alive);
+            }
+
+            Assert.Equal(1L, log.DroppedTotal);
+            Assert.Empty(log.SectionSeqs);
+        }
+
+        [Fact]
+        public void Clear_EmptiesSectionSeqs()
+        {
+            var log = new MeetingChatLog();
+            log.AppendSystem("Taxman", "🔔 1", "死亡: なし", section: true);
+
+            log.Clear();
+
+            Assert.Empty(log.SectionSeqs);
+        }
+
+        [Fact]
         public void Message_HasNoTitleOrIcon()
         {
             var log = new MeetingChatLog();

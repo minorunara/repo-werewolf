@@ -117,6 +117,7 @@ namespace Werewolf.Tests
             var session = CreateStartedSession();
 
             session.RecordDeath(1, Now + 1000);
+            session.ConfirmPendingWin(Now + 1000 + EradicationCeremony.CeremonyMs);
             Assert.NotNull(session.Winner);
             _sent.Clear();
 

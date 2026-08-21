@@ -63,10 +63,7 @@ namespace Werewolf.UI
             var rootGo = new GameObject("WW_ModIntegrityPanel", typeof(RectTransform));
             var rootRect = (RectTransform)rootGo.transform;
             rootRect.SetParent(layerRoot, false);
-            rootRect.anchorMin = Vector2.zero;
-            rootRect.anchorMax = Vector2.one;
-            rootRect.offsetMin = Vector2.zero;
-            rootRect.offsetMax = Vector2.zero;
+            UiKit.Stretch(rootRect);
             var canvas = rootGo.AddComponent<Canvas>();
             canvas.overrideSorting = true;
             canvas.sortingOrder = WerewolfUIManager.PanelSortingOrder;
@@ -222,10 +219,7 @@ namespace Werewolf.UI
             var viewportGo = new GameObject("Viewport", typeof(RectTransform));
             var viewport = (RectTransform)viewportGo.transform;
             viewport.SetParent(scrollRect, false);
-            viewport.anchorMin = Vector2.zero;
-            viewport.anchorMax = Vector2.one;
-            viewport.offsetMin = Vector2.zero;
-            viewport.offsetMax = Vector2.zero;
+            UiKit.Stretch(viewport);
             viewportGo.AddComponent<RectMask2D>();
             Image vpImage = viewportGo.AddComponent<Image>();
             vpImage.color = new Color(0f, 0f, 0f, 0.001f);
@@ -280,10 +274,7 @@ namespace Werewolf.UI
             var viewportGo = new GameObject("Viewport", typeof(RectTransform));
             _detailViewport = (RectTransform)viewportGo.transform;
             _detailViewport.SetParent(scrollRect, false);
-            _detailViewport.anchorMin = Vector2.zero;
-            _detailViewport.anchorMax = Vector2.one;
-            _detailViewport.offsetMin = Vector2.zero;
-            _detailViewport.offsetMax = Vector2.zero;
+            UiKit.Stretch(_detailViewport);
             viewportGo.AddComponent<RectMask2D>();
             Image image = viewportGo.AddComponent<Image>();
             image.color = new Color(0f, 0f, 0f, 0.001f);

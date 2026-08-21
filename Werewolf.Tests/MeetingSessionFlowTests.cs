@@ -124,15 +124,16 @@ namespace Werewolf.Tests
             for (int voter = 1; voter <= 5; voter++) h.Session.CastVote(voter, 2, Warp);
             long closeAt = Warp;
             h.Session.Tick(closeAt);
+            long finish = closeAt + h.Session.ResultCeremonyDelayMs + 6_000;
             h.PhaseRequests.Clear();
             h.MeetingStates.Clear();
 
-            h.Session.Tick(closeAt + 6_000);
+            h.Session.Tick(finish);
 
             Assert.Equal(MeetingStage.Idle, h.Session.Stage);
             Assert.Equal(GamePhase.Play, Assert.Single(h.PhaseRequests));
             Assert.Equal((-1, 0L), Assert.Single(h.MeetingStates));
-            Assert.Equal(closeAt + 6_000, h.Session.LastMeetingEndUnixMs);
+            Assert.Equal(finish, h.Session.LastMeetingEndUnixMs);
         }
 
         [Fact]
@@ -159,7 +160,8 @@ namespace Werewolf.Tests
             h.Session.Tick(Warp);
             h.PhaseRequests.Clear();
 
-            long floorMs = (MeetingSession.PostResultKillDelaySec + 1) * 1000L;
+            long floorMs = h.Session.ResultCeremonyDelayMs
+                + (MeetingSession.PostResultKillDelaySec + 1) * 1000L;
             h.Session.Tick(Warp + floorMs - 1);
             Assert.Equal(MeetingStage.Closing, h.Session.Stage);
 
@@ -177,12 +179,13 @@ namespace Werewolf.Tests
             h.Session.Tick(Warp);
             h.PhaseRequests.Clear();
 
+            long ceremony = h.Session.ResultCeremonyDelayMs;
             h.Session.ExtendClosingHold(3_000);
-            h.Session.Tick(Warp + 6_000);
+            h.Session.Tick(Warp + ceremony + 6_000);
             Assert.Equal(MeetingStage.Closing, h.Session.Stage);
             Assert.Empty(h.PhaseRequests);
 
-            h.Session.Tick(Warp + 9_000);
+            h.Session.Tick(Warp + ceremony + 9_000);
             Assert.Equal(MeetingStage.Idle, h.Session.Stage);
             Assert.Equal(GamePhase.Play, Assert.Single(h.PhaseRequests));
         }
@@ -218,7 +221,7 @@ namespace Werewolf.Tests
 
             h.Session.EnsureClosingHoldRemaining(Warp, 3_000);
 
-            h.Session.Tick(Warp + 6_000);
+            h.Session.Tick(Warp + h.Session.ResultCeremonyDelayMs + 6_000);
             Assert.Equal(MeetingStage.Idle, h.Session.Stage);
             Assert.Equal(GamePhase.Play, Assert.Single(h.PhaseRequests));
         }
@@ -236,7 +239,7 @@ namespace Werewolf.Tests
             for (int voter = 1; voter <= 5; voter++) h.Session.CastVote(voter, 2, Warp);
             h.Session.Tick(Warp);
             h.PhaseRequests.Clear();
-            h.Session.Tick(Warp + 6_000);
+            h.Session.Tick(Warp + h.Session.ResultCeremonyDelayMs + 6_000);
             Assert.Equal(MeetingStage.Idle, h.Session.Stage);
         }
 
@@ -258,11 +261,19 @@ namespace Werewolf.Tests
             h.Session.Tick(Warp);
 
             Assert.Equal(1, Assert.Single(h.Executed));
+            Assert.True(h.Game.WinLocked);
+            Assert.Null(h.Game.Winner);
+
+            long finish = Warp + h.Session.ResultCeremonyDelayMs + 6_000;
+            h.PhaseRequests.Clear();
+            h.Session.Tick(finish);
+            Assert.Equal(MeetingStage.Closing, h.Session.Stage);
+            Assert.Empty(h.PhaseRequests);
+
+            h.Game.ConfirmPendingWin(Warp + EradicationCeremony.CeremonyMs);
             Assert.Equal(GamePhase.GameOver, h.Game.Phase);
 
-            h.PhaseRequests.Clear();
-            h.Session.Tick(Warp + 6_000);
-
+            h.Session.Tick(finish);
             Assert.Equal(MeetingStage.Idle, h.Session.Stage);
             Assert.Empty(h.PhaseRequests);
         }
@@ -281,7 +292,7 @@ namespace Werewolf.Tests
             Assert.Equal(-1, result.Payload[0]);
 
             h.PhaseRequests.Clear();
-            h.Session.Tick(Warp + 6_000);
+            h.Session.Tick(Warp + h.Session.ResultCeremonyDelayMs + 6_000);
             Assert.Equal(GamePhase.Play, Assert.Single(h.PhaseRequests));
         }
     }

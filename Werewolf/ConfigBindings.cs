@@ -62,6 +62,7 @@ namespace Werewolf
         internal ConfigEntry<int> ResultDisplaySec;
         internal ConfigEntry<bool> MeetingScatterEnabled;
         internal ConfigEntry<int> ScatterGuardSec;
+        internal ConfigEntry<int> MeetingEnemyRespawnScalePct;
         internal ConfigEntry<float> ButtonOffsetX;
         internal ConfigEntry<float> ButtonOffsetY;
         internal ConfigEntry<float> ButtonOffsetZ;
@@ -289,6 +290,18 @@ namespace Werewolf
                     "（予告なし＝即時ワープ・開催権消費なし・「引き継ぎのトラブル」表示）を自動召集する" +
                     "＝着地直後の即キルの逃げ得防止。0=無効。ラストラン中は発火しない",
                     new AcceptableValueRange<int>(0, 60)));
+
+            MeetingEnemyRespawnScalePct = config.Bind(
+                SecMeeting, "MeetingEnemyRespawnScalePct", defaults.MeetingEnemyRespawnScalePct,
+                new ConfigDescription(
+                    "How fast enemy respawn timers (and the stay-too-long respawn-interval ramp) keep running " +
+                    "while a meeting suppresses enemies (%). Default 75 = three quarters of real time, " +
+                    "100 = real time as vanilla, 0 = fully paused (enemies come back exactly as they were " +
+                    "before the meeting). Lower this for text-chat lobbies where meetings run long / " +
+                    "会議の敵抑制中に敵のリスポーンタイマーと滞在時間によるリスポーン間隔短縮が進む速さ（%）。" +
+                    "既定75=実時間の3/4で進む、100=バニラどおり実時間で進む、0=一切進まない（会議前後で敵の復活状況が同一）。" +
+                    "テキストチャット主体で会議が長引くロビーはさらに下げる",
+                    new AcceptableValueRange<int>(0, 100)));
 
             ConveneSuppressStartSec = config.Bind(
                 SecMeeting, "ConveneSuppressStartSec", defaults.ConveneSuppressStartSec,
@@ -937,6 +950,7 @@ namespace Werewolf
                 ResultDisplaySec = ResultDisplaySec.Value,
                 MeetingScatterEnabled = MeetingScatterEnabled.Value,
                 ScatterGuardSec = ScatterGuardSec.Value,
+                MeetingEnemyRespawnScalePct = MeetingEnemyRespawnScalePct.Value,
                 ButtonOffsetX = ButtonOffsetX.Value,
                 ButtonOffsetY = ButtonOffsetY.Value,
                 ButtonOffsetZ = ButtonOffsetZ.Value,

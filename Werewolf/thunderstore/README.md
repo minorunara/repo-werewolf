@@ -319,7 +319,7 @@ REPO人狼では、どんな方法でも死者は蘇生できません。
 その後、投票が始まります。  
 会議中は全体マップを開いて、更新された貴重品の情報を確認できます。  
 試合の制限時間は会議中は停止するので、議論で持ち時間は減りません。  
-ただし、会議中にも敵のリスポーンタイマーは減っていくので、会議で時間を浪費しすぎると敵が復活してしまいます。  
+ただし、会議中にも敵のリスポーンタイマーは減っていくので、会議で時間を浪費しすぎると敵が復活してしまいます（ルーム設定で係数を設定可能）。  
 会議終了時点でリスポーンの準備が整っている敵は即座にスポーンします。
 
 ### 投票と処刑
@@ -537,4 +537,5 @@ MODが追加する操作キーは、Mod Managerの設定ファイル編集機能
 - [効果音ラボ](https://soundeffect-lab.info/)（[利用規約](https://soundeffect-lab.info/agreement/)）
 - [いらすとや](https://www.irasutoya.com/)（[利用規約](https://www.irasutoya.com/p/terms.html)）
 - [びたちー素材館](http://www.vita-chi.net/sozai1.htm)
+- [Noto Emoji](https://github.com/googlefonts/noto-emoji)（Copyright 2013 Google LLC / [SIL Open Font License 1.1](https://scripts.sil.org/OFL)。ライセンス本文は配布物同梱の `LICENSE-NotoEmoji.txt`）
 - [African Mist Voice | No Copyright Music | Royalty Free Loops |](https://www.youtube.com/watch?v=UvmdiB_7YX0)

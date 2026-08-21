@@ -9,6 +9,8 @@ namespace Werewolf.Core
         WinnerConfirmed = 2,
 
         MatchVoided = 3,
+
+        WinLocked = 4,
     }
 
     public sealed class SessionEvent
@@ -30,6 +32,8 @@ namespace Werewolf.Core
 
         public WinResult Winner { get; private set; }
 
+        public bool Vanished { get; private set; }
+
         public static SessionEvent ForPhaseChanged(GamePhase phase, long roundEndUnixMs)
             => new SessionEvent(SessionEventKind.PhaseChanged) { Phase = phase, RoundEndUnixMs = roundEndUnixMs };
 
@@ -41,5 +45,9 @@ namespace Werewolf.Core
 
         public static SessionEvent ForMatchVoided()
             => new SessionEvent(SessionEventKind.MatchVoided);
+
+        public static SessionEvent ForWinLocked(WinResult pending, int actorNumber, bool vanished)
+            => new SessionEvent(SessionEventKind.WinLocked)
+               { Winner = pending, ActorNumber = actorNumber, Vanished = vanished };
     }
 }

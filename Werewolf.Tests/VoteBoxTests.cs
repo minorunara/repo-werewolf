@@ -232,5 +232,34 @@ namespace Werewolf.Tests
             Assert.Equal(5, total);
             Assert.Equal(-1, outcome.ExecutedActor);
         }
+
+        [Fact]
+        public void SkipVotes_ReturnsSkipRowCount()
+        {
+            var box = Box(1, 2, 3, 4);
+            box.TryCast(1, 2);
+            box.TryCast(2, -1);
+            box.TryCast(3, -1);
+
+            MeetingOutcome outcome = box.Tally(_ => true);
+
+            int skipIdx = Array.IndexOf(outcome.TargetActors, -1);
+            Assert.Equal(outcome.VoteCounts[skipIdx], outcome.SkipVotes);
+            Assert.Equal(3, outcome.SkipVotes);
+        }
+
+        [Fact]
+        public void SkipVotes_NoSkipRowOrNoBreakdown_IsZero()
+        {
+            var withoutSkip = new MeetingOutcome
+            {
+                ExecutedActor = 2,
+                TargetActors = new[] { 2, 3 },
+                VoteCounts = new[] { 2, 1 },
+            };
+            Assert.Equal(0, withoutSkip.SkipVotes);
+
+            Assert.Equal(0, new MeetingOutcome().SkipVotes);
+        }
     }
 }

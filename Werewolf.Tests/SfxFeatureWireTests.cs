@@ -19,6 +19,13 @@ namespace Werewolf.Tests
         [Theory]
         [InlineData("sfx_bell_five_minutes")]
         [InlineData("sfx_chat_message")]
+        [InlineData("sfx_page_turn_01")]
+        [InlineData("sfx_page_turn_02")]
+        [InlineData("sfx_page_turn_03")]
+        [InlineData("sfx_page_turn_04")]
+        [InlineData("sfx_page_turn_05")]
+        [InlineData("sfx_page_turn_06")]
+        [InlineData("sfx_page_turn_07")]
         public void RequestedClips_AreEmbeddedSupportedPcm16Wav(string clipKey)
         {
             using var module = ModuleDefinition.ReadModule(Meta("Werewolf.ModDllPath"));
@@ -67,6 +74,30 @@ namespace Werewolf.Tests
             Assert.True(sampleRate > 0);
             Assert.Equal((ushort)16, bits);
             Assert.True(dataBytes > 0);
+        }
+
+        [Fact]
+        public void PageTurnVariants_MatchEmbeddedAssets()
+        {
+            using var module = ModuleDefinition.ReadModule(Meta("Werewolf.ModDllPath"));
+            TypeDefinition view = module.GetType("Werewolf.UI.VoteTallyRevealView");
+            Assert.NotNull(view);
+            FieldDefinition countField = view.Fields.SingleOrDefault(f => f.Name == "PageTurnVariantCount");
+            Assert.True(countField != null && countField.HasConstant,
+                "PageTurnVariantCount 定数が見つからない（改名したらこの監査も追随させる）");
+
+            int declared = (int)countField.Constant;
+            Assert.True(declared > 1, "変種が1つでは反復感を消す目的を満たさない");
+
+            var embedded = module.Resources.OfType<EmbeddedResource>()
+                .Select(r => r.Name)
+                .Where(n => n.StartsWith("Werewolf.Assets.sfx_page_turn_", System.StringComparison.Ordinal))
+                .ToList();
+            Assert.Equal(declared, embedded.Count);
+            for (int i = 1; i <= declared; i++)
+            {
+                Assert.Contains($"Werewolf.Assets.sfx_page_turn_{i:00}.wav", embedded);
+            }
         }
 
         [Fact]

@@ -17,8 +17,6 @@ namespace Werewolf.Game
 
         private readonly RoomState _roomState = new RoomState();
 
-        private readonly LifecycleGate _lifecycleGate = new LifecycleGate();
-
         private readonly AutoStartWaitGate _autoStartWait = new AutoStartWaitGate();
 
         private readonly ResultSequence _resultSequence = new ResultSequence();
@@ -47,10 +45,12 @@ namespace Werewolf.Game
         private readonly HudPanel _hudPanel = new HudPanel();
         private readonly HudModel _hudModel = new HudModel();
 
+        private readonly DeadlineBannerPanel _deadlineBanner = new DeadlineBannerPanel();
+
+        private readonly DiscussionImpactPanel _discussionImpact = new DiscussionImpactPanel();
+
         private readonly ToastPanel _toastPanel = new ToastPanel();
         private ToastQueue _toastQueue;
-
-        private readonly TutorialPresenter _tutorialPresenter = new TutorialPresenter();
 
         private readonly CursorMirror _cursorMirror = new CursorMirror();
 
@@ -90,13 +90,9 @@ namespace Werewolf.Game
         private readonly List<string> _chatRecapDeaths = new List<string>();
         private int _chatRecapBeaconUses = MeetingRecap.Unknown;
 
-        private int _chatRecapLostBaseline;
-
         private bool _chatSystemPosted;
 
         private List<List<int>> _lastScatterGroups;
-
-        private bool _pendingMeetingTutorial;
 
         private readonly ConveneCountdown _conveneCountdown = new ConveneCountdown();
         private Coroutine _conveneTweenCoroutine;
@@ -104,19 +100,11 @@ namespace Werewolf.Game
         private readonly SfxPlayer _sfxPlayer = new SfxPlayer();
 
         private readonly ResultScreen _resultScreen = new ResultScreen();
-        private readonly ResultCountdown _resultCountdown = new ResultCountdown();
         private int _roundGameOverAutoReturnSec;
-        private int _lastResultCountdownSecond = -1;
 
-        private readonly VoidMatchHold _voidMatchHold = new VoidMatchHold();
-        private readonly VoidMatchPanel _voidMatchPanel = new VoidMatchPanel();
-
-        private long _resultReturnArmedAtUnixMs;
         private bool _revealStarted;
         private bool _awakeningRevealStarted;
         private Coroutine _revealCoroutine;
-
-        private CurseTargetSource _curseSource;
 
         private Role? _localRole;
         private int[] _knownWerewolves;
@@ -125,7 +113,6 @@ namespace Werewolf.Game
         private long _clientRoundEndUnixMs;
         private int _clientWerewolfCount;
         private readonly Dictionary<int, DeathCause> _deathMirror = new Dictionary<int, DeathCause>();
-        private Dictionary<int, string> _displayNameCache;
 
         private string _lastPublishedBlob;
         private long _lobbyTickAtMs;
@@ -162,34 +149,24 @@ namespace Werewolf.Game
 
         private readonly MeetingClientState _meetingClient = new MeetingClientState();
         private MeetingButton _meetingButton;
-        private long _nextConveneHoldHintUnixMs;
         private TruckWarper _truckWarper;
         private ExtractionScatter _extractionScatter;
         private MovementFreezer _movementFreezer;
         private EnemyFreezer _enemyFreezer;
         private WerewolfUIManager _uiManager;
         private VotePanel _votePanel;
-        private readonly MeetingMapOverlay _meetingMapOverlay = new MeetingMapOverlay();
         private readonly ManualOverlay _manualOverlay = new ManualOverlay();
 
         private IClientPanel[] _roundPanels;
-        private long _clientWarpUnixMs;
-        private bool _warpExecuted;
         private bool _meetingUiActive;
 
-        private bool _votePendulumPlayed;
-
-        private int _executionSfxWaitTicks = -1;
-        private const int ExecutionSfxCurseWaitTicks = 3;
+        private long _resultCeremonyAtMs;
+        private int _pendingCurseCatActor = -1;
+        private long _pendingCurseDeadlineMs;
 
         private long _gameStartUnixMsClient;
         private long _lastMeetingEndUnixMsClient;
         private int _clientRevealDelaySec;
-
-        private readonly CatAwakenToastGate _catAwakenGate = new CatAwakenToastGate();
-
-        private Vector3? _warpVerifyTarget;
-        private long _warpVerifyDeadlineMs;
 
         private bool _resetArmed;
 
@@ -379,6 +356,11 @@ namespace Werewolf.Game
             _uiManager = new WerewolfUIManager();
             _votePanel = new VotePanel();
             _votePanel.OnVoteSubmit += SendVote;
+            _votePanel.PlaySfx = (key, volume) =>
+            {
+                EnsureSfxBuilt();
+                _sfxPlayer.Play(key, volume);
+            };
             _votePanel.SetTeamMarkerProvider(MarkedTeammateRole);
             _gaugePanel.OnRevealBreak = () =>
             {
@@ -407,15 +389,19 @@ namespace Werewolf.Game
                 _revealCinematic, _catAwakenToast, _wolfStatusPanel, _conveneCountdown,
                 _resultScreen, _deathReveal, _cursorMirror,
                 _bomberHud, _bombIconPresenter, _bombWarningPresenter,
+                _deadlineBanner,
+                _discussionImpact,
                 _corpseReportHud,
                 _valuableRecordHud,
                 _checkmateReveal,
+                _eradicationReveal,
                 _startHoldOverlay,
                 _conveneHoldGauge,
                 _chatPanel,
                 _resultChatPanel,
                 _replayViewer,
                 _idBadgePresenter,
+                _tutorialBubble,
             };
         }
 
@@ -450,6 +436,7 @@ namespace Werewolf.Game
                 TickCorpseReportCancel(now);
                 _roles?.Tick(now);
                 TickCheckmateHost(now);
+                TickEradicationHost(now);
                 _beaconEffect.Tick(now);
 
                 if (SemiFunc.IsMasterClientOrSingleplayer()
@@ -474,6 +461,11 @@ namespace Werewolf.Game
                 TickMeetingClient(now);
                 TickWarpVerify(now);
 
+                _enemyFreezer?.Tick(
+                    Plugin.GameConfig != null ? Plugin.GameConfig.MeetingEnemyRespawnScalePct
+                                              : EnemyRespawnScale.MaxPercent,
+                    Time.deltaTime);
+
                 TickRolesClient(now);
 
                 TickBomberClient(now);
@@ -495,6 +487,8 @@ namespace Werewolf.Game
                 _deathReveal.Tick();
 
                 TickCheckmateClient();
+
+                TickEradicationClient();
 
                 EnemyMapIcons.Tick();
 
@@ -548,7 +542,7 @@ namespace Werewolf.Game
         {
             if (_voiceDriver == null) return;
             bool localAlive = !IsDeadActorClient(LocalActor);
-            GamePhase effectivePhase = _checkmateVoiceOpen ? GamePhase.GameOver : ClientPhase;
+            GamePhase effectivePhase = _winCeremonyActive ? GamePhase.GameOver : ClientPhase;
             VoicePlanKind kind = VoiceRules.DecideKind(
                 effectivePhase, LocalRoleClient, localAlive, _clientNecroVoiceMode);
             bool deadCueMute = VoiceRules.IsDeadCueMuteActive(effectivePhase, localAlive);

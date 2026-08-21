@@ -29,6 +29,19 @@ namespace Werewolf.Core
         public int[] TargetActors;
 
         public int[] VoteCounts;
+
+        public int SkipVotes
+        {
+            get
+            {
+                if (TargetActors == null || VoteCounts == null) return 0;
+                for (int i = 0; i < TargetActors.Length && i < VoteCounts.Length; i++)
+                {
+                    if (TargetActors[i] == -1) return VoteCounts[i];
+                }
+                return 0;
+            }
+        }
     }
 
     public sealed class VoteBox

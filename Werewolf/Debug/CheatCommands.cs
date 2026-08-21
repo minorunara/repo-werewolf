@@ -16,7 +16,7 @@ namespace Werewolf.Debugging
             "body [clear]|spawnbag [dollars]|scatter [diag|warp]|replay <dump|stat|demo N>|" +
             "bomb <gauge|plant <actor>|detonate|ammo [n]>|" +
             "fx <reveal [villager|werewolf|blackcat]|toast [message]|countdown [sec]|" +
-            "result|sfx [countdown|howl|toast]|clear>|" +
+            "result|sfx [countdown|howl|toast]|banner [mute]|impact|clear>|" +
             "cfg <inject <id=value;...>|clear>|echo|lang export|" +
             "chat <say <text>|as <actor> <text>|name <actor> <name> <text>|spam [n]|auto [n]|" +
             "vote [actor]|baseline|late [ms] [text]|gate|avatar|state|clear>|res <w> <h>>";
@@ -539,6 +539,14 @@ namespace Werewolf.Debugging
                     HandleFxSfx(director, rest);
                     break;
 
+                case "banner":
+                    HandleFxBanner(director, rest);
+                    break;
+
+                case "impact":
+                    director.ShowDiscussionImpact();
+                    break;
+
                 case "clear":
                     director.DebugClearFx();
                     break;
@@ -579,6 +587,13 @@ namespace Werewolf.Debugging
                 return;
             }
             director.DebugPlayConveneCountdown("デバッグ", seconds);
+        }
+
+        private static void HandleFxBanner(WerewolfDirector director, string[] rest)
+        {
+            bool mute = rest.Length >= 1 && rest[0].ToLowerInvariant() == "mute";
+            director.ShowDeadlineBanner();
+            if (!mute) director.DebugPlaySfx(BellSchedule.FiveMinuteClipKey);
         }
 
         private static void HandleFxSfx(WerewolfDirector director, string[] rest)

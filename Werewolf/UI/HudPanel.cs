@@ -337,10 +337,7 @@ namespace Werewolf.UI
             text = UiKit.CreateText(rect, "Text", Vector2.zero, TimerSize,
                 string.Empty, TimerFontSize, TimerNormalColor, TextAlignmentOptions.Center);
             var tRect = text.rectTransform;
-            tRect.anchorMin = Vector2.zero;
-            tRect.anchorMax = Vector2.one;
-            tRect.offsetMin = Vector2.zero;
-            tRect.offsetMax = Vector2.zero;
+            UiKit.Stretch(tRect);
             return go;
         }
 
@@ -358,10 +355,7 @@ namespace Werewolf.UI
             var text = UiKit.CreateText(rect, "Text", Vector2.zero, size,
                 Texts.Get(textId), fontSize, color, TextAlignmentOptions.Center);
             var tRect = text.rectTransform;
-            tRect.anchorMin = Vector2.zero;
-            tRect.anchorMax = Vector2.one;
-            tRect.offsetMin = Vector2.zero;
-            tRect.offsetMax = Vector2.zero;
+            UiKit.Stretch(tRect);
             return go;
         }
 

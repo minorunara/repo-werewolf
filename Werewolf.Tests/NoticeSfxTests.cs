@@ -21,7 +21,6 @@ namespace Werewolf.Tests
         }
 
         [Theory]
-        [InlineData(NoticeKind.BeaconAudit)]
         [InlineData(NoticeKind.NoExecution)]
         [InlineData(NoticeKind.Executed)]
         [InlineData(NoticeKind.BlackCatRevealed)]
@@ -75,7 +74,6 @@ namespace Werewolf.Tests
             switch (kind)
             {
                 case NoticeKind.ConveneStarted:   return SessionNotice.ForConveneStarted("A");
-                case NoticeKind.BeaconAudit:      return SessionNotice.ForBeaconAudit(1);
                 case NoticeKind.NoExecution:      return SessionNotice.ForNoExecution();
                 case NoticeKind.Executed:         return SessionNotice.ForExecuted("A");
                 case NoticeKind.BlackCatRevealed: return SessionNotice.ForBlackCatRevealed("A");
@@ -84,7 +82,7 @@ namespace Werewolf.Tests
                 case NoticeKind.CatAwakened:      return SessionNotice.ForCatAwakened();
                 case NoticeKind.PlayerDisconnected: return SessionNotice.ForPlayerDisconnected("A");
                 case NoticeKind.ConveneHoldHint:  return SessionNotice.ForConveneHoldHint();
-                default: return SessionNotice.ForBeaconAudit(1);
+                default: return SessionNotice.ForNoExecution();
             }
         }
     }

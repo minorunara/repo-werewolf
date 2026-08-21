@@ -42,10 +42,7 @@ namespace Werewolf.UI
             var go = new GameObject("WW_CursorMirror", typeof(RectTransform));
             var rect = (RectTransform)go.transform;
             rect.SetParent(layerRoot, false);
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
+            UiKit.Stretch(rect);
             var canvas = go.AddComponent<Canvas>();
             canvas.overrideSorting = true;
             canvas.sortingOrder = WerewolfUIManager.CursorSortingOrder;

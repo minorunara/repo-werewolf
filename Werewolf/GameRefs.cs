@@ -76,10 +76,13 @@ namespace Werewolf
 
         public static AccessTools.FieldRef<EnemyParent, Enemy> EnemyParent_Enemy;
         public static AccessTools.FieldRef<EnemyParent, bool> EnemyParent_Spawned;
+        public static AccessTools.FieldRef<EnemyParent, bool> EnemyParent_firstSpawnPointUsed;
         public static AccessTools.FieldRef<Enemy, EnemyRigidbody> Enemy_Rigidbody;
         public static AccessTools.FieldRef<Enemy, bool> Enemy_HasRigidbody;
         public static AccessTools.FieldRef<MapCustom, MapCustomEntity> MapCustom_mapCustomEntity;
         public static AccessTools.FieldRef<EnemyDirector, List<string>> EnemyDirector_debugNoVision;
+        public static AccessTools.FieldRef<EnemyDirector, float> EnemyDirector_despawnedDecreaseTimer;
+        public static AccessTools.FieldRef<EnemyDirector, float> EnemyDirector_spawnIdlePauseTimer;
         public static AccessTools.FieldRef<EnemyShadow, PlayerAvatar> EnemyShadow_playerTarget;
         public static MethodInfo EnemyShadow_UpdatePlayerTarget;
         public static AccessTools.FieldRef<AudioManager, AudioManager.SoundSnapshot> AudioManager_currentSnapshot;
@@ -161,10 +164,13 @@ namespace Werewolf
 
             EnemyParent_Enemy = Field<EnemyParent, Enemy>("Enemy");
             EnemyParent_Spawned = Field<EnemyParent, bool>("Spawned");
+            EnemyParent_firstSpawnPointUsed = Field<EnemyParent, bool>("firstSpawnPointUsed");
             Enemy_Rigidbody = Field<Enemy, EnemyRigidbody>("Rigidbody");
             Enemy_HasRigidbody = Field<Enemy, bool>("HasRigidbody");
             MapCustom_mapCustomEntity = Field<MapCustom, MapCustomEntity>("mapCustomEntity");
             EnemyDirector_debugNoVision = Field<EnemyDirector, List<string>>("debugNoVision");
+            EnemyDirector_despawnedDecreaseTimer = Field<EnemyDirector, float>("despawnedDecreaseTimer");
+            EnemyDirector_spawnIdlePauseTimer = Field<EnemyDirector, float>("spawnIdlePauseTimer");
             EnemyShadow_playerTarget = Field<EnemyShadow, PlayerAvatar>("playerTarget");
             EnemyShadow_UpdatePlayerTarget = RawMethod(typeof(EnemyShadow), "UpdatePlayerTarget");
             AudioManager_currentSnapshot = Field<AudioManager, AudioManager.SoundSnapshot>("currentSnapshot");

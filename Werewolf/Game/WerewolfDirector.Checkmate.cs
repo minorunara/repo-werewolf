@@ -15,7 +15,7 @@ namespace Werewolf.Game
         private readonly CheckmateRevealPanel _checkmateReveal = new CheckmateRevealPanel();
         private Coroutine _checkmateRevealCoroutine;
 
-        private bool _checkmateVoiceOpen;
+        private bool _winCeremonyActive;
 
         private const long CheckmateScanIntervalMs = 500;
 
@@ -33,6 +33,8 @@ namespace Werewolf.Game
         {
             if (_checkmate == null || _session == null || _session.Winner != null) return;
             if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
+
+            if (_session.WinLocked && !_checkmate.CeremonyStarted) return;
 
             bool haulSuck = ValueTrackPatch.InHaulSuckWindow(now);
 
@@ -52,7 +54,8 @@ namespace Werewolf.Game
 
             bool curseActive = _roles != null
                 && _roles.ActiveCurse != null && !_roles.ActiveCurse.Resolved;
-            switch (_checkmate.Tick(now, _session.Phase, curseActive))
+            bool meetingCountdown = _meeting != null && _meeting.Stage == MeetingStage.Countdown;
+            switch (_checkmate.Tick(now, _session.Phase, curseActive, meetingCountdown))
             {
                 case CheckmateAction.StartCeremony:
                     _session.LockValueCheckmate();
@@ -171,7 +174,7 @@ namespace Werewolf.Game
             _checkmateReveal.Show(snapshot,
                 _gaugePanel.LastRevealedPermille, _gaugePanel.LastRevealedLoss);
 
-            _checkmateVoiceOpen = true;
+            _winCeremonyActive = true;
 
             EnsureSfxBuilt();
             if (_checkmateRevealCoroutine != null) StopCoroutine(_checkmateRevealCoroutine);
@@ -190,7 +193,7 @@ namespace Werewolf.Game
 
         private void HideCheckmateReveal()
         {
-            _checkmateVoiceOpen = false;
+            _winCeremonyActive = false;
             if (_checkmateRevealCoroutine != null)
             {
                 StopCoroutine(_checkmateRevealCoroutine);

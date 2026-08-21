@@ -372,7 +372,7 @@ namespace Werewolf.UI
                 Vector2.zero, new Vector2(seekWidth, SeekBarThickness));
             var seekBg = UiKit.CreateImage(_seekBarRect, "SeekBg", Vector2.zero,
                 new Vector2(seekWidth, SeekBarThickness), SeekBgColor);
-            Stretch(seekBg.rectTransform);
+            UiKit.Stretch(seekBg.rectTransform);
 
             _seekFill = UiKit.CreateImage(_seekBarRect, "SeekFill", Vector2.zero,
                 new Vector2(0f, SeekBarThickness), SeekFillColor);
@@ -418,7 +418,7 @@ namespace Werewolf.UI
             _gaugeRoot = gauge.gameObject;
             Image bg = UiKit.CreateImage(gauge, "Bg", Vector2.zero,
                 new Vector2(PanelWidth, GaugeHeight), GaugeBgColor);
-            Stretch(bg.rectTransform);
+            UiKit.Stretch(bg.rectTransform);
 
             var trackSize = new Vector2(GaugeTrackWidth, GaugeTrackHeight);
             Image lossTrack = UiKit.CreateImage(gauge, "LossTrack",
@@ -1009,14 +1009,6 @@ namespace Werewolf.UI
         {
             return rect != null && rect.gameObject.activeInHierarchy
                 && RectTransformUtility.RectangleContainsScreenPoint(rect, screenPoint, null);
-        }
-
-        private static void Stretch(RectTransform rect)
-        {
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
         }
 
         private void SetStatus(string text, Color color)

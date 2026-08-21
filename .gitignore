@@ -1,6 +1,7 @@
 bin/
 obj/
 out/
+REPO_Data/
 BepInEx/
 *.user
 *.suo

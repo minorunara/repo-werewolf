@@ -177,7 +177,7 @@ namespace Werewolf.Tests
             h.Session.CastVote(4, -1, Warp);
             h.Session.Tick(Warp);
             Assert.Equal(MeetingStage.Closing, h.Session.Stage);
-            long finish = Warp + 6_000;
+            long finish = Warp + h.Session.ResultCeremonyDelayMs + 6_000;
             h.Session.Tick(finish);
             Assert.Equal(MeetingStage.Idle, h.Session.Stage);
 

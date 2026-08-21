@@ -44,7 +44,12 @@ namespace Werewolf.UI
         private static readonly ButtonPalette NeutralPalette = new ButtonPalette(
             NeutralButtonEnabledColor, NeutralButtonHoverColor, NeutralButtonDisabledColor, NeutralLabelDisabledColor);
 
+        private static readonly Vector2 TimeTextBarPos = new Vector2(410f, MeetingTimeBarView.BarY);
+        private static readonly Vector2 TimeTextHeaderPos = new Vector2(390f, 358f);
+
         public event Action<int> OnVoteSubmit;
+
+        public Action<string, float> PlaySfx;
 
         private readonly List<VoteRow> _rows = new List<VoteRow>();
         private readonly Dictionary<int, VoteRow> _rowsByActor = new Dictionary<int, VoteRow>();
@@ -59,6 +64,8 @@ namespace Werewolf.UI
         private Image _pagePrevBg;
         private Image _pageNextBg;
         private TextMeshProUGUI _pageLabel;
+
+        private readonly MeetingTimeBarView _timeBarView = new MeetingTimeBarView();
 
         private ITargetSelectionSource _selectionSource;
         private DefaultVoteTargetProvider _defaultProvider;
@@ -83,27 +90,18 @@ namespace Werewolf.UI
         private bool _slideActive;
         private bool _reorderApplied;
 
-        private const long ScatterIntroMs = 900;
-        private const long ScatterShuffleMs = 3200;
-        private const long ScatterFadeMs = 700;
-        private const long ScatterSwapIntervalMs = 90;
-        private const long ScatterSettledReadMs = 4400;
+        private readonly ScatterRevealView _scatter;
 
-        public const long ScatterRevealHoldRequiredMs =
-            ScatterIntroMs + ScatterShuffleMs + ScatterFadeMs + ScatterSettledReadMs;
+        private readonly VoteTallyRevealView _tallyView;
 
-        private bool _scatterActive;
-        private bool _scatterSettled;
-        private bool _scatterMusicStopped;
-        private long _scatterStartUnixMs;
-        private long _scatterNextSwapUnixMs;
-        private readonly Dictionary<int, char> _scatterLetterByActor = new Dictionary<int, char>();
-        private char[] _scatterLetters = Array.Empty<char>();
-        private readonly System.Random _scatterRng = new System.Random();
-        private Action<float> _scatterPumpMusic;
-        private Action _scatterStopMusic;
-        private Action _scatterPlayJingle;
-        private GameObject _scatterSloganRoot;
+        public const long ScatterRevealHoldRequiredMs = ScatterRevealView.HoldRequiredMs;
+
+        public VotePanel()
+        {
+            _scatter = new ScatterRevealView(_rows, () => _rootRect, TitleTextColor);
+            _tallyView = new VoteTallyRevealView(_rows, () => _rootRect,
+                (key, volume) => PlaySfx?.Invoke(key, volume));
+        }
 
         public bool Exists => _root != null;
 
@@ -127,8 +125,10 @@ namespace Werewolf.UI
             UiKit.CreateText(rect, "Title", new Vector2(0f, 358f), new Vector2(400f, 44f),
                 Texts.Get(TextId.VoteMeetingTitle), 34f, TitleTextColor, TextAlignmentOptions.Center);
 
-            _timeText = UiKit.CreateText(rect, "Time", new Vector2(390f, 358f), new Vector2(200f, 44f),
+            _timeText = UiKit.CreateText(rect, "Time", TimeTextHeaderPos, new Vector2(200f, 44f),
                 "--:--", 30f, TimeNormalColor, TextAlignmentOptions.Center);
+
+            _timeBarView.Build(rect);
 
             _resultBanner = UiKit.CreateText(rect, "Result", new Vector2(0f, 318f), new Vector2(960f, 36f),
                 "", 26f, ResultExecutedColor, TextAlignmentOptions.Center);
@@ -148,7 +148,8 @@ namespace Werewolf.UI
                 icon.preserveAspect = true;
             }
             _skipCountLabel = UiKit.CreateText(rect, "SkipCount", new Vector2(175f, -352f), new Vector2(110f, 50f),
-                "", 22f, TitleTextColor, TextAlignmentOptions.MidlineLeft);
+                "", 28f, TitleTextColor, TextAlignmentOptions.MidlineLeft);
+            _skipCountLabel.enableWordWrapping = false;
             _skipCountLabel.gameObject.SetActive(false);
 
             _pagePrevBg = UiKit.CreateImage(rect, "PagePrev", new Vector2(-420f, -352f),
@@ -180,6 +181,7 @@ namespace Werewolf.UI
             _myVoteTarget = ArmedNone;
             _slideActive = true;
             _reorderApplied = false;
+            _timeBarView.Reset();
             if (_rootRect != null)
             {
                 _rootRect.anchoredPosition = new Vector2(PanelPos.x, PanelPos.y + SlideStartOffsetY);
@@ -217,6 +219,7 @@ namespace Werewolf.UI
             }
             else
             {
+                _tallyView.FastForward();
                 _selectionSource = source;
                 _defaultProvider = null;
             }
@@ -263,9 +266,10 @@ namespace Werewolf.UI
                 UpdateSlide(state, nowUnixMs);
                 ApplyInitialSortIfNeeded(state);
                 UpdateTime(state, nowUnixMs);
+                UpdateTimeBar(state, nowUnixMs);
                 UpdateRows(state);
-                UpdateResult(state);
-                UpdateScatterReveal(nowUnixMs);
+                UpdateResult(state, nowUnixMs);
+                _scatter.Tick(nowUnixMs);
                 HandleInput(state);
             }
             catch (Exception e)
@@ -277,6 +281,7 @@ namespace Werewolf.UI
         public void EndMeeting()
         {
             StopScatterReveal();
+            _tallyView.Stop();
             ClearRows();
             _pendingSend = false;
             _resultShown = false;
@@ -288,6 +293,8 @@ namespace Werewolf.UI
             _reorderApplied = false;
             _timeOverrideEndUnixMs = 0;
             _lastState = null;
+            _timeBarView.Reset();
+            if (_timeText != null) _timeText.rectTransform.anchoredPosition = TimeTextHeaderPos;
             if (_resultBanner != null) _resultBanner.gameObject.SetActive(false);
             if (_skipCountLabel != null) _skipCountLabel.gameObject.SetActive(false);
         }
@@ -295,7 +302,10 @@ namespace Werewolf.UI
         public void Destroy()
         {
             StopScatterReveal();
-            _scatterSloganRoot = null;
+            _scatter.OnPanelDestroy();
+            _tallyView.Stop();
+            _tallyView.OnPanelDestroy();
+            _timeBarView.OnPanelDestroy();
             ClearRows();
             if (_root != null)
             {
@@ -307,7 +317,7 @@ namespace Werewolf.UI
 
         private int PageCount => _rows.Count == 0 ? 1 : (_rows.Count + VoteRowGrid.RowsPerPage - 1) / VoteRowGrid.RowsPerPage;
 
-        private bool SelectionLocked => _resultShown && _defaultProvider != null;
+        private bool SelectionLocked => (_resultShown || _countsApplied) && _defaultProvider != null;
 
         private void ClearRows()
         {
@@ -381,6 +391,18 @@ namespace Werewolf.UI
             _timeText.color = totalSec <= 10 ? TimeUrgentColor : TimeNormalColor;
         }
 
+        private void UpdateTimeBar(MeetingClientState state, long nowUnixMs)
+        {
+            bool visible = _timeOverrideEndUnixMs == 0 && state.MeetingActive && state.Result == null;
+            _timeBarView.SetVisible(visible);
+            if (_timeText != null)
+            {
+                _timeText.rectTransform.anchoredPosition = visible ? TimeTextBarPos : TimeTextHeaderPos;
+            }
+            if (!visible) return;
+            _timeBarView.Tick(state, nowUnixMs);
+        }
+
         private void UpdateRows(MeetingClientState state)
         {
             bool canConfirm = _selectionSource != null && _selectionSource.CanConfirm(_localActor);
@@ -410,9 +432,9 @@ namespace Werewolf.UI
                 if (isTarget) row.SetVoteButtonEnabled(canConfirm);
                 row.SetSelected(isTarget && row.ActorNumber == selectedActor);
                 row.SetArmed(isTarget && row.ActorNumber == _armedTarget);
-                row.SetMyVoteMarker(!_scatterActive && myVoteVisible && row.ActorNumber == _myVoteTarget);
+                row.SetMyVoteMarker(!_scatter.IsActive && myVoteVisible && row.ActorNumber == _myVoteTarget);
                 row.SetTeamMarker(_teamMarkerRole != null ? _teamMarkerRole(row.ActorNumber) : null);
-                row.SetHostMarker(!_scatterActive && state.CallerActor == row.ActorNumber);
+                row.SetHostMarker(!_scatter.IsActive && state.CallerActor == row.ActorNumber);
                 row.Tick();
             }
 
@@ -455,49 +477,22 @@ namespace Werewolf.UI
             return false;
         }
 
-        private void UpdateResult(MeetingClientState state)
+        private void UpdateResult(MeetingClientState state, long nowUnixMs)
         {
             if (state.Result == null) return;
             MeetingOutcome outcome = state.Result;
 
-            int skipVotes = 0;
-            if (outcome.TargetActors != null && outcome.VoteCounts != null)
-            {
-                for (int i = 0; i < outcome.TargetActors.Length && i < outcome.VoteCounts.Length; i++)
-                {
-                    if (outcome.TargetActors[i] == SkipTarget)
-                    {
-                        skipVotes = outcome.VoteCounts[i];
-                        break;
-                    }
-                }
-            }
-
             if (!_countsApplied)
             {
                 _countsApplied = true;
-                foreach (VoteRow row in _rows) row.SetVoteCount(0);
-                if (outcome.TargetActors != null && outcome.VoteCounts != null)
-                {
-                    for (int i = 0; i < outcome.TargetActors.Length && i < outcome.VoteCounts.Length; i++)
-                    {
-                        int target = outcome.TargetActors[i];
-                        if (target == SkipTarget) continue;
-                        if (_rowsByActor.TryGetValue(target, out VoteRow row))
-                        {
-                            row.SetVoteCount(outcome.VoteCounts[i]);
-                        }
-                    }
-                }
-                if (_skipCountLabel != null)
-                {
-                    _skipCountLabel.text = Texts.Format(TextId.VoteCountFormat, skipVotes);
-                    _skipCountLabel.gameObject.SetActive(true);
-                }
+                _tallyView.Start(outcome, nowUnixMs, _skipCountLabel);
             }
+            _tallyView.Tick(nowUnixMs);
 
-            if (_resultShown) return;
+            if (_resultShown || !_tallyView.BannerReady(nowUnixMs)) return;
             _resultShown = true;
+
+            int skipVotes = outcome.SkipVotes;
 
             string banner;
             if (outcome.ExecutedActor != SkipTarget)
@@ -524,149 +519,13 @@ namespace Werewolf.UI
         public bool StartScatterReveal(List<List<int>> groups, long nowUnixMs,
             Action<float> pumpMusic, Action stopMusic, Action playJingle)
         {
-            if (_root == null || _rows.Count == 0) return false;
-            if (groups == null || groups.Count < 2) return false;
-
-            _scatterLetterByActor.Clear();
-            var letters = new List<char>(groups.Count);
-            for (int g = 0; g < groups.Count; g++)
-            {
-                char letter = (char)('A' + g);
-                letters.Add(letter);
-                foreach (int actor in groups[g]) _scatterLetterByActor[actor] = letter;
-            }
-
-            bool anyRow = false;
-            foreach (VoteRow row in _rows)
-            {
-                if (_scatterLetterByActor.ContainsKey(row.ActorNumber)) { anyRow = true; break; }
-            }
-            if (!anyRow)
-            {
-                _scatterLetterByActor.Clear();
-                return false;
-            }
-
-            _scatterLetters = letters.ToArray();
-            _scatterActive = true;
-            _scatterSettled = false;
-            _scatterMusicStopped = false;
-            _scatterStartUnixMs = nowUnixMs;
-            _scatterNextSwapUnixMs = 0;
-            _scatterPumpMusic = pumpMusic;
-            _scatterStopMusic = stopMusic;
-            _scatterPlayJingle = playJingle;
-
-            EnsureScatterSloganBuilt();
-            if (_scatterSloganRoot != null) _scatterSloganRoot.SetActive(true);
-
-            string unknown = Texts.Get(TextId.VoteScatterBadgeUnknown);
-            foreach (VoteRow row in _rows)
-            {
-                if (_scatterLetterByActor.ContainsKey(row.ActorNumber))
-                {
-                    row.SetScatterBadge(unknown, settled: false);
-                }
-            }
-
-            WLog.Line("vote_panel_scatter_reveal", secret: false,
-                ("groups", groups.Count), ("actors", _scatterLetterByActor.Count));
-            return true;
-        }
-
-        private void UpdateScatterReveal(long nowUnixMs)
-        {
-            if (!_scatterActive) return;
-            long elapsed = nowUnixMs - _scatterStartUnixMs;
-
-            if (elapsed < ScatterIntroMs)
-            {
-                _scatterPumpMusic?.Invoke(1f);
-                return;
-            }
-
-            if (elapsed < ScatterIntroMs + ScatterShuffleMs)
-            {
-                _scatterPumpMusic?.Invoke(1f);
-                if (nowUnixMs < _scatterNextSwapUnixMs) return;
-                _scatterNextSwapUnixMs = nowUnixMs + ScatterSwapIntervalMs;
-                foreach (VoteRow row in _rows)
-                {
-                    if (!_scatterLetterByActor.ContainsKey(row.ActorNumber)) continue;
-                    char spin = _scatterLetters[_scatterRng.Next(_scatterLetters.Length)];
-                    row.SetScatterBadge(Texts.Format(TextId.VoteScatterBadgeFormat, spin), settled: false);
-                }
-                return;
-            }
-
-            if (!_scatterSettled)
-            {
-                _scatterSettled = true;
-                foreach (VoteRow row in _rows)
-                {
-                    if (_scatterLetterByActor.TryGetValue(row.ActorNumber, out char letter))
-                    {
-                        row.SetScatterBadge(Texts.Format(TextId.VoteScatterBadgeFormat, letter), settled: true);
-                    }
-                }
-                _scatterPlayJingle?.Invoke();
-                WLog.Line("vote_panel_scatter_settled", secret: false);
-            }
-
-            if (_scatterMusicStopped) return;
-            long fadeElapsed = elapsed - ScatterIntroMs - ScatterShuffleMs;
-            if (fadeElapsed >= ScatterFadeMs)
-            {
-                _scatterMusicStopped = true;
-                _scatterStopMusic?.Invoke();
-            }
-            else
-            {
-                _scatterPumpMusic?.Invoke(1f - fadeElapsed / (float)ScatterFadeMs);
-            }
+            _tallyView.FastForward();
+            return _scatter.Start(groups, nowUnixMs, pumpMusic, stopMusic, playJingle);
         }
 
         public void StopScatterReveal()
         {
-            if (_scatterActive && !_scatterMusicStopped) _scatterStopMusic?.Invoke();
-            if (_scatterActive)
-            {
-                foreach (VoteRow row in _rows) row.SetScatterBadge(null, settled: false);
-            }
-            _scatterActive = false;
-            _scatterSettled = false;
-            _scatterMusicStopped = false;
-            _scatterLetterByActor.Clear();
-            _scatterPumpMusic = null;
-            _scatterStopMusic = null;
-            _scatterPlayJingle = null;
-            if (_scatterSloganRoot != null) _scatterSloganRoot.SetActive(false);
-        }
-
-        private void EnsureScatterSloganBuilt()
-        {
-            if (_scatterSloganRoot != null || _rootRect == null) return;
-            RectTransform slogan = UiKit.CreateRect(_rootRect, "ScatterSlogan",
-                new Vector2(0f, 284f), new Vector2(520f, 32f));
-            _scatterSloganRoot = slogan.gameObject;
-            string text = Texts.Get(TextId.NoticeScatterSlogan);
-            TextMeshProUGUI label = UiKit.CreateText(slogan, "Label", Vector2.zero,
-                new Vector2(520f, 32f), text, 24f, TitleTextColor, TextAlignmentOptions.Center);
-            Sprite wink = AssetCatalog.GetSprite("img_taxman_wink")
-                ?? AssetCatalog.GetSprite("img_taxman_nodeath");
-            if (wink != null)
-            {
-                const float iconSize = 26f;
-                const float gap = 4f;
-                float textWidth = label.GetPreferredValues(text).x;
-                label.rectTransform.anchoredPosition = new Vector2(-(gap + iconSize) / 2f, 0f);
-                Image icon = UiKit.CreateImage(slogan, "Icon",
-                    new Vector2(textWidth / 2f + gap / 2f, 0f),
-                    new Vector2(iconSize, iconSize), Color.white);
-                icon.sprite = wink;
-                icon.preserveAspect = true;
-            }
-            _scatterSloganRoot.SetActive(false);
+            _scatter.Stop();
         }
 
         private void HandleInput(MeetingClientState state)

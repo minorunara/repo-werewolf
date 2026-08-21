@@ -74,10 +74,7 @@ namespace Werewolf.UI
                 var bgGo = new GameObject("Bg", typeof(RectTransform));
                 var bgRect = (RectTransform)bgGo.transform;
                 bgRect.SetParent(rootRect, false);
-                bgRect.anchorMin = Vector2.zero;
-                bgRect.anchorMax = Vector2.one;
-                bgRect.offsetMin = Vector2.zero;
-                bgRect.offsetMax = Vector2.zero;
+                UiKit.Stretch(bgRect);
                 var bgImg = bgGo.AddComponent<Image>();
                 bgImg.color = PanelBgColor;
                 bgImg.raycastTarget = false;
@@ -147,10 +144,7 @@ namespace Werewolf.UI
                 var handleGo = new GameObject("Handle", typeof(RectTransform));
                 var handleRect = (RectTransform)handleGo.transform;
                 handleRect.SetParent(slidingRect, false);
-                handleRect.anchorMin = Vector2.zero;
-                handleRect.anchorMax = Vector2.one;
-                handleRect.offsetMin = Vector2.zero;
-                handleRect.offsetMax = Vector2.zero;
+                UiKit.Stretch(handleRect);
                 var handleImg = handleGo.AddComponent<Image>();
                 handleImg.color = ScrollbarHandleColor;
                 handleImg.raycastTarget = true;

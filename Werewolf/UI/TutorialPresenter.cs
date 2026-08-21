@@ -16,11 +16,15 @@ namespace Werewolf.UI
 
         public float FontScale { get; set; } = 1f;
 
+        public TutorialBubblePanel Bubble { get; set; }
+
         private readonly List<(TutorialId Id, string Message)> _queue = new List<(TutorialId, string)>();
         private float _remaining;
         private float _fontRestoreRemaining;
         private float _originalFontSizeMax = -1f;
         private TutorialUI _elevatedUi;
+        private bool _onBubble;
+        private string _currentMessage;
 
         public void Enqueue(TutorialId id, string message)
         {
@@ -37,30 +41,64 @@ namespace Werewolf.UI
             return false;
         }
 
-        public TutorialId? Tick()
+        public TutorialId? Tick(bool meetingUiVisible)
         {
             TutorialUI ui = TutorialUI.instance;
+            TutorialBubblePanel bubble = Bubble;
+            bool bubbleReady = bubble != null && bubble.Exists;
+            bool bubbleSkip = bubbleReady && bubble.Tick();
 
             if (_remaining > 0f)
             {
-                if (ui == null)
+                if (_onBubble)
                 {
-                    _remaining = 0f;
-                    _fontRestoreRemaining = 0f;
-                    return null;
+                    if (!bubbleReady || !bubble.Visible)
+                    {
+                        EndDisplay();
+                        return null;
+                    }
+                    if (bubbleSkip)
+                    {
+                        EndDisplay();
+                        return null;
+                    }
                 }
-                ui.Show();
+                else
+                {
+                    if (ui == null)
+                    {
+                        _remaining = 0f;
+                        _fontRestoreRemaining = 0f;
+                        _currentMessage = null;
+                        return null;
+                    }
+                    if (meetingUiVisible && bubbleReady && _currentMessage != null)
+                    {
+                        bubble.ShowMessage(_currentMessage, FontScale);
+                        _onBubble = true;
+                        _fontRestoreRemaining = FontRestoreDelaySeconds;
+                    }
+                    else
+                    {
+                        ui.Show();
+                    }
+                }
                 _remaining -= Time.deltaTime;
-                if (_remaining <= 0f) _fontRestoreRemaining = FontRestoreDelaySeconds;
+                if (_remaining <= 0f) EndDisplay();
                 return null;
             }
 
             if (_queue.Count > 0)
             {
-                if (ui == null) return null;
+                bool useBubble = meetingUiVisible && bubbleReady;
+                if (useBubble && !bubble.Idle) return null;
+                if (!useBubble && ui == null) return null;
                 (TutorialId id, string message) = _queue[0];
                 _queue.RemoveAt(0);
-                Display(ui, message);
+                _currentMessage = message;
+                _onBubble = useBubble;
+                if (useBubble) bubble.ShowMessage(message, FontScale);
+                else Display(ui, message);
                 _remaining = DisplaySeconds;
                 return id;
             }
@@ -79,11 +117,16 @@ namespace Werewolf.UI
         public void Cancel()
         {
             _queue.Clear();
-            if (_remaining > 0f)
-            {
-                _remaining = 0f;
-                _fontRestoreRemaining = FontRestoreDelaySeconds;
-            }
+            if (_remaining > 0f) EndDisplay();
+        }
+
+        private void EndDisplay()
+        {
+            _remaining = 0f;
+            if (_onBubble) Bubble?.Hide();
+            else _fontRestoreRemaining = FontRestoreDelaySeconds;
+            _onBubble = false;
+            _currentMessage = null;
         }
 
         private void Display(TutorialUI ui, string message)

@@ -70,7 +70,11 @@ namespace Werewolf.Core
         private int _head;
         private int _count;
 
+        private readonly List<long> _sectionSeqs = new List<long>();
+
         public IReadOnlyList<ChatLogEntry> Entries => this;
+
+        public IReadOnlyList<long> SectionSeqs => _sectionSeqs;
 
         public int Count => _count;
 
@@ -95,8 +99,13 @@ namespace Werewolf.Core
         public bool AppendVote(int actor, string name, string text)
             => AppendCore(actor, name, text, ChatSpeaker.Alive, ChatEntryKind.Vote);
 
-        public bool AppendSystem(string name, string title, string text, string icon = null)
-            => AppendCore(SystemActor, name, text, ChatSpeaker.Alive, ChatEntryKind.System, title, icon);
+        public bool AppendSystem(string name, string title, string text, string icon = null,
+                                 bool section = false)
+        {
+            bool added = AppendCore(SystemActor, name, text, ChatSpeaker.Alive, ChatEntryKind.System, title, icon);
+            if (added && section) _sectionSeqs.Add(AppendedTotal - 1);
+            return added;
+        }
 
         private bool AppendCore(int actor, string name, string text, ChatSpeaker speaker, ChatEntryKind kind,
                                 string title = null, string icon = null)
@@ -124,6 +133,10 @@ namespace Werewolf.Core
                 _entries[_head] = entry;
                 _head = (_head + 1) % MaxEntries;
                 DroppedTotal++;
+                while (_sectionSeqs.Count > 0 && _sectionSeqs[0] < DroppedTotal)
+                {
+                    _sectionSeqs.RemoveAt(0);
+                }
             }
             AppendedTotal++;
             Revision++;
@@ -140,6 +153,7 @@ namespace Werewolf.Core
             }
             _head = 0;
             _count = 0;
+            _sectionSeqs.Clear();
             Revision++;
         }
 

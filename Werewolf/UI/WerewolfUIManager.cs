@@ -24,10 +24,11 @@ namespace Werewolf.UI
         public const string ManualLayer = "Manual";
 
         internal const int PanelSortingOrder = 9999;
-        internal const int VoidMatchSortingOrder = 10000;
-        internal const int ManualSortingOrder = 10001;
+        internal const int TutorialBubbleSortingOrder = 10000;
+        internal const int VoidMatchSortingOrder = 10001;
+        internal const int ManualSortingOrder = 10002;
         internal const int TutorialSortingOrder = 10000;
-        internal const int CursorSortingOrder = 10002;
+        internal const int CursorSortingOrder = 10003;
 
         private GameObject _canvasRoot;
         private readonly Dictionary<string, GameObject> _layers = new Dictionary<string, GameObject>();
@@ -79,10 +80,7 @@ namespace Werewolf.UI
             var layer = new GameObject($"WW_Layer_{layerName}", typeof(RectTransform));
             var rect = (RectTransform)layer.transform;
             rect.SetParent(_canvasRoot.transform, false);
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
+            UiKit.Stretch(rect);
             layer.SetActive(false);
 
             _layers[layerName] = layer;
@@ -160,6 +158,22 @@ namespace Werewolf.UI
             rect.anchoredPosition = anchoredPos;
             rect.sizeDelta = size;
             return rect;
+        }
+
+        internal static void Stretch(RectTransform rect)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+        }
+
+        internal static void SetAnchorsBottomLeft(RectTransform rect, Vector2 centerPos, Vector2 size)
+        {
+            rect.anchorMin = rect.anchorMax = new Vector2(0f, 0f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = centerPos;
+            rect.sizeDelta = size;
         }
 
         internal static Image CreateImage(Transform parent, string name, Vector2 anchoredPos, Vector2 size, Color color)
@@ -303,6 +317,32 @@ namespace Werewolf.UI
             _circleSprite = Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
             _circleSprite.name = "WW_CircleSprite";
             return _circleSprite;
+        }
+
+        private static Sprite _triangleUpSprite;
+
+        internal static Sprite TriangleUpSprite()
+        {
+            if (_triangleUpSprite != null) return _triangleUpSprite;
+            const int size = 32;
+            var tex = new Texture2D(size, size, TextureFormat.ARGB32, false);
+            tex.wrapMode = TextureWrapMode.Clamp;
+            var pixels = new Color[size * size];
+            float center = size / 2f;
+            for (int y = 0; y < size; y++)
+            {
+                float halfWidth = (center - 1f) * (1f - (y + 0.5f) / size);
+                for (int x = 0; x < size; x++)
+                {
+                    float d = halfWidth - Mathf.Abs((x + 0.5f) - center);
+                    pixels[y * size + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(d + 0.5f));
+                }
+            }
+            tex.SetPixels(pixels);
+            tex.Apply();
+            _triangleUpSprite = Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
+            _triangleUpSprite.name = "WW_TriangleUpSprite";
+            return _triangleUpSprite;
         }
 
         internal static Image CreateRoundedImage(Transform parent, string name, Vector2 anchoredPos, Vector2 size, Color color)

@@ -89,6 +89,18 @@ namespace Werewolf.UI
             if (_content != null) _content.sizeDelta = new Vector2(0f, height);
         }
 
+        public float WindowTop => _content != null ? _content.anchoredPosition.y - _padding : 0f;
+
+        public void ScrollToContentTop(float contentTop)
+        {
+            if (_scroll == null || _content == null || _viewport == null) return;
+            Canvas.ForceUpdateCanvases();
+            float scrollable = Mathf.Max(0f, _content.rect.height - _viewport.rect.height);
+            _content.anchoredPosition = new Vector2(
+                _content.anchoredPosition.x,
+                Mathf.Clamp(contentTop + _padding, 0f, scrollable));
+        }
+
         public bool IsAtBottom()
         {
             if (_scroll == null || _content == null || _viewport == null) return true;
