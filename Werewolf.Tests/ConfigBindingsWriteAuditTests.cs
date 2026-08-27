@@ -54,7 +54,7 @@ namespace Werewolf.Tests
 
             var violations = new List<string>();
 
-            foreach (TypeDefinition type in module.Types.SelectMany(Flatten))
+            foreach (TypeDefinition type in CecilTypes.AllTypes(module))
             {
                 foreach (MethodDefinition method in type.Methods.Where(m => m.HasBody))
                 {
@@ -82,13 +82,6 @@ namespace Werewolf.Tests
                 "REPOConfig でのその場編集が一部の参照元へ反映されなくなる。" +
                 "Bind は ConfigBindings のコンストラクタまたは Bind* メソッドで行うこと。" +
                 "正当な再 Bind 経路は AllowedExternalWriters へ理由付きで登録する。");
-        }
-
-        private static IEnumerable<TypeDefinition> Flatten(TypeDefinition type)
-        {
-            yield return type;
-            foreach (TypeDefinition nested in type.NestedTypes.SelectMany(Flatten))
-                yield return nested;
         }
     }
 }

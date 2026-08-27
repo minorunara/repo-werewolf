@@ -82,7 +82,7 @@ namespace Werewolf.Core
             float flyStart = SlideSec + HoldSec;
             if (t >= flyStart)
             {
-                float u = Clamp01((t - flyStart) / FlySec);
+                float u = MathUtil.Clamp01((t - flyStart) / FlySec);
                 float ease = 1f - (1f - u) * (1f - u);
                 flyOffset = FlyDistPx * ease;
                 alpha = Math.Max(0f, 1f - (float)Math.Pow(u, 1.5));
@@ -139,8 +139,6 @@ namespace Werewolf.Core
             }
             return n;
         }
-
-        private static float Clamp01(float v) => v < 0f ? 0f : (v > 1f ? 1f : v);
     }
 
     public enum ImpactJitterUnit

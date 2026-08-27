@@ -1,6 +1,7 @@
 using System;
 using HarmonyLib;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.Game.Patches
 {

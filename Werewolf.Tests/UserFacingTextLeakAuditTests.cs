@@ -47,7 +47,7 @@ namespace Werewolf.Tests
 
             var violations = new List<string>();
 
-            foreach (TypeDefinition type in types.SelectMany(Flatten))
+            foreach (TypeDefinition type in types.SelectMany(t => CecilTypes.AllTypes(t)))
             {
                 foreach (MethodDefinition method in type.Methods.Where(m => m.HasBody))
                 {
@@ -76,13 +76,6 @@ namespace Werewolf.Tests
             const int max = 80;
             string single = text.Replace("\n", " ").Replace("\r", " ");
             return single.Length <= max ? single : single.Substring(0, max) + "…";
-        }
-
-        private static IEnumerable<TypeDefinition> Flatten(TypeDefinition type)
-        {
-            yield return type;
-            foreach (TypeDefinition nested in type.NestedTypes.SelectMany(Flatten))
-                yield return nested;
         }
     }
 }

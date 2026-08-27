@@ -78,36 +78,99 @@ namespace Werewolf.UI
         private void UpdateStamp()
         {
             if (_stampLabel == null) return;
-            int executed = 0;
-            double progress = 0;
-            bool show = _danmaku != null && _danmaku.TryGetStamp(out executed, out progress);
-            if (!show)
+            ReplayStamp stamp;
+            if (_danmaku == null || !_danmaku.TryGetStamp(out stamp))
             {
-                if (_stampLabel.gameObject.activeSelf) _stampLabel.gameObject.SetActive(false);
+                HideStampViews();
                 return;
             }
+            if (stamp.Kind == ReplayStampKind.Win) ShowWinStamp(stamp);
+            else ShowResultStamp(stamp);
+        }
 
+        private void ShowResultStamp(ReplayStamp stamp)
+        {
             string want;
             Color color;
-            if (executed == -1)
+            if (stamp.ExecutedActor == -1)
             {
                 want = Texts.Get(TextId.ReplayStampNoExecution);
                 color = StampNoExecutionColor;
             }
             else
             {
-                _danmakuPlayers.TryGetValue(executed, out ReplayPlayerEntry entry);
+                _danmakuPlayers.TryGetValue(stamp.ExecutedActor, out ReplayPlayerEntry entry);
                 string idText = entry != null && entry.ParticipantId > 0
                     ? entry.ParticipantId.ToString()
-                    : executed.ToString();
+                    : stamp.ExecutedActor.ToString();
                 string name = entry != null && !string.IsNullOrEmpty(entry.Name) ? entry.Name : "???";
                 want = Texts.Format(TextId.ReplayStampExecutedFormat, idText, name);
                 color = StampExecutedColor;
             }
-            color.a = 1f - (float)(progress * progress);
-            if (_stampLabel.text != want) _stampLabel.text = want;
+            color.a = 1f - (float)(stamp.Progress * stamp.Progress);
+            SetStampTitle(want, color, null);
+        }
+
+        private void ShowWinStamp(ReplayStamp stamp)
+        {
+            Color color;
+            switch (stamp.Team)
+            {
+                case (byte)Team.Villagers:
+                case TeamCodes.PeacefulSurvived:
+                    color = StampVillagerWinColor;
+                    break;
+                case (byte)Team.Werewolves:
+                case TeamCodes.PeacefulCollapsed:
+                    color = StampExecutedColor;
+                    break;
+                default:
+                    color = StampNoExecutionColor;
+                    break;
+            }
+            SetStampTitle(ResultDigestText.OutcomeText(stamp.Team), color,
+                ResultDigestText.EpigraphText(stamp.Reason));
+        }
+
+        private void SetStampTitle(string title, Color color, string epigraph)
+        {
+            if (_stampLabel.text != title) _stampLabel.text = title;
             _stampLabel.color = color;
+            bool hasEpigraph = !string.IsNullOrEmpty(epigraph);
+            Vector2 titlePos = _stampLabel.rectTransform.anchoredPosition;
+            float wantY = hasEpigraph ? StampTitleWithEpigraphOffsetY : 0f;
+            if (!Mathf.Approximately(titlePos.y, wantY))
+            {
+                _stampLabel.rectTransform.anchoredPosition = new Vector2(titlePos.x, wantY);
+            }
             if (!_stampLabel.gameObject.activeSelf) _stampLabel.gameObject.SetActive(true);
+
+            if (_stampEpigraphLabel == null) return;
+            if (!hasEpigraph)
+            {
+                if (_stampEpigraphLabel.gameObject.activeSelf)
+                {
+                    _stampEpigraphLabel.gameObject.SetActive(false);
+                }
+                return;
+            }
+            if (_stampEpigraphLabel.text != epigraph) _stampEpigraphLabel.text = epigraph;
+            Color epigraphColor = StampNoExecutionColor;
+            epigraphColor.a = color.a;
+            _stampEpigraphLabel.color = epigraphColor;
+            if (!_stampEpigraphLabel.gameObject.activeSelf) _stampEpigraphLabel.gameObject.SetActive(true);
+        }
+
+        private void HideStampViews()
+        {
+            if (_stampLabel != null && _stampLabel.gameObject.activeSelf)
+            {
+                _stampLabel.gameObject.SetActive(false);
+            }
+            if (_stampEpigraphLabel != null && _stampEpigraphLabel.gameObject.activeSelf)
+            {
+                _stampEpigraphLabel.gameObject.SetActive(false);
+            }
         }
 
         private double MeasureCommentWidth(ReplayDanmakuComment c)
@@ -273,10 +336,7 @@ namespace Werewolf.UI
         private void HideDanmakuViews()
         {
             HideCommentExtra(0);
-            if (_stampLabel != null && _stampLabel.gameObject.activeSelf)
-            {
-                _stampLabel.gameObject.SetActive(false);
-            }
+            HideStampViews();
         }
 
         private void BuildDanmakuOutlineMaterial()

@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.UI
 {
@@ -24,16 +26,16 @@ namespace Werewolf.UI
             _surface = surface;
         }
 
-        private const float PanelWidth = 330f;
-        private const float PanelHeight = 690f;
-        private const float PanelMarginRight = 24f;
-        private const float PanelOffsetY = -10f;
+        private const float PanelWidth = HudGeometry.ChatPanel.Width;
+        private const float PanelHeight = HudGeometry.ChatPanel.Height;
+        private const float PanelMarginRight = HudGeometry.ChatPanel.MarginRight;
+        private const float PanelOffsetY = HudGeometry.ChatPanel.OffsetY;
 
-        private const float ToggleButtonMargin = 24f;
+        private const float ToggleButtonMargin = HudGeometry.ChatToggle.Margin;
         private static readonly IconToggleStyle ToggleStyle = new IconToggleStyle(
-            iconSize: 96f,
-            labelWidth: 320f,
-            labelHeight: 32f,
+            iconSize: HudGeometry.ChatToggle.IconSize,
+            labelWidth: HudGeometry.ChatToggle.LabelWidth,
+            labelHeight: HudGeometry.ChatToggle.LabelHeight,
             labelFontSize: 24f,
             labelColor: new Color(0.95f, 0.95f, 1f, 0.95f),
             fallbackText: "LOG",
@@ -55,6 +57,8 @@ namespace Werewolf.UI
         private const float ScrollSensitivity = 40f;
 
         private const float BottomStickSlack = 24f;
+
+        private const float MinVisibleLineHeight = 6f;
 
         private static readonly Color PanelBgColor = new Color(0.02f, 0.02f, 0.05f, 0.85f);
         private static readonly Color HeaderBgColor = new Color(0.2f, 0.2f, 0.25f, 0.9f);
@@ -84,6 +88,8 @@ namespace Werewolf.UI
         private readonly ChatSectionNav _nav = new ChatSectionNav();
 
         private readonly ChatSpeakerFilter _speakerFilter = new ChatSpeakerFilter();
+
+        private readonly Vector3[] _cornerScratch = new Vector3[4];
 
         private Func<ChatLogEntry, ChatBlockSize> _measureFn;
         private Func<int, GameObject> _createBlockFn;
@@ -119,19 +125,13 @@ namespace Werewolf.UI
         {
             if (_root != null || layerRoot == null) return;
 
-            var rootGo = new GameObject("WW_MeetingChatRoot", typeof(RectTransform));
-            var containerRect = (RectTransform)rootGo.transform;
-            containerRect.SetParent(layerRoot, false);
-            UiKit.Stretch(containerRect);
-            _root = rootGo;
+            RectTransform containerRect = UiKit.CreateStretched(layerRoot, "WW_MeetingChatRoot");
+            _root = containerRect.gameObject;
 
-            var panelGo = new GameObject("WW_MeetingChatPanel", typeof(RectTransform));
-            var rootRect = (RectTransform)panelGo.transform;
-            rootRect.SetParent(containerRect, false);
-            rootRect.anchorMin = rootRect.anchorMax = new Vector2(1f, 0.5f);
-            rootRect.pivot = new Vector2(1f, 0.5f);
-            rootRect.anchoredPosition = new Vector2(-PanelMarginRight, PanelOffsetY);
-            rootRect.sizeDelta = new Vector2(PanelWidth, PanelHeight);
+            RectTransform rootRect = UiKit.CreateAnchoredRect(containerRect, "WW_MeetingChatPanel",
+                new Vector2(1f, 0.5f), new Vector2(1f, 0.5f),
+                new Vector2(-PanelMarginRight, PanelOffsetY), new Vector2(PanelWidth, PanelHeight));
+            var panelGo = rootRect.gameObject;
 
             var subCanvas = panelGo.AddComponent<Canvas>();
             if (_surface == ChatPanelSurface.Meeting)
@@ -143,8 +143,7 @@ namespace Werewolf.UI
             _panel = panelGo;
             _panelRect = rootRect;
 
-            Image bg = UiKit.CreateImage(rootRect, "Bg", Vector2.zero, new Vector2(PanelWidth, PanelHeight), PanelBgColor);
-            UiKit.Stretch(bg.rectTransform);
+            UiKit.CreateBackdrop(rootRect, "Bg", PanelBgColor);
 
             float headerY = PanelHeight * 0.5f - HeaderHeight * 0.5f;
             UiKit.CreateImage(rootRect, "HeaderBg", new Vector2(0f, headerY),
@@ -212,9 +211,6 @@ namespace Werewolf.UI
 
             BuildToggleButton(containerRect);
             _panel.SetActive(_open);
-
-            WLog.Line("chat_panel_built", secret: false,
-                ("icon", _toggle.HasIcon ? 1 : 0), ("surface", _surface));
         }
 
         public void EnsureTopSibling()
@@ -238,10 +234,7 @@ namespace Werewolf.UI
         {
             RectTransform toggleRoot = _toggle.Build(containerRect, "ToggleButton", ToggleStyle,
                 "icon_chat_log", Texts.Format(ToggleLabelFormatId, "L"));
-            Vector2 size = toggleRoot.sizeDelta;
-            toggleRoot.anchoredPosition = new Vector2(
-                (1920f * 0.5f) - size.x * 0.5f - ToggleButtonMargin,
-                -(1080f * 0.5f) + size.y * 0.5f + ToggleButtonMargin);
+            UiKit.PinToCorner(toggleRoot, UiKit.BottomRight, ToggleButtonMargin);
         }
 
         private static RectTransform BuildScrollbar(RectTransform scrollRect, ScrollRect scroll)
@@ -337,6 +330,85 @@ namespace Werewolf.UI
             return _toggle.ContainsRect(screenPoint);
         }
 
+        public bool TryGetRecapLineScreenRect(int lineIndex, out Rect screenRect)
+        {
+            screenRect = default;
+            if (_root == null || !_open || !_hasRenderState || _log == null || !_view.Attached) return false;
+            if (lineIndex < 0) return false;
+
+            IReadOnlyList<long> sections = _log.SectionSeqs;
+            if (sections == null || sections.Count == 0) return false;
+            long seq = sections[sections.Count - 1];
+
+            GameObject row = null;
+            for (int i = _layout.Count - 1; i >= 0; i--)
+            {
+                ChatLayoutBlock block = _layout[i];
+                if (block.EntrySeq != seq || block.Kind != ChatBlockKind.Bubble) continue;
+                row = _view.Live(i);
+                break;
+            }
+            if (row == null) return false;
+
+            var label = row.GetComponentInChildren<TextMeshProUGUI>();
+            if (label == null || !TryGetLineWorldRect(label, lineIndex, out Rect world)) return false;
+
+            RectTransform viewport = _view.Viewport;
+            if (viewport != null)
+            {
+                viewport.GetWorldCorners(_cornerScratch);
+                float minY = Mathf.Max(world.yMin, _cornerScratch[0].y);
+                float maxY = Mathf.Min(world.yMax, _cornerScratch[1].y);
+                if (maxY - minY < MinVisibleLineHeight) return false;
+                world = Rect.MinMaxRect(world.xMin, minY, world.xMax, maxY);
+            }
+
+            screenRect = world;
+            return true;
+        }
+
+        private static bool TryGetLineWorldRect(TextMeshProUGUI label, int lineIndex, out Rect world)
+        {
+            world = default;
+            TMP_TextInfo info = label.textInfo;
+            if (info == null || info.characterCount <= 0) return false;
+
+            string source = label.text;
+            if (string.IsNullOrEmpty(source)) return false;
+
+            int start = 0;
+            for (int i = 0; i < lineIndex; i++)
+            {
+                int br = source.IndexOf('\n', start);
+                if (br < 0) return false;
+                start = br + 1;
+            }
+            int end = source.IndexOf('\n', start);
+            if (end < 0) end = source.Length;
+
+            float minX = float.MaxValue, maxX = float.MinValue;
+            float minY = float.MaxValue, maxY = float.MinValue;
+            int count = Mathf.Min(info.characterCount, info.characterInfo.Length);
+            for (int i = 0; i < count; i++)
+            {
+                TMP_CharacterInfo ch = info.characterInfo[i];
+                if (ch.index < start || ch.index >= end || ch.character == '\n') continue;
+                minX = Mathf.Min(minX, ch.bottomLeft.x);
+                maxX = Mathf.Max(maxX, ch.topRight.x);
+                minY = Mathf.Min(minY, ch.descender);
+                maxY = Mathf.Max(maxY, ch.ascender);
+            }
+            if (minX > maxX || minY > maxY) return false;
+
+            Transform t = label.rectTransform;
+            Vector3 wMin = t.TransformPoint(new Vector3(minX, minY, 0f));
+            Vector3 wMax = t.TransformPoint(new Vector3(maxX, maxY, 0f));
+            world = Rect.MinMaxRect(
+                Mathf.Min(wMin.x, wMax.x), Mathf.Min(wMin.y, wMax.y),
+                Mathf.Max(wMin.x, wMax.x), Mathf.Max(wMin.y, wMax.y));
+            return true;
+        }
+
         public void SetUnreadBadge(bool visible)
         {
             if (_root == null) return;
@@ -346,7 +418,7 @@ namespace Werewolf.UI
         private static string FormatKey(KeyCode key) => key == KeyCode.None ? "-" : key.ToString();
 
         public void Render(MeetingChatLog log,
-                           int localActor, Func<int, PlayerAvatar> resolveAvatar,
+                           int localActor, Func<int, PlayerHandle> resolveAvatar,
                            Func<int, int> resolveId, Func<int, Role?> markedRole, bool localDead)
         {
             if (_root == null || !_view.Attached) return;

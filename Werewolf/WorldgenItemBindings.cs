@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using BepInEx.Configuration;
 using Werewolf.Core;
 using Werewolf.Game;
+using Werewolf.Vanilla;
 
 namespace Werewolf
 {

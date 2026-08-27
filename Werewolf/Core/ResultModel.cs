@@ -34,8 +34,7 @@ namespace Werewolf.Core
                     "actors と roles の長さが一致しません（169 payload破損）。", nameof(roles));
             }
 
-            bool voided = winningTeam == TeamCodes.VoidMatch;
-            var team = (Team)winningTeam;
+            Team? winner = TeamCodes.WinnerOf(winningTeam);
             var rows = new List<ResultRow>(actors.Length);
             for (int i = 0; i < actors.Length; i++)
             {
@@ -52,7 +51,7 @@ namespace Werewolf.Core
                     status = ResultRowStatus.Disconnected;
                 }
 
-                bool isWinningSide = !voided && RoleDistribution.TeamOf(role) == team;
+                bool isWinningSide = winner.HasValue && RoleDistribution.TeamOf(role) == winner.Value;
 
                 string name = resolveName(actor);
                 if (string.IsNullOrEmpty(name)) name = "Actor" + actor;

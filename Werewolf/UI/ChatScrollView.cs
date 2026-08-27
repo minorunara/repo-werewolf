@@ -31,6 +31,11 @@ namespace Werewolf.UI
 
         public bool Attached => _content != null && _viewport != null;
 
+        public RectTransform Viewport => _viewport;
+
+        public GameObject Live(int index)
+            => _live.TryGetValue(index, out GameObject go) ? go : null;
+
         public int LiveCount => _live.Count;
 
         public void Attach(ScrollRect scroll, RectTransform viewport, RectTransform content)

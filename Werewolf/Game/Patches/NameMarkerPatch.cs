@@ -4,6 +4,7 @@ using TMPro;
 using UnityEngine;
 using Werewolf.Core;
 using Werewolf.UI;
+using Werewolf.Vanilla;
 
 namespace Werewolf.Game.Patches
 {
@@ -25,7 +26,7 @@ namespace Werewolf.Game.Patches
                 PlayerAvatar avatar = ResolvePlayerAvatar(__instance);
                 if (avatar == null) return;
 
-                Role? marked = dir.MarkedTeammateRoleForAvatar(avatar);
+                Role? marked = dir.MarkedTeammateRoleForActor(Players.ActorOf(avatar));
                 if (marked == null) return;
 
                 TextMeshProUGUI text = __instance.text;

@@ -305,9 +305,27 @@ namespace Werewolf.Tests
 
             rec.Sample(1.5, new[] { Player(1), Player(2) });
             Assert.False(rec.ShouldSample(100.0));
+            Assert.True(rec.PositionCapped);
+
+            Assert.Equal(1, rec.EventCount);
+            Assert.Single(rec.ToJsonLines(), l => l.Contains("\"rec_cap\""));
 
             rec.NoteEvent(2.0, "death", ("a", 1));
+            Assert.Equal(2, rec.EventCount);
+        }
+
+        [Fact]
+        public void CapacityHardCap_NotesRecCapOncePerAffectedSegment()
+        {
+            var rec = new ReplayRecorder(degradeEntries1: 2, degradeEntries2: 4, hardCapEntries: 2);
+            rec.BeginSegment(Header(), 0.0);
+            rec.Sample(0.0, new[] { Player(1), Player(2) });
+            rec.Sample(10.0, new[] { Player(1) });
             Assert.Equal(1, rec.EventCount);
+
+            rec.BeginSegment(Header(), 50.0);
+            Assert.Equal(2, rec.EventCount);
+            Assert.Equal(2, rec.ToJsonLines().Count(l => l.Contains("\"rec_cap\"")));
         }
 
         [Fact]

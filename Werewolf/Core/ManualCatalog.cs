@@ -71,6 +71,7 @@ namespace Werewolf.Core
             new ManualPage(TextId.ManualGameFlowTitle, TextId.ManualGameFlowBody),
             new ManualPage(TextId.ManualVillagerWinTitle, TextId.ManualVillagerWinBody),
             new ManualPage(TextId.ManualWerewolfWinTitle, TextId.ManualWerewolfWinBody),
+            new ManualPage(TextId.ManualPeacefulVillageTitle, TextId.ManualPeacefulVillageBody),
             new ManualPage(TextId.ManualValuablesMapTitle, TextId.ManualValuablesMapBody, "manual_map_markers"),
             new ManualPage(TextId.ManualValuableRecordTitle, new[]
             {
@@ -136,15 +137,15 @@ namespace Werewolf.Core
         public static readonly ManualSection[] Sections =
         {
             new ManualSection(TextId.ManualSectionBasics, 0),
-            new ManualSection(TextId.ManualSectionExploration, 4),
-            new ManualSection(TextId.ManualSectionMeeting, 8),
-            new ManualSection(TextId.ManualSectionGauge, 13),
-            new ManualSection(TextId.ManualSectionVillager, 14),
-            new ManualSection(TextId.ManualSectionShaman, 15),
-            new ManualSection(TextId.ManualSectionWerewolf, 17),
-            new ManualSection(TextId.ManualSectionBlackCat, 21),
-            new ManualSection(TextId.ManualSectionBomber, 24),
-            new ManualSection(TextId.ManualSectionAfterDeath, 27),
+            new ManualSection(TextId.ManualSectionExploration, 5),
+            new ManualSection(TextId.ManualSectionMeeting, 9),
+            new ManualSection(TextId.ManualSectionGauge, 14),
+            new ManualSection(TextId.ManualSectionVillager, 15),
+            new ManualSection(TextId.ManualSectionShaman, 16),
+            new ManualSection(TextId.ManualSectionWerewolf, 18),
+            new ManualSection(TextId.ManualSectionBlackCat, 22),
+            new ManualSection(TextId.ManualSectionBomber, 25),
+            new ManualSection(TextId.ManualSectionAfterDeath, 28),
         };
 
         public static int PageCount => Pages.Length;

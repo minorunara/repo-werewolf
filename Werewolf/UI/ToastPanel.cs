@@ -30,22 +30,16 @@ namespace Werewolf.UI
 
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            var go = new GameObject("WW_ToastPanel", typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(layerRoot, false);
-            rect.anchorMin = rect.anchorMax = new Vector2(1f, 1f);
-            rect.pivot = new Vector2(1f, 1f);
-            rect.anchoredPosition = new Vector2(-RightMargin, -TopMargin);
-            rect.sizeDelta = new Vector2(
-                SlotWidth,
-                SlotCount * SlotHeight + (SlotCount - 1) * SlotSpacing);
-            _root = go;
+            RectTransform rect = UiKit.CreateAnchoredRect(layerRoot, "WW_ToastPanel",
+                UiKit.TopRight, new Vector2(1f, 1f),
+                new Vector2(-RightMargin, -TopMargin),
+                new Vector2(SlotWidth, SlotCount * SlotHeight + (SlotCount - 1) * SlotSpacing));
+            _root = rect.gameObject;
 
             for (int i = 0; i < SlotCount; i++)
             {
                 _slots.Add(BuildSlot(rect, i));
             }
-            WLog.Line("toast_panel_built", secret: false, ("slots", SlotCount));
         }
 
         public void Tick(ToastQueue queue, long nowUnixMs)

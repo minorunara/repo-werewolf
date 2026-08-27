@@ -49,7 +49,7 @@ namespace Werewolf.Tests
         [InlineData(50.0, true, 32f)]
         [InlineData(101.0, false, 4f)]
         [InlineData(101.0, true, 16f)]
-        [InlineData(106.0, false, 16f)]
+        [InlineData(106.0, false, 32f)]
         [InlineData(106.0, true, 32f)]
         public void SpeedAt_MatchesAdrTable(double t, bool fast, float expected)
         {
@@ -77,7 +77,7 @@ namespace Werewolf.Tests
         public void Advance_SwitchesSpeedAtSilenceOnsetWithinOneCall()
         {
             ReplayPace pace = Pace(chats: new List<double>());
-            Assert.Equal(109.0, pace.Advance(100.0, 1.5, fast: false), 6);
+            Assert.Equal(113.0, pace.Advance(100.0, 1.5, fast: false), 6);
         }
 
         [Fact]
@@ -85,7 +85,7 @@ namespace Werewolf.Tests
         {
             ReplayPace pace = Pace(chats: new List<double>());
             double result = pace.Advance(199.0, 1.0625, fast: false);
-            Assert.Equal(208.0, result, 6);
+            Assert.Equal(208.25, result, 6);
         }
 
         [Fact]
@@ -107,8 +107,8 @@ namespace Werewolf.Tests
         public void RealSecondsBetween_IntegratesPiecewise()
         {
             ReplayPace pace = Pace();
-            Assert.Equal(1.5625, pace.RealSecondsBetween(100.0, 110.0, false), 6);
-            Assert.Equal(1.5625, pace.RealSecondsBetween(110.0, 120.0, false), 6);
+            Assert.Equal(1.40625, pace.RealSecondsBetween(100.0, 110.0, false), 6);
+            Assert.Equal(1.40625, pace.RealSecondsBetween(110.0, 120.0, false), 6);
             Assert.Equal(0.0, pace.RealSecondsBetween(120.0, 110.0, false), 6);
             Assert.Equal(0.0, pace.RealSecondsBetween(110.0, 110.0, false), 6);
         }

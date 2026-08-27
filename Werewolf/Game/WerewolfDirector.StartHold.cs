@@ -1,4 +1,5 @@
 using Werewolf.Core;
+using Werewolf.Vanilla;
 using Werewolf.UI;
 
 namespace Werewolf.Game
@@ -13,22 +14,20 @@ namespace Werewolf.Game
 
         internal bool IsWerewolfRoundExpected()
         {
-            if (SemiFunc.IsMasterClientOrSingleplayer()) return LiveWerewolfModeEnabled();
-            return _lastPanelModeEnabled;
+            if (Session.IsHost) return LiveConfig.WerewolfModeEnabled();
+            return _lobbySettingsFeature.PanelModeEnabled;
         }
 
         private void TickStartHold(long now)
         {
-            bool inRunLevel = SemiFunc.RunIsLevel();
-            bool operable = inRunLevel
-                && GameDirector.instance != null
-                && GameDirector.instance.currentState == GameDirector.gameState.Main;
+            bool inRunLevel = Session.InRunLevel;
+            bool operable = inRunLevel && Session.IsGameStateMain;
 
             StartHoldPhase before = _startHold.Phase;
             long heldMsBefore = _startHold.HeldMs(now);
             bool freeze = _startHold.Tick(
                 inRunLevel, operable, IsWerewolfRoundExpected(),
-                _gameStartUnixMsClient > 0, now, out StartHoldRelease released);
+                _roundMirror.GameStartUnixMs > 0, now, out StartHoldRelease released);
 
             if (before != StartHoldPhase.Holding && _startHold.Phase == StartHoldPhase.Holding)
             {
@@ -49,9 +48,8 @@ namespace Werewolf.Game
 
             if (freeze)
             {
-                SemiFunc.InputDisableMovement();
-                PhysGrabber grabber = PhysGrabber.instance;
-                if (grabber != null) grabber.OverrideGrabDisable(StartHoldKeepAliveSeconds);
+                Inputs.DisableMovement();
+                LocalPlayer.DisableGrab(StartHoldKeepAliveSeconds);
             }
 
             _startHoldOverlay.Tick(freeze);

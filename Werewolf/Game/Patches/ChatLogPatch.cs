@@ -1,6 +1,7 @@
 using System;
 using HarmonyLib;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.Game.Patches
 {
@@ -16,11 +17,12 @@ namespace Werewolf.Game.Patches
                 WerewolfDirector dir = WerewolfDirector.Instance;
                 if (dir == null || !dir.IsChatLogWindowOpenClient) return;
 
-                dir.RecordReplayChatClient(__instance, _message);
+                int actor = Players.ActorOf(__instance);
+                dir.RecordReplayChatClient(actor, _message);
 
                 if (!DeadTextGuard.ShouldShow(__instance)) return;
 
-                dir.RecordMeetingChatClient(__instance, _message);
+                dir.RecordMeetingChatClient(actor, _message);
             }
             catch (Exception e)
             {

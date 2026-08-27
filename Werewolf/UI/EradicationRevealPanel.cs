@@ -4,6 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.UI
 {
@@ -56,15 +57,14 @@ namespace Werewolf.UI
                 out _titleTextBack);
 
             _root.SetActive(false);
-            WLog.Line("eradication_reveal_built", secret: false);
         }
 
-        public void Show(WPlayer victim, Func<int, PlayerAvatar> resolveAvatar,
-                         Team winningTeam, bool vanished)
+        public void Show(WPlayer victim, Func<int, PlayerHandle> resolveAvatar,
+                         byte outcome, bool vanished)
         {
             if (_root == null || victim == null) return;
 
-            string title = Texts.Get(EradicationCeremony.TitleId(winningTeam, vanished));
+            string title = Texts.Get(EradicationCeremony.TitleId(outcome, vanished));
             _titleText.text = title;
             _titleTextBack.text = title;
 
@@ -79,7 +79,7 @@ namespace Werewolf.UI
             _contentReady = true;
         }
 
-        public IEnumerator Play(Action onStamp)
+        public IEnumerator Play(Action onStamp, Action onDone = null)
         {
             if (_root == null || !_contentReady)
             {
@@ -100,10 +100,11 @@ namespace Werewolf.UI
             yield return RevealPanelKit.StampEntrance(
                 _stampRect, _stampGroup, EradicationCeremony.StampEntranceSec);
 
-            RevealPanelKit.InvokeSfx(onStamp, "eradication_stamp_sfx_error");
+            RevealPanelKit.InvokeCallback(onStamp, "eradication_stamp_sfx_error");
 
             yield return UiTween.Hold(EradicationCeremony.StampHoldSec);
             WLog.Line("eradication_reveal_hold_end", secret: false);
+            RevealPanelKit.InvokeCallback(onDone, "eradication_done_callback_error");
         }
 
         public void Tick()

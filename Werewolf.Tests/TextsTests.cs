@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using Werewolf.Core;
+using Werewolf.Scenarios.Core;
 using Xunit;
 
 namespace Werewolf.Tests
@@ -54,6 +56,46 @@ namespace Werewolf.Tests
             }
         }
 
+        private static string StripVanillaTokens(string text)
+            => VanillaEmojiToken.Strip(text).Trim();
+
+        [Fact]
+        public void Tables_UseKnownVanillaSpriteNames()
+        {
+            var broken = new List<string>();
+            foreach (Language language in Enum.GetValues(typeof(Language)))
+            {
+                var table = Texts.TableFor(language);
+                foreach (TextId id in Enum.GetValues(typeof(TextId)))
+                {
+                    if (!table.TryGetValue(id, out string value)) continue;
+                    foreach (string problem in VanillaEmojiNames.Problems(value))
+                    {
+                        broken.Add($"{language}/{id}: {problem}");
+                    }
+                }
+            }
+
+            Assert.True(broken.Count == 0,
+                "本体に無いスプライト名が文言テーブルにある: " + string.Join(", ", broken) +
+                "。VanillaEmojiNames のスプライト名から選ぶ。");
+        }
+
+        [Fact]
+        public void EnglishAndJapanese_ModKeyTagsMatch()
+        {
+            var japanese = Texts.TableFor(Language.Japanese);
+            var english = Texts.TableFor(Language.English);
+            foreach (TextId id in Enum.GetValues(typeof(TextId)))
+            {
+                foreach (string tag in ScenarioKeyTags.All)
+                {
+                    Assert.True(japanese[id].Contains(tag) == english[id].Contains(tag),
+                        $"TextId.{id} の {tag} が日英で不一致");
+                }
+            }
+        }
+
         [Fact]
         public void EnglishAndJapanese_PlaceholderSetsMatch()
         {
@@ -89,9 +131,9 @@ namespace Werewolf.Tests
         public void ScatterSlogan_HasIntendedJapaneseAndEnglishCopy()
         {
             Assert.Equal("サイロ化を解消しよう",
-                Texts.TableFor(Language.Japanese)[TextId.NoticeScatterSlogan]);
-            Assert.Equal("Let's maximize our bus factor.",
-                Texts.TableFor(Language.English)[TextId.NoticeScatterSlogan]);
+                StripVanillaTokens(Texts.TableFor(Language.Japanese)[TextId.NoticeScatterSlogan]));
+            Assert.Equal("Let's maximize our bus factor",
+                StripVanillaTokens(Texts.TableFor(Language.English)[TextId.NoticeScatterSlogan]));
         }
 
         [Fact]

@@ -1,6 +1,7 @@
 using System;
 using HarmonyLib;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.Game.Patches
 {
@@ -17,7 +18,7 @@ namespace Werewolf.Game.Patches
 
                 if (!dir.Registry.IsDeadSet(__instance)) return;
 
-                dir.HostRecordDeath(__instance);
+                dir.HostRecordDeath(Players.ActorOf(__instance));
             }
             catch (Exception e)
             {

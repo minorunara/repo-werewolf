@@ -18,5 +18,7 @@ namespace Werewolf.Core.Replay
         public string FileName;
 
         public bool ToDownloads;
+
+        public bool PositionCapped;
     }
 }

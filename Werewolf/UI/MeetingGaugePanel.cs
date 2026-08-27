@@ -9,11 +9,13 @@ namespace Werewolf.UI
 {
     public sealed class MeetingGaugePanel : IClientPanel
     {
-        private static readonly Vector2 FullPanelSize = new Vector2(1560f, 104f);
-        private static readonly Vector2 FullPanelPos = new Vector2(0f, 400f);
+        private static readonly Vector2 FullPanelSize =
+            new Vector2(HudGeometry.MeetingGauge.Width, HudGeometry.MeetingGauge.Height);
+        private static readonly Vector2 FullPanelPos = new Vector2(0f, HudGeometry.MeetingGauge.CenterY);
         private static readonly Vector2 CenterPanelPos = new Vector2(0f, 0f);
 
-        private static readonly Vector2 TrackSize = new Vector2(1500f, 20f);
+        private static readonly Vector2 TrackSize =
+            new Vector2(HudGeometry.MeetingGauge.TrackWidth, HudGeometry.MeetingGauge.TrackHeight);
         private static readonly Vector2 TrackPos = new Vector2(0f, -6f);
         private static readonly Color TrackBgColor = new Color(0.10f, 0.10f, 0.14f, 0.9f);
         private static readonly Color FillColor = new Color(0.85f, 0.65f, 0.15f, 0.95f);
@@ -108,6 +110,8 @@ namespace Werewolf.UI
 
         public bool Visible => _root != null && _root.activeSelf;
 
+        public RectTransform PanelRect => _rootRect;
+
         public void Build(Transform layerRoot)
         {
             if (_root != null || layerRoot == null) return;
@@ -182,7 +186,6 @@ namespace Werewolf.UI
             }
 
             _root.SetActive(false);
-            WLog.Line("gauge_panel_built", secret: false);
         }
 
         public void Tick(RolesClientState roles, MeetingClientState meeting, long nowUnixMs)

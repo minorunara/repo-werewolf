@@ -25,7 +25,7 @@ namespace Werewolf.Tests
             clock.Seek(101.0);
             Assert.Equal(4f, clock.EffectiveSpeed(), 3);
             clock.Seek(150.0);
-            Assert.Equal(16f, clock.EffectiveSpeed(), 3);
+            Assert.Equal(32f, clock.EffectiveSpeed(), 3);
             clock.Fast = true;
             Assert.Equal(32f, clock.EffectiveSpeed(), 3);
         }

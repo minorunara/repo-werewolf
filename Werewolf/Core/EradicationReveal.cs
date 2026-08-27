@@ -19,9 +19,13 @@ namespace Werewolf.Core
 
         public const int CeremonyMs = 4500;
 
-        public static TextId TitleId(Team winningTeam, bool vanished)
+        public static TextId TitleId(byte outcome, bool vanished)
         {
-            if (winningTeam == Team.Villagers)
+            if (outcome == TeamCodes.PeacefulCollapsed)
+            {
+                return TextId.EradicationPeacefulCollapsed;
+            }
+            if (outcome == (byte)Team.Villagers)
             {
                 return vanished
                     ? TextId.EradicationLastWerewolfVanished
@@ -35,17 +39,17 @@ namespace Werewolf.Core
 
     public sealed class EradicationRevealData
     {
-        public EradicationRevealData(int actorNumber, Team winningTeam, bool vanished, string name)
+        public EradicationRevealData(int actorNumber, byte outcome, bool vanished, string name)
         {
             ActorNumber = actorNumber;
-            WinningTeam = winningTeam;
+            Outcome = outcome;
             Vanished = vanished;
             Name = name;
         }
 
         public int ActorNumber { get; }
 
-        public Team WinningTeam { get; }
+        public byte Outcome { get; }
 
         public bool Vanished { get; }
 
@@ -56,11 +60,11 @@ namespace Werewolf.Core
     {
         private const byte FlagVanished = 1 << 0;
 
-        public static object[] ToWire(int actorNumber, Team winningTeam, bool vanished, string name)
+        public static object[] ToWire(int actorNumber, byte outcome, bool vanished, string name)
             => new object[]
             {
                 actorNumber,
-                (byte)winningTeam,
+                outcome,
                 (byte)(vanished ? FlagVanished : 0),
                 name ?? "",
             };
@@ -68,13 +72,17 @@ namespace Werewolf.Core
         public static EradicationRevealData FromWire(object[] payload)
         {
             if (payload == null || payload.Length < 4) return null;
-            if (!(payload[0] is int actor) || !(payload[1] is byte team)
+            if (!(payload[0] is int actor) || !(payload[1] is byte outcome)
                 || !(payload[2] is byte flags) || !(payload[3] is string name))
             {
                 return null;
             }
-            if (team != (byte)Team.Villagers && team != (byte)Team.Werewolves) return null;
-            return new EradicationRevealData(actor, (Team)team, (flags & FlagVanished) != 0, name);
+            if (outcome != (byte)Team.Villagers && outcome != (byte)Team.Werewolves
+                && outcome != TeamCodes.PeacefulCollapsed)
+            {
+                return null;
+            }
+            return new EradicationRevealData(actor, outcome, (flags & FlagVanished) != 0, name);
         }
     }
 }

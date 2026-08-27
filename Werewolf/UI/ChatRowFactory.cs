@@ -4,6 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.UI
 {
@@ -62,7 +63,7 @@ namespace Werewolf.UI
         private bool _measureErrorLogged;
 
         private int _localActor;
-        private Func<int, PlayerAvatar> _resolveAvatar;
+        private Func<int, PlayerHandle> _resolveAvatar;
         private Func<int, int> _resolveId;
         private Func<int, Role?> _markedRole;
 
@@ -70,7 +71,7 @@ namespace Werewolf.UI
 
         private struct PendingAvatar
         {
-            public MenuPlayerListed Listed;
+            public ListedRow Listed;
             public int WaitedFrames;
             public string DisplayName;
         }
@@ -90,7 +91,6 @@ namespace Werewolf.UI
             _measure = UiKit.CreateText(measureParent, "Measure", Vector2.zero, Vector2.zero,
                 string.Empty, BodyFontSize, new Color(0f, 0f, 0f, 0f), TextAlignmentOptions.TopLeft);
             _measure.enableWordWrapping = true;
-            _measure.spriteAsset = EmojiSprites.Asset;
         }
 
         public void Attach(RectTransform content)
@@ -98,7 +98,7 @@ namespace Werewolf.UI
             _content = content;
         }
 
-        public void SetContext(int localActor, Func<int, PlayerAvatar> resolveAvatar,
+        public void SetContext(int localActor, Func<int, PlayerHandle> resolveAvatar,
                                Func<int, int> resolveId, Func<int, Role?> markedRole)
         {
             _localActor = localActor;
@@ -140,7 +140,9 @@ namespace Werewolf.UI
                         Vector2 unconstrained = _measure.GetPreferredValues(body, MaxTextWidth, 0f);
                         textWidth = Mathf.Clamp(unconstrained.x, BodyFontSize, MaxTextWidth);
                     }
-                    textHeight = Mathf.Max(BodyFontSize, _measure.GetPreferredValues(body, textWidth, 0f).y);
+                    textHeight = Mathf.Max(BodyFontSize,
+                        Mathf.Max(_measure.GetPreferredValues(body, textWidth, 0f).y,
+                            MeasureWrappedHeight(body, textWidth)));
                 }
             }
             catch (Exception e)
@@ -152,6 +154,17 @@ namespace Werewolf.UI
                 }
             }
             return new ChatBlockSize(textWidth + BubblePadding * 2f, textHeight + BubblePadding * 2f);
+        }
+
+        private float MeasureWrappedHeight(string body, float width)
+        {
+            _measure.rectTransform.sizeDelta = new Vector2(width, 0f);
+            _measure.text = body;
+            _measure.ForceMeshUpdate(ignoreActiveState: true);
+
+            TMP_TextInfo info = _measure.textInfo;
+            if (info == null || info.lineCount <= 0) return 0f;
+            return info.lineInfo[0].ascender - info.lineInfo[info.lineCount - 1].descender;
         }
 
         public RectTransform CreateBlock(string name, Vector2 size, float topY, float anchorX)
@@ -173,13 +186,13 @@ namespace Werewolf.UI
             for (int i = _pendingAvatars.Count - 1; i >= 0; i--)
             {
                 PendingAvatar pending = _pendingAvatars[i];
-                MenuPlayerListed listed = pending.Listed;
-                if (listed == null)
+                ListedRow listed = pending.Listed;
+                if (listed == null || !listed.Exists)
                 {
                     _pendingAvatars.RemoveAt(i);
                     continue;
                 }
-                if (!listed.gameObject.activeInHierarchy) continue;
+                if (!listed.IsActiveInHierarchy) continue;
 
                 pending.WaitedFrames++;
                 if (!ListedAvatar.IsReady(listed) && pending.WaitedFrames < AvatarFreezeWaitFrames)
@@ -189,10 +202,7 @@ namespace Werewolf.UI
                 }
 
                 ListedAvatar.Freeze(listed, NameTextColor);
-                if (listed.playerName != null && !string.IsNullOrEmpty(pending.DisplayName))
-                {
-                    listed.playerName.text = pending.DisplayName;
-                }
+                if (!string.IsNullOrEmpty(pending.DisplayName)) listed.SetNameText(pending.DisplayName);
                 _pendingAvatars.RemoveAt(i);
             }
         }
@@ -219,14 +229,15 @@ namespace Werewolf.UI
                 topY, isSelf ? 1f : 0f);
 
             string displayName = DecorateName(entry.Actor, entry.Name);
-            MenuPlayerListed listed = TryCreateAvatar(row, entry, displayName,
+            ListedRow listed = TryCreateAvatar(row, entry, displayName,
                 new Vector2(AvatarHolderX(block.Width, isSelf), 0f),
                 new Vector2(block.Width, block.Height), AvatarPrefabScale);
 
             if (listed == null)
             {
-                CreateNameLabel(row, displayName, Vector2.zero,
-                    new Vector2(block.Width, block.Height),
+                float inset = isSelf ? 0f : ListedAvatar.NameOffsetX * AvatarPrefabScale;
+                CreateNameLabel(row, displayName, new Vector2(inset * 0.5f, 0f),
+                    new Vector2(block.Width - inset, block.Height),
                     isSelf ? TextAlignmentOptions.MidlineRight : TextAlignmentOptions.MidlineLeft);
             }
 
@@ -242,13 +253,14 @@ namespace Werewolf.UI
             var labelSize = new Vector2(VoteTextWidth, block.Height);
 
             string displayName = DecorateName(entry.Actor, entry.Name);
-            MenuPlayerListed listed = TryCreateAvatar(row, entry, displayName, new Vector2(avatarX, 0f),
+            ListedRow listed = TryCreateAvatar(row, entry, displayName, new Vector2(avatarX, 0f),
                 new Vector2(VoteAvatarWidth, block.Height), VoteAvatarScale);
 
             if (listed == null)
             {
-                CreateNameLabel(row, displayName, new Vector2(avatarX, 0f),
-                    new Vector2(VoteAvatarWidth, block.Height), TextAlignmentOptions.MidlineLeft);
+                float inset = ListedAvatar.NameStartFromHolder(VoteAvatarScale) + VoteAvatarWidth * 0.5f;
+                CreateNameLabel(row, displayName, new Vector2(avatarX + inset * 0.5f, 0f),
+                    new Vector2(VoteAvatarWidth - inset, block.Height), TextAlignmentOptions.MidlineLeft);
             }
 
             TextMeshProUGUI text = UiKit.CreateText(row, "VoteText", labelPos, labelSize,
@@ -262,7 +274,8 @@ namespace Werewolf.UI
         {
             RectTransform row = CreateBlock("SystemSpeaker", new Vector2(block.Width, block.Height), topY, 0f);
 
-            Sprite face = AssetCatalog.GetSprite(entry.Icon)
+            Sprite face = EmojiSprites.VanillaSprite(entry.Icon)
+                ?? AssetCatalog.GetSprite(entry.Icon)
                 ?? AssetCatalog.GetSprite(SystemFallbackFace);
             float nameX = 0f;
             float nameWidth = block.Width;
@@ -299,7 +312,6 @@ namespace Werewolf.UI
                 new Vector2(textWidth, textHeight), ComposeSystemText(entry), BodyFontSize,
                 SystemBodyColor, TextAlignmentOptions.TopLeft);
             label.enableWordWrapping = true;
-            label.spriteAsset = EmojiSprites.Asset;
 
             RectTransform labelRect = label.rectTransform;
             labelRect.anchorMin = new Vector2(0f, 1f);
@@ -370,22 +382,32 @@ namespace Werewolf.UI
             return isSelf ? 0f : -blockWidth * 0.5f - ListedAvatar.OriginOffsetX * AvatarPrefabScale;
         }
 
-        private MenuPlayerListed TryCreateAvatar(RectTransform row, ChatLogEntry entry, string displayName,
+        private ListedRow TryCreateAvatar(RectTransform row, ChatLogEntry entry, string displayName,
                                                  Vector2 holderPos, Vector2 holderSize, float scale)
         {
-            PlayerAvatar avatar = _resolveAvatar != null ? _resolveAvatar(entry.Actor) : null;
-            if (avatar == null) return null;
+            bool isBot = entry.Actor < 0;
+            PlayerHandle avatar = !isBot && _resolveAvatar != null ? _resolveAvatar(entry.Actor) : PlayerHandle.None;
+            if (!isBot && !avatar.IsValid) return null;
 
             holderPos.y -= (ListedAvatar.RowHeight * 0.5f + AvatarOriginTrim) * scale;
             RectTransform holder = UiKit.CreateRect(row, "AvatarHolder", holderPos, holderSize);
             holder.localScale = new Vector3(scale, scale, 1f);
-            MenuPlayerListed listed = ListedAvatar.TryCreate(holder, avatar, displayName);
+            ListedRow listed = isBot
+                ? ListedAvatar.TryCreateStatic(holder, displayName, BotColors.IndexFor(entry.Actor))
+                : ListedAvatar.TryCreate(holder, avatar, displayName);
             if (listed == null)
             {
                 UnityEngine.Object.Destroy(holder.gameObject);
                 return null;
             }
-            QueueAvatarFreeze(listed, displayName);
+            if (isBot)
+            {
+                listed.SetNameColor(NameTextColor);
+            }
+            else
+            {
+                QueueAvatarFreeze(listed, displayName);
+            }
             return listed;
         }
 
@@ -397,7 +419,7 @@ namespace Werewolf.UI
             name.enableWordWrapping = false;
         }
 
-        private void QueueAvatarFreeze(MenuPlayerListed listed, string displayName)
+        private void QueueAvatarFreeze(ListedRow listed, string displayName)
         {
             _pendingAvatars.Add(new PendingAvatar
             {

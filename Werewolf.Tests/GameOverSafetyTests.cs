@@ -46,6 +46,26 @@ namespace Werewolf.Tests
             Assert.True(GameOverSafety.ShouldInjectInvincibility(GamePhase.GameOver, false, false, false));
         }
 
+        [Theory]
+        [InlineData(GamePhase.Play)]
+        [InlineData(GamePhase.Meeting)]
+        [InlineData(GamePhase.GameOver)]
+        public void SafetyWindows_AlwaysOpenDuringScenario(GamePhase phase)
+        {
+            Assert.True(GameOverSafety.ShouldHoldEnemyFreeze(phase, false, scenarioActive: true));
+            Assert.True(GameOverSafety.ShouldInjectInvincibility(
+                phase, meetingActive: false, warpDone: false, winCeremonyActive: false,
+                scenarioActive: true));
+        }
+
+        [Fact]
+        public void SafetyWindows_UnchangedOutsideScenario()
+        {
+            Assert.False(GameOverSafety.ShouldHoldEnemyFreeze(GamePhase.Play, false, scenarioActive: false));
+            Assert.False(GameOverSafety.ShouldInjectInvincibility(
+                GamePhase.Play, false, false, false, scenarioActive: false));
+        }
+
         [Fact]
         public void SafetyWindows_SeamlessAcrossCeremonyToGameOver()
         {

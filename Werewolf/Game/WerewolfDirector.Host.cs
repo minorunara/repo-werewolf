@@ -6,7 +6,10 @@ using UnityEngine;
 using Werewolf.Core;
 using Werewolf.Game.Patches;
 using Werewolf.Net;
+using Werewolf.Scenarios.Core;
+using Werewolf.Scenarios.Game;
 using Werewolf.UI;
+using Werewolf.Vanilla;
 
 namespace Werewolf.Game
 {
@@ -22,33 +25,38 @@ namespace Werewolf.Game
                 WLog.Line("start_rejected", secret: false, ("reason", "mod_disabled"));
                 return StartResult.Rejected(StartRejectReason.NotInLobby);
             }
-            if (!SemiFunc.IsMasterClientOrSingleplayer())
+            if (!Session.IsHost)
             {
                 WLog.Line("start_rejected", secret: false, ("reason", "not_host"));
                 return StartResult.Rejected(StartRejectReason.NotInLobby);
             }
 
+            if (ScenarioRun.Active) SeedScenarioRoster();
+
             Plugin.RefreshGameConfig();
 
             string roundSettingsBlob = SettingsCatalog.EncodeBlob(Plugin.GameConfig);
             _roomState.PublishSharedSettings(roundSettingsBlob);
-            _lastPublishedBlob = roundSettingsBlob;
-            _roundGameOverAutoReturnSec = Math.Max(0, Plugin.GameConfig.GameOverAutoReturnSec);
+            _lobbySettingsFeature.NotePublishedBlob(roundSettingsBlob);
+            _lobbySettingsFeature.NoteMatchBlob(roundSettingsBlob);
+            _resultFlowFeature.FreezeAutoReturnForHost();
 
-            long now = NowUnixMs();
+            long now = SessionClock.NowMs();
 
             SelectBus();
 
             var players = Registry.BuildRealPlayers();
-            players.AddRange(_pendingBots);
+            players.AddRange(_reservations.Bots);
 
             _session = new GameSession();
             _session.OnSend += SendViaBus;
             _session.OnSessionEvent += HandleSessionEvent;
-            foreach (var kv in _pendingForcedRoles)
+            foreach (var kv in _reservations.ForcedRoles)
             {
                 _session.ReserveForcedRole(kv.Key, kv.Value);
             }
+            if (_reservations.ForcedPeaceful) _session.ReserveForcedPeaceful();
+            if (ScenarioRun.Active) ReserveScenarioPlayerRole();
 
             ClearClientState();
             _resultSequence.Cancel();
@@ -62,7 +70,7 @@ namespace Werewolf.Game
                 return result;
             }
 
-            _pendingForcedRoles.Clear();
+            _reservations.ClearRoles();
             _lifecycleGate.MarkStarted();
 
             _meeting = new MeetingSession(Plugin.GameConfig, _session, _session.Players, now);
@@ -73,30 +81,28 @@ namespace Werewolf.Game
             _meeting.OnRightsChanged += _roomState.PublishRights;
 
             _roomState.PublishSettings(Plugin.GameConfig, players.Count);
-            _clientValuableMapMode = Plugin.GameConfig.ValuableMapMode;
-            _clientNecroVoiceMode = Plugin.GameConfig.NecroVoiceMode;
-            _clientExtraJumpCount = Plugin.GameConfig.ExtraJumpCount;
-            _clientConveneSuppressStartSec = Plugin.GameConfig.ConveneSuppressStartSec;
-            _clientConveneSuppressAfterSec = Plugin.GameConfig.ConveneSuppressAfterSec;
-            _clientHealIntervalSec = Plugin.GameConfig.HealIntervalSec;
-            _clientOutfitChangeAllowed = Plugin.GameConfig.OutfitChangeAllowed;
-            _clientBombPack = RoomStateKeys.EncodeBomb(Plugin.GameConfig, players.Count);
-            _clientShamanPack = RoomStateKeys.EncodeShaman(Plugin.GameConfig);
+            _cfgMirror.ValuableMapMode = Plugin.GameConfig.ValuableMapMode;
+            _cfgMirror.NecroVoiceMode = Plugin.GameConfig.NecroVoiceMode;
+            _cfgMirror.ExtraJumpCount = Plugin.GameConfig.ExtraJumpCount;
+            _cfgMirror.ConveneSuppressStartSec = Plugin.GameConfig.ConveneSuppressStartSec;
+            _cfgMirror.ConveneSuppressAfterSec = Plugin.GameConfig.ConveneSuppressAfterSec;
+            _cfgMirror.HealIntervalSec = Plugin.GameConfig.HealIntervalSec;
+            _cfgMirror.OutfitChangeAllowed = Plugin.GameConfig.OutfitChangeAllowed;
+            _cfgMirror.BombPack = RoomStateKeys.EncodeBomb(Plugin.GameConfig, players.Count);
+            _cfgMirror.ShamanPack = RoomStateKeys.EncodeShaman(Plugin.GameConfig);
             foreach (var p in players)
             {
                 _roomState.PublishRights(p.ActorNumber, _meeting.RightsRemaining(p.ActorNumber));
             }
 
-            _checkmate = new CheckmateSequence();
-            _checkmateScanPending = false;
-            _checkmateNextScanUnixMs = 0;
-            _eradicationConfirmAtUnixMs = 0;
+            _winCeremonyFeature.BeginHostRound();
 
             _roles = new RolesSession(Plugin.GameConfig, _session, now, new System.Random());
+            HostValuablesDestroyed = 0;
             _roles.OnSend += SendViaBus;
             _roles.OnInformantEstablished += HandleInformantEstablished;
-            _roles.OnInformantEstablished += HandleInformantDigest;
-            _roles.OnPerkUnlocked += HandlePerkUnlockedDigest;
+            _roles.OnInformantEstablished += _resultFlowFeature.HandleInformantDigest;
+            _roles.OnPerkUnlocked += _resultFlowFeature.HandlePerkUnlockedDigest;
             _roles.OnCurseSealed += SealBlackCatOnCurseResolved;
             _roles.OnCurseKill += ExecuteCurseKill;
             _roles.OnEnemyIgnoreChanged += ApplyEnemyIgnore;
@@ -108,10 +114,12 @@ namespace Werewolf.Game
             _roles.OnGaugePctChanged += HandleGaugePctChangedForBomber;
             SendBomberStateIfDirty();
 
-            if (LevelGenerator.Instance != null && LevelGenerator.Instance.Generated)
+            if (Session.LevelGenerated)
             {
                 Patches.ValueTrackPatch.ScanAndFreezeBase();
             }
+
+            if (ScenarioRun.Active) SeedScenarioLoss();
 
             _resetArmed = true;
             WLog.Line("start", secret: false, ("players", players.Count), ("mode", BusMode()));
@@ -122,13 +130,14 @@ namespace Werewolf.Game
         {
             try
             {
-                if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
+                if (!Session.IsHost) return;
 
-                if (Plugin.GameConfig == null || !Plugin.GameConfig.WerewolfModeEnabled) return;
+                if (Plugin.GameConfig == null) return;
+                if (!ScenarioSessionGate.ShouldEngage(Plugin.GameConfig.WerewolfModeEnabled, ScenarioRun.Active)) return;
 
                 if (_session != null) return;
 
-                bool isRunLevel = SemiFunc.RunIsLevel();
+                bool isRunLevel = Session.InRunLevel;
                 GamePhase phase = HostPhase;
                 if (!_lifecycleGate.ShouldAutoStart(true, isRunLevel, phase))
                 {
@@ -137,7 +146,7 @@ namespace Werewolf.Game
                     return;
                 }
 
-                _autoStartWait.Arm(NowUnixMs());
+                _autoStartWait.Arm(SessionClock.NowMs());
                 WLog.Line("autostart_armed", secret: false,
                     ("phase", phase), ("timeoutSec", AutoStartWaitGate.DefaultTimeoutSec));
             }
@@ -151,7 +160,7 @@ namespace Werewolf.Game
         {
             if (!_autoStartWait.Armed) return;
 
-            if (_session != null || !SemiFunc.RunIsLevel() || !SemiFunc.IsMasterClientOrSingleplayer())
+            if (_session != null || !Session.InRunLevel || !Session.IsHost)
             {
                 _autoStartWait.Disarm();
                 return;
@@ -173,25 +182,11 @@ namespace Werewolf.Game
         {
             try
             {
-                if (GameDirector.instance == null ||
-                    GameDirector.instance.currentState != GameDirector.gameState.Main)
+                if (!Session.IsGameStateMain)
                 {
                     return false;
                 }
-
-                List<PlayerAvatar> avatars = SemiFunc.PlayerGetList();
-                if (avatars == null || avatars.Count == 0) return false;
-                if (SemiFunc.IsMultiplayer())
-                {
-                    Photon.Realtime.Room room = Photon.Pun.PhotonNetwork.CurrentRoom;
-                    if (room != null && avatars.Count < room.PlayerCount) return false;
-                }
-                foreach (PlayerAvatar avatar in avatars)
-                {
-                    if (avatar == null) continue;
-                    if (!GameRefs.PlayerAvatar_levelAnimationCompleted(avatar)) return false;
-                }
-                return true;
+                return Players.AllLoadAnimationsCompleted();
             }
             catch (Exception e)
             {
@@ -200,53 +195,108 @@ namespace Werewolf.Game
             }
         }
 
-        public int PendingBotCount => _pendingBots.Count;
+        private void SeedScenarioRoster()
+        {
+            ScenarioDefinition definition = ScenarioRun.Definition;
+            if (definition == null)
+            {
+                WLog.Line("scenario_roster_skipped", secret: false,
+                    ("scenario", ScenarioRun.Scenario), ("reason", "no_definition"));
+                return;
+            }
+
+            var participants = definition.Cast.Bots;
+
+            _reservations.Bots.Clear();
+            _reservations.Bots.AddRange(ScenarioRoster.BuildBots(participants));
+
+            _reservations.ForcedRoles.Clear();
+            foreach (var forced in ScenarioRoster.BuildForcedRoles(participants))
+            {
+                _reservations.ForcedRoles[forced.Key] = forced.Value;
+            }
+
+            WLog.Line("scenario_roster_seeded", secret: false,
+                ("scenario", ScenarioRun.Scenario), ("bots", _reservations.Bots.Count));
+        }
+
+        private void ReserveScenarioPlayerRole()
+        {
+            ScenarioDefinition definition = ScenarioRun.Definition;
+            if (definition == null || _session == null) return;
+
+            int actor = LocalActor;
+            _session.ReserveForcedRole(actor, definition.Cast.PlayerRole);
+            WLog.Line("scenario_player_role_reserved", secret: false,
+                ("actor", actor), ("role", definition.Cast.PlayerRole));
+        }
+
+        private void SeedScenarioLoss()
+        {
+            ScenarioDefinition definition = ScenarioRun.Definition;
+            if (_roles == null || definition == null) return;
+
+            int pct = definition.Environment.SeededLossPct;
+            if (pct <= 0) return;
+
+            _roles.DebugAddGaugePct(pct);
+            WLog.Line("scenario_loss_seeded", secret: false,
+                ("pct", pct),
+                ("permille", _roles.Gauge.DisplayPermille),
+                ("unlocked", _roles.Gauge.UnlockedFlags));
+        }
+
+        public int PendingBotCount => _reservations.Bots.Count;
 
         public void AddPendingBot(WPlayer bot)
         {
-            if (bot != null) _pendingBots.Add(bot);
+            if (bot != null) _reservations.Bots.Add(bot);
         }
 
         public void ReserveForcedRole(int actorNumber, Role role)
         {
-            _pendingForcedRoles[actorNumber] = role;
+            _reservations.ForcedRoles[actorNumber] = role;
         }
 
-        public void HostRecordDeath(PlayerAvatar avatar)
+        public void ReserveForcedPeaceful()
         {
-            if (_session == null || !SemiFunc.IsMasterClientOrSingleplayer()) return;
-            int actor = Registry.ResolveActor(avatar);
-            bool recorded = _session.RecordDeath(actor, NowUnixMs());
+            _reservations.ForcedPeaceful = true;
+        }
+
+        public void HostRecordDeath(int actor)
+        {
+            if (_session == null || !Session.IsHost) return;
+            bool recorded = _session.RecordDeath(actor, SessionClock.NowMs());
             _meeting?.NotifyPlayerDied(actor);
-            if (recorded) TryFireScatterGuard(actor);
+            if (recorded) _scatterFeature.TryFireScatterGuard(actor);
         }
 
         public void HostRecordDeathByActor(int actorNumber, bool asVote)
         {
-            if (_session == null || !SemiFunc.IsMasterClientOrSingleplayer()) return;
+            if (_session == null || !Session.IsHost) return;
             if (asVote) _session.MarkNextDeathAsVote(actorNumber);
-            bool recorded = _session.RecordDeath(actorNumber, NowUnixMs());
+            bool recorded = _session.RecordDeath(actorNumber, SessionClock.NowMs());
             _meeting?.NotifyPlayerDied(actorNumber);
-            if (recorded) TryFireScatterGuard(actorNumber);
+            if (recorded) _scatterFeature.TryFireScatterGuard(actorNumber);
         }
 
         public void HostNotifyExtraction(bool completed, bool failed)
         {
-            if (_session == null || !SemiFunc.IsMasterClientOrSingleplayer()) return;
-            _session.NotifyExtractionOutcome(completed, failed, NowUnixMs());
+            if (_session == null || !Session.IsHost) return;
+            _session.NotifyExtractionOutcome(completed, failed, SessionClock.NowMs());
         }
 
         public void HostNotifyMailDeparture()
         {
-            if (_session == null || !SemiFunc.IsMasterClientOrSingleplayer()) return;
+            if (_session == null || !Session.IsHost) return;
 
             WLog.Line("mail_departure", secret: false);
-            _session.NotifyMailDeparture(NowUnixMs());
+            _session.NotifyMailDeparture(SessionClock.NowMs());
         }
 
         private void TickCorpseReportCancel(long now)
         {
-            if (_meeting == null || !SemiFunc.IsMasterClientOrSingleplayer()) return;
+            if (_meeting == null || !Session.IsHost) return;
             if (!LastRunGate.IsLastRunActive()) return;
             _meeting.TryCancelCorpseReportCountdown(now);
         }
@@ -263,11 +313,11 @@ namespace Werewolf.Game
 
         public PhaseChangeResult HostRequestPhaseChange(GamePhase target)
         {
-            if (_session == null || !SemiFunc.IsMasterClientOrSingleplayer())
+            if (_session == null || !Session.IsHost)
             {
                 return PhaseChangeResult.Rejected(PhaseChangeRejectReason.InvalidTransition);
             }
-            return _session.RequestPhaseChange(target, NowUnixMs());
+            return _session.RequestPhaseChange(target, SessionClock.NowMs());
         }
 
         private void ExecuteVotedPlayer(int actorNumber)
@@ -277,12 +327,12 @@ namespace Werewolf.Game
                 long ceremonyMs = _meeting != null ? _meeting.ResultCeremonyDelayMs : 0;
                 long holdExtensionMs = 0;
                 bool isBlackCat = _roles != null && _meeting != null
-                    && _roles.TryStartCurse(actorNumber, NowUnixMs() + ceremonyMs, out holdExtensionMs,
+                    && _roles.TryStartCurse(actorNumber, SessionClock.NowMs() + ceremonyMs, out holdExtensionMs,
                                             _meeting.VotersFor(actorNumber));
                 if (isBlackCat)
                 {
                     _meeting.ExtendClosingHold(holdExtensionMs);
-                    HostMarkScatterAwaitCurse();
+                    _scatterFeature.HostMarkScatterAwaitCurse();
                     long catDelayMs = ceremonyMs
                         + (Plugin.GameConfig != null ? Plugin.GameConfig.CurseWaitSec * 1000 : 10_000);
                     StartCoroutine(DelayedExecute(actorNumber, catDelayMs, reason: "blackcat_curse_wait"));
@@ -315,11 +365,11 @@ namespace Werewolf.Game
             }
             try
             {
-                PlayerAvatar avatar = actorNumber > 0 ? ResolveAvatar(actorNumber) : null;
-                if (avatar != null)
+                PlayerHandle player = actorNumber > 0 ? Players.Resolve(actorNumber) : PlayerHandle.None;
+                if (player.IsValid)
                 {
                     _session?.MarkNextDeathAsVote(actorNumber);
-                    avatar.PlayerDeath(-1);
+                    Players.KillByHost(player);
                     WLog.Line("execute_player_kill", secret: false,
                         ("actor", actorNumber), ("via", "avatar"), ("reason", reason));
                 }
@@ -355,7 +405,7 @@ namespace Werewolf.Game
                 return;
             }
 
-            long now = NowUnixMs();
+            long now = SessionClock.NowMs();
             _roles?.OnMeetingEnded(now);
             if (_bomber != null)
             {
@@ -367,17 +417,8 @@ namespace Werewolf.Game
         private void HandleVotingStartedForRoles()
         {
             if (_roles == null) return;
-            int extracted = -1;
-            int haulGoal = -1;
-            RoundDirector rd = RoundDirector.instance;
-            if (rd != null)
-            {
-                haulGoal = GameRefs.RoundDirector_haulGoal(rd);
-                int points = GameRefs.RoundDirector_extractionPoints(rd);
-                int completed = GameRefs.RoundDirector_extractionPointsCompleted(rd);
-                extracted = points > 0 ? haulGoal / points * completed : 0;
-            }
-            _roles.OnMeetingStarted(NowUnixMs(), extracted, haulGoal, HostComputeCheckmateLineDollars());
+            Extraction.ReadExtractedAndGoal(out int extracted, out int haulGoal);
+            _roles.OnMeetingStarted(SessionClock.NowMs(), extracted, haulGoal, _winCeremonyFeature.ComputeCheckmateLineDollars());
         }
 
         private void HandleInformantEstablished()
@@ -397,7 +438,7 @@ namespace Werewolf.Game
                 WLog.Line("curse_cat_seal_error", secret: false,
                     ("actor", catActor), ("err", e.Message));
             }
-            HostScheduleScatterPlanAfterCurse();
+            _scatterFeature.HostScheduleScatterPlanAfterCurse();
         }
 
         private void ExecuteCurseKill(int actorNumber)
@@ -418,10 +459,10 @@ namespace Werewolf.Game
             }
             try
             {
-                PlayerAvatar avatar = actorNumber > 0 ? ResolveAvatar(actorNumber) : null;
-                if (avatar != null)
+                PlayerHandle player = actorNumber > 0 ? Players.Resolve(actorNumber) : PlayerHandle.None;
+                if (player.IsValid)
                 {
-                    avatar.PlayerDeath(-1);
+                    Players.KillByHost(player);
                     WLog.Line("curse_kill", secret: false, ("actor", actorNumber), ("via", "avatar"));
                 }
                 else
@@ -462,7 +503,7 @@ namespace Werewolf.Game
             try
             {
                 int summonCooldownSec = Plugin.GameConfig != null ? Plugin.GameConfig.BeaconCooldownSec : 60;
-                _beaconEffect.Trigger(ResolveAvatar(requesterActor), NowUnixMs(), summonCooldownSec);
+                _beaconEffect.Trigger(Players.Resolve(requesterActor), SessionClock.NowMs(), summonCooldownSec);
             }
             catch (Exception e)
             {
@@ -481,23 +522,12 @@ namespace Werewolf.Game
             return null;
         }
 
-        private PlayerAvatar ResolveAvatar(int actorNumber)
-        {
-            var director = GameDirector.instance;
-            if (director == null || director.PlayerList == null) return null;
-            foreach (PlayerAvatar avatar in director.PlayerList)
-            {
-                if (avatar != null && Registry.ResolveActor(avatar) == actorNumber) return avatar;
-            }
-            return null;
-        }
-
-        private void SendViaBus(OutboundMessage msg)
+        internal void SendViaBus(OutboundMessage msg)
         {
             if (_bus == null) return;
             try
             {
-                ObserveForDigest(msg);
+                _resultFlowFeature.ObserveForDigest(msg);
                 switch (msg.Target)
                 {
                     case MessageTarget.All:
@@ -521,11 +551,12 @@ namespace Werewolf.Game
         {
             if (_bomber == null) return;
             BombDenyReason reason = _bomber.TryPlant(senderActor, targetActor, now);
+            bool denyChanged = NoteBombDeny(senderActor, "plant", reason);
             if (reason == BombDenyReason.None)
             {
                 WLog.Line("bomb_plant", secret: true, ("actor", senderActor), ("target", targetActor));
             }
-            else
+            else if (denyChanged)
             {
                 WLog.Line("bomb_deny", secret: false,
                     ("actor", senderActor), ("stage", "plant"), ("reason", reason));
@@ -540,11 +571,11 @@ namespace Werewolf.Game
             bool meetingLocked = HostPhase != GamePhase.Play;
 
             bool targetNearTruck = false;
+            Vector3? targetPos = null;
             int currentTarget = _bomber.TargetActor;
             if (currentTarget != -1)
             {
-                PlayerAvatar av = ResolveAvatar(currentTarget);
-                Vector3? targetPos = av != null ? (Vector3?)av.transform.position : null;
+                targetPos = Players.Resolve(currentTarget).Position;
                 if (targetPos == null && FakeBodies.TryGetPosition(currentTarget, out Vector3 fakePos))
                     targetPos = fakePos;
                 if (targetPos != null)
@@ -555,9 +586,21 @@ namespace Werewolf.Game
                 }
             }
 
-            BombDenyReason reason = _bomber.TryDetonate(
-                senderActor, now, meetingLocked, targetNearTruck, out int detonatedTarget);
+            BombDenyReason scenarioDeny = BombDenyReason.None;
+            if (_scenarioFeature != null)
+            {
+                Vector3? bomberPos = Players.Resolve(senderActor).Position;
+                float blastRadius = Plugin.GameConfig != null
+                    ? Plugin.GameConfig.BomberBlastRadiusMeters : GameConfig.DefaultBomberBlastRadiusMeters;
+                scenarioDeny = _scenarioFeature.DeniesDetonation(
+                    bomberPos, targetPos, blastRadius, targetNearTruck, currentTarget);
+            }
 
+            BombDenyReason reason = _bomber.TryDetonate(
+                senderActor, now, meetingLocked, targetNearTruck, out int detonatedTarget,
+                scenarioDeny: scenarioDeny);
+
+            bool denyChanged = NoteBombDeny(senderActor, "detonate", reason);
             if (reason == BombDenyReason.None && detonatedTarget != -1)
             {
                 float warningSec = Plugin.GameConfig != null ? Plugin.GameConfig.BomberWarningSec : 1f;
@@ -573,13 +616,21 @@ namespace Werewolf.Game
             {
                 WLog.Line("bomb_dud", secret: false, ("actor", senderActor));
             }
-            else
+            else if (denyChanged)
             {
                 WLog.Line("bomb_deny", secret: false,
                     ("actor", senderActor), ("stage", "detonate"), ("reason", reason));
             }
 
             SendBomberStateIfDirty();
+        }
+
+        private bool NoteBombDeny(int actor, string stage, BombDenyReason reason)
+        {
+            var key = (actor, stage);
+            if (_lastBombDeny.TryGetValue(key, out BombDenyReason last) && last == reason) return false;
+            _lastBombDeny[key] = reason;
+            return true;
         }
 
         private void HandleGaugePctChangedForBomber(float cumulativeGaugePct)
@@ -644,18 +695,18 @@ namespace Werewolf.Game
                         WLog.Line("session_win_locked", secret: false,
                             ("team", e.Winner.WinningTeam), ("reason", e.Winner.Reason),
                             ("actor", e.ActorNumber), ("vanished", e.Vanished));
-                        HostBeginEradicationCeremony();
+                        _winCeremonyFeature.HostBeginEradicationCeremony();
                         break;
 
                     case SessionEventKind.WinnerConfirmed:
                         WLog.Line("session_win", secret: false, ("team", e.Winner.WinningTeam));
                         _enemyIgnoreRoster.ClearAll();
 
-                        long winUnixMs = NowUnixMs();
-                        if (!CosmeticHandoff.ShouldGrant(_session.StartUnixMs, winUnixMs))
+                        long winUnixMs = SessionClock.NowMs();
+                        if (!CosmeticHandoff.ShouldGrant(_session.StartUnixMs, winUnixMs, ScenarioRun.Active))
                         {
                             WLog.Line("cosmetic_grant_skipped", secret: false,
-                                ("reason", "short_match"),
+                                ("reason", ScenarioRun.Active ? "scenario" : "short_match"),
                                 ("durationMs", winUnixMs - _session.StartUnixMs),
                                 ("minMs", CosmeticHandoff.MinMatchDurationMs));
                         }
@@ -677,11 +728,11 @@ namespace Werewolf.Game
                             _bus.SendToAll(MessageCodes.CosmeticGrant, CosmeticGrantWire.ToWire(grant));
                         }
 
-                        if (SemiFunc.IsMasterClientOrSingleplayer())
+                        if (Session.IsHost)
                         {
                             int autoReturnSec = Plugin.GameConfig != null
                                 ? Plugin.GameConfig.GameOverAutoReturnSec : 120;
-                            _resultSequence.Begin(NowUnixMs(), autoReturnSec);
+                            _resultSequence.Begin(SessionClock.NowMs(), autoReturnSec);
                         }
                         break;
 
@@ -690,11 +741,11 @@ namespace Werewolf.Game
                         _enemyIgnoreRoster.ClearAll();
                         WLog.Line("cosmetic_grant_skipped", secret: false, ("reason", "void_match"));
 
-                        if (SemiFunc.IsMasterClientOrSingleplayer())
+                        if (Session.IsHost)
                         {
                             int voidAutoReturnSec = Plugin.GameConfig != null
                                 ? Plugin.GameConfig.GameOverAutoReturnSec : 120;
-                            _resultSequence.Begin(NowUnixMs(), voidAutoReturnSec);
+                            _resultSequence.Begin(SessionClock.NowMs(), voidAutoReturnSec);
                         }
                         break;
                 }

@@ -213,6 +213,16 @@ namespace Werewolf.Core
             return list;
         }
 
+        public static int MatchEndReason(IReadOnlyList<DigestEntry> entries)
+        {
+            if (entries == null) return ReasonUnknown;
+            for (int i = entries.Count - 1; i >= 0; i--)
+            {
+                if (entries[i].Kind == DigestKind.MatchEnd) return entries[i].ArgB;
+            }
+            return ReasonUnknown;
+        }
+
         private void Add(DigestKind kind, long nowUnixMs, int actor, int argA, int argB, bool force = false)
         {
             if (!force && _entries.Count >= MaxEntries) return;

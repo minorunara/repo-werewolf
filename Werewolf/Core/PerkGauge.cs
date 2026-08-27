@@ -9,6 +9,8 @@ namespace Werewolf.Core
 
         private readonly GameConfig _config;
         private float _lostDollars;
+
+        private int _loggedPercentStep = -1;
         private PerkFlags _unlocked = PerkFlags.None;
         private bool _informantFired;
         private int _beaconChargesGranted;
@@ -69,8 +71,15 @@ namespace Werewolf.Core
             if (lostDollars <= 0f) return Empty;
 
             _lostDollars += lostDollars;
-            WLog.Line("gauge_add", secret: true,
-                ("lost", lostDollars), ("totalLost", _lostDollars), ("permille", DisplayPermille));
+
+            int permille = DisplayPermille;
+            int percentStep = permille / 10;
+            if (percentStep != _loggedPercentStep)
+            {
+                _loggedPercentStep = percentStep;
+                WLog.Line("gauge_add", secret: true,
+                    ("lost", lostDollars), ("totalLost", _lostDollars), ("permille", permille));
+            }
 
             float pct = _lostDollars / BaseDollars * 100f;
             List<GaugeEvent> events = null;

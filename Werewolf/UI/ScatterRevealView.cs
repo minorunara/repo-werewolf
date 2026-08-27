@@ -178,23 +178,8 @@ namespace Werewolf.UI
             RectTransform slogan = UiKit.CreateRect(rootRect, "ScatterSlogan",
                 new Vector2(0f, 284f), new Vector2(520f, 32f));
             _scatterSloganRoot = slogan.gameObject;
-            string text = Texts.Get(TextId.NoticeScatterSlogan);
-            TextMeshProUGUI label = UiKit.CreateText(slogan, "Label", Vector2.zero,
-                new Vector2(520f, 32f), text, 24f, _sloganTextColor, TextAlignmentOptions.Center);
-            Sprite wink = AssetCatalog.GetSprite("img_taxman_wink")
-                ?? AssetCatalog.GetSprite("img_taxman_nodeath");
-            if (wink != null)
-            {
-                const float iconSize = 26f;
-                const float gap = 4f;
-                float textWidth = label.GetPreferredValues(text).x;
-                label.rectTransform.anchoredPosition = new Vector2(-(gap + iconSize) / 2f, 0f);
-                Image icon = UiKit.CreateImage(slogan, "Icon",
-                    new Vector2(textWidth / 2f + gap / 2f, 0f),
-                    new Vector2(iconSize, iconSize), Color.white);
-                icon.sprite = wink;
-                icon.preserveAspect = true;
-            }
+            UiKit.CreateText(slogan, "Label", Vector2.zero, new Vector2(520f, 32f),
+                Texts.Get(TextId.NoticeScatterSlogan), 24f, _sloganTextColor, TextAlignmentOptions.Center);
             _scatterSloganRoot.SetActive(false);
         }
     }

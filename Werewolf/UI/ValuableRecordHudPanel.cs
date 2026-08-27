@@ -12,13 +12,12 @@ namespace Werewolf.UI
 
         private const string IconKey = "icon_valuable_record";
 
-        private const float RightMargin = CorpseReportHudPanel.RightMargin;
-        private const float IconSize = CorpseReportHudPanel.IconSize;
-        private const float PlatePadding = CorpseReportHudPanel.PlatePadding;
-        private const float LabelHeight = CorpseReportHudPanel.LabelHeight;
-        private const float LabelGap = CorpseReportHudPanel.LabelGap;
+        private const float RightMargin = HudGeometry.HudIcon.RightMargin;
+        private const float IconSize = HudGeometry.HudIcon.IconSize;
+        private const float PlatePadding = HudGeometry.HudIcon.PlatePadding;
+        private const float LabelHeight = HudGeometry.HudIcon.LabelHeight;
+        private const float LabelGap = HudGeometry.HudIcon.LabelGap;
         private const float LabelFontSize = CorpseReportHudPanel.LabelFontSize;
-        private const float StackGap = 12f;
         private const float LabelExtraWidth = 300f;
 
         private static readonly Color IconTint = new Color(1f, 0.95f, 0.85f, 1f);
@@ -50,15 +49,11 @@ namespace Werewolf.UI
             float rootWidth = plate;
             float rootHeight = plate + LabelGap + LabelHeight;
 
-            var go = new GameObject("WW_ValuableRecordHudPanel", typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(layerRoot, false);
-            rect.anchorMin = rect.anchorMax = new Vector2(1f, 0f);
-            rect.pivot = new Vector2(1f, 0f);
-            rect.anchoredPosition = new Vector2(-RightMargin, CorpseReportHudPanel.BaseY(
-                CorpseReportHudPanel.Layout.AboveMiniGauge));
-            rect.sizeDelta = new Vector2(rootWidth, rootHeight);
-            _root = go;
+            RectTransform rect = UiKit.CreateAnchoredRect(layerRoot, "WW_ValuableRecordHudPanel",
+                UiKit.BottomRight, new Vector2(1f, 0f),
+                new Vector2(-RightMargin, HudGeometry.HudIcon.ReportBottom(true)),
+                new Vector2(rootWidth, rootHeight));
+            _root = rect.gameObject;
 
             float iconCenterX = rootWidth / 2f;
             float iconCenterY = LabelHeight + LabelGap + plate / 2f;
@@ -104,7 +99,6 @@ namespace Werewolf.UI
                 new Vector2(rootWidth + LabelExtraWidth, LabelHeight));
 
             _root.SetActive(false);
-            WLog.Line("valuable_record_hud_built", secret: false);
         }
 
         public void Tick(bool visible, bool recordOn, float holdRatio, bool holdCharging,
@@ -120,8 +114,8 @@ namespace Werewolf.UI
                     return;
                 }
 
-                float y = CorpseReportHudPanel.BaseY(corpseLayout)
-                    + CorpseReportHudPanel.StackHeight + StackGap;
+                float y = HudGeometry.HudIcon.RecordBottom(
+                    corpseLayout == CorpseReportHudPanel.Layout.AboveMiniGauge);
                 if (!Mathf.Approximately(y, _lastY))
                 {
                     _lastY = y;

@@ -3,6 +3,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.UI
 {
@@ -32,14 +33,14 @@ namespace Werewolf.UI
         private const float BlockGap = 16f;
         private const float BlockLineHeightFallback = 36f;
 
-        private const float IconLeftMargin = 40f;
-        private const float IconTopMargin = 364f;
+        private const float IconLeftMargin = HudGeometry.ManualIcon.LeftMargin;
+        private const float IconTopMargin = HudGeometry.ManualIcon.TopMargin;
         private const float IconLobbyLeftMargin = 20f;
         private const float IconLobbyTopMargin = 20f;
         private static readonly IconToggleStyle ToggleStyle = new IconToggleStyle(
-            iconSize: 72f,
-            labelWidth: 170f,
-            labelHeight: 28f,
+            iconSize: HudGeometry.ManualIcon.IconSize,
+            labelWidth: HudGeometry.ManualIcon.LabelWidth,
+            labelHeight: HudGeometry.ManualIcon.LabelHeight,
             labelFontSize: 22f,
             labelColor: new Color(1f, 0.9f, 0.6f, 1f),
             fallbackText: "？",
@@ -88,7 +89,7 @@ namespace Werewolf.UI
 
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            RectTransform rootRect = UiKit.CreateRect(layerRoot, "WW_ManualOverlay", Vector2.zero, new Vector2(1920f, 1080f));
+            RectTransform rootRect = UiKit.CreateStretched(layerRoot, "WW_ManualOverlay");
             _root = rootRect.gameObject;
             Canvas canvas = _root.AddComponent<Canvas>();
             canvas.overrideSorting = true;
@@ -121,7 +122,6 @@ namespace Werewolf.UI
 
             _iconContainer = _toggle.Build(rootRect, "ToggleButton", ToggleStyle,
                 "manual_icon", Texts.Format(TextId.ManualToggleLabelFormat, "-"));
-            _iconContainer.anchorMin = _iconContainer.anchorMax = new Vector2(0f, 1f);
             ApplyIconOffset(force: true);
 
             WLog.Line("manual_built", secret: false,
@@ -367,12 +367,9 @@ namespace Werewolf.UI
         {
             if (_iconContainer == null) return;
             if (!force && _offsetApplied && _appliedOffset == _positionOffset) return;
-            Vector2 size = _iconContainer.sizeDelta;
             float left = _lobbyLayout ? IconLobbyLeftMargin : IconLeftMargin + _positionOffset.x;
             float top = _lobbyLayout ? IconLobbyTopMargin : IconTopMargin + _positionOffset.y;
-            _iconContainer.anchoredPosition = new Vector2(
-                left + size.x * 0.5f,
-                -(top + size.y * 0.5f));
+            UiKit.PinToCorner(_iconContainer, UiKit.TopLeft, new Vector2(left, top));
             _appliedOffset = _positionOffset;
             _offsetApplied = true;
         }
@@ -381,8 +378,7 @@ namespace Werewolf.UI
         {
             try
             {
-                GameDirector director = GameDirector.instance;
-                if (director != null) director.SetDisableEscMenu(1f);
+                Session.DisableEscMenu(1f);
             }
             catch { }
         }
@@ -391,7 +387,7 @@ namespace Werewolf.UI
         {
             try
             {
-                return SemiFunc.InputDown(InputKey.Menu);
+                return Inputs.Down(GameKey.Menu);
             }
             catch
             {
@@ -403,7 +399,7 @@ namespace Werewolf.UI
         {
             try
             {
-                return SemiFunc.NoTextInputsActive();
+                return Inputs.NoTextInputsActive;
             }
             catch
             {
@@ -416,11 +412,7 @@ namespace Werewolf.UI
             string hint = Texts.Format(TextId.ManualNavHint, FormatKey(key));
             try
             {
-                InputManager input = InputManager.instance;
-                if (input != null)
-                {
-                    hint = input.InputDisplayReplaceTags(hint, "<color=#FF8500>", "</color>");
-                }
+                hint = Inputs.ReplaceDisplayTags(hint, "<color=#FF8500>", "</color>");
             }
             catch { }
             return hint;

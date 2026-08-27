@@ -463,6 +463,15 @@ namespace Werewolf.Core
                 RawValue = c => c.BomberChancePercent.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
+            new SettingEntry
+            {
+                SettingId = "PeacefulVillageChancePercent",
+                Section = SectionRoleAssignment,
+                LabelJa = Texts.Get(TextId.SettingsLabelPeacefulVillageChancePercent),
+                Unit = Texts.Get(TextId.SettingsUnitPercent),
+                RawValue = c => c.PeacefulVillageChancePercent.ToString(CultureInfo.InvariantCulture),
+                Display = raw => raw,
+            },
         };
 
         private static SettingEntry[] BuildShamanEntries() => new[]
@@ -780,6 +789,30 @@ namespace Werewolf.Core
                 RawValue = c => c.OrbDropMax.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
+            new SettingEntry
+            {
+                SettingId = "StartHaulGoalPct",
+                Section = SectionWorldgen,
+                LabelJa = Texts.Get(TextId.SettingsLabelStartHaulGoalPct),
+                Unit = Texts.Get(TextId.SettingsUnitPercent),
+                RawValue = c => c.StartHaulGoalPct.ToString(CultureInfo.InvariantCulture),
+                Display = raw => raw == "0" ? Texts.Get(TextId.SettingsValueVanilla) : raw,
+            },
+            EnemySetsEntry("EnemySetsDanger1", TextId.SettingsLabelEnemySetsDanger1, c => c.EnemySetsDanger1),
+            EnemySetsEntry("EnemySetsDanger2", TextId.SettingsLabelEnemySetsDanger2, c => c.EnemySetsDanger2),
+            EnemySetsEntry("EnemySetsDanger3", TextId.SettingsLabelEnemySetsDanger3, c => c.EnemySetsDanger3),
+        };
+
+        private static SettingEntry EnemySetsEntry(string id, TextId label, Func<GameConfig, int> sets) => new SettingEntry
+        {
+            SettingId = id,
+            Section = SectionWorldgen,
+            LabelJa = Texts.Get(label),
+            Unit = "",
+            RawValue = c => sets(c).ToString(CultureInfo.InvariantCulture),
+            Display = raw => raw == "-1"
+                ? Texts.Get(TextId.SettingsValueVanilla)
+                : raw + Texts.Get(TextId.SettingsUnitSets),
         };
     }
 

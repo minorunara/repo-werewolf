@@ -4,6 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.UI
 {
@@ -31,18 +32,11 @@ namespace Werewolf.UI
 
         private const int DeadCueSuppressWaitFrames = 120;
 
-        private static readonly AccessTools.FieldRef<PlayerAvatar, PlayerVoiceChat> _voiceChatRef =
-            GameRefs.PlayerAvatar_voiceChat;
-        private static readonly AccessTools.FieldRef<PlayerAvatar, bool> _voiceChatFetchedRef =
-            GameRefs.PlayerAvatar_voiceChatFetched;
-        private static readonly AccessTools.FieldRef<PlayerVoiceChat, bool> _isTalkingRef =
-            GameRefs.PlayerVoiceChat_isTalking;
-
         private static Func<int, bool> s_showDeadCues;
 
         private static Func<int, int> s_participantId;
 
-        private readonly PlayerAvatar _avatar;
+        private readonly PlayerHandle _avatar;
         private GameObject _root;
         private Image _background;
         private TextMeshProUGUI _fallbackName;
@@ -60,7 +54,7 @@ namespace Werewolf.UI
         private TallyChipStrip _tallyChips;
         private TextMeshProUGUI _scatterBadge;
         private Vector2 _rowSize;
-        private MenuPlayerListed _listed;
+        private ListedRow _listed;
         private bool _deadCuesHidden;
         private int _deadCueWaitFrames;
         private bool _prefabUsed;
@@ -83,7 +77,7 @@ namespace Werewolf.UI
 
         public bool PrefabUsed => _prefabUsed;
 
-        private VoteRow(WPlayer player, PlayerAvatar avatar)
+        private VoteRow(WPlayer player, PlayerHandle avatar)
         {
             ActorNumber = player.ActorNumber;
             PlayerName = player.Name ?? $"#{player.ActorNumber}";
@@ -91,18 +85,18 @@ namespace Werewolf.UI
             _avatar = avatar;
         }
 
-        public static VoteRow Build(Transform parent, WPlayer player, Func<int, PlayerAvatar> resolveAvatar, Vector2 size)
+        public static VoteRow Build(Transform parent, WPlayer player, Func<int, PlayerHandle> resolveAvatar, Vector2 size)
         {
             var row = new VoteRow(player, ResolveAvatarSafe(player, resolveAvatar));
             row.BuildInternal(parent, size);
             return row;
         }
 
-        private static PlayerAvatar ResolveAvatarSafe(WPlayer player, Func<int, PlayerAvatar> resolveAvatar)
+        private static PlayerHandle ResolveAvatarSafe(WPlayer player, Func<int, PlayerHandle> resolveAvatar)
         {
-            if (player.IsBot || resolveAvatar == null) return null;
+            if (player.IsBot || resolveAvatar == null) return PlayerHandle.None;
             try { return resolveAvatar(player.ActorNumber); }
-            catch { return null; }
+            catch { return PlayerHandle.None; }
         }
 
         private void BuildInternal(Transform parent, Vector2 size)
@@ -113,7 +107,7 @@ namespace Werewolf.UI
 
             _background = UiKit.CreateImage(rect, "Bg", Vector2.zero, size, BgAliveColor);
 
-            _prefabUsed = !IsBot && _avatar != null && TryBuildFromPrefab(rect, size);
+            _prefabUsed = (IsBot || _avatar.IsValid) && TryBuildFromPrefab(rect, size);
             if (!_prefabUsed)
             {
                 BuildFallbackVisual(rect, size);
@@ -188,18 +182,17 @@ namespace Werewolf.UI
 
             SetVoteButtonVisible(false);
             SetStatus(RowStatus.Alive);
-
-            WLog.Line("vote_row_built", secret: false,
-                ("actor", ActorNumber), ("bot", IsBot), ("mode", _prefabUsed ? "prefab" : "fallback"));
         }
 
         private bool TryBuildFromPrefab(RectTransform rowRect, Vector2 size)
         {
             RectTransform holder = UiKit.CreateRect(rowRect, "AvatarHolder",
-                new Vector2(-size.x * 0.5f + 85f, -40f), new Vector2(220f, size.y));
+                new Vector2(AvatarHolderX(size), -40f), new Vector2(220f, size.y));
             holder.localScale = new Vector3(PrefabScale, PrefabScale, 1f);
 
-            MenuPlayerListed listed = ListedAvatar.TryCreate(holder, _avatar, PlayerName);
+            ListedRow listed = IsBot
+                ? ListedAvatar.TryCreateStatic(holder, PlayerName, BotColors.IndexFor(ActorNumber))
+                : ListedAvatar.TryCreate(holder, _avatar, PlayerName);
             if (listed == null)
             {
                 WLog.Line("vote_row_prefab_fallback", secret: false, ("actor", ActorNumber));
@@ -210,17 +203,21 @@ namespace Werewolf.UI
             return true;
         }
 
+        private static float AvatarHolderX(Vector2 size) => -size.x * 0.5f + 85f;
+
         private void BuildFallbackVisual(RectTransform rowRect, Vector2 size)
         {
             float leftX = -size.x * 0.5f;
-            if (!IsBot && _avatar != null)
+            if (!IsBot && _avatar.IsValid)
             {
                 _talkIndicator = UiKit.CreateImage(rowRect, "Talk",
                     new Vector2(leftX + 22f, size.y * 0.5f - 14f),
                     new Vector2(14f, 14f), TalkIdleColor);
             }
-            _fallbackName = UiKit.CreateText(rowRect, "Name", new Vector2(leftX + 130f, 0f),
-                new Vector2(190f, size.y), PlayerName, 24f, Color.white, TextAlignmentOptions.MidlineLeft);
+            const float nameWidth = 190f;
+            float nameStartX = AvatarHolderX(size) + ListedAvatar.NameStartFromHolder(PrefabScale);
+            _fallbackName = UiKit.CreateText(rowRect, "Name", new Vector2(nameStartX + nameWidth * 0.5f, 0f),
+                new Vector2(nameWidth, size.y), PlayerName, 24f, Color.white, TextAlignmentOptions.MidlineLeft);
         }
 
         public void SetStatus(RowStatus status)
@@ -245,6 +242,7 @@ namespace Werewolf.UI
             {
                 _fallbackName.color = Color.white;
             }
+            ListedAvatar.SetStaticShade(_listed, dead: status != RowStatus.Alive, DeadTextColor);
         }
 
         private void SetStatusIcon(RowStatus status)
@@ -455,7 +453,7 @@ namespace Werewolf.UI
             }
             else
             {
-                if (!_listed.gameObject.activeInHierarchy) return;
+                if (!_listed.IsActiveInHierarchy) return;
                 if (!ListedAvatar.IsReady(_listed) && _deadCueWaitFrames < DeadCueSuppressWaitFrames)
                 {
                     _deadCueWaitFrames++;
@@ -468,13 +466,8 @@ namespace Werewolf.UI
 
         private void TickFallbackTalk(bool showCues)
         {
-            if (_talkIndicator == null || _avatar == null) return;
-            bool talking = false;
-            if (showCues && HasVoiceRefs() && _voiceChatFetchedRef(_avatar))
-            {
-                PlayerVoiceChat vc = _voiceChatRef(_avatar);
-                talking = vc != null && _isTalkingRef(vc);
-            }
+            if (_talkIndicator == null || !_avatar.IsValid) return;
+            bool talking = showCues && Players.IsTalking(_avatar);
             _talkIndicator.color = talking ? TalkActiveColor : TalkIdleColor;
         }
 
@@ -485,11 +478,6 @@ namespace Werewolf.UI
                 UnityEngine.Object.Destroy(_root);
                 _root = null;
             }
-        }
-
-        private static bool HasVoiceRefs()
-        {
-            return _voiceChatRef != null && _voiceChatFetchedRef != null && _isTalkingRef != null;
         }
     }
 }

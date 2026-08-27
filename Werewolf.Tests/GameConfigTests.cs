@@ -24,6 +24,14 @@ namespace Werewolf.Tests
             Assert.Equal("", config.StartUpgradesSpec);
         }
 
+        [Fact]
+        public void Defaults_EnemySetsLeaveVanillaAlone()
+        {
+            var config = new GameConfig();
+
+            Assert.False(config.EnemySets.AnyOverridden);
+        }
+
         [Theory]
         [InlineData(0, false)]
         [InlineData(1, true)]

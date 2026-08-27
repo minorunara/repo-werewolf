@@ -15,14 +15,16 @@ namespace Werewolf.Tests
 
         private static ReplayDanmaku Build(
             List<(double, int, string)> chats,
-            List<(double, int)> results = null)
+            List<(double, int)> results = null,
+            ReplayGameOver? gameOver = null)
         {
             var times = new List<double>();
             if (chats != null) foreach ((double t, int _, string _) in chats) times.Add(t);
             return new ReplayDanmaku(
                 chats ?? new List<(double, int, string)>(),
                 results ?? new List<(double, int)>(),
-                new ReplayPace(Meetings, times));
+                new ReplayPace(Meetings, times),
+                gameOver);
         }
 
         [Fact]
@@ -501,18 +503,19 @@ namespace Werewolf.Tests
                 new List<(double, int, string)>(),
                 new List<(double, int)> { (150.0, 3) });
 
-            Assert.False(d.TryGetStamp(out _, out _));
+            Assert.False(d.TryGetStamp(out _));
             d.Step(149.0, 150.5, 0.1, FixedWidth);
-            Assert.True(d.TryGetStamp(out int actor, out double progress));
-            Assert.Equal(3, actor);
-            Assert.Equal(0.0, progress, 6);
+            Assert.True(d.TryGetStamp(out ReplayStamp stamp));
+            Assert.Equal(ReplayStampKind.Result, stamp.Kind);
+            Assert.Equal(3, stamp.ExecutedActor);
+            Assert.Equal(0.0, stamp.Progress, 6);
 
             d.Step(150.5, 150.6, 1.0, FixedWidth);
-            Assert.True(d.TryGetStamp(out _, out progress));
-            Assert.Equal(1.0 / ReplayDanmaku.StampLifeSec, progress, 6);
+            Assert.True(d.TryGetStamp(out stamp));
+            Assert.Equal(1.0 / ReplayDanmaku.StampLifeSec, stamp.Progress, 6);
 
             d.Step(150.6, 150.7, 0.6, FixedWidth);
-            Assert.False(d.TryGetStamp(out _, out _));
+            Assert.False(d.TryGetStamp(out _));
         }
 
         [Fact]
@@ -523,14 +526,102 @@ namespace Werewolf.Tests
                 new List<(double, int)> { (150.0, -1) });
 
             d.RebuildAtSeek(151.0, fast: false, FixedWidth);
-            Assert.False(d.TryGetStamp(out _, out _));
+            Assert.False(d.TryGetStamp(out _));
             d.Step(151.0, 152.0, 0.1, FixedWidth);
-            Assert.False(d.TryGetStamp(out _, out _));
+            Assert.False(d.TryGetStamp(out _));
 
             d.RebuildAtSeek(149.0, fast: false, FixedWidth);
             d.Step(149.0, 150.5, 0.1, FixedWidth);
-            Assert.True(d.TryGetStamp(out int actor, out _));
-            Assert.Equal(-1, actor);
+            Assert.True(d.TryGetStamp(out ReplayStamp stamp));
+            Assert.Equal(ReplayStampKind.Result, stamp.Kind);
+            Assert.Equal(-1, stamp.ExecutedActor);
+        }
+
+        private static readonly ReplayGameOver GameOver = new ReplayGameOver(150.0, 1, 5);
+
+        [Fact]
+        public void WinStamp_ShowsOnForwardPass_ReplacesResultStamp_AndClearsComments()
+        {
+            ReplayDanmaku d = Build(
+                new List<(double, int, string)> { (110.0, 1, "あ") },
+                new List<(double, int)> { (120.0, 3) },
+                GameOver);
+
+            d.Step(109.0, 121.0, 0.1, FixedWidth);
+            Assert.Single(d.Active);
+            Assert.True(d.TryGetStamp(out ReplayStamp stamp));
+            Assert.Equal(ReplayStampKind.Result, stamp.Kind);
+
+            d.Step(121.0, 151.0, 0.1, FixedWidth);
+            Assert.Empty(d.Active);
+            Assert.True(d.TryGetStamp(out stamp));
+            Assert.Equal(ReplayStampKind.Win, stamp.Kind);
+            Assert.Equal((byte)1, stamp.Team);
+            Assert.Equal((byte)5, stamp.Reason);
+            Assert.Equal(0.0, stamp.Progress, 6);
+        }
+
+        [Fact]
+        public void WinStamp_DoesNotFadeOut()
+        {
+            ReplayDanmaku d = Build(new List<(double, int, string)>(), null, GameOver);
+            d.Step(149.0, 151.0, 0.1, FixedWidth);
+
+            d.Step(151.0, 151.5, ReplayDanmaku.StampLifeSec * 2.0, FixedWidth);
+            Assert.True(d.TryGetStamp(out ReplayStamp stamp));
+            Assert.Equal(ReplayStampKind.Win, stamp.Kind);
+            Assert.Equal(0.0, stamp.Progress, 6);
+        }
+
+        [Fact]
+        public void WinStamp_RestoredBySeekAfterGameOver_WithoutComments()
+        {
+            ReplayDanmaku d = Build(
+                new List<(double, int, string)> { (149.8, 1, "最後の一言") }, null, GameOver);
+
+            d.RebuildAtSeek(150.0, fast: false, FixedWidth);
+            Assert.True(d.TryGetStamp(out ReplayStamp stamp));
+            Assert.Equal(ReplayStampKind.Win, stamp.Kind);
+            Assert.Equal((byte)1, stamp.Team);
+            Assert.Empty(d.Active);
+
+            d.RebuildAtSeek(160.0, fast: false, FixedWidth);
+            Assert.True(d.TryGetStamp(out stamp));
+            Assert.Equal(ReplayStampKind.Win, stamp.Kind);
+            Assert.Empty(d.Active);
+        }
+
+        [Fact]
+        public void WinStamp_NotShownBySeekBeforeGameOver()
+        {
+            ReplayDanmaku d = Build(
+                new List<(double, int, string)> { (149.8, 1, "最後の一言") }, null, GameOver);
+
+            d.RebuildAtSeek(149.9, fast: false, FixedWidth);
+            Assert.False(d.TryGetStamp(out _));
+            Assert.Single(d.Active);
+        }
+
+        [Fact]
+        public void WinStamp_ClearedByRewind()
+        {
+            ReplayDanmaku d = Build(new List<(double, int, string)>(), null, GameOver);
+            d.Step(149.0, 151.0, 0.1, FixedWidth);
+            Assert.True(d.TryGetStamp(out _));
+
+            d.Step(151.0, 0.0, 0.0, FixedWidth);
+            Assert.False(d.TryGetStamp(out _));
+        }
+
+        [Fact]
+        public void WinStamp_AbsentWithoutGameOver()
+        {
+            ReplayDanmaku d = Build(new List<(double, int, string)> { (110.0, 1, "あ") });
+
+            d.Step(109.0, 200.0, 0.1, FixedWidth);
+            Assert.False(d.TryGetStamp(out _));
+            d.RebuildAtSeek(200.0, fast: false, FixedWidth);
+            Assert.False(d.TryGetStamp(out _));
         }
 
         [Fact]
@@ -566,11 +657,11 @@ namespace Werewolf.Tests
             d.RebuildAtSeek(120.0, fast: false, FixedWidth);
             Assert.Equal(2, d.Active.Count);
 
-            d.RebuildAtSeek(129.0, fast: false, FixedWidth);
+            d.RebuildAtSeek(135.0, fast: false, FixedWidth);
             Assert.Single(d.Active);
             Assert.Equal(2, d.Active[0].Actor);
 
-            d.RebuildAtSeek(145.0, fast: false, FixedWidth);
+            d.RebuildAtSeek(175.0, fast: false, FixedWidth);
             Assert.Empty(d.Active);
         }
 
@@ -584,7 +675,7 @@ namespace Werewolf.Tests
             };
             ReplayDanmaku d = Build(chats);
 
-            d.RebuildAtSeek(129.0, fast: false, FixedWidth);
+            d.RebuildAtSeek(140.0, fast: false, FixedWidth);
             Assert.Empty(d.Active);
         }
 
@@ -611,18 +702,18 @@ namespace Werewolf.Tests
             ReplayDanmaku d = Build(chats, results);
             d.Step(109.0, 151.0, 0.1, FixedWidth);
             Assert.Single(d.Active);
-            Assert.True(d.TryGetStamp(out _, out _));
+            Assert.True(d.TryGetStamp(out _));
 
             d.Step(151.0, 0.0, 0.0, FixedWidth);
             Assert.Empty(d.Active);
-            Assert.False(d.TryGetStamp(out _, out _));
+            Assert.False(d.TryGetStamp(out _));
 
             d.Step(0.0, 110.5, 0.1, FixedWidth);
             Assert.Single(d.Active);
             Assert.Equal(1, d.Active[0].Actor);
             d.Step(110.5, 150.5, 0.1, FixedWidth);
-            Assert.True(d.TryGetStamp(out int actor, out _));
-            Assert.Equal(2, actor);
+            Assert.True(d.TryGetStamp(out ReplayStamp stamp));
+            Assert.Equal(2, stamp.ExecutedActor);
         }
 
         [Fact]

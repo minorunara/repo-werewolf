@@ -37,14 +37,15 @@ namespace Werewolf.Core
                 ? _frozenRemainingMs
                 : RemainingMs(input.RoundEndUnixMs, input.NowUnixMs);
 
-            int rungMarkSec = meetingWindow ? 0 : _bell.Tick(timerRemainingMs);
+            int rungMarkSec = meetingWindow || input.ScenarioSession ? 0 : _bell.Tick(timerRemainingMs);
 
             return new HudState(
                 showBadge: true,
                 badgeRole: input.LocalRole,
-                showTimer: true, timerRemainingMs: timerRemainingMs,
+                showTimer: !input.ScenarioSession, timerRemainingMs: timerRemainingMs,
                 timerFrozen: meetingWindow,
-                timerAlert: BellSchedule.AlertActive(timerRemainingMs),
+                timerAlert: !input.ScenarioSession && BellSchedule.AlertActive(timerRemainingMs),
+                showScenarioBanner: input.ScenarioSession,
                 bellMarkSec: rungMarkSec,
                 bellVolumeScale: rungMarkSec > 0 ? BellSchedule.VolumeScaleFor(rungMarkSec) : 0f,
                 showGauge: showGauge,
@@ -88,6 +89,8 @@ namespace Werewolf.Core
 
         public bool ScatterGuardActive { get; }
 
+        public bool ScenarioSession { get; }
+
         public HudInput(
             GamePhase phase,
             Role? localRole,
@@ -99,8 +102,10 @@ namespace Werewolf.Core
             bool meetingActive = false,
             bool debugSession = false,
             int selfParticipantId = 0,
-            bool scatterGuardActive = false)
+            bool scatterGuardActive = false,
+            bool scenarioSession = false)
         {
+            ScenarioSession = scenarioSession;
             Phase = phase;
             LocalRole = localRole;
             RoundEndUnixMs = roundEndUnixMs;
@@ -149,6 +154,8 @@ namespace Werewolf.Core
 
         public bool ShowScatterGuard { get; }
 
+        public bool ShowScenarioBanner { get; }
+
         public HudState(
             bool showBadge, Role? badgeRole,
             bool showTimer, long timerRemainingMs, bool timerFrozen,
@@ -157,8 +164,10 @@ namespace Werewolf.Core
             bool showRights, int rightsRemaining,
             bool showTestPlay = false,
             bool showSelfId = false, int selfId = 0,
-            bool showScatterGuard = false)
+            bool showScatterGuard = false,
+            bool showScenarioBanner = false)
         {
+            ShowScenarioBanner = showScenarioBanner;
             ShowBadge = showBadge;
             BadgeRole = badgeRole;
             ShowTimer = showTimer;

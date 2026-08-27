@@ -3,15 +3,16 @@ using System.IO;
 using System.Text;
 using Werewolf.Core;
 using Werewolf.Game;
+using Werewolf.Vanilla;
 
 namespace Werewolf.Debugging
 {
     internal static class CheatCommands
     {
         private const string Usage =
-            "/ww <start|bot [n]|role <actor> <villager|werewolf|blackcat|bomber|shaman>|skiptimer|" +
+            "/ww <start|bot [n]|role <actor> <villager|werewolf|blackcat|bomber|shaman>|peaceful|skiptimer|" +
             "checkmate|reveal <selfcat|mates>|kill <actor> [vote]|phase <play|meeting|gameover>|" +
-            "meeting|vote <actor|skip> [asActor]|leave <actor>|meetingstatus|status|selftest|" +
+            "meeting|vote <actor|skip> [asActor]|leave <actor>|meetingstatus|status|selftest|enemies|" +
             "gauge <pct>|beacon <charge [n]|use>|perk <stamina|jump|ghost|heal|all>|informant|curse [actor]|" +
             "body [clear]|spawnbag [dollars]|scatter [diag|warp]|replay <dump|stat|demo N>|" +
             "bomb <gauge|plant <actor>|detonate|ammo [n]>|" +
@@ -27,7 +28,7 @@ namespace Werewolf.Debugging
                 return;
             }
 
-            bool isHost = SemiFunc.IsMasterClientOrSingleplayer();
+            bool isHost = Session.IsHost;
             bool debugMode = Plugin.GameConfig != null && Plugin.GameConfig.DebugMode;
 
             var verdict = CommandGate.Decide(command, isHost, debugMode);
@@ -66,6 +67,11 @@ namespace Werewolf.Debugging
 
                 case "role":
                     HandleRole(director, args);
+                    break;
+
+                case "peaceful":
+                    director.ReserveForcedPeaceful();
+                    WLog.Line("cmd_peaceful", secret: true);
                     break;
 
                 case "skiptimer":
@@ -144,6 +150,10 @@ namespace Werewolf.Debugging
                     SelfTest.RunAll();
                     break;
 
+                case "enemies":
+                    EnemyPoolDump.Write();
+                    break;
+
                 case "gauge":
                     HandleGauge(director, args);
                     break;
@@ -213,8 +223,6 @@ namespace Werewolf.Debugging
 
         private static void HandleBot(WerewolfDirector director, string[] args)
         {
-            const int firstBotActor = -101;
-
             int count = 1;
             if (args.Length >= 1 && (!int.TryParse(args[0], out count) || count < 1))
             {
@@ -227,13 +235,24 @@ namespace Werewolf.Debugging
             {
                 director.AddPendingBot(new WPlayer
                 {
-                    ActorNumber = firstBotActor - (first + i),
-                    Name = "Bot" + (first + i + 1),
+                    ActorNumber = WPlayer.FirstBotActor - (first + i),
+                    Name = "Semibot" + BotSuffix(first + i),
                     IsBot = true,
                 });
             }
             WLog.Line("cmd_bot", secret: false,
                 ("added", count), ("pendingBots", director.PendingBotCount));
+        }
+
+        private static string BotSuffix(int index)
+        {
+            string suffix = string.Empty;
+            for (int n = index; ; n = n / 26 - 1)
+            {
+                suffix = (char)('A' + n % 26) + suffix;
+                if (n < 26) break;
+            }
+            return suffix;
         }
 
         private static void HandleRole(WerewolfDirector director, string[] args)
@@ -586,7 +605,7 @@ namespace Werewolf.Debugging
                 WLog.Line("cmd_error", secret: false, ("name", "fx"), ("reason", "bad_countdown_sec"));
                 return;
             }
-            director.DebugPlayConveneCountdown("デバッグ", seconds);
+            director.DebugPlayConveneCountdown(ParticipantLabel.Format(7, "デバッグ"), seconds);
         }
 
         private static void HandleFxBanner(WerewolfDirector director, string[] rest)
@@ -749,13 +768,13 @@ namespace Werewolf.Debugging
             switch (sub)
             {
                 case "say":
-                    director.DebugInjectChat(director.DebugLocalActor, null, JoinFrom(args, 1, "テスト発言"));
+                    director.Chat.DebugInjectChat(director.Chat.DebugLocalActor, null, JoinFrom(args, 1, "テスト発言"));
                     break;
 
                 case "as":
                     if (args.Length >= 2 && int.TryParse(args[1], out int asActor))
                     {
-                        director.DebugInjectChat(asActor, null, JoinFrom(args, 2, "テスト発言"));
+                        director.Chat.DebugInjectChat(asActor, null, JoinFrom(args, 2, "テスト発言"));
                     }
                     else
                     {
@@ -766,7 +785,7 @@ namespace Werewolf.Debugging
                 case "name":
                     if (args.Length >= 3 && int.TryParse(args[1], out int nameActor))
                     {
-                        director.DebugInjectChat(nameActor, args[2], JoinFrom(args, 3, "テスト発言"));
+                        director.Chat.DebugInjectChat(nameActor, args[2], JoinFrom(args, 3, "テスト発言"));
                     }
                     else
                     {
@@ -776,44 +795,44 @@ namespace Werewolf.Debugging
                     break;
 
                 case "spam":
-                    director.DebugSpamChat(args.Length >= 2 && int.TryParse(args[1], out int n) ? n : 20);
+                    director.Chat.DebugSpamChat(args.Length >= 2 && int.TryParse(args[1], out int n) ? n : 20);
                     break;
 
                 case "auto":
-                    director.DebugToggleChatAuto(
+                    director.Chat.DebugToggleChatAuto(
                         args.Length >= 2 && int.TryParse(args[1], out int autoCount) ? autoCount : 0);
                     break;
 
                 case "vote":
-                    director.DebugInjectVoteLine(
+                    director.Chat.DebugInjectVoteLine(
                         args.Length >= 2 && int.TryParse(args[1], out int vActor)
-                            ? vActor : director.DebugLocalActor);
+                            ? vActor : director.Chat.DebugLocalActor);
                     break;
 
                 case "baseline":
-                    director.DebugArmVoteBaseline();
+                    director.Chat.DebugArmVoteBaseline();
                     break;
 
                 case "late":
-                    director.DebugScheduleChat(
+                    director.Chat.DebugScheduleChat(
                         args.Length >= 2 && long.TryParse(args[1], out long ms) ? ms : 1000L,
                         JoinFrom(args, 2, "終了間際の発言"));
                     break;
 
                 case "gate":
-                    director.DebugToggleInputGateProbe();
+                    director.Chat.DebugToggleInputGateProbe();
                     break;
 
                 case "avatar":
-                    director.DebugToggleChatAvatarFallback();
+                    director.Chat.DebugToggleChatAvatarFallback();
                     break;
 
                 case "clear":
-                    director.DebugClearChat();
+                    director.Chat.DebugClearChat();
                     break;
 
                 case "state":
-                    director.DebugDumpChatState();
+                    director.Chat.DebugDumpChatState();
                     break;
 
                 default:
@@ -858,9 +877,7 @@ namespace Werewolf.Debugging
 
         private static void HandleStart(WerewolfDirector director)
         {
-            if (!SemiFunc.RunIsLevel() ||
-                GameDirector.instance == null ||
-                GameDirector.instance.currentState != GameDirector.gameState.Main)
+            if (!Session.InRunLevel || !Session.IsGameStateMain)
             {
                 WLog.Line("cmd_start", secret: false, ("result", "rejected"), ("reason", "not_in_level"));
                 return;

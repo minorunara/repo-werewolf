@@ -10,16 +10,16 @@ namespace Werewolf.UI
     {
         public string LayerName => "Hud";
 
-        private const float LeftMargin = 48f;
-        private const float BottomMargin = 150f;
-        private const float MainIconSize = 112f;
-        private const float PerkIconSize = 84f;
-        private const float SlotPadding = 8f;
-        private const float SlotGap = 10f;
-        private const float BeaconGap = 22f;
-        private const float LabelHeight = 34f;
+        private const float LeftMargin = HudGeometry.WolfStatus.LeftMargin;
+        private const float BottomMargin = HudGeometry.WolfStatus.BottomMargin;
+        private const float MainIconSize = HudGeometry.WolfStatus.MainIconSize;
+        private const float PerkIconSize = HudGeometry.WolfStatus.PerkIconSize;
+        private const float SlotPadding = HudGeometry.WolfStatus.SlotPadding;
+        private const float SlotGap = HudGeometry.WolfStatus.SlotGap;
+        private const float BeaconGap = HudGeometry.WolfStatus.BeaconGap;
+        private const float LabelHeight = HudGeometry.WolfStatus.LabelHeight;
         private const float LabelFontSize = 26f;
-        private const float LabelGap = 4f;
+        private const float LabelGap = HudGeometry.WolfStatus.LabelGap;
         private const float CooldownFontSize = 44f;
         private const float ChargesFontSize = 34f;
         private const float JumpChargesFontSize = 34f;
@@ -96,21 +96,17 @@ namespace Werewolf.UI
 
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            float mainSlotSize = MainIconSize + SlotPadding;
-            float perkSlotSize = PerkIconSize + SlotPadding;
-            float perkGridWidth = perkSlotSize * 2f + SlotGap;
-            float perkGridHeight = perkSlotSize * 2f + SlotGap;
-            float rootWidth = mainSlotSize + SlotGap + perkGridWidth + BeaconGap + mainSlotSize;
-            float rootHeight = LabelHeight + LabelGap + perkGridHeight;
+            float mainSlotSize = HudGeometry.WolfStatus.MainSlot;
+            float perkSlotSize = HudGeometry.WolfStatus.PerkSlot;
+            float perkGridWidth = HudGeometry.WolfStatus.PerkGrid;
+            float perkGridHeight = HudGeometry.WolfStatus.PerkGrid;
+            float rootWidth = HudGeometry.WolfStatus.Width;
+            float rootHeight = HudGeometry.WolfStatus.Height;
 
-            var go = new GameObject("WW_WolfStatusPanel", typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(layerRoot, false);
-            rect.anchorMin = rect.anchorMax = new Vector2(0f, 0f);
-            rect.pivot = new Vector2(0f, 0f);
-            rect.anchoredPosition = new Vector2(LeftMargin, BottomMargin);
-            rect.sizeDelta = new Vector2(rootWidth, rootHeight);
-            _root = go;
+            RectTransform rect = UiKit.CreateAnchoredRect(layerRoot, "WW_WolfStatusPanel",
+                UiKit.BottomLeft, Vector2.zero,
+                new Vector2(LeftMargin, BottomMargin), new Vector2(rootWidth, rootHeight));
+            _root = rect.gameObject;
 
             float perkGridBottom = LabelHeight + LabelGap;
             float iconRowCenterY = perkGridBottom + perkGridHeight / 2f;
@@ -171,7 +167,6 @@ namespace Werewolf.UI
             _beaconKeyLabel = BuildKeyLabel(rect, "BeaconKeyLabel", beaconCenterX);
 
             _root.SetActive(false);
-            WLog.Line("wolf_status_panel_built", secret: false);
         }
 
         public void Tick(WolfStatusState state, string wolfKeyName, string beaconKeyName)

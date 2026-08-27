@@ -37,16 +37,17 @@ namespace Werewolf.Tests
         }
 
         [Theory]
-        [InlineData(3, Team.Villagers, false, "Alice")]
-        [InlineData(-101, Team.Werewolves, true, "Bot")]
-        public void Wire_RoundTrips(int actor, Team team, bool vanished, string name)
+        [InlineData(3, (byte)Team.Villagers, false, "Alice")]
+        [InlineData(-101, (byte)Team.Werewolves, true, "Bot")]
+        [InlineData(7, TeamCodes.PeacefulCollapsed, false, "Carol")]
+        public void Wire_RoundTrips(int actor, byte outcome, bool vanished, string name)
         {
             var data = EradicationRevealWire.FromWire(
-                EradicationRevealWire.ToWire(actor, team, vanished, name));
+                EradicationRevealWire.ToWire(actor, outcome, vanished, name));
 
             Assert.NotNull(data);
             Assert.Equal(actor, data.ActorNumber);
-            Assert.Equal(team, data.WinningTeam);
+            Assert.Equal(outcome, data.Outcome);
             Assert.Equal(vanished, data.Vanished);
             Assert.Equal(name, data.Name);
         }
@@ -55,22 +56,25 @@ namespace Werewolf.Tests
         public void Wire_NullNameBecomesEmpty_MalformedIsNull()
         {
             Assert.Equal("", EradicationRevealWire.FromWire(
-                EradicationRevealWire.ToWire(1, Team.Villagers, false, null)).Name);
+                EradicationRevealWire.ToWire(1, (byte)Team.Villagers, false, null)).Name);
 
             Assert.Null(EradicationRevealWire.FromWire(null));
             Assert.Null(EradicationRevealWire.FromWire(new object[] { 1, (byte)0 }));
             Assert.Null(EradicationRevealWire.FromWire(new object[] { "x", (byte)0, (byte)0, "n" }));
             Assert.Null(EradicationRevealWire.FromWire(new object[] { 1, (byte)255, (byte)0, "n" }));
+            Assert.Null(EradicationRevealWire.FromWire(new object[] { 1, TeamCodes.PeacefulSurvived, (byte)0, "n" }));
         }
 
         [Theory]
-        [InlineData(Team.Villagers, false, TextId.EradicationLastWerewolfDied)]
-        [InlineData(Team.Villagers, true, TextId.EradicationLastWerewolfVanished)]
-        [InlineData(Team.Werewolves, false, TextId.EradicationLastVillagerDied)]
-        [InlineData(Team.Werewolves, true, TextId.EradicationLastVillagerVanished)]
-        public void TitleId_MapsWinnerToFallenSide(Team winner, bool vanished, TextId expected)
+        [InlineData((byte)Team.Villagers, false, TextId.EradicationLastWerewolfDied)]
+        [InlineData((byte)Team.Villagers, true, TextId.EradicationLastWerewolfVanished)]
+        [InlineData((byte)Team.Werewolves, false, TextId.EradicationLastVillagerDied)]
+        [InlineData((byte)Team.Werewolves, true, TextId.EradicationLastVillagerVanished)]
+        [InlineData(TeamCodes.PeacefulCollapsed, false, TextId.EradicationPeacefulCollapsed)]
+        [InlineData(TeamCodes.PeacefulCollapsed, true, TextId.EradicationPeacefulCollapsed)]
+        public void TitleId_MapsWinnerToFallenSide(byte outcome, bool vanished, TextId expected)
         {
-            Assert.Equal(expected, EradicationCeremony.TitleId(winner, vanished));
+            Assert.Equal(expected, EradicationCeremony.TitleId(outcome, vanished));
         }
 
         private GameSession CreateStartedSession()
@@ -107,7 +111,7 @@ namespace Werewolf.Tests
             Assert.Equal(MessageTarget.All, reveal.Target);
             var data = EradicationRevealWire.FromWire(reveal.Payload);
             Assert.Equal(1, data.ActorNumber);
-            Assert.Equal(Team.Villagers, data.WinningTeam);
+            Assert.Equal((byte)Team.Villagers, data.Outcome);
             Assert.False(data.Vanished);
             Assert.Equal("P1", data.Name);
         }

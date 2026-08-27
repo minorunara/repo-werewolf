@@ -16,6 +16,10 @@ namespace Werewolf.Core
         ExtractionFailed = 4,
 
         ValueCheckmate = 5,
+
+        PeacefulSurvived = 6,
+
+        PeacefulCollapsed = 7,
     }
 
     public sealed class WinResult
@@ -28,16 +32,52 @@ namespace Werewolf.Core
 
         public Team WinningTeam { get; }
         public WinReason Reason { get; }
+
+        public bool Peaceful
+            => Reason == WinReason.PeacefulSurvived || Reason == WinReason.PeacefulCollapsed;
+
+        public WinResult AsPeaceful()
+        {
+            if (Peaceful) return this;
+            return WinningTeam == Team.Villagers
+                ? new WinResult(Team.Villagers, WinReason.PeacefulSurvived)
+                : new WinResult(Team.Werewolves, WinReason.PeacefulCollapsed);
+        }
     }
 
     public static class WinJudge
     {
+        public const int PeacefulMinAlive = 2;
+
         public static WinResult Judge(
             IReadOnlyList<WPlayer> players,
             bool extractionCompleted = false,
-            bool timerExpired = false)
+            bool timerExpired = false,
+            bool peaceful = false)
         {
             if (players == null) throw new ArgumentNullException(nameof(players));
+
+            if (peaceful)
+            {
+                int alive = 0;
+                foreach (var player in players)
+                {
+                    if (player.Alive && RoleDistribution.TeamOf(player.Role) == Team.Villagers) alive++;
+                }
+                if (alive < PeacefulMinAlive)
+                {
+                    return new WinResult(Team.Werewolves, WinReason.PeacefulCollapsed);
+                }
+                if (extractionCompleted)
+                {
+                    return new WinResult(Team.Villagers, WinReason.PeacefulSurvived);
+                }
+                if (timerExpired)
+                {
+                    return new WinResult(Team.Werewolves, WinReason.PeacefulCollapsed);
+                }
+                return null;
+            }
 
             int aliveWerewolves = 0;
             int aliveVillagers = 0;

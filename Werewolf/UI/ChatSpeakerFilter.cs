@@ -43,7 +43,6 @@ namespace Werewolf.UI
             _viewport = viewport;
             _normalTitle = title != null ? title.text : string.Empty;
             _titleBaseColor = title != null ? title.color : Color.white;
-            if (title != null) title.spriteAsset = EmojiSprites.Asset;
         }
 
         public void RegisterTarget(RectTransform rect, int actor)

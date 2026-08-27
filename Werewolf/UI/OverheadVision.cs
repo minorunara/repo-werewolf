@@ -1,4 +1,5 @@
 using UnityEngine;
+using Werewolf.Vanilla;
 
 namespace Werewolf.UI
 {
@@ -14,7 +15,7 @@ namespace Werewolf.UI
             Vector3 toCam = cam.transform.position - probe;
             float dist = toCam.magnitude;
             if (dist > MaxDistance) return false;
-            int mask = (int)SemiFunc.LayerMaskGetVisionObstruct() & ~LayerMask.GetMask("Player");
+            int mask = VisualEffects.VisionObstructMask & ~LayerMask.GetMask("Player");
             return !Physics.Raycast(probe, toCam, dist, mask, QueryTriggerInteraction.Collide);
         }
     }

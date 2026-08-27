@@ -8,6 +8,8 @@ namespace Werewolf.Core
 
         public int BomberChancePercent = 0;
 
+        public int PeacefulVillageChancePercent = 15;
+
         public int ShamanChancePercent = 100;
 
         public int RoundSeconds = 1200;
@@ -78,6 +80,8 @@ namespace Werewolf.Core
 
         public bool WerewolfModeEnabled = false;
 
+        public bool TimeLimitDisabled = false;
+
         public bool MinimapHideEnabled = true;
 
         public bool OutfitChangeAllowed = false;
@@ -99,6 +103,14 @@ namespace Werewolf.Core
         public string StartUpgradesSpec = "";
 
         public int OrbDropMax = 6;
+
+        public int StartHaulGoalPct = 0;
+
+        public int EnemySetsDanger1 = EnemySetRules.Vanilla;
+        public int EnemySetsDanger2 = EnemySetRules.Vanilla;
+        public int EnemySetsDanger3 = EnemySetRules.Vanilla;
+
+        public EnemySetCounts EnemySets => new EnemySetCounts(EnemySetsDanger1, EnemySetsDanger2, EnemySetsDanger3);
 
         public NecroVoiceMode NecroVoiceMode = NecroVoiceMode.NonWerewolfDead;
 
@@ -139,7 +151,9 @@ namespace Werewolf.Core
         public bool BomberPossible(int playerCount)
             => BomberChancePercent > 0 && RoleAssigner.CorrectedWerewolfSlots(this, playerCount) >= 2;
 
-        public int BomberProximityMeters = 9;
+        public const int DefaultBomberProximityMeters = 9;
+
+        public int BomberProximityMeters = DefaultBomberProximityMeters;
 
         public const float SelfDefenseProximityMarginMeters = 2f;
 
@@ -151,7 +165,9 @@ namespace Werewolf.Core
 
         public float BomberWarningSec = 1.0f;
 
-        public float BomberBlastRadiusMeters = 9.0f;
+        public const float DefaultBomberBlastRadiusMeters = 9f;
+
+        public float BomberBlastRadiusMeters = DefaultBomberBlastRadiusMeters;
 
         public int BomberBlastPlayerDamage = 80;
 
@@ -159,7 +175,9 @@ namespace Werewolf.Core
 
         public int BomberAmmoRefillPct = 20;
 
-        public float BomberTruckSafeRadiusMeters = 20f;
+        public const float DefaultTruckSafeRadiusMeters = 20f;
+
+        public float BomberTruckSafeRadiusMeters = DefaultTruckSafeRadiusMeters;
 
         public int ShamanGazeFullSec = 3;
 

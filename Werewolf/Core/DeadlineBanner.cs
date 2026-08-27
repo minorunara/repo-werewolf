@@ -39,8 +39,6 @@ namespace Werewolf.Core
 
         public const float RowOffsetY = 97f;
 
-        public const float ReferenceWidthPx = 1920f;
-
         public const float OffscreenMarginPx = 120f;
 
         public const int EmojiCount = 1;
@@ -67,9 +65,9 @@ namespace Werewolf.Core
 
         public const float TotalSec = Line2StaggerSec + RowTotalSec;
 
-        public static float StartOffsetX(float restWidthPx, bool fromLeft)
+        public static float StartOffsetX(CanvasBounds canvas, float restWidthPx, bool fromLeft)
         {
-            float distance = ReferenceWidthPx * 0.5f + restWidthPx * 0.5f + OffscreenMarginPx;
+            float distance = canvas.Right + restWidthPx * 0.5f + OffscreenMarginPx;
             return fromLeft ? -distance : distance;
         }
 
@@ -93,7 +91,7 @@ namespace Werewolf.Core
 
                 if (sinceStop >= PopDelaySec)
                 {
-                    float u = Clamp01((sinceStop - PopDelaySec) / PopSec);
+                    float u = MathUtil.Clamp01((sinceStop - PopDelaySec) / PopSec);
                     scale = 1f + (PopScale - 1f) * EaseOutBack(u);
                 }
                 if (sinceStop >= HoldSec)
@@ -136,19 +134,19 @@ namespace Werewolf.Core
             return new BannerRowState(main, slideGhost, popGhost);
         }
 
-        public static BannerEmojiState ComputeEmoji(float t, int index)
+        public static BannerEmojiState ComputeEmoji(float t, int index, CanvasBounds canvas)
         {
             float lt = t - (EmojiDelaySec + index * EmojiStaggerSec);
             float exitStart = Line2StaggerSec + SlideInSec + HoldSec;
             if (lt < 0f || t >= exitStart + ExitSec) return BannerEmojiState.Hidden;
 
             float travel = EmojiSpeedPxPerSec * lt;
-            float span = ReferenceWidthPx + EmojiSizePx;
+            float span = canvas.Width + EmojiSizePx;
             if (travel > span) return BannerEmojiState.Hidden;
 
             float alpha = EmojiPeakAlpha;
-            if (EmojiFadeInSec > 0f) alpha *= Clamp01(lt / EmojiFadeInSec);
-            if (EmojiAppearPx > 0f) alpha *= Clamp01(travel / EmojiAppearPx);
+            if (EmojiFadeInSec > 0f) alpha *= MathUtil.Clamp01(lt / EmojiFadeInSec);
+            if (EmojiAppearPx > 0f) alpha *= MathUtil.Clamp01(travel / EmojiAppearPx);
             if (t >= exitStart) alpha *= 1f - (t - exitStart) / ExitSec;
 
             float dir = index % 2 == 0 ? 1f : -1f;
@@ -164,7 +162,7 @@ namespace Werewolf.Core
         public static float RampAlpha(float t)
         {
             if (t <= 0f) return StartOpacity;
-            float u = Clamp01(t / FadeInSec);
+            float u = MathUtil.Clamp01(t / FadeInSec);
             return StartOpacity + (1f - StartOpacity) * u;
         }
 
@@ -182,8 +180,6 @@ namespace Werewolf.Core
         }
 
         private static float Pow15(float u) => (float)Math.Pow(u, 1.5);
-
-        private static float Clamp01(float v) => v < 0f ? 0f : (v > 1f ? 1f : v);
     }
 
     public readonly struct BannerLayerState

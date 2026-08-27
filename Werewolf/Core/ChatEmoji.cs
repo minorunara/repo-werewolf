@@ -8,6 +8,10 @@ namespace Werewolf.Core
     {
         public const int VariationSelector16 = 0xFE0F;
 
+        public const string RecapFaceDeaths = "[[creepycrying]]";
+
+        public const string RecapFaceNoDeaths = "[[yawn]]";
+
         private static readonly Dictionary<int, string> _spriteKeys = new Dictionary<int, string>
         {
             [0x1F465] = "emoji_people",
@@ -22,18 +26,27 @@ namespace Werewolf.Core
             [0x1F479] = "emoji_ogre",
             [0x1F4A8] = "emoji_dashing_away",
             [0x1F514] = "emoji_bell",
+            [0x1F602] = "emoji_face_with_tears_of_joy",
+            [0x1F3AD] = "emoji_performing_arts",
+            [0x1F43A] = "emoji_wolf",
+            [0x1F916] = "emoji_robot",
+            [0x1F449] = "emoji_backhand_index_right",
+            [0x2694]  = "emoji_crossed_swords",
+            [0x1F5F3] = "emoji_ballot_box",
+            [0x270B]  = "emoji_raised_hand",
+            [0x1F4A6] = "emoji_sweat_droplets",
         };
 
         private static readonly Dictionary<TextId, string> _templates = new Dictionary<TextId, string>
         {
-            [TextId.ChatLogScatterTitle] = "👥",
+            [TextId.ChatLogScatterTitle] = "[[semibots]]",
             [TextId.ChatLogMeetingNumberFormat] = "🔔 {0}",
-            [TextId.RecapDeathsFormat] = "👻: {0}",
-            [TextId.RecapDeathsNone] = "👻: ❌",
+            [TextId.RecapDeathsFormat] = "[[deathhead]]: {0}",
+            [TextId.RecapDeathsNone] = "[[deathhead]]: ❌",
             [TextId.RecapLostFormat] = "💔🔨: -${0}",
-            [TextId.RecapHaulFormat] = "💰: ${0} ／ 🎯 ${1}",
-            [TextId.RecapBeaconFormat] = "📡👈👹💨: {0}",
-            [TextId.RecapBeaconNone] = "📡👈👹💨: ❌",
+            [TextId.RecapHaulFormat] = "[[$$$]]: ${0} ／ [[extraction]] ${1}",
+            [TextId.RecapBeaconFormat] = "📡[[arrowleft]][[headman]][[poof2]][[clown]][[poof2]]: {0}",
+            [TextId.RecapBeaconNone] = "📡[[arrowleft]][[headman]][[poof2]][[clown]][[poof2]]: ❌",
         };
 
         public static IReadOnlyDictionary<int, string> SpriteKeys => _spriteKeys;

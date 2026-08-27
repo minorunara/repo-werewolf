@@ -52,8 +52,9 @@ namespace Werewolf.Net
                         senderActor, out InboundMessage message, out _))
                     return;
 
+                int transitMs = unchecked(PhotonNetwork.ServerTimestamp - info.SentServerTimestamp);
                 WLog.Event("recv", messageType, "in", message.Payload,
-                    secret: MessageCodes.IsSecret(messageType));
+                    secret: MessageCodes.IsSecret(messageType), transitMs: transitMs);
                 OnMessage?.Invoke(message);
             }
             catch

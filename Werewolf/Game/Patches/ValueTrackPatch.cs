@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using HarmonyLib;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.Game.Patches
 {
@@ -83,7 +84,7 @@ namespace Werewolf.Game.Patches
         private static readonly HaulFreeze _haulFreeze = new HaulFreeze();
 
         internal static void NoteHaulSuck()
-            => _haulFreeze.NoteSuck(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            => _haulFreeze.NoteSuck(SessionClock.NowMs());
 
         internal static void CloseHaulFreeze() => _haulFreeze.Close();
 

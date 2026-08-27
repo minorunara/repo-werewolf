@@ -10,12 +10,12 @@ namespace Werewolf.UI
     {
         public string LayerName => "Hud";
 
-        private const float LeftMargin = 40f;
-        private const float TopMargin = 220f;
+        private const float LeftMargin = HudGeometry.RoleBadge.LeftMargin;
+        private const float TopMargin = HudGeometry.RoleBadge.TopMargin;
         private const float RootWidth = 400f;
         private const float RootHeight = 220f;
         private const float BadgeIconSize = 128f;
-        private const float BadgeRowHeight = 132f;
+        private const float BadgeRowHeight = HudGeometry.RoleBadge.RowHeight;
         private const float BadgeGap = 10f;
         private const float BadgeFontSize = 48f;
 
@@ -25,6 +25,11 @@ namespace Werewolf.UI
         private const float TimerFontSize = 66f;
         private const float TimerTopMargin = 16f;
         private static readonly Vector2 TimerSize = new Vector2(700f, 80f);
+
+        private const float ScenarioBannerFontSize = 44f;
+        private const float ScenarioBannerTopMargin = TimerTopMargin + 18f;
+        private static readonly Vector2 ScenarioBannerSize = new Vector2(900f, 56f);
+        private static readonly Color ScenarioBannerColor = new Color(1f, 0.95f, 0.7f, 0.9f);
 
         private const float ScatterGuardFontSize = 38f;
         private const float ScatterGuardTopMargin = TimerTopMargin + 80f + 4f;
@@ -50,6 +55,7 @@ namespace Werewolf.UI
 
         private GameObject _scatterGuardRow;
         private GameObject _testPlayRow;
+        private GameObject _scenarioBannerRow;
 
         private Role? _lastBadgeRole;
         private long _lastTimerSec = -1;
@@ -80,13 +86,9 @@ namespace Werewolf.UI
 
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            var go = new GameObject("WW_HudPanel", typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(layerRoot, false);
-            rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
-            rect.pivot = new Vector2(0f, 1f);
-            rect.sizeDelta = new Vector2(RootWidth, RootHeight);
-            _root = go;
+            RectTransform rect = UiKit.CreateAnchoredRect(layerRoot, "WW_HudPanel",
+                UiKit.TopLeft, new Vector2(0f, 1f), Vector2.zero, new Vector2(RootWidth, RootHeight));
+            _root = rect.gameObject;
             ApplyPositionOffset(force: true);
 
             _badgeRow = BuildBadgeRow(rect);
@@ -98,13 +100,16 @@ namespace Werewolf.UI
             _testPlayRow = BuildStaticBanner(layerRoot, "WW_HudTestPlay",
                 TextId.HudTestPlayBanner, TestPlayTopMargin, TestPlaySize,
                 TestPlayFontSize, TestPlayColor);
+            _scenarioBannerRow = BuildStaticBanner(layerRoot, "WW_HudScenarioBanner",
+                TextId.ScenarioHudBadge, ScenarioBannerTopMargin, ScenarioBannerSize,
+                ScenarioBannerFontSize, ScenarioBannerColor);
 
             _badgeRow.SetActive(false);
             _idRow.SetActive(false);
             _timerRow.SetActive(false);
             _scatterGuardRow.SetActive(false);
             _testPlayRow.SetActive(false);
-            WLog.Line("hud_panel_built", secret: false);
+            _scenarioBannerRow.SetActive(false);
         }
 
         public HudState Tick(HudModel model, HudInput input)
@@ -120,6 +125,7 @@ namespace Werewolf.UI
                 ApplyTimer(s);
                 ApplyScatterGuard(s);
                 ApplyTestPlay(s);
+                ApplyScenarioBanner(s);
                 return s;
             }
             catch (Exception e)
@@ -148,6 +154,7 @@ namespace Werewolf.UI
             if (_timerRow != null && _timerRow.activeSelf) _timerRow.SetActive(false);
             if (_scatterGuardRow != null && _scatterGuardRow.activeSelf) _scatterGuardRow.SetActive(false);
             if (_testPlayRow != null && _testPlayRow.activeSelf) _testPlayRow.SetActive(false);
+            if (_scenarioBannerRow != null && _scenarioBannerRow.activeSelf) _scenarioBannerRow.SetActive(false);
         }
 
         public void Destroy()
@@ -169,11 +176,16 @@ namespace Werewolf.UI
             {
                 UnityEngine.Object.Destroy(_testPlayRow);
             }
+            if (_scenarioBannerRow != null)
+            {
+                UnityEngine.Object.Destroy(_scenarioBannerRow);
+            }
             _badgeRow = null; _badgeIcon = null; _badgeText = null;
             _idRow = null; _idText = null;
             _timerRow = null; _timerText = null;
             _scatterGuardRow = null;
             _testPlayRow = null;
+            _scenarioBannerRow = null;
             _lastBadgeRole = null;
             _lastTimerSec = -1;
             _lastSelfId = -1;
@@ -267,6 +279,12 @@ namespace Werewolf.UI
         {
             if (_testPlayRow != null && _testPlayRow.activeSelf != s.ShowTestPlay)
                 _testPlayRow.SetActive(s.ShowTestPlay);
+        }
+
+        private void ApplyScenarioBanner(HudState s)
+        {
+            if (_scenarioBannerRow != null && _scenarioBannerRow.activeSelf != s.ShowScenarioBanner)
+                _scenarioBannerRow.SetActive(s.ShowScenarioBanner);
         }
 
         private GameObject BuildBadgeRow(RectTransform parent)

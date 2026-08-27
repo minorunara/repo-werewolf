@@ -55,7 +55,7 @@
   #gauges td { padding: 1px 0; font-size: 12px; }
   #gauges td:first-child { color: var(--dim); width: 45%; }
   #gauges td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
-  /* 減額・納品バー（ゲーム内リプレイの減額ゲージ帯と同じ配色・同じ左右原点） */
+  /* 減額バーは左から、納品バーは右から伸びる */
   #gaugeBars { display: flex; flex-direction: column; gap: 3px; margin-bottom: 6px; }
   #gaugeBars .grow { display: flex; align-items: center; gap: 6px; }
   #gaugeBars .grow img { width: 20px; height: 20px; object-fit: contain; flex: none; }
@@ -90,6 +90,7 @@
   #events .ev.death { color: var(--danger); }
   #events .ev.meet { color: var(--meeting); }
   #events .ev.gameover { color: var(--accent); }
+  #events .ev.warn { color: var(--dim); }
   footer { background: var(--panel); border-top: 1px solid var(--border); padding: 6px 12px 10px; }
   #controls { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
   #playBtn { width: 64px; }
@@ -117,12 +118,15 @@
   <select id="segSel" data-i18n-title="segTitle" title="Segment (level)"></select>
   <label class="toggle"><input type="checkbox" id="tEnemies" checked><span data-i18n="tgEnemies">Enemies</span></label>
   <label class="toggle"><input type="checkbox" id="tVals" checked><span data-i18n="tgVals">Valuables</span></label>
-  <label class="toggle"><input type="checkbox" id="tItems"><span data-i18n="tgItems">Items</span></label>
+  <label class="toggle"><input type="checkbox" id="tItems" checked><span data-i18n="tgItems">Items</span></label>
   <label class="toggle"><input type="checkbox" id="tNames" checked><span data-i18n="tgNames">Names</span></label>
   <label class="toggle"><input type="checkbox" id="tTrail" checked><span data-i18n="tgTrail">Trails</span></label>
-  <label class="toggle"><input type="checkbox" id="tBg" checked><span data-i18n="tgBg">All trails as background</span></label>
+  <label class="toggle"><input type="checkbox" id="tBg"><span data-i18n="tgBg">All trails as background</span></label>
+  <label class="toggle" data-i18n-title="tgMeshTitle" title="Overlay the walkable floor mesh on the map image. Recordings without a map image always show the mesh as the background"><input type="checkbox" id="tMesh" checked><span data-i18n="tgMesh">Floor mesh</span></label>
   <label class="toggle"><input type="checkbox" id="tYFade" checked><span data-i18n="tgYFade">Fade by height</span></label>
-  <label class="toggle"><input type="checkbox" id="tRoles"><span data-i18n="tgRoles">Roles</span></label>
+  <label class="toggle"><input type="checkbox" id="tRoles" checked><span data-i18n="tgRoles">Roles</span></label>
+  <label class="toggle" data-i18n-title="tgChatTitle" title="Show meeting comments. When off, the meeting plays as if nobody had chatted"><input type="checkbox" id="tChat" checked><span data-i18n="tgChat">Comments</span></label>
+  <label class="toggle" data-i18n-title="tgAnonTitle" title="Show players by identifier only (names hidden everywhere). Remembered next time"><input type="checkbox" id="tAnon"><span data-i18n="tgAnon">Anonymize</span></label>
   <span class="meta" id="fileMeta"></span>
   <span id="warn"></span>
   <select id="langSel" title="Language / 言語">
@@ -182,7 +186,7 @@
       <option value="32">32×</option>
     </select>
     <span class="meta" id="paceLabel" data-i18n="paceLabel" data-i18n-title="paceTitle"
-      title="Meetings play at an absolute speed (4× around chat, 16× while silent; 16×+ selections use 16×/32×)">Auto pace in meetings</span>
+      title="Meetings play at an absolute speed (4× around chat, 32× while silent; 16× around chat when 16× or faster is selected)">Auto pace in meetings</span>
     <span id="timeLabel">0:00.0 / 0:00.0</span>
     <span class="meta" data-i18n="keyHint">Space = play/pause · ←→ = ±5s (Shift ±30s) · Wheel = zoom · Drag = pan · Click/roster = track player (Esc clears)</span>
   </div>
@@ -193,13 +197,12 @@
 <script>
 "use strict";
 /* ---------------- パース・導出コア ----------------
- * DOM非依存。replay-viewer.test.mjs はこのブロックだけを抜き出してテストする */
+ * DOM に依存しない。replay-viewer.test.mjs はこのブロックだけを抜き出して読み込む */
 /*__CORE_BEGIN__*/
 const TAU = Math.PI * 2;
 const WOLF_ROLES = new Set([1, 2, 3]);
 
-/* 言語辞書。既定は en で、UI層が保存値／navigator.language で切り替える。
- * 役職・陣営・EP状態の語彙は MOD 本体の表記に揃える。値が関数のキーは tx(key, ...args) で呼ぶ */
+/* 言語辞書。既定は en。値が関数のキーは tx(key, ...args) で呼ぶ */
 const TEXTS = {
   en: {
     appTitle: "Werewolf Replay Viewer",
@@ -207,13 +210,19 @@ const TEXTS = {
     segTitle: "Segment (level)",
     tgEnemies: "Enemies", tgVals: "Valuables", tgItems: "Items", tgNames: "Names",
     tgTrail: "Trails", tgBg: "All trails as background", tgYFade: "Fade by height", tgRoles: "Roles",
+    tgMesh: "Floor mesh",
+    tgMeshTitle: "Overlay the walkable floor mesh on the map image. Recordings without a map image always show the mesh as the background",
+    tgChat: "Comments",
+    tgChatTitle: "Show meeting comments. When off, the meeting plays as if nobody had chatted",
+    tgAnon: "Anonymize",
+    tgAnonTitle: "Show players by identifier only (names hidden everywhere). Remembered next time",
     dropTitle: "Drop a replay .jsonl file here",
     dropHint: "Or use “Open file” at the top left. Load a file saved from the in-game replay viewer, or dumped with /ww replay dump.",
     gPhase: "Phase", gValCount: "Valuables left", gRemain: "Value left",
     gLoss: "Confirmed loss (host)", gExtract: "Extraction points", gDeaths: "Deaths",
     play: "▶ Play", pause: "⏸ Pause",
     paceLabel: "Auto pace in meetings",
-    paceTitle: "Meetings play at an absolute speed (4× around chat, 16× while silent; 16×+ selections use 16×/32×)",
+    paceTitle: "Meetings play at an absolute speed (4× around chat, 32× while silent; 16× around chat when 16× or faster is selected)",
     keyHint: "Space = play/pause · ←→ = ±5s (Shift ±30s) · Wheel = zoom · Drag = pan · Click/roster = track player (Esc clears)",
     rosterRowTitle: "Click to track this player",
     selfSuffix: " (you)",
@@ -233,8 +242,23 @@ const TEXTS = {
     scatterGroupSep: " | ",
     roleBadge: role => ` (${role})`,
     roles: { 0: "Villager", 1: "Werewolf", 2: "Black Cat", 3: "Bomber", 4: "Shaman" },
-    teams: { 0: "Villager Team", 1: "Werewolf Team", 255: "No Contest" },
+    teams: {
+      0: "Villager Team", 1: "Werewolf Team", 255: "No Contest",
+      254: "The Peaceful Village Endured", 253: "The Peaceful Village Collapsed",
+    },
     causes: { Vote: "Voted out", Other: "Other" },
+    winReasons: {
+      0: "All werewolves eliminated", 1: "Villager team eliminated", 2: "Truck departed",
+      3: "Time expired", 4: "Extraction failed", 5: "Value Checkmate",
+      6: "Truck departed", 7: "",
+    },
+    winEpigraphs: {
+      0: "The werewolves were wiped out.", 1: "The villagers were wiped out.",
+      2: "The debt was collected.", 3: "The debt fell into delinquency.",
+      4: "The debt was written off.", 5: "The village went insolvent.",
+      6: "They doubted one another. Yet they still stood together.",
+      7: "There were never any werewolves. Yet the village still fell.",
+    },
     phases: { Lobby: "Lobby", Play: "Play", Meeting: "Meeting", GameOver: "Game over" },
     epStates: {
       None: "Inactive", Idle: "Idle", Active: "Open", Success: "Goal met", Warning: "Closing",
@@ -243,9 +267,11 @@ const TEXTS = {
     },
     stampNoExecution: "Vote result / No execution",
     stampExecuted: who => `Executed / ${who}`,
+    stampWin: team => `${team} wins`,
     evMeet: (who, kind) => `Meeting called by ${who} (${kind})`,
     meetKinds: { Button: "Button", Report: "Body report", Guard: "Scatter guard" },
     evMeetWarp: "Meeting begins (everyone gathered at the truck)",
+    evRecCap: "Recording limit reached (no position data past this point)",
     evMeetCancel: reason => `Meeting cancelled (reason=${reason})`,
     evChat: (who, text) => `💬 ${who}: “${text}”`,
     evResultNone: "Vote result: no execution",
@@ -257,7 +283,8 @@ const TEXTS = {
     evScatter: groups => `Scatter warp: ${groups}`,
     evGuardOn: sec => `Scatter guard armed (${sec}s)`,
     evGuardOff: "Scatter guard ended",
-    evGameOver: (team, roles) => `Game over — winner: ${team} | ${roles}`,
+    evGameOver: (team, reason, roles) => `Game over — winner: ${team}${reason ? ` (${reason})` : ""} | ${roles}`,
+    evGameOverOutcome: (outcome, reason, roles) => `Game over — ${outcome}${reason ? ` (${reason})` : ""} | ${roles}`,
     evLoss: (amount, orb) => `Confirmed loss -${amount}${orb ? " (orb)" : ""}`,
     evValGone: name => `${name} gone / collected`,
     evItemGone: name => `${name} gone`,
@@ -270,13 +297,19 @@ const TEXTS = {
     segTitle: "セグメント（レベル）",
     tgEnemies: "敵", tgVals: "貴重品", tgItems: "アイテム", tgNames: "名前",
     tgTrail: "軌跡", tgBg: "背景に全軌跡", tgYFade: "高さで淡色化", tgRoles: "役職",
+    tgMesh: "床メッシュ",
+    tgMeshTitle: "歩ける床のメッシュをマップ画像の上に重ねる。マップ画像の無い録画では常にメッシュが背景になる",
+    tgChat: "コメント",
+    tgChatTitle: "会議の発言を表示する。オフにすると発言が無かったものとして会議を再生する",
+    tgAnon: "匿名化",
+    tgAnonTitle: "プレイヤーを識別IDだけで表示する（名前はどこにも出さない）。次回開いたときも引き継ぐ",
     dropTitle: "リプレイ .jsonl をここへドロップ",
     dropHint: "または左上の「ファイルを開く」。ゲーム内リプレイビューアの「保存」、または /ww replay dump で書き出したファイルを読み込めます。",
     gPhase: "フェーズ", gValCount: "現存貴重品", gRemain: "現存総額",
     gLoss: "確定実損（ホスト）", gExtract: "抽出ポイント", gDeaths: "死亡",
     play: "▶ 再生", pause: "⏸ 停止",
     paceLabel: "会議自動変速",
-    paceTitle: "会議中は絶対速度へ自動変速（発言周辺4×・無言16×。選択16×以上は16×/32×）",
+    paceTitle: "会議中は絶対速度へ自動変速（発言周辺4×・無言32×。選択16×以上は発言周辺も16×）",
     keyHint: "Space=再生/停止・←→=±5秒（Shiftで±30秒）・ホイール=ズーム・ドラッグ=パン・クリック/名簿=追跡選択（Esc解除）",
     rosterRowTitle: "クリックで追跡選択",
     selfSuffix: "（自分）",
@@ -296,8 +329,17 @@ const TEXTS = {
     scatterGroupSep: " ／ ",
     roleBadge: role => `〔${role}〕`,
     roles: { 0: "村人", 1: "人狼", 2: "黒猫", 3: "爆弾魔", 4: "祈祷師" },
-    teams: { 0: "村人陣営", 1: "人狼陣営", 255: "無効試合" },
+    teams: { 0: "村人陣営", 1: "人狼陣営", 255: "無効試合", 254: "平和村は生き延びた", 253: "平和村は崩壊した" },
     causes: { Vote: "投票追放", Other: "その他" },
+    winReasons: {
+      0: "人狼全滅", 1: "村人陣営全滅", 2: "トラック発車", 3: "時間切れ", 4: "抽出失敗", 5: "資産詰み",
+      6: "トラック発車", 7: "",
+    },
+    winEpigraphs: {
+      0: "人狼は全滅した", 1: "村人は全滅した", 2: "債権を回収した", 3: "履行遅滞に陥った",
+      4: "債権が焦げ付いた", 5: "債務超過に陥った",
+      6: "人狼かと疑った。それでも手を取り合った。", 7: "人狼などいなかった。それでも村は滅びた。",
+    },
     phases: { Lobby: "ロビー", Play: "探索", Meeting: "会議", GameOver: "終局" },
     epStates: {
       None: "未起動", Idle: "待機", Active: "受付中", Success: "ノルマ達成", Warning: "作動中",
@@ -306,9 +348,11 @@ const TEXTS = {
     },
     stampNoExecution: "投票結果／処刑なし",
     stampExecuted: who => `処刑／${who}`,
+    stampWin: team => `${team}の勝利`,
     evMeet: (who, kind) => `会議召集 ${who}（${kind}）`,
     meetKinds: { Button: "ボタン", Report: "死体通報", Guard: "散開ガード" },
     evMeetWarp: "会議開始（トラックへ集合完了）",
+    evRecCap: "録画上限に達した（ここから先は位置の記録なし）",
     evMeetCancel: reason => `会議中止（reason=${reason}）`,
     evChat: (who, text) => `💬 ${who}「${text}」`,
     evResultNone: "開票 処刑なし",
@@ -320,7 +364,8 @@ const TEXTS = {
     evScatter: groups => `分散ワープ: ${groups}`,
     evGuardOn: sec => `散開ガード監視開始（${sec}秒）`,
     evGuardOff: "散開ガード監視終了",
-    evGameOver: (team, roles) => `終局 勝者=${team}｜${roles}`,
+    evGameOver: (team, reason, roles) => `終局 勝者=${team}${reason ? `（${reason}）` : ""}｜${roles}`,
+    evGameOverOutcome: (outcome, reason, roles) => `終局 ${outcome}${reason ? `（${reason}）` : ""}｜${roles}`,
     evLoss: (amount, orb) => `確定実損 -${amount}${orb ? "（オーブ）" : ""}`,
     evValGone: name => `${name} 消滅/回収`,
     evItemGone: name => `${name} 消滅`,
@@ -334,15 +379,25 @@ function tx(key, ...args) {
   const v = TEXTS[LANG][key] !== undefined ? TEXTS[LANG][key] : TEXTS.en[key];
   return typeof v === "function" ? v(...args) : v;
 }
-/* 保存値が有効ならそれを使い、無ければブラウザ言語が日本語のときだけ ja（入出力は UI 層） */
+/* 保存値が有効ならそれを使い、無ければブラウザ言語が日本語のときだけ ja */
 function pickLang(storedLang, browserLang) {
   if (storedLang && TEXTS[storedLang]) return storedLang;
   return /^ja\b/i.test(browserLang || "") ? "ja" : "en";
 }
-/* 未知値（本体の enum 追加・旧録画）は生の値へ縮退する */
+/* 語彙に無い値はそのまま返す */
 const roleName = r => tx("roles")[r] ?? r;
 const teamName = n => tx("teams")[n] ?? n;
 const causeName = c => tx("causes")[c] ?? c;
+const winReasonName = r => tx("winReasons")[r] ?? r;
+/* gameover の reason（勝因）。未記録と 255（不明）は空文字 */
+const winReasonText = reason => (reason === undefined || reason === null || reason === 255) ? "" : String(winReasonName(reason));
+/* 同じ reason の格言（1文）。語彙に無い値・未記録は空文字＝格言を出さない */
+const winEpigraphText = reason => String(tx("winEpigraphs")[reason] ?? "");
+/* team が実在陣営（0/1）か。番兵（255 無効試合・254/253 平和村）は勝者名として扱わない */
+const isTeamCode = team => team === 0 || team === 1;
+/* イベント欄の終局1行。0/1 は「勝者=陣営」、番兵は結果をそのまま見出しにする */
+const gameOverEventText = (team, reason, roles) =>
+  tx(isTeamCode(team) ? "evGameOver" : "evGameOverOutcome", teamName(team), winReasonText(reason), roles);
 const phaseName = p => tx("phases")[p] ?? p;
 const epStateName = s => tx("epStates")[s] ?? s;
 
@@ -432,6 +487,7 @@ function buildDerived(seg) {
   const epIndex = new Map();      // epId → 1始まりの表示番号
   const lossCum = [];             // [{t,cum}]
   const deaths = [];              // [{t,a,cause}]
+  const deathAt = new Map();      // actor → 最初の死亡時刻
   const announcedAt = new Map();  // actor → t（死亡発表＝以降その死体は盤面から退場）
   const extracts = [];            // [{t,completed,total}]
   const phases = [];              // [{t,to}]
@@ -442,6 +498,7 @@ function buildDerived(seg) {
   const idToVid = new Map();      // valId → vid（vidToId の逆引き）
   const chats = [];               // [{t,a,text}]（会議中の公開発言＝議論ショット）
   const meetingResults = [];      // [{t,a}]（開票結果。-1=処刑なし）
+  let capT = Infinity;            // 位置サンプリングの打ち切り時刻（rec_cap。なしは +∞）
   let gameover = null;
 
   for (const [vid, id] of seg.vidToId || []) idToVid.set(id, vid);
@@ -497,7 +554,10 @@ function buildDerived(seg) {
         }
         break;
       }
-      case "death": deaths.push(ev); break;
+      case "death":
+        deaths.push(ev);
+        deathAt.set(ev.a, Math.min(deathAt.get(ev.a) ?? Infinity, ev.t));
+        break;
       case "announced":
         for (const a of ev.actors || []) {
           if (!announcedAt.has(a)) announcedAt.set(a, ev.t);
@@ -509,12 +569,13 @@ function buildDerived(seg) {
       case "meet_warp": meetWarps.push(ev); break;
       case "chat": chats.push(ev); break;
       case "meeting_result": meetingResults.push(ev); break;
+      case "rec_cap": if (ev.t < capT) capT = ev.t; break;
       case "gameover": gameover = ev; break;
     }
   }
 
-  // 会議の網掛け範囲（ゲーム内リプレイの MeetingRangeBuilder と同一規則）。集合完了
-  // （meet_warp）から、Meeting を離れる最初のフェーズ遷移まで（無ければ末尾まで）
+  // 会議の網掛け範囲。集合完了（meet_warp）から、Meeting を離れる最初のフェーズ遷移まで
+  // （無ければ末尾まで）
   const meetingRanges = [];
   for (const w of meetWarps) {
     const open = meetingRanges[meetingRanges.length - 1];
@@ -523,13 +584,16 @@ function buildDerived(seg) {
     const to = end ? end.t : seg.duration;
     if (w.t < to) meetingRanges.push({ from: w.t, to });
   }
-  return { valueSteps, goneAt, itemGoneAt, epSteps, epIndex, lossCum, deaths, announcedAt, extracts,
-    phases, meetings, gameover, meetingRanges, haulRanges, destroyedByVid, idToVid,
-    chats, meetingResults };
+  // 終局イベントで開示された役職を actor → 役職へ引き直す（終局前は誰の役職も分からない）
+  const roleByActor = new Map();
+  if (gameover) (gameover.actors || []).forEach((a, i) => roleByActor.set(a, gameover.roles[i]));
+  return { valueSteps, goneAt, itemGoneAt, epSteps, epIndex, lossCum, deaths, deathAt, announcedAt,
+    extracts, phases, meetings, gameover, roleByActor, meetingRanges, haulRanges, destroyedByVid,
+    idToVid, chats, meetingResults, capT };
 }
 
 /* レベル形状（map行＝NavMesh三角形分割）をY(平均)2m刻みのバケットへ分類する
- * （階層別フェード描画用。戻り値はY昇順・trisは各三角形の先頭index） */
+ * （階層別の色分け描画用。戻り値はY昇順・trisは各三角形の先頭index） */
 function groupMapTriangles(verts, tris) {
   const buckets = new Map();
   for (let i = 0; i + 2 < tris.length; i += 3) {
@@ -552,9 +616,14 @@ function stepAt(steps, t) {
   }
   return ans;
 }
+/* [{t,...}] の昇順配列で t より後の最初の要素の index（無ければ配列長） */
+function indexAfter(steps, t) {
+  const i = steps.findIndex(s => s.t > t);
+  return i < 0 ? steps.length : i;
+}
 
-/* 位置トラックの t 時点の補間位置。maxGapSec 超の隙間は「不在」として null を返す
- * （敵のデスポーン区間・容量降格後の粗い周期に対応。V/Iは hold=true で保持） */
+/* 位置トラックの t 時点の補間位置。maxGapSec 超の隙間は「不在」として null を返し、
+ * hold=true なら最後のサンプルを保持する */
 function trackAt(track, t, maxGapSec, hold) {
   if (!track.length || t < track[0].t - 0.3) return null;
   let lo = 0, hi = track.length - 1, idx = -1;
@@ -651,10 +720,9 @@ function buildValuePopups(seg, tracks, derived) {
   return popups;
 }
 
-/* 減額・納品バーの導出（ゲーム内リプレイと同一規則）。分母はセグメント開始時の貴重品総額。
- * 実損はホスト録画なら loss イベントの累計＝会議で見えていたゲージと同じ値、
- * loss を持たない録画は damage/lost ポップアップの累計へ縮退する。
- * 納品は deliver ポップアップの累計。どちらも stepAt でそのまま引ける {t,cum} 昇順 */
+/* 減額・納品バーの導出。分母はセグメント開始時の貴重品総額。実損は loss イベントの累計、
+ * loss を持たない録画は damage/lost ポップアップの累計へ縮退する。納品は deliver ポップアップの
+ * 累計。どちらも stepAt でそのまま引ける {t,cum} 昇順 */
 function buildGaugeIndex(seg, derived, popups) {
   const base = (seg.header.vals || []).reduce((sum, v) => sum + (v.$ || 0), 0);
   let lostSteps = derived.lossCum;
@@ -674,10 +742,8 @@ function buildGaugeIndex(seg, derived, popups) {
 }
 
 /* 死亡地点マーク（❌）。死亡の瞬間から、その死が議論された会議の終了まで殺害地点へ固定表示する
- * （ゲーム内リプレイと同一規則）
- * - 会議フェーズ中の死（処刑・黒猫の呪殺＝その場で全員へ公表される）は対象外
- * - 位置は死亡直後0.5秒のアバター位置。死体（D）トラックは使わない（死者頭部は場外の待機座標
- *   から出現するため直後のサンプルが場外を指す。アバターは死亡でその場に静止する）
+ * - 会議フェーズ中の死（処刑・呪殺）は対象外
+ * - 位置は死亡直後0.5秒のアバター位置（死体（D）トラックは使わない）
  * - 会議が来ないまま終局した死は末尾まで表示（hideT=Infinity） */
 const DEATH_POS_LOOKAHEAD_S = 0.5;
 function buildDeathMarks(seg, tracks, derived) {
@@ -693,9 +759,8 @@ function buildDeathMarks(seg, tracks, derived) {
   return marks;
 }
 
-/* 死体（D）トラック冒頭の場外待機座標サンプルを削る（ゲーム内リプレイと同一規則）。放置すると
- * 死亡マーカーと追跡軌跡が原点方向へ跳ねる。死亡地点から10m（3D）超の冒頭サンプルを近傍サンプル
- * が現れるまで削り、全部遠ければ安全側で削らない。tracks.D を直接書き換える */
+/* 死体（D）トラック冒頭の場外サンプルを削る。死亡地点から10m（3D）超の冒頭サンプルを近傍サンプルが
+ * 現れるまで削り、全部遠ければ削らない。tracks.D を直接書き換える */
 const CORPSE_SPAWN_NEAR_M = 10;
 function pruneCorpseSpawnGlitch(tracks, derived) {
   for (const ev of derived.deaths) {
@@ -713,9 +778,8 @@ function pruneCorpseSpawnGlitch(tracks, derived) {
   }
 }
 
-/* カートは固定周期のC(PhysGrabCart)とオンチェンジのI(ItemAttributes)の両方に
- * 載る＝同名かつ初期位置1m以内のI側を隠す（Item Cart Cannon のようなC無し
- * アイテムは残る） */
+/* カートは固定周期の C と変化時の I の両方に載る。同名かつ初期位置1m以内の I 側を隠す
+ * （C の無いアイテムは残る） */
 function buildCartItemHides(seg, tracks) {
   const hide = new Set();
   for (const [cid, ctrack] of tracks.C) {
@@ -732,7 +796,7 @@ function buildCartItemHides(seg, tracks) {
   }
   return hide;
 }
-/* ---- 議論ショットの文字処理（ゲーム内リプレイと同一規則） ---- */
+/* ---- 議論ショットの文字処理 ---- */
 const CHAT_SINGLE_LINE_MAX = 30;
 const CHAT_WRAP_TARGET = 25;      // 禁則により 24〜26 の範囲でずらす
 const CHAT_SLIDE_IN = 0.22, CHAT_SLIDE_OUT = 0.28;
@@ -781,32 +845,40 @@ function chatDwellSec(n) {
 }
 function chatTotalSec(n) { return CHAT_SLIDE_IN + chatDwellSec(n) + CHAT_SLIDE_OUT; }
 
-/* ---- 再生速度プロファイル（ゲーム内リプレイと同一規則）。探索は speedSel の選択値、
- * 会議は絶対速度で発言周辺4倍・無言16倍（選択値16以上なら早送り段の16/32倍）。
- * chat境界では必ず一度クランプし、複数発言を同一フレームで通過させない ---- */
+/* ---- 再生速度プロファイル。探索は選択速度、会議は絶対速度で発言周辺4倍（選択値16以上なら
+ * 16倍）、無言は段に関わらず32倍。chat境界では必ず一度クランプし、複数発言を同一フレームで
+ * 通過させない ---- */
 const PACE_TALK_WINDOW = 5.0;
+const meetingAt = (ranges, t) => ranges.find(r => t >= r.from && t < r.to) || null;
+/* t 以下で最後の発言時刻（無ければ -Infinity） */
+function lastChatAtOrBefore(chatTimes, t) {
+  let last = -Infinity;
+  for (const ct of chatTimes) { if (ct <= t) last = ct; else break; }
+  return last;
+}
+/* t より後の最初の発言時刻（無ければ Infinity） */
+function firstChatAfter(chatTimes, t) {
+  for (const ct of chatTimes) if (ct > t) return ct;
+  return Infinity;
+}
 function paceZoneAt(ranges, chatTimes, t) {
-  const m = ranges.find(r => t >= r.from && t < r.to);
+  const m = meetingAt(ranges, t);
   if (!m) return 0; // Explore
-  let lastChat = -Infinity;
-  for (const ct of chatTimes) { if (ct <= t) lastChat = ct; else break; }
-  return t - Math.max(m.from, lastChat) < PACE_TALK_WINDOW ? 1 : 2; // Talk : Silent
+  const talkStart = Math.max(m.from, lastChatAtOrBefore(chatTimes, t));
+  return t - talkStart < PACE_TALK_WINDOW ? 1 : 2; // Talk : Silent
 }
 function paceSpeedOf(zone, exploreSpeed) {
-  const fast = exploreSpeed >= 16;
-  if (zone === 1) return fast ? 16 : 4;
-  if (zone === 2) return fast ? 32 : 16;
+  if (zone === 1) return exploreSpeed >= 16 ? 16 : 4;
+  if (zone === 2) return 32;
   return exploreSpeed;
 }
+/* 次の速度境界。isChat は境界が発言時刻そのものか（＝そこで一度クランプする） */
 function paceNextBoundary(ranges, chatTimes, t) {
-  let next = Infinity, isChat = false;
-  for (const ct of chatTimes) { if (ct > t) { next = ct; isChat = true; break; } }
-  const m = ranges.find(r => t >= r.from && t < r.to);
+  let next = firstChatAfter(chatTimes, t), isChat = next !== Infinity;
+  const m = meetingAt(ranges, t);
   if (m) {
     if (m.to < next) { next = m.to; isChat = false; }
-    let lastChat = -Infinity;
-    for (const ct of chatTimes) { if (ct <= t) lastChat = ct; else break; }
-    const onset = Math.max(m.from, lastChat) + PACE_TALK_WINDOW;
+    const onset = Math.max(m.from, lastChatAtOrBefore(chatTimes, t)) + PACE_TALK_WINDOW;
     if (onset > t && onset < next) { next = onset; isChat = false; }
   } else {
     const nm = ranges.find(r => r.from > t);
@@ -840,8 +912,8 @@ function paceRealSecondsBetween(ranges, chatTimes, t0, t1, exploreSpeed) {
   return total;
 }
 
-/* ---- 議論ショットの配置（ゲーム内リプレイと同一規則）。新着を Depth 0 の主役、直前3件を
- * Depth 1/2/3 の残像にし、横へ流さず主役交代で奥へ送る ---- */
+/* ---- 議論ショットの配置。新着を Depth 0 の主役、直前3件を Depth 1/2/3 の残像にし、
+ * 横へ流さず主役交代で奥へ送る ---- */
 const DANMAKU_HANDOFF = 0.26;
 const DANMAKU_FOCUS_X = 0.10, DANMAKU_ECHO_STEP_X = 0.065, DANMAKU_EDGE_MARGIN = 0.025;
 const clamp01 = t => Math.max(0, Math.min(1, t));
@@ -970,9 +1042,8 @@ function danmakuLandingShake(c, elapsed) {
     y: Math.sin(phase * 1.7 + u * TAU * 35) * decay * amplitude * 0.65,
   };
 }
-/* 滞留中の微動。固定4位置の周囲だけを小さく動かす。再生時計から求める決定的なオフセット
- * なので、一時停止・シーク後も同じ発言は同じ姿勢へ復元される。
- * x/y はCanvasピクセル、rotation は現在の滞留角へ加える度数 */
+/* 滞留中の微動。固定4位置の周囲だけを小さく動かす。経過時間とシードだけから決まる
+ * オフセットで、x/y はCanvasピクセル、rotation は現在の滞留角へ加える度数 */
 const DANMAKU_IDLE_FADE_IN_SEC = 0.24;
 const DANMAKU_IDLE_STILL = 0, DANMAKU_IDLE_GLIDE = 1, DANMAKU_IDLE_FLOAT = 2;
 const DANMAKU_IDLE_STYLES = 3;
@@ -1015,7 +1086,7 @@ function danmakuIdleMotion(c, elapsed) {
     };
   }
 
-  // Float: 低周波の異なる2軸で、固定位置の周囲だけをふらふら漂う
+  // Float: 周期の異なる2軸の正弦で、固定位置の周囲を漂う
   if (style === DANMAKU_IDLE_FLOAT) {
     const fadeOut = remaining >= CHAT_SLIDE_OUT ? 1 : smoothstep(remaining / CHAT_SLIDE_OUT);
     const gain = fadeIn * fadeOut * depthGain;
@@ -1028,7 +1099,7 @@ function danmakuIdleMotion(c, elapsed) {
     };
   }
 
-  // Still: 突入と着地後は完全に止め、他の動きとの対比を作る
+  // Still: 突入と着地後は動かさない
   return { x: 0, y: 0, rotation: 0 };
 }
 function danmakuRotation(c, elapsed) {
@@ -1074,13 +1145,15 @@ function danmakuAccentCenterOffsetFactor(c, elapsed) {
 /* ---------------- UI（DOM・Canvas） ---------------- */
 const $ = id => document.getElementById(id);
 const isOn = id => $(id).checked;
-/* プレイヤー色は識別ID起点のゴールデンアングル色相。同一性はマーカー内のID数字が担うので、
- * 人数が増えたときの色相衝突は許容する */
+/* コメント非表示中は速度プロファイルにも発言を渡さない＝会議は発言が無かったものとして進む */
+const NO_CHATS = [];
+function paceChatTimes() { return isOn("tChat") ? state.chatTimes : NO_CHATS; }
+/* プレイヤー色は識別ID起点のゴールデンアングル色相 */
 function playerColor(n) {
   const hue = ((n * 137.508) % 360 + 360) % 360;
   return `hsl(${hue.toFixed(1)}, 62%, 60%)`;
 }
-/* プレイヤーマーカーの輪郭＝菱形。ID文字の内接域が狭いぶん外接半径を大きく取る */
+/* プレイヤーマーカーの輪郭＝菱形 */
 function tracePlayerMarker(ctx, cx, cy, r) {
   ctx.beginPath();
   ctx.moveTo(cx, cy - r);
@@ -1099,6 +1172,13 @@ const EP_COLORS = {
   Cancel: "#e5534b", Extracting: "#4fa6c0", Complete: "#3f8f55", Surplus: "#4fc06b", TaxReturn: "#4fa6c0",
 };
 
+/* 議論ショットとスタンプの表示状態（セグメント切替で作り直す）。stamp は
+ * { kind: "result", actor, elapsed }（開票結果・1.5秒で薄れる）か
+ * { kind: "win", gameover }（終局・終端まで残る）か null */
+const emptyDanmaku = () => ({ active: [], stamp: null, chatCursor: 0, resultCursor: 0 });
+const resultStamp = actor => ({ kind: "result", actor, elapsed: 0 });
+const winStamp = gameover => ({ kind: "win", gameover });
+
 const state = {
   replay: null, segIdx: 0, tracks: null, derived: null,
   t: 0, playing: false, speed: 4, lastFrame: 0,
@@ -1107,7 +1187,7 @@ const state = {
   bgPaths: [], mapLayers: null, mapBitmap: null, fixedRefY: null,
   popups: [], gaugeIndex: null, deathMarks: [], cartItemHides: new Set(),
   selected: new Set(), hoverables: [], playerHits: [], actorToId: new Map(),
-  chatTimes: [], danmaku: { active: [], stamp: null, chatCursor: 0, resultCursor: 0 },
+  chatTimes: [], danmaku: emptyDanmaku(),
 };
 
 function seg() { return state.replay ? state.replay.segments[state.segIdx] : null; }
@@ -1117,14 +1197,14 @@ const fadeCurve = dy => dy <= 3 ? 1 : dy >= 5 ? 0.3 : 1 - 0.7 * (dy - 3) / 2;
 function heightAlpha(y) {
   return (!isOn("tYFade") || state.fixedRefY === null) ? 1 : fadeCurve(Math.abs(y - state.fixedRefY));
 }
-/* 終局イベントは全員の役職を持つ（それ以前は誰の役職も分からない） */
-function roleOf(actor) {
-  const go = state.derived.gameover;
-  if (!go) return null;
-  const idx = go.actors.indexOf(actor);
-  return idx >= 0 ? go.roles[idx] : null;
+/* 終局イベントで開示された役職（未開示は null） */
+const roleOf = actor => state.derived.roleByActor.get(actor) ?? null;
+/* 再生位置 t で死亡済みか */
+function isDeadAt(actor, t) {
+  const at = state.derived.deathAt.get(actor);
+  return at !== undefined && at <= t;
 }
-/* 影付き文字。背景がマップでも軌跡でも読めるように必ずこの2度描きを通す */
+/* 影付き文字。黒の影を offset ぶん右下へ置いてから本体を描く */
 function outlinedText(ctx, text, x, y, fill, offset = 1) {
   ctx.fillStyle = "#000c";
   ctx.fillText(text, x + offset, y + offset);
@@ -1145,12 +1225,21 @@ function playerOf(a) {
   const s = seg();
   return s ? (s.header.players || []).find(p => p.a === a) || null : null;
 }
+/* 名簿にあるプレイヤーの表示名。匿名化中は識別IDだけ */
+function playerLabel(p) { return isOn("tAnon") ? String(p.id) : `${p.id}. ${p.n}`; }
 function actorName(a) {
   const p = playerOf(a);
-  if (p) return `${p.id}. ${p.n}`;
+  if (p) return playerLabel(p);
   return a < 0 ? `Bot(${a})` : `#${a}`;
 }
-/* マーカーに入れる識別ID（名簿に居ない actor は色だけ actor 値から作り「?」表示） */
+/* 議論ショットのメタ行（名前〔役職〕）。匿名化中は名前を落として役職だけ残す */
+function danmakuMetaText(actor, role) {
+  const p = playerOf(actor);
+  let meta = p && !isOn("tAnon") ? p.n : "";
+  if (role !== null) meta += tx("roleBadge", roleName(role));
+  return meta;
+}
+/* マーカーに入れる識別ID（名簿に居ない actor は「?」。色は actor 値から作る） */
 function actorIdText(a) {
   const pid = state.actorToId.get(a);
   return pid !== undefined ? String(pid) : "?";
@@ -1177,14 +1266,19 @@ function loadText(text, fileName) {
     return;
   }
   state.replay = replay;
-  state.segIdx = 0; // buildSegOptions が選択位置を復元するので、前のファイルの位置を先に落とす
-  $("warn").textContent = replay.warnings.length ? tx("warnCount", replay.warnings.length) : "";
+  state.segIdx = 0; // segSel の選択位置を先頭へ戻してから作り直す
+  showWarnings();
   replay.warnings.forEach(w => console.warn(w));
   $("fileMeta").textContent = fileName;
   buildSegOptions();
   state.selected.clear();
   selectSegment(0);
   $("drop").classList.add("hidden");
+}
+
+function showWarnings() {
+  const n = state.replay.warnings.length;
+  $("warn").textContent = n ? tx("warnCount", n) : "";
 }
 
 function buildSegOptions() {
@@ -1207,7 +1301,7 @@ function selectSegment(i) {
   state.derived = buildDerived(s);
   pruneCorpseSpawnGlitch(state.tracks, state.derived);
   state.chatTimes = state.derived.chats.map(c => c.t);
-  state.danmaku = { active: [], stamp: null, chatCursor: 0, resultCursor: 0 };
+  state.danmaku = emptyDanmaku();
   state.popups = buildValuePopups(s, state.tracks, state.derived);
   state.gaugeIndex = buildGaugeIndex(s, state.derived, state.popups);
   state.deathMarks = buildDeathMarks(s, state.tracks, state.derived);
@@ -1218,30 +1312,32 @@ function selectSegment(i) {
   state.cartItemHides = buildCartItemHides(s, state.tracks);
   state.bgPaths = buildBackgroundPaths(state.tracks);
   state.mapLayers = buildMapLayers(s.map);
-  // base64→Image のデコードは非同期。読了時にまだ同じセグメントを見ていれば描き直す
-  state.mapBitmap = null;
-  if (s.mapImage && s.mapImage.png) {
-    const img = new Image();
-    img.onload = () => { if (seg() === s) { state.mapBitmap = img; requestDraw(); } };
-    img.onerror = () => console.warn(tx("mapImgDecodeFailed"));
-    img.src = "data:image/png;base64," + s.mapImage.png;
-  }
+  loadMapBitmap(s);
   state.fixedRefY = segmentStartY();
-  // 実マップ（静止画 or NavMesh）があれば軌跡背景は要らない
+  // 静止画も NavMesh も無い録画だけ軌跡背景を既定 ON にする
   $("tBg").checked = !state.mapLayers && !(s.mapImage && s.mapImage.png);
   state.t = 0;
   state.playing = false;
   state.view.fitted = false;
   computeBounds();
-  buildEventList();
-  buildRosterStatic();
+  rebuildNameViews();
   updatePlayButton();
   drawSeek();
   requestDraw();
 }
 
-/* 全期間のP/E/C軌跡をワールド座標のPath2Dへ焼く。マップ未録画時の代用背景で、1試合ぶんの
- * 徘徊跡が通路・部屋の形を浮かび上がらせる。2.5秒超のギャップはデスポーン/ワープとみなし線を切る */
+/* マップ静止画（base64 PNG）を非同期にデコードし、読了時にまだ同じセグメントを見ていれば描き直す */
+function loadMapBitmap(s) {
+  state.mapBitmap = null;
+  if (!s.mapImage || !s.mapImage.png) return;
+  const img = new Image();
+  img.onload = () => { if (seg() === s) { state.mapBitmap = img; requestDraw(); } };
+  img.onerror = () => console.warn(tx("mapImgDecodeFailed"));
+  img.src = "data:image/png;base64," + s.mapImage.png;
+}
+
+/* 全期間のP/E/C軌跡をワールド座標のPath2Dへ焼く（マップ未録画時の代用背景）。
+ * 2.5秒超のギャップは線を切る */
 function buildBackgroundPaths(tracks) {
   const paths = [];
   for (const kind of ["P", "E", "C"]) {
@@ -1275,7 +1371,7 @@ function buildMapLayers(map) {
   });
 }
 
-/* 高さ淡色化の基準Y＝レベル開始時の自機の高さ。以後は自機が動いても固定する */
+/* 高さ淡色化の基準Y＝レベル開始時の自機の高さ（以後固定） */
 function segmentStartY() {
   const s = seg();
   const track = state.tracks.P.get(s.header.me) || state.tracks.P.values().next().value;
@@ -1369,18 +1465,42 @@ function withWorldTransform(ctx, body) {
   ctx.restore();
 }
 
-/* 背景の優先順位は マップ静止画 ＞ NavMesh の歩行可能面。軌跡は静止画もNavMeshも無い録画の代用 */
+/* 背景の優先順位は マップ静止画 ＞ 床メッシュ（NavMesh の歩行可能面）＞ 軌跡。
+ * 床メッシュは静止画が無ければ背景そのもの（濃く）、静止画があれば「床メッシュ」ONのときだけ
+ * 半透明で静止画の上に重ねる。階の違いは色相を変えず明度だけで表す（高さ淡色化はメッシュには
+ * 掛けない）: 基準階（レベル開始時の自機の高さ）が MESH_COLOR そのもので、2m上がるごとに明るく・
+ * 下がるごとに暗い */
+const MESH_COLOR = "#004903";
+const MESH_ALPHA = { background: 0.6, overlay: 0.3 };
+const MESH_LIGHTNESS_PER_M = 4;       // 1mあたりの明度変化（%）
+const MESH_LIGHTNESS_RANGE = [4, 60]; // 明度の下限・上限（%）
+function hexToHsl(hex) {
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min, l = (max + min) / 2;
+  if (d === 0) return { h: 0, s: 0, l: l * 100 };
+  const s = d / (1 - Math.abs(2 * l - 1));
+  const h = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return { h: h * 60, s: s * 100, l: l * 100 };
+}
+const MESH_HSL = hexToHsl(MESH_COLOR);
+function meshFillStyle(y) {
+  const dy = Math.round((y - (state.fixedRefY ?? 0)) / 2) * 2;
+  const l = Math.min(MESH_LIGHTNESS_RANGE[1], Math.max(MESH_LIGHTNESS_RANGE[0], MESH_HSL.l + dy * MESH_LIGHTNESS_PER_M));
+  return `hsl(${MESH_HSL.h.toFixed(1)}, ${MESH_HSL.s.toFixed(1)}%, ${l.toFixed(1)}%)`;
+}
 function drawBackground(ctx) {
-  if (state.mapBitmap) {
+  const onImage = !!state.mapBitmap;
+  if (onImage) {
     const mi = seg().mapImage;
     // ワールドXZ被覆矩形へ線形に敷く（画像の上端が+Z）
     withWorldTransform(ctx, () =>
       ctx.drawImage(state.mapBitmap, mi.x0, -mi.z1, mi.x1 - mi.x0, mi.z1 - mi.z0));
-  } else if (state.mapLayers) {
+  }
+  if (state.mapLayers && (!onImage || isOn("tMesh"))) {
     withWorldTransform(ctx, () => {
-      ctx.fillStyle = "#333945";
-      for (const layer of state.mapLayers) {
-        ctx.globalAlpha = heightAlpha(layer.y) * 0.6;
+      ctx.globalAlpha = onImage ? MESH_ALPHA.overlay : MESH_ALPHA.background;
+      for (const layer of state.mapLayers) { // Y昇順＝高い階ほど上に乗る
+        ctx.fillStyle = meshFillStyle(layer.y);
         ctx.fill(layer.path);
       }
       ctx.globalAlpha = 1;
@@ -1474,7 +1594,7 @@ function drawValuables(ctx, hits) {
   }
 }
 
-/* アイテムはバニラマップと同じシアン丸。カート重複分は隠し、消滅以降は出さない */
+/* アイテムはシアン丸。カート重複分は隠し、消滅以降は出さない */
 function drawItems(ctx, hits) {
   if (!isOn("tItems")) return;
   const d = state.derived, t = state.t;
@@ -1518,7 +1638,7 @@ function goneBy(ledger, id) {
   const t = ledger.get(id);
   return t !== undefined && state.t >= t;
 }
-/* 死亡発表の済んだ死体は盤面から退場させる（通報できず試合上の意味を失うため。名簿には残る） */
+/* 死亡発表の済んだ死体は盤面から退場させる（名簿には残る） */
 const hasDeparted = actor => goneBy(state.derived.announcedAt, actor);
 
 /* 直近15秒の移動跡。追跡選択中は選択者だけを描く */
@@ -1550,15 +1670,14 @@ function drawPlayerTrails(ctx) {
   }
 }
 
-/* 同一性はマーカー内のID数字が担い、色は補助。追跡選択中の非選択者は減光してラベルを省く */
+/* 菱形マーカー＋識別ID。追跡選択中の非選択者は減光してラベルを省く */
 function drawPlayers(ctx, hits) {
   const s = seg(), t = state.t, tracking = state.selected.size > 0;
   const radius = 9.5;
   for (const [actor, track] of state.tracks.P) {
     if (hasDeparted(actor)) continue;
-    const dead = state.derived.deaths.some(dv => dv.a === actor && dv.t <= t);
-    // 死亡中は死体（D=死者頭部）の実位置を優先＝運搬・隠蔽・会議の頭部ワープが映る。
-    // 頭部生成前でDが無い区間は最終アバター位置へ縮退
+    const dead = isDeadAt(actor, t);
+    // 死亡中は死体（D）の実位置を優先し、D が無い区間は最終アバター位置へ縮退
     const corpse = dead ? state.tracks.D.get(actor) : null;
     const pos = (corpse && trackAt(corpse, t, 2.0, true)) || trackAt(track, t, 2.0, true);
     if (!pos) continue;
@@ -1676,7 +1795,7 @@ function buildRosterStatic() {
     sw.style.background = playerColor(p.id);
     const name = document.createElement("span");
     name.className = "name";
-    name.textContent = `${p.id}. ${p.n}` + (p.a === s.header.me ? tx("selfSuffix") : "");
+    name.textContent = playerLabel(p) + (p.a === s.header.me ? tx("selfSuffix") : "");
     const role = document.createElement("span");
     role.className = "role";
     row.append(sw, name, role);
@@ -1693,9 +1812,8 @@ function updateRoster() {
   const d = state.derived, t = state.t;
   for (const row of $("roster").children) {
     const actor = Number(row.dataset.actor);
-    const dead = d.deaths.some(dv => dv.a === actor && dv.t <= t);
     row.classList.toggle("sel", state.selected.has(actor));
-    row.querySelector(".name").classList.toggle("dead", dead);
+    row.querySelector(".name").classList.toggle("dead", isDeadAt(actor, t));
     const role = isOn("tRoles") ? roleOf(actor) : null;
     const roleEl = row.querySelector(".role");
     roleEl.textContent = role !== null ? roleName(role) : "";
@@ -1713,6 +1831,7 @@ function describeEvent(ev) {
     case "chat": return { cls: "", text: tx("evChat", actorName(ev.a), ev.text) };
     case "meeting_result":
       return { cls: "meet", text: ev.a === -1 ? tx("evResultNone") : tx("evResultExecuted", actorName(ev.a)) };
+    case "rec_cap": return { cls: "warn", text: tx("evRecCap") };
     case "phase": return { cls: ev.to === "Meeting" ? "meet" : "", text: tx("evPhase", phaseName(ev.to)) };
     case "death": return { cls: "death", text: tx("evDeath", actorName(ev.a), causeName(ev.cause)) };
     case "announced":
@@ -1728,7 +1847,7 @@ function describeEvent(ev) {
       const roles = ev.actors
         .map((a, i) => `${actorName(a)}=${roleName(ev.roles[i])}`)
         .join(tx("listSep"));
-      return { cls: "gameover", text: tx("evGameOver", teamName(ev.team), roles) };
+      return { cls: "gameover", text: gameOverEventText(ev.team, ev.reason, roles) };
     }
     case "loss": return { cls: "", text: tx("evLoss", formatAmount(ev.$), ev.orb) };
     case "val_value": return { cls: "", text: `${valName(ev.v)} → ${formatMoney(ev.$)}` };
@@ -1802,6 +1921,11 @@ function drawSeek() {
 
   ctx.fillStyle = "#2a2d34";
   ctx.fillRect(0, 9, w, 8);
+  // 録画上限（rec_cap）以降は位置トラックが無い区間＝灰色で潰す
+  if (d.capT < s.duration) {
+    ctx.fillStyle = "rgba(150,150,160,.45)";
+    ctx.fillRect(X(Math.max(0, d.capT)), 9, Math.max(w - X(Math.max(0, d.capT)), 2), 8);
+  }
   ctx.fillStyle = "rgba(202,163,255,.35)";
   for (const r of d.meetingRanges) ctx.fillRect(X(r.from), 9, Math.max(X(r.to) - X(r.from), 2), 8);
   for (const ev of s.events) {
@@ -1813,7 +1937,7 @@ function drawSeek() {
 }
 
 function drawSeekCursor() {
-  drawSeek(); // 目盛りごと引き直す（イベント数は高々百件台なので毎フレームでも軽い）
+  drawSeek(); // 目盛りごと引き直す
   const canvas = $("seekCanvas");
   const ctx = canvas.getContext("2d");
   const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -1826,7 +1950,8 @@ function drawSeekCursor() {
 /* ---------------- 再生制御 ---------------- */
 function setTime(t) {
   state.t = Math.max(0, Math.min(t, seg().duration));
-  rebuildDanmakuAt(state.t); // シークでは表示中の発言を返却し、実時間換算で組み直す
+  state.danmaku.stamp = null; // 開票スタンプはシークでは復元しない（終局スタンプは rebuildDanmakuAt が立て直す）
+  rebuildDanmakuAt(state.t);
   requestDraw();
 }
 function updatePlayButton() {
@@ -1843,12 +1968,10 @@ function togglePlay() {
 }
 function tick(now) {
   if (!state.playing) return;
-  // rAFのタイムスタンプはフレーム開始時刻で直前の performance.now() より過去になりうるため、
-  // dt は0で下限クランプする
-  const dt = Math.max(0, now - state.lastFrame) / 1000;
+  const dt = Math.max(0, now - state.lastFrame) / 1000; // 実時間の経過秒（0 で下限クランプ）
   state.lastFrame = now;
   const prevT = state.t;
-  state.t = paceAdvance(state.derived.meetingRanges, state.chatTimes, state.t, dt, state.speed);
+  state.t = paceAdvance(state.derived.meetingRanges, paceChatTimes(), state.t, dt, state.speed);
   if (state.t >= seg().duration) {
     state.t = seg().duration;
     state.playing = false;
@@ -1929,7 +2052,7 @@ function updateDanmaku(prevT, newT, dt) {
       }
     }
     if (focusExpired) dm.active = []; // 主役が消えたら残像も残さない
-    if (dm.stamp) {
+    if (dm.stamp && dm.stamp.kind === "result") { // 終局スタンプは薄れず終端まで残る
       dm.stamp.elapsed += dt;
       if (dm.stamp.elapsed >= DANMAKU_STAMP_LIFE) dm.stamp = null;
     }
@@ -1937,84 +2060,109 @@ function updateDanmaku(prevT, newT, dt) {
   if (newT <= prevT) return;
   const chats = state.derived.chats;
   while (dm.chatCursor < chats.length && chats[dm.chatCursor].t <= prevT) dm.chatCursor++;
+  const showChat = isOn("tChat");
   while (dm.chatCursor < chats.length && chats[dm.chatCursor].t <= newT) {
-    spawnComment(chats[dm.chatCursor++], 0);
+    const chat = chats[dm.chatCursor++];
+    if (showChat) spawnComment(chat, 0);
   }
   const results = state.derived.meetingResults;
   while (dm.resultCursor < results.length && results[dm.resultCursor].t <= prevT) dm.resultCursor++;
   while (dm.resultCursor < results.length && results[dm.resultCursor].t <= newT) {
-    dm.stamp = { a: results[dm.resultCursor++].a, elapsed: 0 };
+    dm.stamp = resultStamp(results[dm.resultCursor++].a);
+  }
+  const go = state.derived.gameover;
+  if (go && prevT < go.t && go.t <= newT) { // 開票スタンプは終局スタンプに置き換わり、表示中のコメントも消す
+    dm.stamp = winStamp(go);
+    dm.active = [];
   }
 }
 
-/* シーク先の表示状態を組み直す。直前の発言は速度プロファイルの実時間換算で復元し、
- * スタンプは復元しない（結果時刻を飛び越えただけでは出さない） */
+/* 時刻 t の議論ショットを組み直す（シーク・コメント表示の切替）。表示中の発言を返却し、直前の
+ * 発言は速度プロファイルの実時間換算で復元する。コメント非表示中は前進カーソルだけ合わせる */
 function rebuildDanmakuAt(t) {
   const dm = state.danmaku;
   if (!state.derived) return;
   dm.active = [];
-  dm.stamp = null;
   const chats = state.derived.chats;
-  dm.chatCursor = chats.findIndex(c => c.t > t);
-  if (dm.chatCursor < 0) dm.chatCursor = chats.length;
-  const results = state.derived.meetingResults;
-  dm.resultCursor = results.findIndex(rv => rv.t > t);
-  if (dm.resultCursor < 0) dm.resultCursor = results.length;
+  dm.chatCursor = indexAfter(chats, t);
+  dm.resultCursor = indexAfter(state.derived.meetingResults, t);
+  const go = state.derived.gameover;
+  if (go && t >= go.t) { dm.stamp = winStamp(go); return; } // 終局後は終局スタンプだけ（発言は復元しない）
+  if (!isOn("tChat")) return;
 
-  if (dm.chatCursor > 0) {
-    const latest = chats[dm.chatCursor - 1];
-    const latestElapsed = paceRealSecondsBetween(
-      state.derived.meetingRanges, state.chatTimes, latest.t, t, state.speed);
-    if (latestElapsed >= chatTotalSec(chatDisplayLength(latest.text || ""))) return;
-  }
+  // 発言の投稿時刻から t までの実時間（速度プロファイル換算）と、その発言の表示時間
+  const elapsedSince = spawnT =>
+    paceRealSecondsBetween(state.derived.meetingRanges, paceChatTimes(), spawnT, t, state.speed);
+  const totalOf = chat => chatTotalSec(chatDisplayLength(chat.text || ""));
+  const latest = chats[dm.chatCursor - 1];
+  if (latest && elapsedSince(latest.t) >= totalOf(latest)) return; // 主役が退場済みなら残像も出さない
 
   const maxTotal = CHAT_SLIDE_IN + CHAT_DWELL_MAX + CHAT_SLIDE_OUT;
   const restore = [];
   for (let i = dm.chatCursor - 1; i >= 0; i--) {
-    const elapsed = paceRealSecondsBetween(
-      state.derived.meetingRanges, state.chatTimes, chats[i].t, t, state.speed);
+    const elapsed = elapsedSince(chats[i].t);
     if (elapsed >= maxTotal) break;
-    if (elapsed >= chatTotalSec(chatDisplayLength(chats[i].text || ""))) continue;
+    if (elapsed >= totalOf(chats[i])) continue;
     restore.push({ chat: chats[i], elapsed });
     if (restore.length >= DANMAKU_VISIBLE_CAP) break;
   }
   restore.reverse();
   for (const r of restore) spawnComment(r.chat, r.elapsed);
-  if (dm.active.length) {
-    const newestT = dm.active[dm.active.length - 1].spawnT;
-    const sinceNewest = paceRealSecondsBetween(
-      state.derived.meetingRanges, state.chatTimes, newestT, t, state.speed);
-    for (let i = 0; i < dm.active.length; i++) {
-      const c = dm.active[i], depth = dm.active.length - 1 - i;
-      c.depth = depth;
-      c.depthFrom = depth > 0 ? depth - 1 : 0;
-      c.handoffElapsed = depth > 0 ? sinceNewest : DANMAKU_HANDOFF;
-    }
+  if (!dm.active.length) return;
+  const sinceNewest = elapsedSince(dm.active[dm.active.length - 1].spawnT);
+  dm.active.forEach((c, i) => {
+    const depth = dm.active.length - 1 - i;
+    c.depth = depth;
+    c.depthFrom = depth > 0 ? depth - 1 : 0;
+    c.handoffElapsed = depth > 0 ? sinceNewest : DANMAKU_HANDOFF;
+  });
+}
+
+/* スタンプ用の太字フォントを設定し、長い文でも画面幅に収まるよう縮めた px を返す */
+function setStampFont(ctx, text, w, px = 102, italic = false) {
+  const style = italic ? "italic bold" : "bold";
+  ctx.font = `${style} ${px}px ${UI_FONT}`;
+  const width = ctx.measureText(text).width;
+  if (width > w * 0.94) {
+    px = Math.max(34, px * w * 0.94 / width);
+    ctx.font = `${style} ${px}px ${UI_FONT}`;
   }
+  return px;
 }
 
 /* 開票結果のスタンプ。画面中央に一度だけ大きく出して薄れる */
-function drawResultStamp(ctx, w, h) {
-  const stamp = state.danmaku.stamp;
+function drawResultStamp(ctx, w, h, stamp) {
   const f = stamp.elapsed / DANMAKU_STAMP_LIFE;
-  const text = stamp.a === -1 ? tx("stampNoExecution") : tx("stampExecuted", actorName(stamp.a));
+  const none = stamp.actor === -1;
+  const text = none ? tx("stampNoExecution") : tx("stampExecuted", actorName(stamp.actor));
   ctx.globalAlpha = 1 - f * f;
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  let px = 102;
-  ctx.font = `bold ${px}px ${UI_FONT}`;
-  const width = ctx.measureText(text).width;
-  if (width > w * 0.94) { // 長い名前でも画面内へ収める
-    px = Math.max(34, px * w * 0.94 / width);
-    ctx.font = `bold ${px}px ${UI_FONT}`;
-  }
-  outlinedText(ctx, text, w / 2, h / 2, stamp.a === -1 ? "#f5f6f8" : "#e5534b", 4);
+  setStampFont(ctx, text, w);
+  outlinedText(ctx, text, w / 2, h / 2, none ? "#f5f6f8" : "#e5534b", 4);
   ctx.globalAlpha = 1;
+}
+
+/* 終局スタンプ。勝利陣営を中央に大きく、格言があればその下に小さく斜体で。薄れずに終端まで残る。
+   0/1 は陣営名に「の勝利」を添え、番兵（255 無効試合・254/253 平和村）はそのまま見出しにする */
+const WIN_STAMP_COLORS = { 0: "#4fc06b", 1: "#e5534b", 254: "#4fc06b", 253: "#e5534b" };
+function drawWinStamp(ctx, w, h, stamp) {
+  const go = stamp.gameover;
+  const title = isTeamCode(go.team) ? tx("stampWin", teamName(go.team)) : teamName(go.team);
+  const epigraph = winEpigraphText(go.reason);
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const px = setStampFont(ctx, title, w);
+  const y = epigraph ? h / 2 - px * 0.22 : h / 2;
+  outlinedText(ctx, title, w / 2, y, WIN_STAMP_COLORS[go.team] || "#f5f6f8", 4);
+  if (epigraph) {
+    setStampFont(ctx, epigraph, w, Math.round(px * 0.4), true);
+    outlinedText(ctx, epigraph, w / 2, y + px * 0.62, "#f5f6f8", 3);
+  }
 }
 
 /* 会議の発言。マーカー・ポップアップより手前、スタンプよりさらに手前へ重ねる */
 function drawDanmaku(ctx, w, h) {
   const dm = state.danmaku;
-  if (dm.stamp) drawResultStamp(ctx, w, h);
+  if (dm.stamp) (dm.stamp.kind === "win" ? drawWinStamp : drawResultStamp)(ctx, w, h, dm.stamp);
   if (!dm.active.length) return;
   ctx.textAlign = "left"; ctx.textBaseline = "middle";
   for (const c of dm.active) {
@@ -2051,10 +2199,8 @@ function drawDanmaku(ctx, w, h) {
 
     ctx.globalAlpha = opacity;
     // 名前〔役職〕は本文開始位置の上へ小さく薄く。ここは名簿・マーカーと違い役職トグルで隠さない
-    const player = playerOf(c.a);
     const role = roleOf(c.a);
-    let meta = player ? player.n : "";
-    if (role !== null) meta += tx("roleBadge", roleName(role));
+    const meta = danmakuMetaText(c.a, role);
     if (meta) {
       ctx.font = DANMAKU_META_FONT;
       outlinedText(ctx, meta, left + prefixW, -(bodyPx * 0.92 + 8),
@@ -2069,18 +2215,25 @@ function drawDanmaku(ctx, w, h) {
   ctx.globalAlpha = 1;
 }
 
-/* ---------------- 言語切替 ---------------- */
+/* ---------------- 保存設定（言語・匿名化） ---------------- */
+/* localStorage が使えない環境では読み出しは null、書き込みは何もしない */
+function readStored(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function writeStored(key, value) {
+  try { localStorage.setItem(key, value); } catch { /* 保存しない */ }
+}
 const LANG_STORAGE_KEY = "wwReplayViewerLang";
-/* file:// で開くとオリジンが不透明で localStorage が投げる環境があるため、失敗は握り潰して
- * 自動判定へ委ねる */
-function readStoredLang() {
-  try { return localStorage.getItem(LANG_STORAGE_KEY); } catch { return null; }
+const ANON_STORAGE_KEY = "wwReplayViewerAnon";
+const detectLang = () => pickLang(readStored(LANG_STORAGE_KEY), navigator.language);
+
+/* 表示名を含む作り置きの要素（イベント行・名簿）を作り直す */
+function rebuildNameViews() {
+  if (!state.replay) return;
+  buildEventList();
+  buildRosterStatic();
 }
-function storeLang(lang) {
-  try { localStorage.setItem(LANG_STORAGE_KEY, lang); } catch { /* 次回も自動判定でよい */ }
-}
-const detectLang = () => pickLang(readStoredLang(), navigator.language);
-/* 静的ラベルは data-i18n / data-i18n-title を差し替え、動的テキスト（セグメント名・
+/* 静的ラベルは data-i18n / data-i18n-title を差し替え、動的テキスト（セグメント名・警告・
  * イベント行・名簿・キャンバス）は作り直す */
 function applyLang(lang) {
   setLang(lang);
@@ -2092,20 +2245,19 @@ function applyLang(lang) {
   updatePlayButton();
   if (!state.replay) return;
   buildSegOptions();
-  $("warn").textContent = state.replay.warnings.length ? tx("warnCount", state.replay.warnings.length) : "";
-  buildEventList();
-  buildRosterStatic();
+  showWarnings();
+  rebuildNameViews();
   drawSeek();
   requestDraw();
 }
-$("langSel").addEventListener("change", e => {
-  applyLang(e.target.value);
-  storeLang(LANG);
-  e.target.blur(); // 他のコントロールと同じく、Spaceをセレクトへ吸わせない
-});
-applyLang(detectLang());
 
 /* ---------------- 入力 ---------------- */
+/* 操作後は blur してフォーカスを外す（Space は document 側で再生/停止に使う） */
+$("langSel").addEventListener("change", e => {
+  applyLang(e.target.value);
+  writeStored(LANG_STORAGE_KEY, LANG);
+  e.target.blur();
+});
 $("openBtn").addEventListener("click", () => $("fileInput").click());
 $("fileInput").addEventListener("change", async e => {
   const f = e.target.files[0];
@@ -2126,15 +2278,24 @@ window.addEventListener("drop", async e => {
 $("segSel").addEventListener("change", e => selectSegment(Number(e.target.value)));
 $("speedSel").addEventListener("change", e => { state.speed = Number(e.target.value); });
 $("playBtn").addEventListener("click", togglePlay);
-const TOGGLE_IDS = ["tEnemies", "tVals", "tItems", "tNames", "tTrail", "tBg", "tYFade", "tRoles"];
+/* 表示トグル。変更後は描き直す。コメントは表示中の発言をシークと同じ規則で組み直し、
+ * 匿名化は保存してから名簿・イベント行を作り直す */
+const TOGGLE_IDS = ["tEnemies", "tVals", "tItems", "tNames", "tTrail", "tBg", "tMesh", "tYFade", "tRoles",
+  "tChat", "tAnon"];
+const TOGGLE_ACTIONS = {
+  tChat: () => rebuildDanmakuAt(state.t),
+  tAnon: on => { writeStored(ANON_STORAGE_KEY, on ? "1" : "0"); rebuildNameViews(); },
+};
 for (const id of TOGGLE_IDS) {
-  // blur しないと直後の Space がチェックボックスへ吸われて再生が始まらない
-  $(id).addEventListener("change", e => { e.target.blur(); requestDraw(); });
+  $(id).addEventListener("change", e => {
+    e.target.blur();
+    if (TOGGLE_ACTIONS[id]) TOGGLE_ACTIONS[id](e.target.checked);
+    requestDraw();
+  });
 }
 document.addEventListener("keydown", e => {
   if (e.code === "Space") {
-    // どのコントロールにフォーカスがあっても再生/停止。blur でネイティブのSpace動作
-    // （チェックトグル・ボタン再押下）も同時に封じる
+    // どのコントロールにフォーカスがあっても再生/停止。blur でチェックトグル・ボタン再押下も起きない
     e.preventDefault();
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     togglePlay();
@@ -2230,6 +2391,10 @@ map.addEventListener("wheel", e => {
   requestDraw();
 }, { passive: false });
 new ResizeObserver(() => { drawSeek(); requestDraw(); }).observe($("mapWrap"));
+
+/* ---------------- 初期化 ---------------- */
+$("tAnon").checked = readStored(ANON_STORAGE_KEY) === "1";
+applyLang(detectLang());
 </script>
 </body>
 </html>

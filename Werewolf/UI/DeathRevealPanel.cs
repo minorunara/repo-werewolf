@@ -5,6 +5,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.UI
 {
@@ -52,10 +53,9 @@ namespace Werewolf.UI
                 out _titleTextBack);
 
             _root.SetActive(false);
-            WLog.Line("death_reveal_built", secret: false);
         }
 
-        public void Show(IReadOnlyList<WPlayer> deadRoster, Func<int, PlayerAvatar> resolveAvatar,
+        public void Show(IReadOnlyList<WPlayer> deadRoster, Func<int, PlayerHandle> resolveAvatar,
                          ConveneKind kind = ConveneKind.Button)
         {
             if (_root == null) return;
@@ -116,7 +116,7 @@ namespace Werewolf.UI
 
             yield return RevealPanelKit.StampEntrance(_content, _group, DeathReveal.EntranceSec);
 
-            RevealPanelKit.InvokeSfx(onImpact, "death_reveal_impact_error");
+            RevealPanelKit.InvokeCallback(onImpact, "death_reveal_impact_error");
 
             yield return UiTween.Hold(DeathReveal.HoldSec);
 

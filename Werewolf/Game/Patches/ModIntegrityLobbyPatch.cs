@@ -2,6 +2,7 @@ using System;
 using HarmonyLib;
 using Werewolf.Core;
 using Werewolf.UI;
+using Werewolf.Vanilla;
 
 namespace Werewolf.Game.Patches
 {
@@ -11,7 +12,8 @@ namespace Werewolf.Game.Patches
         private static bool Prefix(MenuPageLobby __instance)
         {
             WerewolfDirector director = WerewolfDirector.Instance;
-            return director == null || director.TryInterceptLobbyStart(__instance);
+            return director == null
+                || director.TryInterceptLobbyStart(__instance != null ? new LobbyStartPage(__instance) : null);
         }
     }
 
@@ -32,7 +34,8 @@ namespace Werewolf.Game.Patches
                     return;
                 }
 
-                ModIntegrityPlayerBadge badge = ModIntegrityPlayerBadge.GetOrCreate(__instance);
+                ModIntegrityPlayerBadge badge = ModIntegrityPlayerBadge.GetOrCreate(__instance.gameObject,
+                    __instance.playerName != null ? __instance.playerName.rectTransform : null);
                 PlayerAvatar avatar = PlayerAvatarRef(__instance);
                 int actor = avatar != null ? PlayerCrownPatch.ResolveActor(avatar) : -1;
                 WerewolfDirector director = WerewolfDirector.Instance;

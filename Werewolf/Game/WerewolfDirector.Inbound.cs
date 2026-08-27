@@ -6,6 +6,7 @@ using Werewolf.Core;
 using Werewolf.Game.Patches;
 using Werewolf.Net;
 using Werewolf.UI;
+using Werewolf.Vanilla;
 
 namespace Werewolf.Game
 {
@@ -20,7 +21,7 @@ namespace Werewolf.Game
         {
             try
             {
-                if (TryHandleModIntegrityInbound(msg, NowUnixMs())) return;
+                if (_modIntegrityFeature.TryHandleInbound(msg, SessionClock.NowMs())) return;
 
                 if (MessageCodes.IsMasterInbound(msg.Code))
                 {
@@ -32,9 +33,9 @@ namespace Werewolf.Game
                 switch (msg.Code)
                 {
                     case MessageCodes.AssignRole:
-                        _localRole = (Role)(byte)p[0];
-                        WLog.Line("recv_role", secret: true, ("role", _localRole));
-                        TryStartRoleReveal();
+                        _roundMirror.LocalRole = (Role)(byte)p[0];
+                        WLog.Line("recv_role", secret: true, ("role", _roundMirror.LocalRole));
+                        _roleRevealFeature.TryStartRoleReveal();
                         break;
                     case MessageCodes.RevealSelfRole:
                         RecvRevealSelfRole(p);
@@ -46,7 +47,7 @@ namespace Werewolf.Game
                         RecvPlayerDied(p);
                         break;
                     case MessageCodes.ResultDigest:
-                        ApplyResultDigest(p);
+                        _resultFlowFeature.ApplyResultDigest(p);
                         break;
                     case MessageCodes.ReplayLossLedger:
                         ReplaySampler.ApplyHostLedger(p);
@@ -62,50 +63,39 @@ namespace Werewolf.Game
                         break;
 
                     case MessageCodes.StartMeeting:
-                        RecvStartMeeting(p);
+                        _meetingClientFeature.HandleStartMeeting(p);
                         break;
                     case MessageCodes.MeetingCancelled:
-                        _meetingClient.ApplyCancelled();
-                        ReplaySampler.NoteMeetingCancelled((byte)p[0]);
-                        PushToast(SessionNotice.ForMeetingCancelled());
-                        WLog.Line("recv_meeting_cancelled", secret: false, ("reason", (byte)p[0]));
+                        _meetingClientFeature.HandleMeetingCancelled((byte)p[0]);
                         break;
                     case MessageCodes.ScatterGroups:
-                        HandleScatterGroups(p);
+                        _scatterFeature.HandleScatterGroups(p);
                         break;
                     case MessageCodes.ScatterGuardWindow:
-                        HandleScatterGuardWindow((int)p[0]);
+                        _scatterFeature.HandleScatterGuardWindow((int)p[0]);
                         break;
                     case MessageCodes.VoteProgress:
-                        RecvVoteProgress(p);
+                        _meetingClientFeature.HandleVoteProgress(p);
                         break;
                     case MessageCodes.MeetingResult:
-                        RecvMeetingResult(p);
+                        _meetingClientFeature.HandleMeetingResult(p);
                         break;
                     case MessageCodes.ConveneDenied:
-                        var denyReason = ConveneDeniedWire.FromWire((byte)p[0]);
-                        PushToast(SessionNotice.ForConveneDenied(denyReason));
-                        WLog.Line("recv_convenedenied", secret: false,
-                            ("wire", (byte)p[0]), ("reason", denyReason));
+                        _meetingClientFeature.HandleConveneDenied((byte)p[0]);
                         break;
 
                     case MessageCodes.BeaconAudit:
-                        _pendingBeaconAudit = (byte)p[0];
+                        _meetingClientFeature.HandleBeaconAudit((byte)p[0]);
                         WLog.Line("recv_beacon_audit", secret: false, ("uses", (byte)p[0]));
                         break;
                     case MessageCodes.SyncPerkGauge:
-                        RolesClient.ApplyGaugeSync((int)p[0], (byte)p[1], (byte)p[2], (byte)p[3], (long)p[4], (int[])p[5], NowUnixMs());
-                        WLog.Line("recv_gauge", secret: true,
-                            ("ratio", (int)p[0]), ("flags", (byte)p[1]),
-                            ("charges", (byte)p[2]), ("status", (byte)p[3]));
+                        _rolesClientFeature.HandleGaugeSync(p);
                         break;
                     case MessageCodes.RoleState:
-                        HandleRoleState((byte)p[0], (int[])p[1], (long)p[2]);
+                        _rolesClientFeature.HandleRoleState((byte)p[0], (int[])p[1], (long)p[2]);
                         break;
                     case MessageCodes.CurseCandidates:
-                        RolesClient.ApplyCurseCandidates((int[])p[0]);
-                        WLog.Line("recv_curse_candidates", secret: true,
-                            ("count", ((int[])p[0])?.Length ?? -1));
+                        _rolesClientFeature.HandleCurseCandidates((int[])p[0]);
                         break;
 
                     case MessageCodes.CosmeticGrant:
@@ -113,18 +103,18 @@ namespace Werewolf.Game
                         break;
 
                     case MessageCodes.BomberState:
-                        ApplyBomberState((int)p[0], (byte)p[1], (byte)p[2], (long)p[3], (long)p[4]);
+                        _bomberFeature.ApplyBomberState((int)p[0], (byte)p[1], (byte)p[2], (long)p[3], (long)p[4]);
                         break;
                     case MessageCodes.BombDetonation:
-                        ApplyBombDetonation((int)p[0], (long)p[1]);
+                        _bomberFeature.ApplyBombDetonation((int)p[0], (long)p[1]);
                         break;
 
                     case MessageCodes.CheckmateReveal:
-                        HandleCheckmateReveal(p);
+                        _winCeremonyFeature.HandleCheckmateReveal(p);
                         break;
 
                     case MessageCodes.EradicationReveal:
-                        HandleEradicationReveal(p);
+                        _winCeremonyFeature.HandleEradicationReveal(p);
                         break;
                 }
             }
@@ -136,23 +126,23 @@ namespace Werewolf.Game
 
         private void RecvRevealSelfRole(object[] p)
         {
-            bool initialRevealDone = _revealStarted;
-            _localRole = (Role)(byte)p[0];
-            WLog.Line("recv_selfrole", secret: true, ("role", _localRole));
-            TryStartRoleReveal();
-            if (initialRevealDone) TryStartAwakeningReveal();
+            bool initialRevealDone = _roleRevealFeature.RevealStarted;
+            _roundMirror.LocalRole = (Role)(byte)p[0];
+            WLog.Line("recv_selfrole", secret: true, ("role", _roundMirror.LocalRole));
+            _roleRevealFeature.TryStartRoleReveal();
+            if (initialRevealDone) _roleRevealFeature.TryStartAwakeningReveal();
         }
 
         private void RecvRevealTeammates(object[] p)
         {
-            _knownWerewolves = (int[])p[0];
+            _roundMirror.KnownWerewolves = (int[])p[0];
             {
                 byte[] rr = p.Length > 1 ? p[1] as byte[] : null;
-                _knownTeammateRoles = (rr != null && rr.Length == _knownWerewolves.Length) ? rr : null;
+                _roundMirror.KnownTeammateRoles = (rr != null && rr.Length == _roundMirror.KnownWerewolves.Length) ? rr : null;
             }
-            WLog.Line("recv_teammates", secret: true, ("count", _knownWerewolves.Length));
-            TryStartRoleReveal();
-            if (_localRole == Role.BlackCat)
+            WLog.Line("recv_teammates", secret: true, ("count", _roundMirror.KnownWerewolves.Length));
+            _roleRevealFeature.TryStartRoleReveal();
+            if (_roundMirror.LocalRole == Role.BlackCat)
                 MaybeShowTutorial(TutorialId.InformantUnlockedAsBlackCat);
         }
 
@@ -160,15 +150,14 @@ namespace Werewolf.Game
         {
             int deadActor = (int)p[0];
             var deadCause = (DeathCause)(byte)p[1];
-            _deathMirror[deadActor] = deadCause;
+            _roundMirror.DeathMirror[deadActor] = deadCause;
             ReplaySampler.NoteDeath(deadActor, deadCause.ToString());
             _meetingClient.ApplyPlayerDied(deadActor, deadCause);
             if (deadActor == LocalActor)
             {
                 RolesClient.ForceWolfModeOff();
                 RolesClient.ForceValuableRecordOff();
-                _valuableRecordHold.Reset();
-                _perkEffects.ResetEffects();
+                _rolesClientFeature.ResetForLocalDeath();
                 MaybeShowTutorial(TutorialId.FirstDeath);
             }
             WLog.Line("recv_died", secret: false,
@@ -178,43 +167,46 @@ namespace Werewolf.Game
         private void RecvGameOver(object[] p)
         {
             _clientPhase = GamePhase.GameOver;
-            ReplaySampler.NoteGameOver((byte)p[0], (int[])p[1], (byte[])p[2]);
+            ReplaySampler.NoteGameOver((byte)p[0], (int[])p[1], (byte[])p[2], _resultFlowFeature.MatchWinReason());
             {
                 var announcedAtGameOver = new List<int>();
                 _meetingClient.ApplyPhase(GamePhase.GameOver, announcedAtGameOver);
                 ReplaySampler.NoteDeathsAnnounced(announcedAtGameOver);
             }
             _meeting?.AbortForGameOver();
-            ResetRolesClient("gameover");
+            _rolesClientFeature.ResetRoles("gameover");
             WLog.Line("recv_gameover", secret: false, ("team", (Team)(byte)p[0]));
-            BeginResultCountdown();
+            _resultFlowFeature.BeginResultCountdown();
             ShowResultScreen((byte)p[0], (int[])p[1], (byte[])p[2]);
         }
 
         private void RecvGameStart(object[] p)
         {
             ClearCosmeticGrantState("game_start");
-            ClearClientDigest();
+            _resultFlowFeature.ClearClientDigest();
             CrownRoster.Clear();
-            ResetMeetingChat();
-            _chatMeetingNumber = 0;
+            _chatFeature.ResetForNewMatch();
             Patches.WipeGuardPatch.ResetLogThrottle();
             _voiceDriver?.SanitizeAtRoundStart();
-            _clientRoundEndUnixMs = (long)p[0];
-            _clientWerewolfCount = (byte)p[2];
-            _gameStartUnixMsClient = NowUnixMs();
-            FreezeResultAutoReturnConfig();
-            _clientRevealDelaySec = (int)p[4];
-            _clientCatPossible = (byte)p[3] != 0;
-            _clientDebugSession = (byte)p[5] != 0;
+            _roundMirror.RoundEndUnixMs = (long)p[0];
+            _roundMirror.WerewolfCount = (byte)p[2];
+            _roundMirror.GameStartUnixMs = SessionClock.NowMs();
+            _resultFlowFeature.FreezeResultAutoReturnConfig();
+            if (!Session.IsHost) _lobbySettingsFeature.NoteMatchBlob(LobbyBlobMirror);
+            _roundMirror.RevealDelaySec = (int)p[4];
+            _cfgMirror.CatPossible = (byte)p[3] != 0;
+            _cfgMirror.DebugSession = (byte)p[5] != 0;
             IdRoster.Apply((int[])p[6]);
+            SessionClock.RequestResync();
             WLog.Line("recv_gamestart", secret: false,
-                ("roundEnd", _clientRoundEndUnixMs),
-                ("werewolfCount", _clientWerewolfCount),
-                ("catPossible", _clientCatPossible),
-                ("revealDelaySec", _clientRevealDelaySec),
-                ("debugSession", _clientDebugSession ? 1 : 0));
-            TryStartRoleReveal();
+                ("roundEnd", _roundMirror.RoundEndUnixMs),
+                ("clock", SessionClock.NowMs()),
+                ("serverClock", SessionClock.IsServerBacked ? 1 : 0),
+                ("werewolfCount", _roundMirror.WerewolfCount),
+                ("catPossible", _cfgMirror.CatPossible),
+                ("revealDelaySec", _roundMirror.RevealDelaySec),
+                ("debugSession", _cfgMirror.DebugSession ? 1 : 0));
+            _roleRevealFeature.TryStartRoleReveal();
         }
 
         private void RecvPhaseChanged(object[] p)
@@ -222,85 +214,39 @@ namespace Werewolf.Game
             GamePhase newPhase = (GamePhase)(byte)p[0];
             if (_clientPhase == GamePhase.Meeting && newPhase == GamePhase.Play)
             {
-                _lastMeetingEndUnixMsClient = NowUnixMs();
+                _roundMirror.LastMeetingEndUnixMs = SessionClock.NowMs();
             }
             _clientPhase = newPhase;
             ReplaySampler.NotePhase(newPhase.ToString());
-            _clientRoundEndUnixMs = (long)p[2];
+            _roundMirror.RoundEndUnixMs = (long)p[2];
             var announcedAtPhase = new List<int>();
             _meetingClient.ApplyPhase(_clientPhase, announcedAtPhase);
             ReplaySampler.NoteDeathsAnnounced(announcedAtPhase);
             if (_clientPhase == GamePhase.GameOver || _clientPhase == GamePhase.Lobby)
             {
-                ResetRolesClient("phase");
+                _rolesClientFeature.ResetRoles("phase");
                 Debugging.StructuredLog.FlushDeferredSecrets("recv_phase");
             }
             WLog.Line("recv_phase", secret: false,
-                ("phase", _clientPhase), ("roundEnd", _clientRoundEndUnixMs));
-        }
-
-        private void RecvStartMeeting(object[] p)
-        {
-            byte kindByte = (byte)p[3];
-            ConveneKind startKind = kindByte == 1 ? ConveneKind.CorpseReport
-                : kindByte == 2 ? ConveneKind.ScatterGuard
-                : ConveneKind.Button;
-            HandleStartMeeting((int)p[0], (long)p[1], (long)p[2], startKind);
-            ReplaySampler.NoteMeetingStart((int)p[0], startKind.ToString());
-            string startCaller = ResolveDisplayName((int)p[0]);
-            PushToast(startKind == ConveneKind.CorpseReport
-                ? SessionNotice.ForCorpseReportStarted(startCaller)
-                : startKind == ConveneKind.ScatterGuard
-                    ? SessionNotice.ForScatterGuardTripped()
-                    : SessionNotice.ForConveneStarted(startCaller));
-        }
-
-        private void RecvVoteProgress(object[] p)
-        {
-            int[] votedActors = (int[])p[0];
-            bool voteAdded = votedActors.Length > _meetingClient.VotedActors.Count;
-            RecordMeetingVotesClient(votedActors);
-            _meetingClient.ApplyVoteProgress(votedActors, (long)p[1]);
-            _votePanel?.NotifyVoteProgress();
-            if (voteAdded)
-            {
-                EnsureSfxBuilt();
-                _sfxPlayer.Play("sfx_vote_cast");
-            }
-            WLog.Line("recv_voteprogress", secret: false,
-                ("voted", votedActors.Length), ("endUnixMs", (long)p[1]));
-        }
-
-        private void RecvMeetingResult(object[] p)
-        {
-            int executedActor = (int)p[0];
-            _meetingClient.ApplyResult(new MeetingOutcome
-            {
-                ExecutedActor = executedActor,
-                TargetActors = (int[])p[1],
-                VoteCounts = (int[])p[2],
-            });
-            WLog.Line("recv_meetingresult", secret: false, ("executed", executedActor));
-            ReplaySampler.NoteMeetingResult(executedActor);
-            _resultCeremonyAtMs = NowUnixMs() + VoteTallyTimeline.CeremonyDelayMs((int[])p[2]);
-            HostScheduleScatterPlanFromResult(executedActor);
+                ("phase", _clientPhase), ("roundEnd", _roundMirror.RoundEndUnixMs),
+                ("clock", SessionClock.NowMs()));
         }
 
         private void HandleMasterInbound(InboundMessage msg)
         {
-            if (!SemiFunc.IsMasterClientOrSingleplayer())
+            if (!Session.IsHost)
             {
                 DropMasterInbound(msg, "not_host");
                 return;
             }
 
-            long now = NowUnixMs();
+            long now = SessionClock.NowMs();
             switch (msg.Code)
             {
                 case MessageCodes.RequestMeeting:
                     {
                         if (_meeting == null) { DropMasterInbound(msg, "no_meeting_session"); return; }
-                        if (_checkmate != null && _checkmate.CeremonyStarted)
+                        if (_winCeremonyFeature.IsCheckmateCeremonyStarted)
                         {
                             DropMasterInbound(msg, "checkmate_ceremony");
                             return;
@@ -400,14 +346,9 @@ namespace Werewolf.Game
             float cooldownSeconds = float.MaxValue;
             try
             {
-                departedToLobbyMenu = SemiFunc.RunIsLobbyMenu();
-                roundDirectorAlive = RoundDirector.instance != null;
-                var rm = RunManager.instance;
-                if (rm != null && GameRefs.RunManager_cosmeticWorldObjectCooldown != null)
-                {
-                    cooldownSeconds = GameRefs.RunManager_cosmeticWorldObjectCooldown(rm);
-                    cooldownKnown = true;
-                }
+                departedToLobbyMenu = Session.InLobbyMenu;
+                roundDirectorAlive = Extraction.RoundDirectorAlive;
+                cooldownKnown = Session.TryReadCosmeticWorldObjectCooldown(out cooldownSeconds);
             }
             catch (Exception e)
             {
@@ -422,12 +363,11 @@ namespace Werewolf.Game
                 int injected = 0;
                 try
                 {
-                    var rd = RoundDirector.instance;
                     for (byte r = 0; r < counts.Length; r++)
                     {
                         for (int c = 0; c < counts[r]; c++)
                         {
-                            rd.CosmeticWorldObjectExtracted((SemiFunc.Rarity)r);
+                            Extraction.AddCosmeticExtracted(r);
                             injected++;
                         }
                     }

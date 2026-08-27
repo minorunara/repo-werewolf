@@ -6,22 +6,33 @@ REPO Werewolf turns a normal R.E.P.O. run into a social deduction game. It takes
 
 Each player gets a hidden role on either the villager team or the werewolf team. Villagers still have to finish the extractions and leave in the truck. Werewolves have to stop them without giving themselves away. Bodies can be reported, the truck has an emergency meeting button, and suspected werewolves can be voted out. PvP is enabled too, and melee weapons can kill other players.
 
-- Requires at least 3 players
-- Every player in the lobby needs the mod
-- English is the default language; Japanese is also included
-
 ## What's included
 
+- A scenario-based tutorial where you can learn how to play on your own
 - Five roles: Villager, Shaman, Werewolf, Black Cat, and Bomber
-- Win conditions tied directly to valuable damage and deliveries
+- Win conditions tied directly to valuable damage and extraction progress
+- A "peaceful village" mixed in at a configurable chance, where nobody is on the werewolf team and there is no way to tell during the match
 - Body reports, emergency meetings, discussion, voting, and executions handled inside the game
 - After some meetings, survivors are shuffled and sent back out in random groups
 - Participant numbers for public lobbies, so "No. 3 looks suspicious" is enough to identify someone
 - A valuable loss gauge and a meeting map with a coordinate grid
 - Settings for the stage, level, starting items, player upgrades, the truck's starting charge, and other match rules
 - A lobby check for room settings and differences between players' mod lists
-- A 28-page manual explaining all of the rules and roles, available at any time
+- A 29-page manual explaining all of the rules and roles, available at any time
 - Meeting chat, result screen chat, and a replay that can be saved and watched in a browser
+
+## Try the tutorial solo
+
+Select `REPO Werewolf Tutorial` in the bottom-right corner of the title screen for a quick, hands-on introduction that you can play alone with bots.
+
+![Starting the REPO Werewolf Tutorial](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/tutorial-en.gif)
+
+- Play as a Villager and experience discussion through the meeting chat log, voting, the ballot reveal, and the match results
+- Play as a Werewolf, destroy valuables around the map, unlock perks, and win by reaching value checkmate
+- Find a body hidden somewhere on the map, report it, call a meeting, and close in on the Werewolf
+- Use the ability to turn another player into a bomb and see how the ensuing clues can be pieced together
+
+The tutorial runs as a self-contained round and does not modify your regular save data.
 
 ## Meetings and voting
 
@@ -81,7 +92,7 @@ To type Japanese, install [JapaneseTextInput](https://thunderstore.io/c/repo/p/s
 
 ![Top-down match replay](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/match-replay.gif)
 
-The `Replay` button on the result screen opens a top-down view of the match over the game map. It shows players, enemies, items (including valuables and carts), and bodies moving over time. You can also review damage to valuables, valuables that were lost or delivered, extraction point states, and the running loss total.
+The `Replay` button on the result screen opens a top-down view of the match over the game map. It shows players, enemies, items (including valuables and carts), and bodies moving over time. You can also review damage to valuables, valuables that were lost or extracted, extraction point states, and the running loss total.
 
 The viewer has play, pause, speed, and seek controls. Select a marker to follow its trail. During meetings, the replay shows the text chat and vote result. Playback slows down when someone posts a message and speeds through parts of the meeting with no chat.
 
@@ -96,19 +107,20 @@ The save button writes the replay file to your Downloads folder. To watch it lat
 
 ## Suggested room settings for your first matches
 
-| Players | Shaman | Werewolves | Black Cat | Bomber | Villager team + Werewolf team |
-|---|---:|---:|---:|---:|---:|
-| 3 | 0% | 1 | 0% | 0% | 2 + 1 |
-| 4 | 50% | 1 | 0% | 0% | 3 + 1 |
-| 5 | 100% | 1 | 100% (Revenge off) | 0% | 3 + 2 |
-| 6 | 100% | 1 | 100% (Revenge on) | 0% | 4 + 2 |
-| 7-8 | 100% | 2 | 0% | 50% | 5-6 + 2 |
-| 9-10 | 100% | 2 | 100% (Revenge on) | 50% | 6-7 + 3 |
+| Players | Shaman | Werewolves | Black Cat | Bomber | Villager team + Werewolf team | Peaceful village |
+|---|---:|---:|---:|---:|---:|---:|
+| 3 | 0% | 1 | 0% | 0% | 2 + 1 | 35% |
+| 4 | 50% | 1 | 0% | 0% | 3 + 1 | 25% |
+| 5 | 100% | 1 | 0% | 0% | 4 + 1 | 15% |
+| 6 | 100% | 1 | 100% (Revenge off) | 0% | 4 + 2 | 0% |
+| 7-8 | 100% | 2 | 0% | 50% | 5-6 + 2 | 0% |
+| 9-10 | 100% | 2 | 100% (Revenge on) | 50% | 6-7 + 3 | 0% |
 
 Vanilla rooms support up to 6 players. Larger groups need a compatible [MorePlayers mod](https://thunderstore.io/c/repo/p/linkoid/RoboUnion/).
 The Bomber is chosen by converting one of the Werewolves at the configured probability. At least one regular Werewolf always remains, so the Bomber cannot appear when there is only 1 werewolf.
 The Black Cat is converted from a Villager at the configured probability and joins the werewolf team. The role is not included in the "Werewolves" count and only appears when at least one Villager would remain.
 The Shaman is converted from a Villager at the configured probability and cannot also be the Black Cat.
+"Peaceful village chance" mixes in matches where nobody at all is secretly assigned to the werewolf team. The only way to win a peaceful village is to complete the extractions and send the truck on its way within the time limit, and everyone loses the instant the survivors drop to one. Set it to 0 to disable it.
 The Sledge Hammer and Gun deal a lot of damage to players. Consider leaving them out until your group can keep track of who has each weapon.
 Fewer upgrades, less stored energy, higher stage levels, and shorter time limits favor the werewolf team. The opposite settings favor the villagers.
 
@@ -153,6 +165,15 @@ The werewolf team has three win conditions. Satisfy any one to win the match.
 The moment value checkmate is reached, the werewolf team's victory is final.
 Even after the final extraction is complete, the werewolf team wins if every villager dies before the truck departs.
 This includes a Werewolf starting the truck and leaving every villager behind to die.
+
+### Peaceful Village
+
+Depending on the room settings, a match can turn out to be a "peaceful village" where nobody at all is assigned to the werewolf team.
+Since there is no werewolf team to bring down in the first place, the only win condition is the same as regular R.E.P.O.: complete the extractions and send the truck on its way.
+There is no way to confirm that you are in a peaceful village while the match is running. Role reveals, meeting minutes, the Black Cat's awakening notice, bomb warnings, and everything else you can see are identical to a normal village.
+On the other hand, a beacon being used by the werewolf team, someone acting in a way only a werewolf could, or an explosion set off by the Bomber all prove that this is not a peaceful village.
+Until such a moment arrives, you cannot tell a peaceful village—where everyone should drop their suspicions and cooperate—from a normal village where a werewolf is lying low to lull you into carelessness.
+A peaceful village has a special loss condition on top of the villager team's usual ones: the moment the survivors drop to one or fewer, the peaceful village collapses and everyone loses.
 
 ### Valuables and the Map
 
@@ -227,9 +248,9 @@ Meetings have a time limit, and each vote cast reduces the remaining time slight
 ### Scattering After Meetings
 
 Depending on the room settings, when a meeting ends with 6 or more survivors, they are randomly split into groups of three or more, and each group warps to a different location to set out again.
-Destinations are either the truck or one of the delivered extraction points, starting from the second one (the first extraction point is never a destination).
+Destinations are either the truck or one of the completed extraction points, starting from the second one (the first extraction point is never a destination).
 The groupings are announced to everyone, but which group goes where is not revealed. The previous groupings are reposted in the meeting chat log at the start of the next meeting.
-Until the second extraction point has been delivered, after every extraction is complete, or when fewer than 6 players are alive, no one scatters and everyone sets out from the truck.
+Until the second extraction point has been completed, after every extraction is complete, or when fewer than 6 players are alive, no one scatters and everyone sets out from the truck.
 If someone dies right after scattering while "Handover in progress…" is shown at the top of the screen, an emergency meeting is called automatically as a "handover incident".
 This meeting starts instantly with no warning countdown and does not consume anyone's meeting call.
 
@@ -238,7 +259,7 @@ This meeting starts instantly with no warning countdown and does not consume any
 The valuable loss gauge tracks the struggle over valuables between the villager and werewolf teams. Its baseline is the total value of all valuables on the map when the match starts.
 
 ・Yellow bar (grows from the left)… total value lost through damage  
-・Cyan bar (grows from the right)… total value delivered through completed extractions
+・Cyan bar (grows from the right)… total value extracted
 
 ・Blue line… the value required to meet the quota. Once the cyan bar reaches this line, the truck can depart  
 ・Red line… the value checkmate threshold, where the quota can no longer be met even if every available valuable is collected. The moment the yellow bar reaches this line, the werewolf team wins  
@@ -386,7 +407,9 @@ Wolf Mode and Plant Bomb, as well as Beacon and Detonate, can each be bound to s
 
 ## Notes
 
-- Werewolf Mode requires at least 3 players.
+- Both the host and every client must install this mod
+- The UI is available in English (default) and Japanese
+- The REPO Werewolf Tutorial can be played solo, but multiplayer Werewolf Mode requires at least 3 players.
   Trying to start with fewer shows a warning and the match will not start
 - Setting the werewolf count (WerewolfCount) to the number of participants or higher also shows a warning and blocks the start (a role assignment with no villagers is impossible; lower the setting to proceed)
 - To play regular R.E.P.O., the host can turn off Werewolf Mode (WerewolfModeEnabled) in the settings (the host's setting decides whether the room runs Werewolf Mode; a guest's setting applies only when that player hosts)

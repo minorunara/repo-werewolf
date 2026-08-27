@@ -10,8 +10,13 @@ namespace Werewolf.UI
         private AudioSource _source;
 
         private AudioSource _stoppableSource;
+        private string _stoppableClipKey;
 
         private AudioSource _loopSource;
+
+        private AudioSource _conveneChargeSource;
+
+        private AudioSource[] _sources = Array.Empty<AudioSource>();
 
         private string _loopClipKey;
 
@@ -25,27 +30,18 @@ namespace Werewolf.UI
         {
             if (_source != null || host == null) return;
 
-            _source = CreateSource(host);
-            _stoppableSource = CreateSource(host);
-            _loopSource = CreateSource(host);
-            _loopSource.loop = true;
+            _source = CreateSource(host, loop: false);
+            _stoppableSource = CreateSource(host, loop: false);
+            _loopSource = CreateSource(host, loop: true);
+            _conveneChargeSource = CreateSource(host, loop: true);
+            _sources = new[] { _source, _stoppableSource, _loopSource, _conveneChargeSource };
 
             TryResolveMixerGroup();
-
-            WLog.Line("sfx_built", secret: false,
-                ("mixer", _source.outputAudioMixerGroup != null ? _source.outputAudioMixerGroup.name : "none"));
         }
 
         public void Play(string clipKey, float volumeScale = 1f)
         {
-            if (_source == null) return;
-
-            if (_source.outputAudioMixerGroup == null && !_mixerResolved)
-            {
-                TryResolveMixerGroup();
-            }
-            if (_source.outputAudioMixerGroup == null) return;
-
+            if (!MixerReady(_source)) return;
             AudioClip clip = AssetCatalog.GetClip(clipKey);
             if (clip == null) return;
 
@@ -55,46 +51,33 @@ namespace Werewolf.UI
             }
             catch (Exception e)
             {
-                WLog.Line("sfx_play_error", secret: false, ("key", clipKey ?? ""), ("err", e.GetType().Name));
+                LogPlayError(clipKey, e);
             }
         }
 
         public void PlayStoppable(string clipKey, float volumeScale = 1f)
         {
-            if (_stoppableSource == null) return;
-
-            if (_stoppableSource.outputAudioMixerGroup == null && !_mixerResolved)
-            {
-                TryResolveMixerGroup();
-            }
-            if (_stoppableSource.outputAudioMixerGroup == null) return;
-
+            if (!MixerReady(_stoppableSource)) return;
             AudioClip clip = AssetCatalog.GetClip(clipKey);
             if (clip == null) return;
 
             try
             {
                 _stoppableSource.Stop();
+                _stoppableClipKey = clipKey;
                 _stoppableSource.clip = clip;
                 _stoppableSource.volume = volumeScale;
                 _stoppableSource.Play();
             }
             catch (Exception e)
             {
-                WLog.Line("sfx_play_error", secret: false, ("key", clipKey ?? ""), ("err", e.GetType().Name));
+                LogPlayError(clipKey, e);
             }
         }
 
         public void PlayLoop(string clipKey, float volume)
         {
-            if (_loopSource == null) return;
-
-            if (_loopSource.outputAudioMixerGroup == null && !_mixerResolved)
-            {
-                TryResolveMixerGroup();
-            }
-            if (_loopSource.outputAudioMixerGroup == null) return;
-
+            if (!MixerReady(_loopSource)) return;
             AudioClip clip = AssetCatalog.GetClip(clipKey);
             if (clip == null) return;
 
@@ -102,71 +85,109 @@ namespace Werewolf.UI
             {
                 _loopClipKey = clipKey;
                 _loopSource.volume = Mathf.Clamp01(volume);
-                if (_loopSource.clip != clip)
-                {
-                    _loopSource.Stop();
-                    _loopSource.clip = clip;
-                }
-                if (!_loopSource.isPlaying) _loopSource.Play();
+                KeepLooping(_loopSource, clip);
             }
             catch (Exception e)
             {
-                WLog.Line("sfx_play_error", secret: false, ("key", clipKey ?? ""), ("err", e.GetType().Name));
+                LogPlayError(clipKey, e);
             }
         }
 
         public void StopLoop(string clipKey)
         {
-            if (_loopSource == null || clipKey != _loopClipKey) return;
+            if (clipKey != _loopClipKey) return;
+            StopSource(_loopSource, clipKey);
+        }
+
+        public void PlayConveneCharge(float ratio)
+        {
+            if (!MixerReady(_conveneChargeSource)) return;
+            AudioClip clip = AssetCatalog.GetConveneChargeClip();
+            if (clip == null) return;
+
             try
             {
-                if (_loopSource.isPlaying) _loopSource.Stop();
+                _conveneChargeSource.pitch = ConveneChargeTone.PitchFor(ratio);
+                _conveneChargeSource.volume = ConveneChargeTone.VolumeFor(ratio);
+                KeepLooping(_conveneChargeSource, clip);
             }
             catch (Exception e)
             {
-                WLog.Line("sfx_stop_error", secret: false, ("err", e.GetType().Name));
+                LogPlayError("convene_charge", e);
             }
         }
 
-        public void StopStoppable()
+        public void StopConveneCharge()
         {
-            if (_stoppableSource == null) return;
-            try
-            {
-                if (_stoppableSource.isPlaying) _stoppableSource.Stop();
-            }
-            catch (Exception e)
-            {
-                WLog.Line("sfx_stop_error", secret: false, ("err", e.GetType().Name));
-            }
+            if (_conveneChargeSource == null) return;
+            StopSource(_conveneChargeSource, "convene_charge");
+            _conveneChargeSource.pitch = 1f;
+            _conveneChargeSource.volume = 0f;
+        }
+
+        public void StopStoppable(string clipKey = null)
+        {
+            if (clipKey != null && clipKey != _stoppableClipKey) return;
+            StopSource(_stoppableSource, clipKey);
         }
 
         public void Destroy()
         {
-            if (_source != null)
+            foreach (AudioSource source in _sources)
             {
-                UnityEngine.Object.Destroy(_source);
-                _source = null;
+                if (source != null) UnityEngine.Object.Destroy(source);
             }
-            if (_stoppableSource != null)
-            {
-                UnityEngine.Object.Destroy(_stoppableSource);
-                _stoppableSource = null;
-            }
-            if (_loopSource != null)
-            {
-                UnityEngine.Object.Destroy(_loopSource);
-                _loopSource = null;
-            }
+            _sources = Array.Empty<AudioSource>();
+            _source = null;
+            _stoppableSource = null;
+            _loopSource = null;
+            _conveneChargeSource = null;
+            _stoppableClipKey = null;
             _loopClipKey = null;
             _mixerResolved = false;
         }
 
-        private static AudioSource CreateSource(GameObject host)
+        private bool MixerReady(AudioSource source)
+        {
+            if (source == null) return false;
+            if (source.outputAudioMixerGroup == null && !_mixerResolved)
+            {
+                TryResolveMixerGroup();
+            }
+            return source.outputAudioMixerGroup != null;
+        }
+
+        private static void KeepLooping(AudioSource source, AudioClip clip)
+        {
+            if (source.clip != clip)
+            {
+                source.Stop();
+                source.clip = clip;
+            }
+            if (!source.isPlaying) source.Play();
+        }
+
+        private static void StopSource(AudioSource source, string key)
+        {
+            if (source == null) return;
+            try
+            {
+                if (source.isPlaying) source.Stop();
+            }
+            catch (Exception e)
+            {
+                WLog.Line("sfx_stop_error", secret: false, ("key", key ?? ""), ("err", e.GetType().Name));
+            }
+        }
+
+        private static void LogPlayError(string key, Exception e)
+            => WLog.Line("sfx_play_error", secret: false, ("key", key ?? ""), ("err", e.GetType().Name));
+
+        private static AudioSource CreateSource(GameObject host, bool loop)
         {
             AudioSource source = host.AddComponent<AudioSource>();
             source.playOnAwake = false;
-            source.loop = false;
+            source.loop = loop;
             source.spatialBlend = 0f;
             source.dopplerLevel = 0f;
             source.bypassEffects = false;
@@ -178,7 +199,7 @@ namespace Werewolf.UI
 
         private void TryResolveMixerGroup()
         {
-            if (_source == null) return;
+            if (_sources.Length == 0) return;
 
             try
             {
@@ -191,15 +212,13 @@ namespace Werewolf.UI
                 for (int i = 0; i < sources.Length; i++)
                 {
                     AudioSource src = sources[i];
-                    if (src == null || src == _source || src == _stoppableSource || src == _loopSource) continue;
+                    if (src == null || Array.IndexOf(_sources, src) >= 0) continue;
                     AudioMixerGroup group = src.outputAudioMixerGroup;
                     if (group == null) continue;
 
                     if (IsVoiceLikeGroup(group.name)) continue;
 
-                    _source.outputAudioMixerGroup = group;
-                    if (_stoppableSource != null) _stoppableSource.outputAudioMixerGroup = group;
-                    if (_loopSource != null) _loopSource.outputAudioMixerGroup = group;
+                    foreach (AudioSource own in _sources) own.outputAudioMixerGroup = group;
                     _mixerResolved = true;
                     return;
                 }

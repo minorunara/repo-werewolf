@@ -6,7 +6,8 @@ namespace Werewolf.Tests
     public class DeadlineBannerTests
     {
         private const float RestWidth = 667f;
-        private static readonly float StartX = DeadlineBanner.StartOffsetX(RestWidth, fromLeft: true);
+        private static readonly CanvasBounds Canvas = new CanvasBounds(1920f, 1080f);
+        private static readonly float StartX = DeadlineBanner.StartOffsetX(Canvas, RestWidth, fromLeft: true);
 
         private static BannerRowState At(float t) => DeadlineBanner.Compute(t, StartX);
 
@@ -19,13 +20,17 @@ namespace Werewolf.Tests
         [Fact]
         public void StartOffsetX_PutsTextFullyOffscreenOnTheCorrectSide()
         {
-            float left = DeadlineBanner.StartOffsetX(RestWidth, fromLeft: true);
-            float right = DeadlineBanner.StartOffsetX(RestWidth, fromLeft: false);
+            float left = DeadlineBanner.StartOffsetX(Canvas, RestWidth, fromLeft: true);
+            float right = DeadlineBanner.StartOffsetX(Canvas, RestWidth, fromLeft: false);
 
             Assert.True(left < 0f, "上段は左（負）から走り出す");
             Assert.True(right > 0f, "下段は右（正）から走り出す");
             Assert.Equal(-left, right, 3);
-            Assert.True(left + RestWidth * 0.5f < -DeadlineBanner.ReferenceWidthPx * 0.5f);
+            Assert.True(left + RestWidth * 0.5f < Canvas.Left);
+
+            var wideCanvas = new CanvasBounds(2580f, 1080f);
+            float wideLeft = DeadlineBanner.StartOffsetX(wideCanvas, RestWidth, fromLeft: true);
+            Assert.True(wideLeft + RestWidth * 0.5f < wideCanvas.Left);
         }
 
         [Fact]
@@ -171,7 +176,7 @@ namespace Werewolf.Tests
             }
         }
 
-        private static BannerEmojiState Emoji(float t) => DeadlineBanner.ComputeEmoji(t, 0);
+        private static BannerEmojiState Emoji(float t) => DeadlineBanner.ComputeEmoji(t, 0, Canvas);
 
         private static readonly float EmojiExitStart =
             DeadlineBanner.Line2StaggerSec + DeadlineBanner.SlideInSec + DeadlineBanner.HoldSec;
@@ -226,7 +231,7 @@ namespace Werewolf.Tests
             Assert.True(Emoji(EmojiExitStart + DeadlineBanner.ExitSec - 0.01f).Alpha < 0.05f);
             for (float t = EmojiExitStart + DeadlineBanner.ExitSec; t < 12f; t += 0.25f)
             {
-                Assert.False(DeadlineBanner.ComputeEmoji(t, 0).Visible);
+                Assert.False(DeadlineBanner.ComputeEmoji(t, 0, Canvas).Visible);
             }
         }
 

@@ -49,7 +49,7 @@ namespace Werewolf.UI
             public TextMeshProUGUI PopGhost;
             public TextMeshProUGUI HaloInner;
             public TextMeshProUGUI HaloOuter;
-            public float StartOffsetX;
+            public float RestWidthPx;
             public float CenterY;
             public float TargetWidthPx;
             public bool FromLeft;
@@ -62,11 +62,8 @@ namespace Werewolf.UI
             if (_root != null || layerRoot == null) return;
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            var go = new GameObject("WW_DeadlineBanner", typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(layerRoot, false);
-            UiKit.Stretch(rect);
-            _root = go;
+            RectTransform rect = UiKit.CreateStretched(layerRoot, "WW_DeadlineBanner");
+            _root = rect.gameObject;
 
             BuildEmojis(rect);
 
@@ -220,24 +217,25 @@ namespace Werewolf.UI
             }
             row.Main.fontSize = row.SlideGhost.fontSize = row.PopGhost.fontSize
                 = row.HaloInner.fontSize = row.HaloOuter.fontSize = fontSize;
-            row.StartOffsetX = DeadlineBanner.StartOffsetX(restWidth, row.FromLeft);
+            row.RestWidthPx = restWidth;
         }
 
         private void Apply()
         {
-            ApplyEmojis(_elapsedSec);
-            ApplyRow(_row1, _elapsedSec);
-            ApplyRow(_row2, _elapsedSec - DeadlineBanner.Line2StaggerSec);
+            if (!UiKit.TryMeasureCanvas((RectTransform)_root.transform, out CanvasBounds canvas)) return;
+            ApplyEmojis(_elapsedSec, canvas);
+            ApplyRow(_row1, _elapsedSec, canvas);
+            ApplyRow(_row2, _elapsedSec - DeadlineBanner.Line2StaggerSec, canvas);
         }
 
-        private void ApplyEmojis(float t)
+        private void ApplyEmojis(float t, CanvasBounds canvas)
         {
             if (_emojis == null) return;
             for (int i = 0; i < _emojis.Length; i++)
             {
                 Image img = _emojis[i];
                 if (img == null) continue;
-                BannerEmojiState state = DeadlineBanner.ComputeEmoji(t, i);
+                BannerEmojiState state = DeadlineBanner.ComputeEmoji(t, i, canvas);
                 if (!state.Visible)
                 {
                     if (img.enabled) img.enabled = false;
@@ -252,10 +250,11 @@ namespace Werewolf.UI
             }
         }
 
-        private static void ApplyRow(Row row, float t)
+        private static void ApplyRow(Row row, float t, CanvasBounds canvas)
         {
             if (row == null) return;
-            BannerRowState state = DeadlineBanner.Compute(t, row.StartOffsetX);
+            float startOffsetX = DeadlineBanner.StartOffsetX(canvas, row.RestWidthPx, row.FromLeft);
+            BannerRowState state = DeadlineBanner.Compute(t, startOffsetX);
             ApplyLayer(row.Main, state.Main, row.CenterY);
             ApplyLayer(row.HaloOuter, Dim(state.Main, HaloOuterAlpha), row.CenterY);
             ApplyLayer(row.HaloInner, Dim(state.Main, HaloInnerAlpha), row.CenterY);

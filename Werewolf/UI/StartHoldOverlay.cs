@@ -26,10 +26,8 @@ namespace Werewolf.UI
 
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            var go = new GameObject("WW_StartHold", typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(layerRoot, false);
-            UiKit.Stretch(rect);
+            RectTransform rect = UiKit.CreateStretched(layerRoot, "WW_StartHold");
+            var go = rect.gameObject;
             _root = go;
 
             _group = go.AddComponent<CanvasGroup>();
@@ -37,10 +35,7 @@ namespace Werewolf.UI
             _group.blocksRaycasts = false;
             _group.interactable = false;
 
-            Image backdrop = UiKit.CreateImage(rect, "Backdrop", Vector2.zero,
-                new Vector2(1920f, 1080f), new Color(0f, 0f, 0f, BackdropAlpha));
-            var bgRect = backdrop.rectTransform;
-            UiKit.Stretch(bgRect);
+            UiKit.CreateBackdrop(rect, "Backdrop", new Color(0f, 0f, 0f, BackdropAlpha));
 
             UiKit.CreateText(rect, "Message", new Vector2(0f, 0f), new Vector2(1600f, 100f),
                 Texts.Get(TextId.StartHoldWaitingOthers), 44f, Color.white, TextAlignmentOptions.Center);

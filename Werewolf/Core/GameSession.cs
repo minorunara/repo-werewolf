@@ -65,6 +65,7 @@ namespace Werewolf.Core
         private readonly HashSet<int> _voteMarked = new HashSet<int>();
         private List<WPlayer> _players = new List<WPlayer>();
         private WinResult _pendingWin;
+        private bool _forcedPeaceful;
         private RoundTimer _timer = new RoundTimer();
         private DisclosureManager _disclosures;
         private GameConfig _config;
@@ -74,6 +75,8 @@ namespace Werewolf.Core
         public IReadOnlyList<WPlayer> Players => _players;
 
         public WinResult Winner { get; private set; }
+
+        public bool Peaceful { get; private set; }
 
         public bool WinLocked => _pendingWin != null;
 
@@ -88,6 +91,11 @@ namespace Werewolf.Core
         public void ReserveForcedRole(int actorNumber, Role role)
         {
             _forcedRoles[actorNumber] = role;
+        }
+
+        public void ReserveForcedPeaceful()
+        {
+            _forcedPeaceful = true;
         }
 
         public StartResult Start(GameConfig config, IReadOnlyList<WPlayer> players,
@@ -125,11 +133,13 @@ namespace Werewolf.Core
             _pendingWin = null;
             _voteMarked.Clear();
 
-            var assigned = RoleAssigner.Assign(_players, config, rng, _forcedRoles);
+            var assigned = RoleAssigner.Assign(_players, config, rng, _forcedRoles, _forcedPeaceful);
             _forcedRoles.Clear();
+            _forcedPeaceful = false;
+            Peaceful = assigned.Peaceful;
 
             _timer = new RoundTimer();
-            _timer.Start(nowUnixMs, config.RoundSeconds);
+            _timer.Start(nowUnixMs, config.RoundSeconds, config.TimeLimitDisabled);
             StartUnixMs = nowUnixMs;
             _disclosures = new DisclosureManager(_players, nowUnixMs, config.BlackCatRevealDelaySec);
 
@@ -145,7 +155,7 @@ namespace Werewolf.Core
                 {
                     _timer.EndUnixMs,
                     config.RoundSeconds,
-                    (byte)assigned.Werewolves,
+                    (byte)assigned.WerewolfSlots,
                     (byte)(blackCatPossible ? 1 : 0),
                     config.BlackCatRevealDelaySec,
                     (byte)(config.DebugMode ? 1 : 0),
@@ -172,7 +182,7 @@ namespace Werewolf.Core
             if (_timer.CheckExpiry(nowUnixMs))
             {
                 ConfirmWinner(
-                    WinJudge.Judge(_players, extractionCompleted: false, timerExpired: true),
+                    WinJudge.Judge(_players, extractionCompleted: false, timerExpired: true, peaceful: Peaceful),
                     "timer_expired", nowUnixMs);
             }
         }
@@ -210,7 +220,7 @@ namespace Werewolf.Core
 
             if (_pendingWin != null) return true;
 
-            var result = WinJudge.Judge(_players);
+            var result = WinJudge.Judge(_players, peaceful: Peaceful);
             if (result != null)
             {
                 LockEradication(result, player, vanished: false);
@@ -238,7 +248,7 @@ namespace Werewolf.Core
 
             if (_pendingWin != null) return;
 
-            var result = WinJudge.Judge(_players);
+            var result = WinJudge.Judge(_players, peaceful: Peaceful);
             if (result != null)
             {
                 LockEradication(result, player, vanished: true);
@@ -255,7 +265,7 @@ namespace Werewolf.Core
             Send(new OutboundMessage(
                 WWEradicationCodes.EradicationReveal,
                 EradicationRevealWire.ToWire(
-                    decisive.ActorNumber, result.WinningTeam, vanished, decisive.Name),
+                    decisive.ActorNumber, TeamCodes.Outcome(result), vanished, decisive.Name),
                 MessageTarget.All, null));
             OnSessionEvent?.Invoke(
                 SessionEvent.ForWinLocked(result, decisive.ActorNumber, vanished));
@@ -293,12 +303,12 @@ namespace Werewolf.Core
             if (completed)
             {
                 ConfirmWinner(
-                    WinJudge.Judge(_players, extractionCompleted: true),
+                    WinJudge.Judge(_players, extractionCompleted: true, peaceful: Peaceful),
                     "extraction_completed", nowUnixMs);
             }
             else if (failed)
             {
-                var result = WinJudge.Judge(_players)
+                var result = WinJudge.Judge(_players, peaceful: Peaceful)
                     ?? new WinResult(Team.Werewolves, WinReason.ExtractionFailed);
                 ConfirmWinner(result, "extraction_failed", nowUnixMs);
             }
@@ -308,7 +318,7 @@ namespace Werewolf.Core
         {
             if (Winner != null || (Phase != GamePhase.Play && Phase != GamePhase.Meeting)) return;
 
-            var result = WinJudge.Judge(_players, extractionCompleted: true);
+            var result = WinJudge.Judge(_players, extractionCompleted: true, peaceful: Peaceful);
             ConfirmWinner(result, "mail_departure", nowUnixMs);
         }
 
@@ -319,6 +329,9 @@ namespace Werewolf.Core
             _pendingWin = new WinResult(Team.Werewolves, WinReason.ValueCheckmate);
             WLog.Line("checkmate_locked", secret: false);
         }
+
+        private WinResult ReadForVillage(WinResult result)
+            => Peaceful ? result.AsPeaceful() : result;
 
         public void NotifyValueCheckmate(long nowUnixMs)
         {
@@ -410,6 +423,8 @@ namespace Werewolf.Core
                 return;
             }
 
+            result = ReadForVillage(result);
+
             Winner = result;
             _pendingWin = null;
             WLog.Line("win", secret: false,
@@ -425,7 +440,7 @@ namespace Werewolf.Core
 
             Send(new OutboundMessage(
                 WWEventCodes.GameOver,
-                new object[] { (byte)result.WinningTeam, actors, roles },
+                new object[] { TeamCodes.Outcome(result), actors, roles },
                 MessageTarget.All, null));
             OnSessionEvent?.Invoke(SessionEvent.ForWinnerConfirmed(result));
 

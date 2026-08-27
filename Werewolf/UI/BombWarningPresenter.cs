@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.UI
 {
@@ -49,7 +50,7 @@ namespace Werewolf.UI
             _root.SetActive(false);
         }
 
-        public void Show(bool localIsTarget, PlayerAvatar targetAvatar, float heartbeatRadiusMeters,
+        public void Show(bool localIsTarget, PlayerHandle targetAvatar, float heartbeatRadiusMeters,
             Vector3? spatialFallbackPos = null)
         {
             if (_root == null) return;
@@ -120,11 +121,11 @@ namespace Werewolf.UI
             _selfAudio = null;
         }
 
-        private void SpawnSpatial(PlayerAvatar targetAvatar, Vector3? fallbackPos,
+        private void SpawnSpatial(PlayerHandle targetAvatar, Vector3? fallbackPos,
             AudioClip clip, float maxDistance)
         {
             Vector3 pos;
-            if (targetAvatar != null && targetAvatar.transform != null) pos = targetAvatar.transform.position;
+            if (targetAvatar.TryGetPosition(out Vector3 avatarPos)) pos = avatarPos;
             else if (fallbackPos != null) pos = fallbackPos.Value;
             else return;
             if (clip == null) return;

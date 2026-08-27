@@ -255,6 +255,30 @@ namespace Werewolf.Tests
         }
 
         [Fact]
+        public void CoolingDown_SeparatesTheWaitFromAWrongStance()
+        {
+            var sense = new ShamanSense(gazeFullSec: 5f, cooldownSec: 10f);
+            Assert.False(sense.CoolingDown);
+
+            sense.BeginCooldown();
+            Assert.True(sense.CoolingDown);
+            TickFor(sense, 9.5f, inView: true);
+            Assert.True(sense.CoolingDown);
+            Assert.True(sense.TranceActive);
+            Assert.False(sense.GazeArmed);
+
+            TickFor(sense, 1f, inView: true);
+            Assert.False(sense.CoolingDown);
+
+            Assert.True(TickFor(sense, 5f, inView: true));
+            Assert.True(sense.GhostVisible);
+            Assert.False(sense.CoolingDown);
+            TickFor(sense, ShamanSense.GhostDisplaySec + Dt, inView: true);
+            Assert.False(sense.GhostVisible);
+            Assert.True(sense.CoolingDown);
+        }
+
+        [Fact]
         public void GhostVisible_RectangularWindow_OnImmediatelyOffAfterDisplaySec()
         {
             var sense = new ShamanSense(gazeFullSec: 5f, cooldownSec: 10f);

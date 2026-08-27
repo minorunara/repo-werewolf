@@ -290,6 +290,23 @@ namespace Werewolf.Tests
         }
 
         [Fact]
+        public void TryDetonate_AnswersWithTheScenarioReasonBeforeTheTruckZoneLock()
+        {
+            var s = new BombSession(Cfg(cdSec: 0, initialCdSec: 0), Roster(), T0);
+            s.TryPlant(Bomber, V1, T0);
+
+            int det;
+            Assert.Equal(BombDenyReason.ScenarioTargetMoving,
+                s.TryDetonate(Bomber, T0, meetingLocked: false, targetNearTruck: true, out det,
+                    scenarioDeny: BombDenyReason.ScenarioTargetMoving));
+            Assert.True(s.HasBomb);
+
+            Assert.Equal(BombDenyReason.MeetingLocked,
+                s.TryDetonate(Bomber, T0, meetingLocked: true, targetNearTruck: false, out det,
+                    scenarioDeny: BombDenyReason.ScenarioTargetMoving));
+        }
+
+        [Fact]
         public void TryDetonate_RejectsWhenNoBomb()
         {
             var s = new BombSession(Cfg(cdSec: 0, initialCdSec: 0), Roster(), T0);

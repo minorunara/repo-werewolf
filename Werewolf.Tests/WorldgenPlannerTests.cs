@@ -211,6 +211,21 @@ namespace Werewolf.Tests
             Assert.Equal(expected, plan.OrbDropMax);
         }
 
+        [Theory]
+        [InlineData(-1, -1)]
+        [InlineData(-7, -1)]
+        [InlineData(0, 0)]
+        [InlineData(20, 20)]
+        [InlineData(21, 20)]
+        public void BuildPlan_ClampsEnemySets_PerTier(int value, int expected)
+        {
+            var config = new GameConfig { EnemySetsDanger1 = value, EnemySetsDanger2 = 3, EnemySetsDanger3 = value };
+            var plan = WorldgenPlanner.BuildPlan(config, DefaultCatalog());
+            Assert.Equal(expected, plan.EnemySets.Danger1);
+            Assert.Equal(3, plan.EnemySets.Danger2);
+            Assert.Equal(expected, plan.EnemySets.Danger3);
+        }
+
         [Fact]
         public void BuildPlan_IsDeterministic_SameInputSameOutput()
         {

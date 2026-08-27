@@ -20,11 +20,14 @@
     <AssemblyMetadata Include="Werewolf.ModDllPath" Value="$(MSBuildThisFileDirectory)..\Werewolf\out\Minorunara_Werewolf.dll" />
     <AssemblyMetadata Include="Werewolf.GameManagedDir" Value="$(RepoPath)" />
     <AssemblyMetadata Include="Werewolf.BepInExCoreDir" Value="$(BepInExCorePath)" />
+    <AssemblyMetadata Include="Werewolf.MenuLibDir" Value="$(MenuLibPath)" />
     <AssemblyMetadata Include="Werewolf.SourceDir" Value="$(MSBuildThisFileDirectory)..\Werewolf\" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Include="..\Werewolf\Core\**\*.cs" Link="Core\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\Werewolf\Scenarios\Core\**\*.cs"
+             Link="Scenarios\Core\%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="..\Werewolf\Net\**\*.cs"
              Exclude="..\Werewolf\Net\PhotonRpcBus.cs;..\Werewolf\Net\RpcEndpoint.cs;..\Werewolf\Net\PhotonRoomCallbackAdapter.cs"
              Link="Net\%(RecursiveDir)%(Filename)%(Extension)" />
@@ -40,5 +43,11 @@
   </ItemGroup>
   <ItemGroup Condition="!Exists('..\Werewolf\Assets\sfx_bell_five_minutes.wav')">
     <Compile Remove="SfxFeatureWireTests.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="!Exists('..\DnSpy\clean\LevelGenerator.cs')">
+    <Compile Remove="ScenarioLevelSizeRulesTests.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="!Exists('..\Werewolf\Vanilla\DEPENDENCIES.md')">
+    <Compile Remove="VanillaDependencyLedgerTests.cs" />
   </ItemGroup>
 </Project>

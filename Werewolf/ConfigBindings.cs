@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using BepInEx.Configuration;
 using UnityEngine;
 using Werewolf.Core;
+using Werewolf.Scenarios.Core;
 
 namespace Werewolf
 {
@@ -22,11 +23,13 @@ namespace Werewolf
         private const string SecClientUi = "Client UI";
         private const string SecStreamer = "Streamer";
         private const string SecTutorial = "Tutorial";
+        private const string SecScenario = "Tutorial Scenarios";
         private const string SecVoice = "Voice";
         private const string SecDebug = "Debug";
 
         internal ConfigEntry<int> WerewolfCount;
         internal ConfigEntry<int> BlackCatChancePercent;
+        internal ConfigEntry<int> PeacefulVillageChancePercent;
         internal ConfigEntry<int> BomberChancePercent;
         internal ConfigEntry<int> RoundSeconds;
         internal ConfigEntry<int> BlackCatRevealDelaySec;
@@ -132,6 +135,8 @@ namespace Werewolf
         internal ConfigEntry<bool> ResetTutorials;
         internal ConfigEntry<float> TutorialFontScale;
 
+        private Dictionary<ScenarioId, ConfigEntry<bool>> _scenarioCleared;
+
         internal ConfigEntry<bool> StreamerSafeMode;
 
         internal ConfigEntry<float> CursorMirrorScale;
@@ -143,6 +148,10 @@ namespace Werewolf
         internal ConfigEntry<string> StartMapName;
         internal ConfigEntry<int> StartEnergyPct;
         internal ConfigEntry<int> OrbDropMax;
+        internal ConfigEntry<int> StartHaulGoalPct;
+        internal ConfigEntry<int> EnemySetsDanger1;
+        internal ConfigEntry<int> EnemySetsDanger2;
+        internal ConfigEntry<int> EnemySetsDanger3;
 
         private Dictionary<string, ConfigEntry<int>> _startUpgrades;
 
@@ -347,6 +356,13 @@ namespace Werewolf
                 new ConfigDescription(
                     "Bomber appearance chance P_bomber (0..100%). The Bomber mutates from one werewolf slot (needs werewolves >= 2) / " +
                     "爆弾魔の出現確率 P_bomber（0..100%）。爆弾魔は人狼枠から変異する（人狼の人数2以上で抽選）",
+                    new AcceptableValueRange<int>(0, 100)));
+
+            PeacefulVillageChancePercent = config.Bind(
+                SecRoleAssignment, "PeacefulVillageChancePercent", defaults.PeacefulVillageChancePercent,
+                new ConfigDescription(
+                    "Peaceful village chance P_peace (0..100%). A winning roll puts nobody in the werewolf slots: everyone is a villager (no Black Cat or Bomber; a Shaman may still appear). Nobody can tell during the match / " +
+                    "平和村の確率 P_peace（0..100%）。当選した試合は人狼枠に誰も入らず全員が村人陣営になる（黒猫・爆弾魔も出ない。祈祷師は出得る）。試合中は誰にも分からない",
                     new AcceptableValueRange<int>(0, 100)));
         }
 
@@ -565,7 +581,25 @@ namespace Werewolf
                 new ConfigDescription(
                     "Number of valuable orbs dropped when an enemy dies (vanilla = 3) / 敵撃破時にドロップする貴重品オーブの数（バニラ = 3）",
                     new AcceptableValueRange<int>(0, 20)));
+
+            StartHaulGoalPct = config.Bind(
+                SecStage, "StartHaulGoalPct", defaults.StartHaulGoalPct,
+                new ConfigDescription(
+                    "Extraction quota as a percentage of the map's total valuable value (0 = vanilla). The Werewolves win by checkmate once (100 - this) percent of the map is destroyed / 抽出ノルマをマップ総貴重品額の割合で指定する（0 = バニラのまま）。マップの(100-指定値)%を壊すと人狼の詰み勝ちになる",
+                    new AcceptableValueRange<int>(0, 100)));
+
+            EnemySetsDanger1 = BindEnemySets(config, "EnemySetsDanger1", defaults.EnemySetsDanger1, "tier 1 (weak)", "ティア1（弱）");
+            EnemySetsDanger2 = BindEnemySets(config, "EnemySetsDanger2", defaults.EnemySetsDanger2, "tier 2 (medium)", "ティア2（中）");
+            EnemySetsDanger3 = BindEnemySets(config, "EnemySetsDanger3", defaults.EnemySetsDanger3, "tier 3 (strong)", "ティア3（強）");
         }
+
+        private static ConfigEntry<int> BindEnemySets(ConfigFile config, string key, int defaultValue, string tierEn, string tierJa)
+            => config.Bind(
+                SecStage, key, defaultValue,
+                new ConfigDescription(
+                    $"Number of enemy sets rolled for {tierEn} regardless of level (-1 = vanilla curve, 0 = none). A set is one roll, not one body: some sets spawn several enemies at once / " +
+                    $"{tierJa}の敵セット数。レベルに関係なく決める（-1 = バニラのカーブのまま、0 = 引かない）。1セット＝1抽選で体数ではなく、1セットで複数体湧くものがある",
+                    new AcceptableValueRange<int>(EnemySetRules.Vanilla, EnemySetRules.MaxSets)));
 
         private void BindPlayerUpgrades(ConfigFile config, GameConfig defaults)
         {
@@ -806,6 +840,16 @@ namespace Werewolf
                         $"Whether tutorial \"{id}\" has been shown (internal bookkeeping) / チュートリアル「{id}」を表示済みか（内部管理用）",
                         null, "HideFromREPOConfig"));
             }
+
+            _scenarioCleared = new Dictionary<ScenarioId, ConfigEntry<bool>>();
+            foreach (ScenarioId id in Enum.GetValues(typeof(ScenarioId)))
+            {
+                _scenarioCleared[id] = config.Bind(
+                    SecScenario, "Cleared" + id, false,
+                    new ConfigDescription(
+                        $"Whether tutorial scenario \"{id}\" has been completed (internal bookkeeping) / チュートリアルシナリオ「{id}」を完了済みか（内部管理用）",
+                        null, "HideFromREPOConfig"));
+            }
         }
 
         private void BindVoice(ConfigFile config, GameConfig defaults)
@@ -937,6 +981,7 @@ namespace Werewolf
                 WerewolfCount = WerewolfCount.Value,
                 BlackCatChancePercent = BlackCatChancePercent.Value,
                 BomberChancePercent = BomberChancePercent.Value,
+                PeacefulVillageChancePercent = PeacefulVillageChancePercent.Value,
                 RoundSeconds = RoundSeconds.Value,
                 BlackCatRevealDelaySec = BlackCatRevealDelaySec.Value,
                 BlackCatCurseEnabled = BlackCatCurseEnabled.Value,
@@ -981,6 +1026,10 @@ namespace Werewolf
                 StartEnergyPct = StartEnergyPct.Value,
                 StartUpgradesSpec = WorldgenSpec.Encode(upgradeLevels),
                 OrbDropMax = OrbDropMax.Value,
+                StartHaulGoalPct = StartHaulGoalPct.Value,
+                EnemySetsDanger1 = EnemySetsDanger1.Value,
+                EnemySetsDanger2 = EnemySetsDanger2.Value,
+                EnemySetsDanger3 = EnemySetsDanger3.Value,
                 NecroVoiceMode = necroVoiceMode,
                 NecroVoiceVolume = NecroVoiceVolume.Value,
                 NecroVoiceLowPassCutoffHz = NecroVoiceLowPassCutoffHz.Value,
@@ -1027,6 +1076,14 @@ namespace Werewolf
             if (!ResetTutorials.Value) return;
             foreach (var entry in _tutorialSeen.Values) entry.Value = false;
             ResetTutorials.Value = false;
+        }
+
+        internal bool IsScenarioCleared(ScenarioId id)
+            => _scenarioCleared.TryGetValue(id, out var entry) && entry.Value;
+
+        internal void MarkScenarioCleared(ScenarioId id)
+        {
+            if (_scenarioCleared.TryGetValue(id, out var entry)) entry.Value = true;
         }
     }
 }

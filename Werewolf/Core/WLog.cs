@@ -12,7 +12,7 @@ namespace Werewolf.Core
         public static Action<string, bool> Sink;
 
         public static void Event(string dir, int code, string target, object[] payload,
-            bool secret = false, int[] targetActors = null)
+            bool secret = false, int[] targetActors = null, int? transitMs = null)
         {
             if (Sink == null) return;
 
@@ -25,6 +25,11 @@ namespace Werewolf.Core
             {
                 sb.Append(" targetActors=");
                 AppendValue(sb, targetActors);
+            }
+
+            if (transitMs.HasValue)
+            {
+                sb.Append(" transitMs=").Append(transitMs.Value.ToString(CultureInfo.InvariantCulture));
             }
 
             sb.Append(" payload=");

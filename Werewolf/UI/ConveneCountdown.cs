@@ -79,16 +79,15 @@ namespace Werewolf.UI
             _numberGroup.interactable = false;
 
             _root.SetActive(false);
-            WLog.Line("convene_countdown_built", secret: false);
         }
 
-        public IEnumerator Tick(string callerName, int remainingSeconds,
+        public IEnumerator Tick(string callerLabel, int remainingSeconds,
                                 TextId headerFormatId = TextId.ConveneCountdownHeaderFormat)
         {
             if (_root == null) return null;
             if (remainingSeconds < 0) remainingSeconds = 0;
 
-            ApplyHeader(callerName, headerFormatId);
+            ApplyHeader(callerLabel, headerFormatId);
             if (_group != null) _group.alpha = 1f;
             if (!_root.activeSelf) _root.SetActive(true);
 
@@ -154,7 +153,7 @@ namespace Werewolf.UI
             _totalSeconds = 0;
         }
 
-        public IEnumerator PlayStandalone(string callerName, int totalSeconds)
+        public IEnumerator PlayStandalone(string callerLabel, int totalSeconds)
         {
             if (_root == null)
             {
@@ -168,18 +167,18 @@ namespace Werewolf.UI
 
             for (int s = totalSeconds; s >= 0; s--)
             {
-                IEnumerator secondTween = Tick(callerName, s);
+                IEnumerator secondTween = Tick(callerLabel, s);
                 if (secondTween != null) yield return secondTween;
                 else yield return null;
             }
             Hide();
         }
 
-        private void ApplyHeader(string callerName, TextId headerFormatId)
+        private void ApplyHeader(string callerLabel, TextId headerFormatId)
         {
             if (_headerText == null) return;
-            string name = string.IsNullOrEmpty(callerName) ? Texts.Get(TextId.ConveneCountdownDefaultCallerName) : callerName;
-            string next = Texts.Format(headerFormatId, name);
+            string label = string.IsNullOrEmpty(callerLabel) ? Texts.Get(TextId.ConveneCountdownDefaultCallerName) : callerLabel;
+            string next = Texts.Format(headerFormatId, label);
             if (_headerText.text != next) _headerText.text = next;
         }
     }

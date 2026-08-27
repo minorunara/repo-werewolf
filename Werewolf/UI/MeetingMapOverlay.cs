@@ -5,6 +5,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.UI
 {
@@ -12,18 +13,18 @@ namespace Werewolf.UI
     {
         public string LayerName => WerewolfUIManager.MeetingMapLayer;
 
-        private const float PanelWidth = 1200f;
-        private const float PanelHeight = 720f;
+        private const float PanelWidth = HudGeometry.MapOverlay.Width;
+        private const float PanelHeight = HudGeometry.MapOverlay.Height;
 
-        private const float ToggleButtonMargin = 24f;
+        private const float ToggleButtonMargin = HudGeometry.MapToggle.Margin;
 
         private static readonly Color MapTint = new Color(1f, 1f, 1f, 1f);
 
         private static readonly Color PanelFrameColor = new Color(0.02f, 0.02f, 0.05f, 0.95f);
         private static readonly IconToggleStyle ToggleStyle = new IconToggleStyle(
-            iconSize: 96f,
-            labelWidth: 240f,
-            labelHeight: 32f,
+            iconSize: HudGeometry.MapToggle.IconSize,
+            labelWidth: HudGeometry.MapToggle.LabelWidth,
+            labelHeight: HudGeometry.MapToggle.LabelHeight,
             labelFontSize: 24f,
             labelColor: new Color(1f, 0.9f, 0.6f, 1f),
             fallbackText: "MAP",
@@ -39,6 +40,7 @@ namespace Werewolf.UI
         private readonly MapRtView _rt = new MapRtView("meeting");
 
         private bool _open;
+        private bool _mapToolBlocked;
         private bool _prevMeetingActive;
         private KeyCode _lastLabelKey = KeyCode.None;
 
@@ -64,11 +66,18 @@ namespace Werewolf.UI
 
         public bool IsOpen => _open;
 
+        public bool ConsumeMapToolBlocked()
+        {
+            if (!_mapToolBlocked) return false;
+            _mapToolBlocked = false;
+            return true;
+        }
+
         public void Build(Transform layerRoot)
         {
             if (_root != null || layerRoot == null) return;
 
-            RectTransform rootRect = UiKit.CreateRect(layerRoot, "WW_MeetingMapOverlay", Vector2.zero, new Vector2(1920f, 1080f));
+            RectTransform rootRect = UiKit.CreateStretched(layerRoot, "WW_MeetingMapOverlay");
             _root = rootRect.gameObject;
 
             RectTransform panelRect = UiKit.CreateRect(rootRect, "MapPanel", Vector2.zero, new Vector2(PanelWidth, PanelHeight));
@@ -94,13 +103,7 @@ namespace Werewolf.UI
 
             RectTransform toggleRoot = _toggle.Build(rootRect, "ToggleButton", ToggleStyle,
                 "map_overlay_icon", Texts.Format(TextId.MapOverlayToggleLabelFormat, "M"));
-            Vector2 toggleSize = toggleRoot.sizeDelta;
-            toggleRoot.anchoredPosition = new Vector2(
-                -(1920f * 0.5f) + toggleSize.x * 0.5f + ToggleButtonMargin,
-                -(1080f * 0.5f) + toggleSize.y * 0.5f + ToggleButtonMargin);
-
-            WLog.Line("mapoverlay_built", secret: false,
-                ("icon", _toggle.HasIcon ? 1 : 0));
+            UiKit.PinToCorner(toggleRoot, UiKit.BottomLeft, ToggleButtonMargin);
         }
 
         public void Tick(MeetingClientState state, long nowUnixMs, KeyCode key, float orthoSize, int resolutionPreset,
@@ -135,14 +138,13 @@ namespace Werewolf.UI
                 {
                     _toggle.SetHover(false);
                     if (_open) CloseInternal();
+                    if (WasToggleRequested(key)) _mapToolBlocked = true;
                     return;
                 }
 
                 _toggle.SetHover(_toggle.IsPointerOverOpaqueIcon());
 
-                bool keyPressed = key != KeyCode.None && NoTextInputsActive() && Input.GetKeyDown(key);
-                bool clicked = _toggle.WasClicked();
-                if (keyPressed || clicked)
+                if (WasToggleRequested(key))
                 {
                     if (_open) CloseInternal();
                     else OpenInternal(orthoSize, resolutionPreset);
@@ -179,6 +181,7 @@ namespace Werewolf.UI
             _mapPanelRect = null;
             _mapImage = null;
             _toggle.Clear();
+            _mapToolBlocked = false;
             _prevMeetingActive = false;
             _lastLabelKey = KeyCode.None;
             _placeholderTex = null;
@@ -238,24 +241,25 @@ namespace Werewolf.UI
         {
             try
             {
-                LevelGenerator lg = LevelGenerator.Instance;
-                Map map = Map.Instance;
                 Camera cam = _rt.Camera;
-                if (lg == null || map == null || map.OverLayerParent == null || cam == null) return null;
-                Vector3 origin = map.OverLayerParent.position;
+                if (cam == null || !MapGeometry.TryReadLevelGrid(
+                        out int levelWidth, out int levelHeight, out float mapScale, out Vector3 origin))
+                {
+                    return null;
+                }
                 Vector3 camPos = cam.transform.position;
 
-                EnsureGridModuleRange(lg);
+                EnsureGridModuleRange(levelWidth, levelHeight);
                 MapGridCellRange? range = _gridModuleRange ?? MapGridMath.RangeFromBounds(
-                    lg.LevelWidth, lg.LevelHeight,
-                    map.Scale, origin.x, origin.z,
+                    levelWidth, levelHeight,
+                    mapScale, origin.x, origin.z,
                     _rt.BoundsCenterXZ.x - _rt.BoundsHalfW, _rt.BoundsCenterXZ.x + _rt.BoundsHalfW,
                     _rt.BoundsCenterXZ.y - _rt.BoundsHalfH, _rt.BoundsCenterXZ.y + _rt.BoundsHalfH);
                 if (range == null) return null;
 
                 return MapGridMath.Compute(
-                    lg.LevelWidth, range.Value,
-                    map.Scale, origin.x, origin.z,
+                    levelWidth, range.Value,
+                    mapScale, origin.x, origin.z,
                     camPos.x, camPos.z,
                     cam.orthographicSize, Mathf.Max(0.01f, cam.aspect),
                     PanelWidth, PanelHeight);
@@ -267,24 +271,14 @@ namespace Werewolf.UI
             }
         }
 
-        private void EnsureGridModuleRange(LevelGenerator lg)
+        private void EnsureGridModuleRange(int levelWidth, int levelHeight)
         {
             if (_gridModuleRangeResolved) return;
             _gridModuleRangeResolved = true;
             try
             {
-                Module[] modules = UnityEngine.Object.FindObjectsOfType<Module>();
-                var centers = new List<(float X, float Z)>(modules != null ? modules.Length : 0);
-                if (modules != null)
-                {
-                    for (int i = 0; i < modules.Length; i++)
-                    {
-                        if (modules[i] == null) continue;
-                        Vector3 p = modules[i].transform.position;
-                        centers.Add((p.x, p.z));
-                    }
-                }
-                _gridModuleRange = MapGridMath.RangeFromModuleCenters(centers, lg.LevelWidth, lg.LevelHeight);
+                List<(float X, float Z)> centers = MapGeometry.ModuleCentersXZ();
+                _gridModuleRange = MapGridMath.RangeFromModuleCenters(centers, levelWidth, levelHeight);
                 WLog.Line("mapoverlay_grid_range", secret: false,
                     ("modules", centers.Count),
                     ("resolved", _gridModuleRange != null ? 1 : 0),
@@ -393,11 +387,17 @@ namespace Werewolf.UI
             return _placeholderTex;
         }
 
+        private bool WasToggleRequested(KeyCode key)
+        {
+            bool keyPressed = key != KeyCode.None && NoTextInputsActive() && Input.GetKeyDown(key);
+            return keyPressed || _toggle.WasClicked();
+        }
+
         private static bool NoTextInputsActive()
         {
             try
             {
-                return SemiFunc.NoTextInputsActive();
+                return Inputs.NoTextInputsActive;
             }
             catch
             {

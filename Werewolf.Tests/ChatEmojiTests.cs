@@ -56,6 +56,32 @@ namespace Werewolf.Tests
         }
 
         [Fact]
+        public void Templates_UseKnownVanillaSpriteNames()
+        {
+            var broken = new List<string>();
+            foreach (KeyValuePair<TextId, string> pair in ChatEmoji.Templates)
+            {
+                foreach (string problem in VanillaEmojiNames.Problems(pair.Value))
+                {
+                    broken.Add($"{pair.Key}: {problem}");
+                }
+            }
+
+            Assert.True(broken.Count == 0,
+                "本体に無いスプライト名が文言テーブルにある: " + string.Join(", ", broken) +
+                "。VanillaEmojiNames のスプライト名から選ぶ（誤記はそのまま画面へ出る）。");
+        }
+
+        [Theory]
+        [InlineData(ChatEmoji.RecapFaceDeaths)]
+        [InlineData(ChatEmoji.RecapFaceNoDeaths)]
+        public void RecapFaces_AreWholeKnownVanillaTokens(string key)
+        {
+            Assert.True(VanillaEmojiToken.TryParseWhole(key, out string name), key);
+            Assert.Contains(name, VanillaEmojiNames.All);
+        }
+
+        [Fact]
         public void SpriteKeys_AreUniqueAssetKeys()
         {
             List<string> keys = ChatEmoji.SpriteKeys.Values.ToList();

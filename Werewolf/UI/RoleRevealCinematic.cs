@@ -4,6 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.UI
 {
@@ -49,10 +50,8 @@ namespace Werewolf.UI
 
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            var go = new GameObject("WW_RoleReveal", typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(layerRoot, false);
-            UiKit.Stretch(rect);
+            RectTransform rect = UiKit.CreateStretched(layerRoot, "WW_RoleReveal");
+            var go = rect.gameObject;
             _root = go;
 
             _group = go.AddComponent<CanvasGroup>();
@@ -60,11 +59,7 @@ namespace Werewolf.UI
             _group.blocksRaycasts = false;
             _group.interactable = false;
 
-            _background = UiKit.CreateImage(rect, "Bg", Vector2.zero,
-                new Vector2(1920f, 1080f), new Color(0f, 0f, 0f, 0.85f));
-            var bgRect = _background.rectTransform;
-            UiKit.Stretch(bgRect);
-            _background.raycastTarget = false;
+            _background = UiKit.CreateBackdrop(rect, "Bg", new Color(0f, 0f, 0f, 0.85f));
 
             _selfIdText = UiKit.CreateText(rect, "SelfId", new Vector2(0f, SelfIdPosY),
                 new Vector2(1200f, 56f), "", SelfIdFontSize,
@@ -94,7 +89,6 @@ namespace Werewolf.UI
                 new Color(1f, 1f, 1f, 0.65f), TextAlignmentOptions.Center);
 
             _root.SetActive(false);
-            WLog.Line("reveal_built", secret: false);
         }
 
         private void Populate(RevealContent content)
@@ -252,8 +246,7 @@ namespace Werewolf.UI
         {
             try
             {
-                GameDirector director = GameDirector.instance;
-                if (director != null) director.SetDisableEscMenu(1f);
+                Session.DisableEscMenu(1f);
             }
             catch { }
         }
@@ -262,7 +255,7 @@ namespace Werewolf.UI
         {
             try
             {
-                return SemiFunc.NoTextInputsActive() && SemiFunc.InputDown(InputKey.Menu);
+                return Inputs.NoTextInputsActive && Inputs.Down(GameKey.Menu);
             }
             catch
             {
@@ -275,11 +268,7 @@ namespace Werewolf.UI
             string hint = Texts.Get(TextId.RevealSkipHint);
             try
             {
-                InputManager input = InputManager.instance;
-                if (input != null)
-                {
-                    hint = input.InputDisplayReplaceTags(hint, "<color=#FF8500><u><b>", "</b></u></color>");
-                }
+                hint = Inputs.ReplaceDisplayTags(hint, "<color=#FF8500><u><b>", "</b></u></color>");
             }
             catch { }
             return hint;
@@ -287,11 +276,11 @@ namespace Werewolf.UI
 
         private static IEnumerator WaitForMoonUiFinish(float timeoutSec)
         {
-            MoonUI moon = null;
-            try { moon = MoonUI.instance; }
-            catch { moon = null; }
+            bool playing;
+            try { playing = MoonPhaseUi.IsPlaying; }
+            catch { playing = false; }
 
-            if (moon == null || moon.objectActive == null || !moon.objectActive.activeSelf)
+            if (!playing)
             {
                 yield break;
             }
@@ -299,11 +288,10 @@ namespace Werewolf.UI
             float elapsed = 0f;
             while (elapsed < timeoutSec)
             {
-                MoonUI cur = null;
-                try { cur = MoonUI.instance; }
-                catch { cur = null; }
+                try { playing = MoonPhaseUi.IsPlaying; }
+                catch { playing = false; }
 
-                if (cur == null || cur.objectActive == null || !cur.objectActive.activeSelf)
+                if (!playing)
                 {
                     WLog.Line("reveal_moon_ok", secret: false, ("waitedSec", elapsed));
                     yield break;

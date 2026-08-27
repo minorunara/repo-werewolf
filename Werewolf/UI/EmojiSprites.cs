@@ -15,22 +15,62 @@ namespace Werewolf.UI
         private const string TagPrefix = "<sprite name=";
         private const string TagSuffix = ">";
 
+        private const string VanillaAssetName = "emojis";
+
+        private const int ProbeIntervalFrames = 30;
+
         private static TMP_SpriteAsset _asset;
         private static bool _attempted;
 
-        public static TMP_SpriteAsset Asset => Build();
+        private static TMP_SpriteAsset _vanilla;
+        private static Dictionary<string, TMP_SpriteCharacter> _vanillaCharacters;
+        private static Dictionary<string, Sprite> _vanillaSprites;
+        private static int _vanillaProbeFrame = -ProbeIntervalFrames;
+
+        private static readonly ITextPreprocessor _preprocessor = new SubstitutePreprocessor();
+
+        public static TMP_SpriteAsset Asset
+        {
+            get
+            {
+                TMP_SpriteAsset own = Build();
+                TMP_SpriteAsset vanilla = ResolveVanilla(own);
+                return own != null ? own : vanilla;
+            }
+        }
+
+        public static ITextPreprocessor Preprocessor => _preprocessor;
 
         public static bool Ready => Build() != null;
+
+        public static bool VanillaReady => ResolveVanilla(Build()) != null;
 
         public static string Substitute(string text)
         {
             if (string.IsNullOrEmpty(text)) return text;
-            if (Build() == null) return text;
+            TMP_SpriteAsset own = Build();
+            bool vanilla = ResolveVanilla(own) != null;
+            if (own == null && !vanilla) return text;
 
             StringBuilder sb = null;
             int copied = 0;
             for (int i = 0; i < text.Length; i++)
             {
+                if (vanilla && VanillaEmojiToken.TryReadAt(text, i, out string name, out int next))
+                {
+                    if (_vanillaCharacters.ContainsKey(name))
+                    {
+                        if (sb == null) sb = new StringBuilder(text.Length + 32);
+                        sb.Append(text, copied, i - copied);
+                        sb.Append(TagPrefix).Append(name).Append(TagSuffix);
+                        copied = next;
+                    }
+                    i = next - 1;
+                    continue;
+                }
+
+                if (own == null) continue;
+
                 int size = 1;
                 int codePoint = text[i];
                 if (char.IsHighSurrogate(text[i]) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
@@ -54,10 +94,32 @@ namespace Werewolf.UI
             return sb.ToString();
         }
 
+        public static Sprite VanillaSprite(string key)
+        {
+            if (!VanillaEmojiToken.TryParseWhole(key, out string name)) return null;
+            if (ResolveVanilla(Build()) == null) return null;
+
+            if (_vanillaSprites == null) _vanillaSprites = new Dictionary<string, Sprite>(StringComparer.Ordinal);
+            if (_vanillaSprites.TryGetValue(name, out Sprite cached)) return cached;
+
+            Sprite cut = CutVanillaSprite(name);
+            _vanillaSprites[name] = cut;
+            return cut;
+        }
+
         internal static void ResetForTests()
         {
             _asset = null;
             _attempted = false;
+            _vanilla = null;
+            _vanillaCharacters = null;
+            _vanillaSprites = null;
+            _vanillaProbeFrame = -ProbeIntervalFrames;
+        }
+
+        private sealed class SubstitutePreprocessor : ITextPreprocessor
+        {
+            public string PreprocessText(string text) => Substitute(text);
         }
 
         private static TMP_SpriteAsset Build()
@@ -75,6 +137,57 @@ namespace Werewolf.UI
                 _asset = null;
             }
             return _asset;
+        }
+
+        private static TMP_SpriteAsset ResolveVanilla(TMP_SpriteAsset own)
+        {
+            if (_vanilla != null) return _vanilla;
+
+            int frame = Time.frameCount;
+            if (frame - _vanillaProbeFrame < ProbeIntervalFrames) return null;
+            _vanillaProbeFrame = frame;
+
+            TMP_SpriteAsset found = null;
+            foreach (TMP_SpriteAsset candidate in Resources.FindObjectsOfTypeAll<TMP_SpriteAsset>())
+            {
+                if (candidate != null && candidate.name == VanillaAssetName)
+                {
+                    found = candidate;
+                    break;
+                }
+            }
+            if (found == null) return null;
+
+            var characters = new Dictionary<string, TMP_SpriteCharacter>(StringComparer.Ordinal);
+            foreach (TMP_SpriteCharacter character in found.spriteCharacterTable)
+            {
+                if (character == null || string.IsNullOrEmpty(character.name)) continue;
+                if (!characters.ContainsKey(character.name)) characters.Add(character.name, character);
+            }
+            if (characters.Count == 0) return null;
+
+            _vanilla = found;
+            _vanillaCharacters = characters;
+            if (own != null && own != found)
+            {
+                if (own.fallbackSpriteAssets == null) own.fallbackSpriteAssets = new List<TMP_SpriteAsset>();
+                if (!own.fallbackSpriteAssets.Contains(found)) own.fallbackSpriteAssets.Add(found);
+            }
+            WLog.Line("emoji_vanilla_ready", secret: false, ("count", characters.Count));
+            return _vanilla;
+        }
+
+        private static Sprite CutVanillaSprite(string name)
+        {
+            var sheet = _vanilla.spriteSheet as Texture2D;
+            if (sheet == null) return null;
+            if (!_vanillaCharacters.TryGetValue(name, out TMP_SpriteCharacter character)) return null;
+            if (character.glyph == null) return null;
+
+            GlyphRect area = character.glyph.glyphRect;
+            if (area.width <= 0 || area.height <= 0) return null;
+            return Sprite.Create(sheet, new Rect(area.x, area.y, area.width, area.height),
+                                 new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
         }
 
         private static TMP_SpriteAsset Compose()

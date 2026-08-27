@@ -33,6 +33,7 @@ namespace Werewolf.UI
 
         private const float HintFontSize = 28f;
         private static readonly Vector2 HintAnchor = new Vector2(0.98f, 0.05f);
+        private static readonly Vector2 HintAnchorTop = new Vector2(0.98f, 0.95f);
         private static readonly Vector2 HintSize = new Vector2(640f, 40f);
 
         private static readonly Color PanelBgColor = new Color(0.02f, 0.02f, 0.05f, 0.85f);
@@ -43,9 +44,13 @@ namespace Werewolf.UI
 
         private GameObject _root;
         private GameObject _hintRoot;
+        private Canvas _subCanvas;
+        private RectTransform _hintRect;
         private RectTransform _content;
         private ScrollRect _scrollRect;
         private readonly List<GameObject> _rowObjects = new List<GameObject>();
+        private bool _elevated;
+        private bool _hintAtTop;
 
         public bool Exists => _root != null;
         public bool Visible => _root != null && _root.activeSelf;
@@ -70,6 +75,7 @@ namespace Werewolf.UI
                 subCanvas.sortingOrder = WerewolfUIManager.PanelSortingOrder;
                 rootGo.AddComponent<GraphicRaycaster>();
                 _root = rootGo;
+                _subCanvas = subCanvas;
 
                 var bgGo = new GameObject("Bg", typeof(RectTransform));
                 var bgRect = (RectTransform)bgGo.transform;
@@ -182,6 +188,7 @@ namespace Werewolf.UI
                     Vector2.zero, HintSize,
                     Texts.Format(TextId.LobbySettingsMiniHintFormat, keyName), HintFontSize, HintTextColor, TextAlignmentOptions.Right);
                 _hintRoot = hintGo;
+                _hintRect = hintRect;
 
                 _root.SetActive(false);
                 _hintRoot.SetActive(false);
@@ -247,17 +254,35 @@ namespace Werewolf.UI
             if (_scrollRect != null) _scrollRect.verticalNormalizedPosition = 1f;
         }
 
-        public void SetVisibility(bool panelVisible, bool hintVisible)
+        public void SetVisibility(SettingsPanelView view)
         {
             if (_root == null) return;
-            bool changed = _root.activeSelf != panelVisible
-                           || (_hintRoot != null && _hintRoot.activeSelf != hintVisible);
+            bool changed = _root.activeSelf != view.Panel
+                           || (_hintRoot != null && _hintRoot.activeSelf != view.Hint)
+                           || _elevated != view.Elevated
+                           || _hintAtTop != view.HintAtTop;
             if (!changed) return;
-            _root.SetActive(panelVisible);
-            if (_hintRoot != null) _hintRoot.SetActive(hintVisible);
-            if (panelVisible && _scrollRect != null) _scrollRect.verticalNormalizedPosition = 1f;
+
+            _elevated = view.Elevated;
+            _hintAtTop = view.HintAtTop;
+            if (_subCanvas != null)
+            {
+                _subCanvas.sortingOrder = view.Elevated
+                    ? WerewolfUIManager.MatchSettingsSortingOrder
+                    : WerewolfUIManager.PanelSortingOrder;
+            }
+            if (_hintRect != null)
+            {
+                Vector2 anchor = view.HintAtTop ? HintAnchorTop : HintAnchor;
+                _hintRect.anchorMin = anchor;
+                _hintRect.anchorMax = anchor;
+            }
+
+            _root.SetActive(view.Panel);
+            if (_hintRoot != null) _hintRoot.SetActive(view.Hint);
+            if (view.Panel && _scrollRect != null) _scrollRect.verticalNormalizedPosition = 1f;
             WLog.Line("lobby_settings_panel_visible", secret: false,
-                ("visible", panelVisible), ("hint", hintVisible));
+                ("visible", view.Panel), ("hint", view.Hint), ("elevated", view.Elevated));
         }
 
         public void Destroy()
@@ -275,6 +300,10 @@ namespace Werewolf.UI
             }
             _content = null;
             _scrollRect = null;
+            _subCanvas = null;
+            _hintRect = null;
+            _elevated = false;
+            _hintAtTop = false;
         }
 
         private void ClearRows()

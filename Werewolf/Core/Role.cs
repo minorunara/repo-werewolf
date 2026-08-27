@@ -20,6 +20,28 @@ namespace Werewolf.Core
     public static class TeamCodes
     {
         public const byte VoidMatch = 255;
+
+        public const byte PeacefulSurvived = 254;
+
+        public const byte PeacefulCollapsed = 253;
+
+        public static byte Outcome(WinResult result)
+        {
+            if (result == null) throw new ArgumentNullException(nameof(result));
+            switch (result.Reason)
+            {
+                case WinReason.PeacefulSurvived: return PeacefulSurvived;
+                case WinReason.PeacefulCollapsed: return PeacefulCollapsed;
+                default: return (byte)result.WinningTeam;
+            }
+        }
+
+        public static Team? WinnerOf(byte outcome)
+        {
+            if (outcome == (byte)Team.Villagers || outcome == PeacefulSurvived) return Team.Villagers;
+            if (outcome == (byte)Team.Werewolves) return Team.Werewolves;
+            return null;
+        }
     }
 
     public static class RoleDistribution

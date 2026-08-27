@@ -7,10 +7,13 @@ namespace Werewolf.Core
         public const long MinRemainingMs = 10_000;
 
         private bool _started;
+        private bool _unlimited;
 
         public long EndUnixMs { get; private set; }
 
-        public void Start(long warpUnixMs, int durationSeconds)
+        public bool Unlimited => _unlimited;
+
+        public void Start(long warpUnixMs, int durationSeconds, bool unlimited = false)
         {
             if (durationSeconds <= 0)
             {
@@ -20,11 +23,12 @@ namespace Werewolf.Core
 
             EndUnixMs = warpUnixMs + durationSeconds * 1000L;
             _started = true;
+            _unlimited = unlimited;
         }
 
         public long ReduceByVote(int remainingVoters, long nowUnixMs)
         {
-            if (!_started) return EndUnixMs;
+            if (!_started || _unlimited) return EndUnixMs;
             if (remainingVoters <= 1) return EndUnixMs;
 
             long remaining = EndUnixMs - nowUnixMs;
@@ -39,6 +43,6 @@ namespace Werewolf.Core
             return EndUnixMs;
         }
 
-        public bool IsExpired(long nowUnixMs) => _started && nowUnixMs >= EndUnixMs;
+        public bool IsExpired(long nowUnixMs) => _started && !_unlimited && nowUnixMs >= EndUnixMs;
     }
 }

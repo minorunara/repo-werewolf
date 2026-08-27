@@ -10,12 +10,12 @@ namespace Werewolf.UI
     {
         public string LayerName => "Hud";
 
-        private const float LeftMargin = 48f;
-        private const float BottomMargin = 150f;
-        private const float SlotSize = 112f;
-        private const float SlotGap = 22f;
-        private const float LabelHeight = 34f;
-        private const float LabelGap = 4f;
+        private const float LeftMargin = HudGeometry.BomberHud.LeftMargin;
+        private const float BottomMargin = HudGeometry.BomberHud.BottomMargin;
+        private const float SlotSize = HudGeometry.BomberHud.SlotSize;
+        private const float SlotGap = HudGeometry.BomberHud.SlotGap;
+        private const float LabelHeight = HudGeometry.BomberHud.LabelHeight;
+        private const float LabelGap = HudGeometry.BomberHud.LabelGap;
         private const float LabelFontSize = 26f;
         private const float CooldownFontSize = 44f;
         private const float AmmoFontSize = 34f;
@@ -62,17 +62,13 @@ namespace Werewolf.UI
             if (_root != null || layerRoot == null) return;
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            float rootWidth = SlotSize * 2f + SlotGap;
-            float rootHeight = LabelHeight + LabelGap + SlotSize;
+            float rootWidth = HudGeometry.BomberHud.Width;
+            float rootHeight = HudGeometry.BomberHud.Height;
 
-            var go = new GameObject("WW_BomberStatusPanel", typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(layerRoot, false);
-            rect.anchorMin = rect.anchorMax = new Vector2(0f, 0f);
-            rect.pivot = new Vector2(0f, 0f);
-            rect.anchoredPosition = new Vector2(LeftMargin, BottomMargin);
-            rect.sizeDelta = new Vector2(rootWidth, rootHeight);
-            _root = go;
+            RectTransform rect = UiKit.CreateAnchoredRect(layerRoot, "WW_BomberStatusPanel",
+                UiKit.BottomLeft, Vector2.zero,
+                new Vector2(LeftMargin, BottomMargin), new Vector2(rootWidth, rootHeight));
+            _root = rect.gameObject;
 
             float iconRowCenterY = LabelHeight + LabelGap + SlotSize / 2f;
 
@@ -195,9 +191,7 @@ namespace Werewolf.UI
 
             RectTransform slotRect = UiKit.CreateRect(parent, name + "Slot", Vector2.zero,
                 new Vector2(SlotSize, SlotSize));
-            slotRect.anchorMin = slotRect.anchorMax = new Vector2(0f, 0f);
-            slotRect.pivot = new Vector2(0.5f, 0.5f);
-            slotRect.anchoredPosition = centerPos;
+            UiKit.SetAnchorsBottomLeft(slotRect, centerPos, new Vector2(SlotSize, SlotSize));
             slot.Root = slotRect.gameObject;
 
             slot.Icon = UiKit.CreateImage(slotRect, name + "Icon", Vector2.zero,
@@ -239,10 +233,8 @@ namespace Werewolf.UI
                 new Vector2(centerPos.x, LabelHeight / 2f), new Vector2(220f, LabelHeight),
                 string.Empty, LabelFontSize, ReadyLabelColor, TextAlignmentOptions.Center);
             RectTransform keyRect = slot.KeyLabel.rectTransform;
-            keyRect.anchorMin = keyRect.anchorMax = new Vector2(0f, 0f);
-            keyRect.pivot = new Vector2(0.5f, 0.5f);
-            keyRect.anchoredPosition = new Vector2(centerPos.x, LabelHeight / 2f);
-            keyRect.sizeDelta = new Vector2(220f, LabelHeight);
+            UiKit.SetAnchorsBottomLeft(keyRect, new Vector2(centerPos.x, LabelHeight / 2f),
+                new Vector2(220f, LabelHeight));
 
             return slot;
         }

@@ -4,6 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.UI
 {
@@ -23,12 +24,19 @@ namespace Werewolf.UI
 
         public const string ManualLayer = "Manual";
 
+        public const string ScenarioSelectLayer = "ScenarioSelect";
+
         internal const int PanelSortingOrder = 9999;
         internal const int TutorialBubbleSortingOrder = 10000;
-        internal const int VoidMatchSortingOrder = 10001;
-        internal const int ManualSortingOrder = 10002;
+        internal const int ScenarioHighlightSortingOrder = 10000;
+        internal const int ScenarioGuideSortingOrder = 10001;
+        internal const int ScenarioDecodeSortingOrder = 10000;
+        internal const int VoidMatchSortingOrder = 10002;
+        internal const int ManualSortingOrder = 10003;
+        internal const int MatchSettingsSortingOrder = 10003;
         internal const int TutorialSortingOrder = 10000;
-        internal const int CursorSortingOrder = 10003;
+        internal const int ScenarioSelectSortingOrder = 10003;
+        internal const int CursorSortingOrder = 10004;
 
         private GameObject _canvasRoot;
         private readonly Dictionary<string, GameObject> _layers = new Dictionary<string, GameObject>();
@@ -56,7 +64,7 @@ namespace Werewolf.UI
                 CanvasScaler scaler = _canvasRoot.AddComponent<CanvasScaler>();
                 scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
                 scaler.referenceResolution = new Vector2(1920f, 1080f);
-                scaler.matchWidthOrHeight = 0.5f;
+                scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
 
                 WLog.Line("ui_overlay_created", secret: false, ("sortingOrder", PanelSortingOrder));
                 return true;
@@ -77,14 +85,10 @@ namespace Werewolf.UI
                 return existing.transform;
             }
 
-            var layer = new GameObject($"WW_Layer_{layerName}", typeof(RectTransform));
-            var rect = (RectTransform)layer.transform;
-            rect.SetParent(_canvasRoot.transform, false);
-            UiKit.Stretch(rect);
+            GameObject layer = UiKit.CreateStretched(_canvasRoot.transform, $"WW_Layer_{layerName}").gameObject;
             layer.SetActive(false);
 
             _layers[layerName] = layer;
-            WLog.Line("ui_layer_registered", secret: false, ("layer", layerName));
             return layer.transform;
         }
 
@@ -93,7 +97,6 @@ namespace Werewolf.UI
             if (!_layers.TryGetValue(layerName, out GameObject layer) || layer == null) return;
             if (layer.activeSelf == visible) return;
             layer.SetActive(visible);
-            WLog.Line("ui_layer_visible", secret: false, ("layer", layerName), ("visible", visible));
         }
 
         public bool IsLayerVisible(string layerName)
@@ -129,13 +132,14 @@ namespace Werewolf.UI
     {
         private static TMP_FontAsset _cachedTmpFont;
         private static bool _tmpFontResolved;
+        private static bool _tmpFallbackLogged;
         private static Sprite _whiteSprite;
 
         private const float CursorKeepAliveSeconds = 0.2f;
 
         public static void KeepCursorFree()
         {
-            SemiFunc.CursorUnlock(CursorKeepAliveSeconds);
+            Inputs.UnlockCursor(CursorKeepAliveSeconds);
         }
 
         private static Sprite WhiteSprite()
@@ -167,6 +171,67 @@ namespace Werewolf.UI
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
         }
+
+        internal static RectTransform CreateStretched(Transform parent, string name)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(parent, false);
+            Stretch(rect);
+            return rect;
+        }
+
+        internal static Image CreateBackdrop(Transform parent, string name, Color color)
+        {
+            RectTransform rect = CreateStretched(parent, name);
+            Image image = rect.gameObject.AddComponent<Image>();
+            image.color = color;
+            image.raycastTarget = false;
+            return image;
+        }
+
+        internal static bool TryMeasureCanvas(RectTransform stretchedRect, out CanvasBounds canvas)
+        {
+            canvas = default;
+            if (stretchedRect == null) return false;
+            Vector2 size = stretchedRect.rect.size;
+            canvas = new CanvasBounds(size.x, size.y);
+            return canvas.IsMeasured;
+        }
+
+        internal static readonly Vector2 BottomLeft = new Vector2(0f, 0f);
+        internal static readonly Vector2 BottomRight = new Vector2(1f, 0f);
+        internal static readonly Vector2 TopLeft = new Vector2(0f, 1f);
+        internal static readonly Vector2 TopRight = new Vector2(1f, 1f);
+        internal static readonly Vector2 Center = new Vector2(0.5f, 0.5f);
+
+        internal static RectTransform CreateAnchoredRect(Transform parent, string name, Vector2 anchor, Vector2 pivot,
+                                                         Vector2 anchoredPos, Vector2 size)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(parent, false);
+            rect.anchorMin = rect.anchorMax = anchor;
+            rect.pivot = pivot;
+            rect.anchoredPosition = anchoredPos;
+            rect.sizeDelta = size;
+            return rect;
+        }
+
+        internal static void PinToCorner(RectTransform rect, Vector2 corner, Vector2 margin)
+        {
+            Vector2 size = rect.sizeDelta;
+            float signX = corner.x < 0.5f ? 1f : -1f;
+            float signY = corner.y < 0.5f ? 1f : -1f;
+            rect.anchorMin = rect.anchorMax = corner;
+            rect.pivot = Center;
+            rect.anchoredPosition = new Vector2(
+                signX * (margin.x + size.x * 0.5f),
+                signY * (margin.y + size.y * 0.5f));
+        }
+
+        internal static void PinToCorner(RectTransform rect, Vector2 corner, float margin)
+            => PinToCorner(rect, corner, new Vector2(margin, margin));
 
         internal static void SetAnchorsBottomLeft(RectTransform rect, Vector2 centerPos, Vector2 size)
         {
@@ -367,17 +432,20 @@ namespace Werewolf.UI
             label.raycastTarget = false;
             label.enableWordWrapping = false;
             label.overflowMode = TextOverflowModes.Overflow;
+            label.spriteAsset = EmojiSprites.Asset;
+            label.textPreprocessor = EmojiSprites.Preprocessor;
             return label;
         }
 
-        private static TMP_FontAsset ResolveTmpFont()
+        internal static TMP_FontAsset ResolveTmpFont()
         {
             if (_tmpFontResolved) return _cachedTmpFont;
             try
             {
-                if (ChatUI.instance != null && ChatUI.instance.chatText != null)
+                TMP_FontAsset chatFont = UiText.ChatFontOrNull;
+                if (chatFont != null)
                 {
-                    _cachedTmpFont = ChatUI.instance.chatText.font;
+                    _cachedTmpFont = chatFont;
                     _tmpFontResolved = true;
                     WLog.Line("ui_font", secret: false,
                         ("mode", "chatui"),
@@ -389,12 +457,15 @@ namespace Werewolf.UI
             {
                 WLog.Line("ui_font_error", secret: false, ("src", "chatui"), ("err", e.Message));
             }
-            _tmpFontResolved = true;
-            _cachedTmpFont = TMP_Settings.defaultFontAsset;
-            WLog.Line("ui_font", secret: false,
-                ("mode", "tmp_fallback"),
-                ("font", _cachedTmpFont != null ? _cachedTmpFont.name : "null"));
-            return _cachedTmpFont;
+            TMP_FontAsset fallback = TMP_Settings.defaultFontAsset;
+            if (!_tmpFallbackLogged)
+            {
+                _tmpFallbackLogged = true;
+                WLog.Line("ui_font", secret: false,
+                    ("mode", "tmp_fallback"),
+                    ("font", fallback != null ? fallback.name : "null"));
+            }
+            return fallback;
         }
     }
 }

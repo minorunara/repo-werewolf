@@ -370,6 +370,7 @@ namespace Werewolf.Tests
                 WerewolfCount = 3,
                 BlackCatChancePercent = 50,
                 BomberChancePercent = 50,
+                PeacefulVillageChancePercent = 0,
             };
             for (int seed = 0; seed < 30; seed++)
             {
@@ -485,6 +486,7 @@ namespace Werewolf.Tests
                     WerewolfCount = 1,
                     BlackCatChancePercent = 100,
                     ShamanChancePercent = 100,
+                    PeacefulVillageChancePercent = 0,
                 };
                 var result = RoleAssigner.Assign(players, config, new Random(seed));
                 Assert.Equal(1, result.BlackCats);

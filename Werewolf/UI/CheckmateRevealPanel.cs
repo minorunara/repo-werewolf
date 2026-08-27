@@ -11,9 +11,10 @@ namespace Werewolf.UI
     {
         public string LayerName => "CheckmateReveal";
 
-        private static readonly Vector2 TrackSize = new Vector2(1500f, 20f);
-        private const float GaugeScale = 0.8f;
-        private static readonly Vector2 GaugePos = new Vector2(0f, 220f);
+        private static readonly Vector2 TrackSize =
+            new Vector2(HudGeometry.MeetingGauge.TrackWidth, HudGeometry.MeetingGauge.TrackHeight);
+        private const float GaugeScale = HudGeometry.CheckmateReveal.GaugeScale;
+        private static readonly Vector2 GaugePos = new Vector2(0f, HudGeometry.CheckmateReveal.GaugeCenterY);
         private static readonly Color TrackBgColor = new Color(0.10f, 0.10f, 0.14f, 0.9f);
         private static readonly Color FillColor = new Color(0.85f, 0.65f, 0.15f, 0.95f);
         private static readonly Color DeliveryFillColor = new Color(0.30f, 0.80f, 0.95f, 0.95f);
@@ -23,7 +24,7 @@ namespace Werewolf.UI
 
         private static readonly Vector2 IconSize = new Vector2(300f, 300f);
         private static readonly Vector2 IconPos = new Vector2(0f, -60f);
-        private static readonly Vector2 TitlePos = new Vector2(0f, -290f);
+        private static readonly Vector2 TitlePos = new Vector2(0f, HudGeometry.CheckmateReveal.TitleCenterY);
 
         private static readonly Color BackdropColor = new Color(0f, 0f, 0f, 0.85f);
         private static readonly Color TitleColor = new Color(0.85f, 0.08f, 0.08f, 1f);
@@ -60,7 +61,8 @@ namespace Werewolf.UI
                 layerRoot, "WW_CheckmateReveal", BackdropColor, out _group);
             _root = rect.gameObject;
 
-            _gaugeRect = UiKit.CreateRect(rect, "Gauge", GaugePos, new Vector2(1560f, 104f));
+            _gaugeRect = UiKit.CreateRect(rect, "Gauge", GaugePos,
+                new Vector2(HudGeometry.MeetingGauge.Width, HudGeometry.MeetingGauge.Height));
             _gaugeRect.localScale = Vector3.one * GaugeScale;
 
             Image track = UiKit.CreateImage(_gaugeRect, "Track", Vector2.zero, TrackSize, TrackBgColor);
@@ -89,8 +91,10 @@ namespace Werewolf.UI
                 iconImg.preserveAspect = true;
             }
 
-            _lossText = UiKit.CreateText(_gaugeRect, "LossText", new Vector2(0f, -TrackSize.y - 36f),
-                new Vector2(1500f, 44f), "", 44f, Color.white, TextAlignmentOptions.Center);
+            _lossText = UiKit.CreateText(_gaugeRect, "LossText",
+                new Vector2(0f, HudGeometry.CheckmateReveal.LossTextOffsetY),
+                new Vector2(TrackSize.x, HudGeometry.CheckmateReveal.LossTextHeight),
+                "", 44f, Color.white, TextAlignmentOptions.Center);
 
             _stampRect = UiKit.CreateRect(rect, "Stamp", Vector2.zero, new Vector2(1400f, 800f));
             _stampGroup = _stampRect.gameObject.AddComponent<CanvasGroup>();
@@ -102,11 +106,10 @@ namespace Werewolf.UI
             _iconImage.enabled = false;
 
             _titleText = RevealPanelKit.CreateStampTitle(_stampRect, TitlePos,
-                new Vector2(1400f, 130f), Texts.Get(TextId.CheckmateTitle), 96f,
+                new Vector2(1400f, HudGeometry.CheckmateReveal.TitleHeight), Texts.Get(TextId.CheckmateTitle), 96f,
                 TitleColor, Color.black, 0.12f, out _titleTextBack);
 
             _root.SetActive(false);
-            WLog.Line("checkmate_reveal_built", secret: false);
         }
 
         public void Show(MeetingGaugeSnapshot snapshot, int fromPermille, int fromLoss)
@@ -167,7 +170,8 @@ namespace Werewolf.UI
         private int _pendingFromPermille;
         private int _pendingFromLoss;
 
-        public IEnumerator Play(Action onBreak, Action onStamp)
+        public IEnumerator Play(Action onBreak, Action onStamp, Action onDone = null)
+
         {
             if (_root == null || _snapshot == null)
             {
@@ -190,7 +194,7 @@ namespace Werewolf.UI
                 if (!breakPlayed && _reveal.GrowthStarted(now))
                 {
                     breakPlayed = true;
-                    RevealPanelKit.InvokeSfx(onBreak, "checkmate_break_sfx_error");
+                    RevealPanelKit.InvokeCallback(onBreak, "checkmate_break_sfx_error");
                 }
                 RenderLoss(_reveal.CurrentPermille(now), _reveal.CurrentLoss(now));
                 yield return null;
@@ -203,9 +207,10 @@ namespace Werewolf.UI
             yield return RevealPanelKit.StampEntrance(
                 _stampRect, _stampGroup, CheckmateCeremony.StampEntranceSec);
 
-            RevealPanelKit.InvokeSfx(onStamp, "checkmate_stamp_sfx_error");
+            RevealPanelKit.InvokeCallback(onStamp, "checkmate_stamp_sfx_error");
 
             yield return UiTween.Hold(CheckmateCeremony.StampHoldSec);
+            RevealPanelKit.InvokeCallback(onDone, "checkmate_done_callback_error");
             WLog.Line("checkmate_reveal_hold_end", secret: false);
         }
 

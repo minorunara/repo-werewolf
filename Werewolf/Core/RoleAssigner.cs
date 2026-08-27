@@ -5,16 +5,23 @@ namespace Werewolf.Core
 {
     public readonly struct RoleAssignResult
     {
-        public RoleAssignResult(int werewolves, int blackCats, int bombers, int shamans, bool corrected)
+        public RoleAssignResult(int werewolves, int blackCats, int bombers, int shamans, bool corrected,
+            int werewolfSlots, bool peaceful)
         {
             Werewolves = werewolves;
             BlackCats = blackCats;
             Bombers = bombers;
             Shamans = shamans;
             Corrected = corrected;
+            WerewolfSlots = werewolfSlots;
+            Peaceful = peaceful;
         }
 
         public int Werewolves { get; }
+
+        public int WerewolfSlots { get; }
+
+        public bool Peaceful { get; }
 
         public int BlackCats { get; }
 
@@ -51,9 +58,30 @@ namespace Werewolf.Core
             return (n, corrected);
         }
 
+        private static bool RollPeaceful(GameConfig config, Random rng,
+            IReadOnlyDictionary<int, Role> forcedRoles, bool forcePeaceful)
+        {
+            if (HasForcedWolfSide(forcedRoles)) return false;
+            if (forcePeaceful) return true;
+            if (forcedRoles != null && forcedRoles.Count > 0) return false;
+            int chance = config.PeacefulVillageChancePercent;
+            if (chance <= 0) return false;
+            return chance >= 100 || rng.Next(100) < chance;
+        }
+
+        private static bool HasForcedWolfSide(IReadOnlyDictionary<int, Role> forcedRoles)
+        {
+            if (forcedRoles == null) return false;
+            foreach (var pair in forcedRoles)
+            {
+                if (RoleDistribution.TeamOf(pair.Value) == Team.Werewolves) return true;
+            }
+            return false;
+        }
+
         public static RoleAssignResult Assign(
             IReadOnlyList<WPlayer> players, GameConfig config, Random rng,
-            IReadOnlyDictionary<int, Role> forcedRoles = null)
+            IReadOnlyDictionary<int, Role> forcedRoles = null, bool forcePeaceful = false)
         {
             if (players == null) throw new ArgumentNullException(nameof(players));
             if (config == null) throw new ArgumentNullException(nameof(config));
@@ -64,7 +92,10 @@ namespace Werewolf.Core
                     nameof(players), players.Count, "役職割当は3人以上でのみ定義される。");
             }
 
-            var (n, corrected) = CorrectWerewolfSlots(config, players.Count);
+            bool peaceful = RollPeaceful(config, rng, forcedRoles, forcePeaceful);
+
+            var (slots, corrected) = CorrectWerewolfSlots(config, players.Count);
+            int n = peaceful ? 0 : slots;
 
             bool forcedBomberExists = false, forcedBlackCatExists = false, forcedShamanExists = false;
             if (forcedRoles != null)
@@ -124,7 +155,7 @@ namespace Werewolf.Core
                 randomPool[index++].Role = Role.Bomber;
 
             int blackCatSlots = 0;
-            if (!forcedBlackCatExists)
+            if (!forcedBlackCatExists && !peaceful)
             {
                 int chance = config.BlackCatChancePercent;
                 if (chance > 0 && players.Count - n >= 2 && (chance >= 100 || rng.Next(100) < chance))
@@ -173,9 +204,10 @@ namespace Werewolf.Core
                 ("blackcats", finalBc),
                 ("bombers", finalBomber),
                 ("shamans", finalShaman),
+                ("peaceful", peaceful),
                 ("corrected", corrected));
 
-            return new RoleAssignResult(finalWw, finalBc, finalBomber, finalShaman, corrected);
+            return new RoleAssignResult(finalWw, finalBc, finalBomber, finalShaman, corrected, slots, peaceful);
         }
 
         private static void Shuffle(List<WPlayer> list, Random rng)

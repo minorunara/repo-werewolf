@@ -6,8 +6,9 @@ namespace Werewolf.Core
     {
         public const long MinMatchDurationMs = 180_000;
 
-        public static bool ShouldGrant(long startUnixMs, long nowUnixMs)
+        public static bool ShouldGrant(long startUnixMs, long nowUnixMs, bool scenarioActive = false)
         {
+            if (scenarioActive) return false;
             if (startUnixMs <= 0) return true;
             return nowUnixMs - startUnixMs >= MinMatchDurationMs;
         }

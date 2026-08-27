@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Werewolf.Core;
@@ -143,6 +144,23 @@ namespace Werewolf.Tests
                 new object[] { (byte)Team.Villagers, new int[0], new byte[0] }, 1_600_000L);
 
             Assert.Equal(ResultDigest.ReasonUnknown, d.Entries[1].ArgB);
+        }
+
+        [Fact]
+        public void MatchEndReason_ReadsMatchEnd_OrUnknown()
+        {
+            Assert.Equal(ResultDigest.ReasonUnknown, ResultDigest.MatchEndReason(null));
+            Assert.Equal(ResultDigest.ReasonUnknown, ResultDigest.MatchEndReason(new DigestEntry[0]));
+
+            var d = StartedDigest();
+            Assert.Equal(ResultDigest.ReasonUnknown, ResultDigest.MatchEndReason(d.Entries));
+            d.Observe(WWEventCodes.GameOver,
+                new object[] { (byte)Team.Villagers, new int[0], new byte[0] }, 1_600_000L,
+                new WinResult(Team.Villagers, WinReason.ExtractionCompleted));
+
+            Assert.Equal((int)WinReason.ExtractionCompleted, ResultDigest.MatchEndReason(d.Entries));
+            Assert.Equal((int)WinReason.ExtractionCompleted,
+                ResultDigest.MatchEndReason(ResultDigest.FromWire(d.ToWire())));
         }
 
         [Fact]
@@ -395,6 +413,18 @@ namespace Werewolf.Tests
 
             string line = Assert.Single(lines);
             Assert.Contains(Texts.Get(TextId.ResultBannerVillagerWin), line);
+        }
+
+        [Fact]
+        public void EpigraphText_CoversEveryWinReason_UnknownIsNull()
+        {
+            foreach (WinReason reason in Enum.GetValues(typeof(WinReason)))
+            {
+                Assert.False(string.IsNullOrEmpty(ResultDigestText.EpigraphText((int)reason)),
+                    "格言が未定義の勝因: " + reason);
+            }
+            Assert.Null(ResultDigestText.EpigraphText(ResultDigest.ReasonUnknown));
+            Assert.Null(ResultDigestText.EpigraphText(99));
         }
     }
 }

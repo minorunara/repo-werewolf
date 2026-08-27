@@ -27,10 +27,6 @@ namespace Werewolf
         public static AccessTools.FieldRef<PlayerVoiceChat, bool> PlayerVoiceChat_isTalking;
         public static AccessTools.FieldRef<PlayerVoiceChat, AudioSource> PlayerVoiceChat_audioSource;
         public static AccessTools.FieldRef<PlayerVoiceChat, Recorder> PlayerVoiceChat_recorder;
-        public static AccessTools.FieldRef<PlayerVoiceChat, bool> PlayerVoiceChat_TTSinstantiated;
-        public static AccessTools.FieldRef<PlayerVoiceChat, float> PlayerVoiceChat_overrideMuteTimer;
-        public static AccessTools.FieldRef<PlayerVoiceChat, float> PlayerVoiceChat_clipLoudness;
-        public static AccessTools.FieldRef<PlayerVoiceChat, PlayerAvatar> PlayerVoiceChat_playerAvatar;
 
         public static AccessTools.FieldRef<RunManager, Level> RunManager_debugLevel;
         public static AccessTools.FieldRef<RunManager, bool> RunManager_restarting;
@@ -41,6 +37,7 @@ namespace Werewolf
         public static AccessTools.FieldRef<RoundDirector, int> RoundDirector_extractionPointsCompleted;
         public static AccessTools.FieldRef<RoundDirector, bool> RoundDirector_allExtractionPointsCompleted;
         public static AccessTools.FieldRef<RoundDirector, int> RoundDirector_haulGoal;
+        public static AccessTools.FieldRef<RoundDirector, int> RoundDirector_haulGoalMax;
         public static AccessTools.FieldRef<RoundDirector, int> RoundDirector_extractionPointSurplus;
         public static AccessTools.FieldRef<ExtractionPoint, ExtractionPoint.State> ExtractionPoint_currentState;
         public static AccessTools.FieldRef<StatsManager, string> StatsManager_saveFileCurrent;
@@ -85,9 +82,11 @@ namespace Werewolf
         public static AccessTools.FieldRef<EnemyDirector, float> EnemyDirector_spawnIdlePauseTimer;
         public static AccessTools.FieldRef<EnemyShadow, PlayerAvatar> EnemyShadow_playerTarget;
         public static MethodInfo EnemyShadow_UpdatePlayerTarget;
-        public static AccessTools.FieldRef<AudioManager, AudioManager.SoundSnapshot> AudioManager_currentSnapshot;
         public static FieldInfo ParticleScriptExplosion_explosionPrefab;
         public static FieldInfo ParticlePrefabExplosion_HurtColliderSecondSetup;
+
+        public static AccessTools.FieldRef<RoundDirector, int> RoundDirector_currentHaul;
+        public static AccessTools.FieldRef<LevelGenerator, float> LevelGenerator_DebugLevelSize;
 
         private static List<string> s_failures;
         private static int s_resolvedCount;
@@ -112,10 +111,6 @@ namespace Werewolf
             PlayerVoiceChat_isTalking = Field<PlayerVoiceChat, bool>("isTalking");
             PlayerVoiceChat_audioSource = Field<PlayerVoiceChat, AudioSource>("audioSource");
             PlayerVoiceChat_recorder = Field<PlayerVoiceChat, Recorder>("recorder");
-            PlayerVoiceChat_TTSinstantiated = Field<PlayerVoiceChat, bool>("TTSinstantiated");
-            PlayerVoiceChat_overrideMuteTimer = Field<PlayerVoiceChat, float>("overrideMuteTimer");
-            PlayerVoiceChat_clipLoudness = Field<PlayerVoiceChat, float>("clipLoudness");
-            PlayerVoiceChat_playerAvatar = Field<PlayerVoiceChat, PlayerAvatar>("playerAvatar");
 
             RunManager_debugLevel = Field<RunManager, Level>("debugLevel");
             RunManager_restarting = Field<RunManager, bool>("restarting");
@@ -127,6 +122,7 @@ namespace Werewolf
             RoundDirector_extractionPointsCompleted = Field<RoundDirector, int>("extractionPointsCompleted");
             RoundDirector_allExtractionPointsCompleted = Field<RoundDirector, bool>("allExtractionPointsCompleted");
             RoundDirector_haulGoal = Field<RoundDirector, int>("haulGoal");
+            RoundDirector_haulGoalMax = Field<RoundDirector, int>("haulGoalMax");
             RoundDirector_extractionPointSurplus = Field<RoundDirector, int>("extractionPointSurplus");
             StatsManager_saveFileCurrent = Field<StatsManager, string>("saveFileCurrent");
             StatsManager_dictionaryOfDictionaries = Field<StatsManager,
@@ -173,7 +169,6 @@ namespace Werewolf
             EnemyDirector_spawnIdlePauseTimer = Field<EnemyDirector, float>("spawnIdlePauseTimer");
             EnemyShadow_playerTarget = Field<EnemyShadow, PlayerAvatar>("playerTarget");
             EnemyShadow_UpdatePlayerTarget = RawMethod(typeof(EnemyShadow), "UpdatePlayerTarget");
-            AudioManager_currentSnapshot = Field<AudioManager, AudioManager.SoundSnapshot>("currentSnapshot");
             ParticleScriptExplosion_explosionPrefab = RawField(typeof(ParticleScriptExplosion), "explosionPrefab");
             ParticlePrefabExplosion_HurtColliderSecondSetup =
                 RawField(typeof(ParticlePrefabExplosion), "HurtColliderSecondSetup");
@@ -185,6 +180,19 @@ namespace Werewolf
             }
             WLog.Line("game_refs_disabled", secret: false, ("failedFields", s_failures.Count));
             return false;
+        }
+
+        public static int ResolveScenarioRefs()
+        {
+            s_failures ??= new List<string>();
+            int before = s_failures.Count;
+
+            RoundDirector_currentHaul = Field<RoundDirector, int>("currentHaul");
+            LevelGenerator_DebugLevelSize = Field<LevelGenerator, float>("DebugLevelSize");
+
+            int failed = s_failures.Count - before;
+            WLog.Line("game_refs_scenario", secret: false, ("failed", failed));
+            return failed;
         }
 
         private static AccessTools.FieldRef<TObj, TField> Field<TObj, TField>(string fieldName)

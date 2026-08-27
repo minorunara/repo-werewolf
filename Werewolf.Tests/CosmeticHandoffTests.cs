@@ -22,6 +22,14 @@ namespace Werewolf.Tests
         }
 
         [Fact]
+        public void ShouldGrant_ScenarioSession_NeverGrants()
+        {
+            Assert.False(CosmeticHandoff.ShouldGrant(
+                Start, Start + CosmeticHandoff.MinMatchDurationMs, scenarioActive: true));
+            Assert.False(CosmeticHandoff.ShouldGrant(0, Start, scenarioActive: true));
+        }
+
+        [Fact]
         public void ShouldGrant_UnknownStartTime_FailsOpen()
         {
             Assert.True(CosmeticHandoff.ShouldGrant(0, Start));

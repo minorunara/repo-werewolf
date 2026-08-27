@@ -18,8 +18,8 @@ namespace Werewolf.Core.Replay
         public const float ExploreFast = 32f;
         public const float TalkNormal = 4f;
         public const float TalkFast = 16f;
-        public const float SilentNormal = 16f;
-        public const float SilentFast = 32f;
+
+        public const float Silent = 32f;
 
         public const double TalkWindowSec = 5.0;
 
@@ -52,7 +52,7 @@ namespace Werewolf.Core.Replay
             switch (zone)
             {
                 case ReplayPaceZone.MeetingTalk: return fast ? TalkFast : TalkNormal;
-                case ReplayPaceZone.MeetingSilent: return fast ? SilentFast : SilentNormal;
+                case ReplayPaceZone.MeetingSilent: return Silent;
                 default: return fast ? ExploreFast : ExploreNormal;
             }
         }

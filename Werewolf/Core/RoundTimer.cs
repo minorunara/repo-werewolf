@@ -7,6 +7,7 @@ namespace Werewolf.Core
         private bool _started;
         private bool _expired;
         private bool _paused;
+        private bool _unlimited;
         private long _meetingStartUnixMs;
 
         public long EndUnixMs { get; private set; }
@@ -15,7 +16,9 @@ namespace Werewolf.Core
 
         public bool Expired => _expired;
 
-        public void Start(long nowUnixMs, int roundSeconds)
+        public bool Unlimited => _unlimited;
+
+        public void Start(long nowUnixMs, int roundSeconds, bool unlimited = false)
         {
             if (roundSeconds <= 0)
             {
@@ -27,6 +30,7 @@ namespace Werewolf.Core
             _started = true;
             _expired = false;
             _paused = false;
+            _unlimited = unlimited;
         }
 
         public long RemainingMs(long nowUnixMs)
@@ -40,7 +44,7 @@ namespace Werewolf.Core
 
         public bool CheckExpiry(long nowUnixMs)
         {
-            if (!_started || _expired || _paused) return false;
+            if (!_started || _expired || _paused || _unlimited) return false;
             if (nowUnixMs < EndUnixMs) return false;
 
             _expired = true;

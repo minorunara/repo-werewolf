@@ -4,6 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.UI
 {
@@ -15,8 +16,8 @@ namespace Werewolf.UI
 
         private const float ContentWidth = 1100f;
         private const float PanelWidth = 900f;
-        private const float BannerHeight = 100f;
-        private const float BannerY = 430f;
+        private const float BannerHeight = 130f;
+        private const float BannerY = 445f;
         private const float ViewportHeight = 760f;
         private const float ViewportCenterY = -20f;
         private const float FooterY = -518f;
@@ -28,6 +29,11 @@ namespace Werewolf.UI
         private const float RowSpacing = 4f;
         private const float RowInnerMargin = 24f;
         private const float BannerFontSize = 60f;
+        private const float BannerTitleHeight = 76f;
+        private const float BannerTitleWithEpigraphY = 20f;
+        private const float EpigraphY = -38f;
+        private const float EpigraphHeight = 40f;
+        private const float EpigraphFontSize = 28f;
         private const float RowFontSize = 26f;
         private const float FooterFontSize = 30f;
         private const float DigestHeaderHeight = 44f;
@@ -49,8 +55,10 @@ namespace Werewolf.UI
         private static readonly Color WerewolfTeamColor = new Color(1f, 0.45f, 0.45f, 1f);
         private static readonly Color VillagerTeamColor = new Color(0.55f, 0.85f, 1f, 1f);
         private static readonly Color BannerDefaultColor = new Color(1f, 0.95f, 0.6f, 1f);
+        private static readonly Color EpigraphColor = new Color(0.88f, 0.86f, 0.78f, 1f);
 
         private static readonly Color VoidMatchColor = new Color(0.72f, 0.72f, 0.72f, 1f);
+        private static readonly Color PeacefulCollapsedColor = new Color(0.75f, 0.32f, 0.32f, 1f);
 
         private static readonly ButtonPalette ReturnButtonPalette = new ButtonPalette(
             new Color(0.26f, 0.26f, 0.3f, 0.9f), new Color(0.42f, 0.42f, 0.48f, 1f),
@@ -58,6 +66,7 @@ namespace Werewolf.UI
 
         private GameObject _root;
         private TextMeshProUGUI _bannerText;
+        private TextMeshProUGUI _epigraphText;
         private Image _bannerImage;
         private RectTransform _content;
         private TextMeshProUGUI _footerText;
@@ -80,31 +89,34 @@ namespace Werewolf.UI
 
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            var go = new GameObject("WW_ResultScreen", typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(layerRoot, false);
-            UiKit.Stretch(rect);
-            _root = go;
+            RectTransform rect = UiKit.CreateStretched(layerRoot, "WW_ResultScreen");
+            _root = rect.gameObject;
 
-            var bg = UiKit.CreateImage(rect, "Bg", Vector2.zero,
-                new Vector2(1920f, 1080f), new Color(0f, 0f, 0f, 0.82f));
-            var bgRect = bg.rectTransform;
-            UiKit.Stretch(bgRect);
-            bg.raycastTarget = false;
+            UiKit.CreateBackdrop(rect, "Bg", new Color(0f, 0f, 0f, 0.82f));
 
             _bannerImage = UiKit.CreateImage(rect, "Banner",
                 new Vector2(0f, BannerY), new Vector2(PanelWidth, BannerHeight),
                 new Color(0.2f, 0.2f, 0.25f, 0.9f));
             _bannerImage.raycastTarget = false;
             _bannerText = UiKit.CreateText(_bannerImage.rectTransform, "BannerText",
-                Vector2.zero, new Vector2(PanelWidth, BannerHeight),
+                Vector2.zero, new Vector2(PanelWidth, BannerTitleHeight),
                 string.Empty, BannerFontSize,
                 BannerDefaultColor, TextAlignmentOptions.Center);
             _bannerText.fontStyle = FontStyles.Bold;
             _bannerText.outlineWidth = 0.25f;
             _bannerText.outlineColor = Color.black;
-            var btRect = _bannerText.rectTransform;
-            UiKit.Stretch(btRect);
+
+            _epigraphText = UiKit.CreateText(_bannerImage.rectTransform, "BannerEpigraph",
+                new Vector2(0f, EpigraphY), new Vector2(PanelWidth - 40f, EpigraphHeight),
+                string.Empty, EpigraphFontSize,
+                EpigraphColor, TextAlignmentOptions.Center);
+            _epigraphText.fontStyle = FontStyles.Italic;
+            _epigraphText.outlineWidth = 0.15f;
+            _epigraphText.outlineColor = Color.black;
+            _epigraphText.enableAutoSizing = true;
+            _epigraphText.fontSizeMin = 18f;
+            _epigraphText.fontSizeMax = EpigraphFontSize;
+            _epigraphText.gameObject.SetActive(false);
 
             RectTransform viewport = UiKit.CreateRect(rect, "Viewport",
                 new Vector2(0f, ViewportCenterY), new Vector2(ContentWidth, ViewportHeight));
@@ -137,19 +149,20 @@ namespace Werewolf.UI
                 new Color(1f, 0.95f, 0.6f, 1f), TextAlignmentOptions.Center);
 
             _root.SetActive(false);
-            WLog.Line("result_screen_built", secret: false);
         }
 
         public void Show(byte winningTeam, IReadOnlyList<ResultRow> rows,
-            Func<int, PlayerAvatar> resolveAvatar = null,
+            Func<int, PlayerHandle> resolveAvatar = null,
             IReadOnlyList<string> digestLines = null,
             string footerText = null,
-            Func<int, int> resolveId = null)
+            Func<int, int> resolveId = null,
+            int winReason = ResultDigest.ReasonUnknown)
         {
             if (_root == null) return;
 
-            _bannerText.text = FormatBanner(winningTeam);
+            _bannerText.text = ResultDigestText.OutcomeText(winningTeam);
             _bannerText.color = BannerColor(winningTeam);
+            ShowEpigraph(ResultDigestText.EpigraphText(winReason));
             _footerText.text = footerText ?? string.Empty;
 
             int count = rows != null ? rows.Count : 0;
@@ -159,11 +172,11 @@ namespace Werewolf.UI
             {
                 if (i < count)
                 {
-                    PlayerAvatar avatar = null;
+                    PlayerHandle avatar = PlayerHandle.None;
                     if (resolveAvatar != null && rows[i] != null && rows[i].ActorNumber > 0)
                     {
                         try { avatar = resolveAvatar(rows[i].ActorNumber); }
-                        catch { avatar = null; }
+                        catch { avatar = PlayerHandle.None; }
                     }
                     int participantId = 0;
                     if (resolveId != null && rows[i] != null)
@@ -232,7 +245,9 @@ namespace Werewolf.UI
             if (_footerText != null) _footerText.text = footerText ?? string.Empty;
         }
 
-        public void SetReturnButton(bool visible, float alpha, bool armed, bool hover, string keyName)
+        public void SetReturnButton(bool visible, float alpha, bool armed, bool hover, string keyName,
+                                    TextId labelId = TextId.ResultReturnButtonLabel,
+                                    TextId labelWithKeyFormatId = TextId.ResultReturnButtonWithKeyFormat)
         {
             if (_returnButtonBg == null) return;
             if (_returnButtonBg.gameObject.activeSelf != visible)
@@ -245,8 +260,8 @@ namespace Werewolf.UI
             string labelText = armed
                 ? Texts.Get(TextId.VoteConfirmLabel)
                 : string.IsNullOrEmpty(keyName)
-                    ? Texts.Get(TextId.ResultReturnButtonLabel)
-                    : Texts.Format(TextId.ResultReturnButtonWithKeyFormat, keyName);
+                    ? Texts.Get(labelId)
+                    : Texts.Format(labelWithKeyFormatId, keyName);
             if (_returnButtonLabelText != labelText)
             {
                 _returnButtonLabelText = labelText;
@@ -312,24 +327,25 @@ namespace Werewolf.UI
             rt.anchoredPosition = new Vector2(0f, -(yFromTop + height * 0.5f));
         }
 
-        private static string FormatBanner(byte team)
+        private void ShowEpigraph(string epigraph)
         {
-            if (team == TeamCodes.VoidMatch) return Texts.Get(TextId.ResultBannerVoid);
-            switch ((Team)team)
-            {
-                case Team.Villagers: return Texts.Get(TextId.ResultBannerVillagerWin);
-                case Team.Werewolves: return Texts.Get(TextId.ResultBannerWerewolfWin);
-                default: return Texts.Get(TextId.ResultBannerDefault);
-            }
+            bool has = !string.IsNullOrEmpty(epigraph);
+            _bannerText.rectTransform.anchoredPosition =
+                new Vector2(0f, has ? BannerTitleWithEpigraphY : 0f);
+            if (_epigraphText == null) return;
+            if (has) _epigraphText.text = epigraph;
+            _epigraphText.gameObject.SetActive(has);
         }
 
-        private static Color BannerColor(byte team)
+        private static Color BannerColor(byte outcome)
         {
-            if (team == TeamCodes.VoidMatch) return VoidMatchColor;
-            switch ((Team)team)
+            switch (outcome)
             {
-                case Team.Villagers: return VillagerTeamColor;
-                case Team.Werewolves: return WerewolfTeamColor;
+                case (byte)Team.Villagers: return VillagerTeamColor;
+                case (byte)Team.Werewolves: return WerewolfTeamColor;
+                case TeamCodes.VoidMatch: return VoidMatchColor;
+                case TeamCodes.PeacefulSurvived: return VillagerTeamColor;
+                case TeamCodes.PeacefulCollapsed: return PeacefulCollapsedColor;
                 default: return BannerDefaultColor;
             }
         }
@@ -382,9 +398,11 @@ namespace Werewolf.UI
                 string.Empty, IdFontSize, IdColor, TextAlignmentOptions.Center);
             idLabel.enableWordWrapping = false;
 
+            float nameStartX = AvatarHolderX + ListedAvatar.NameStartFromHolder(AvatarScale);
+            float nameWidth = PanelWidth * 0.05f - nameStartX;
             var name = UiKit.CreateText(bgRect, "Name",
-                new Vector2(-PanelWidth * 0.25f, 0f),
-                new Vector2(PanelWidth * 0.45f, RowHeight),
+                new Vector2(nameStartX + nameWidth * 0.5f, 0f),
+                new Vector2(nameWidth, RowHeight),
                 string.Empty, RowFontSize,
                 new Color(1f, 1f, 1f, 1f), TextAlignmentOptions.MidlineLeft);
 
@@ -418,7 +436,7 @@ namespace Werewolf.UI
             private readonly TextMeshProUGUI _status;
             private readonly Image _statusIcon;
             private readonly TextMeshProUGUI _id;
-            private MenuPlayerListed _listed;
+            private ListedRow _listed;
 
             internal Slot(
                 GameObject go,
@@ -445,12 +463,12 @@ namespace Werewolf.UI
                 PlaceTop((RectTransform)_go.transform, yFromTop, RowHeight);
             }
 
-            internal void Show(ResultRow row, PlayerAvatar avatar, int participantId)
+            internal void Show(ResultRow row, PlayerHandle avatar, int participantId)
             {
                 if (row == null) { Hide(); return; }
                 _mark.text = row.IsWinningSide ? "★" : string.Empty;
                 _id.text = participantId > 0 ? participantId.ToString() : string.Empty;
-                SetAvatar(avatar, row.Name);
+                SetAvatar(avatar, row.ActorNumber, row.Name);
                 _name.gameObject.SetActive(_listed == null);
                 _name.text = row.Name ?? string.Empty;
                 _role.text = RoleLabel(row.Role);
@@ -461,12 +479,13 @@ namespace Werewolf.UI
                     ? new Color(1f, 1f, 1f, 1f)
                     : new Color(0.7f, 0.7f, 0.7f, 0.9f);
                 _name.color = nameColor;
+                ListedAvatar.SetStaticShade(_listed, dead: !row.Alive, nameColor);
                 if (!_go.activeSelf) _go.SetActive(true);
             }
 
             internal void Hide()
             {
-                SetAvatar(null, null);
+                SetAvatar(PlayerHandle.None, 0, null);
                 if (_go.activeSelf) _go.SetActive(false);
             }
 
@@ -491,16 +510,20 @@ namespace Werewolf.UI
                 _statusIcon.gameObject.SetActive(true);
             }
 
-            private void SetAvatar(PlayerAvatar avatar, string playerName)
+            private void SetAvatar(PlayerHandle avatar, int actor, string playerName)
             {
                 if (_listed != null)
                 {
-                    UnityEngine.Object.Destroy(_listed.gameObject);
+                    UnityEngine.Object.Destroy(_listed.GameObject);
                     _listed = null;
                 }
-                if (avatar != null)
+                if (avatar.IsValid)
                 {
                     _listed = ListedAvatar.TryCreate(_avatarHolder, avatar, playerName);
+                }
+                else if (actor < 0)
+                {
+                    _listed = ListedAvatar.TryCreateStatic(_avatarHolder, playerName, BotColors.IndexFor(actor));
                 }
             }
         }

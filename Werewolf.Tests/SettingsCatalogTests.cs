@@ -18,7 +18,7 @@ namespace Werewolf.Tests
             "MeetingCountdownSec", "MeetingDurationSec", "VoteTimeCutEnabled", "ResultDisplaySec",
             "MeetingScatterEnabled", "ScatterGuardSec", "MeetingEnemyRespawnScalePct",
             "ShamanChancePercent", "WerewolfCount",
-            "BlackCatChancePercent", "BomberChancePercent",
+            "BlackCatChancePercent", "BomberChancePercent", "PeacefulVillageChancePercent",
             "ShamanGazeFullSec", "ShamanGhostCooldownSec",
             "ShamanStormWeakMeters", "ShamanStormMediumMeters", "ShamanStormStrongMeters",
             "StaminaUnlockPct", "JumpUnlockPct", "EnemyIgnoreUnlockPct",
@@ -32,7 +32,8 @@ namespace Werewolf.Tests
             "BomberBlastPlayerDamage", "BomberBlastEnemyDamage",
             "BomberAmmoRefillPct",
             "StartLevelNumber", "StartMapName", "StartItemsSpec",
-            "StartEnergyPct", "StartUpgradesSpec", "OrbDropMax",
+            "StartEnergyPct", "StartUpgradesSpec", "OrbDropMax", "StartHaulGoalPct",
+            "EnemySetsDanger1", "EnemySetsDanger2", "EnemySetsDanger3",
         };
 
         private static readonly string[] ExpectedExcludedFields =
@@ -52,6 +53,7 @@ namespace Werewolf.Tests
             "BomberWarningSec",
             "BomberTruckSafeRadiusMeters",
             "CurseWaitSec",
+            "TimeLimitDisabled",
         };
 
         [Fact]
@@ -66,12 +68,23 @@ namespace Werewolf.Tests
                 .ToDictionary(g => g.Key, g => g.Count());
             Assert.Equal(8, bySection["基本"]);
             Assert.Equal(10, bySection["会議"]);
-            Assert.Equal(4, bySection["役職 - 役職配分"]);
+            Assert.Equal(5, bySection["役職 - 役職配分"]);
             Assert.Equal(10, bySection["役職 - 人狼"]);
             Assert.Equal(4, bySection["役職 - 黒猫"]);
             Assert.Equal(8, bySection["役職 - 爆弾魔"]);
             Assert.Equal(5, bySection["役職 - 祈祷師"]);
-            Assert.Equal(6, bySection["開始環境"]);
+            Assert.Equal(10, bySection["開始環境"]);
+        }
+
+        [Fact]
+        public void EnemySets_DisplayVanillaForMinusOne_AndSetsOtherwise()
+        {
+            var entry = SettingsCatalog.Entries.First(e => e.SettingId == "EnemySetsDanger3");
+
+            Assert.Equal("-1", entry.RawValue(new GameConfig()));
+            Assert.Equal("バニラのまま", entry.Display("-1"));
+            Assert.Equal("0セット", entry.Display("0"));
+            Assert.Equal("12セット", entry.Display("12"));
         }
 
         [Fact]
@@ -414,9 +427,10 @@ namespace Werewolf.Tests
                 { "StartEnergyPct", "50" },
                 { "StartUpgradesSpec", "Strength:2" },
                 { "OrbDropMax", "6" },
+                { "StartHaulGoalPct", "0" },
             };
             var rows = SettingsCatalog.BuildRows(values);
-            Assert.Equal(8, rows.Count);
+            Assert.Equal(9, rows.Count);
 
             string Value(string label) => rows.First(r => r.Section == "開始環境" && r.Label == label).Value;
             Assert.Equal("5", Value("レベル"));
@@ -533,7 +547,12 @@ namespace Werewolf.Tests
                 StartEnergyPct = 50,
                 StartUpgradesSpec = "Speed:1,Strength:2",
                 OrbDropMax = 9,
+                StartHaulGoalPct = 55,
+                EnemySetsDanger1 = 6,
+                EnemySetsDanger2 = 2,
+                EnemySetsDanger3 = 0,
                 BomberChancePercent = 60,
+                PeacefulVillageChancePercent = 40,
                 BomberProximityMeters = 3,
                 BomberGaugeFullSec = 25,
                 BomberInitialCooldownSec = 90,

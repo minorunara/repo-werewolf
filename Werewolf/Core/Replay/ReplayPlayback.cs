@@ -3,6 +3,22 @@ using System.Collections.Generic;
 
 namespace Werewolf.Core.Replay
 {
+    public readonly struct ReplayGameOver
+    {
+        public ReplayGameOver(double t, byte team, byte reason)
+        {
+            T = t;
+            Team = team;
+            Reason = reason;
+        }
+
+        public double T { get; }
+
+        public byte Team { get; }
+
+        public byte Reason { get; }
+    }
+
     public sealed class ReplayEntityTrack
     {
         public ReplayEntityKind Kind;
@@ -180,7 +196,9 @@ namespace Werewolf.Core.Replay
         public List<(double T, int ExecutedActor)> MeetingResults { get; }
             = new List<(double, int)>();
 
-        public byte WinnerTeam { get; private set; } = 255;
+        public ReplayGameOver? GameOver { get; private set; }
+
+        public double PositionCapT { get; private set; } = double.PositiveInfinity;
 
         public int BaseDollars { get; private set; }
 
@@ -564,8 +582,15 @@ namespace Werewolf.Core.Replay
                     }
                     break;
 
+                case "rec_cap":
+                    if (ev.T < PositionCapT) PositionCapT = ev.T;
+                    break;
+
                 case "gameover":
-                    if (TryField(ev.Fields, "team", out int team)) WinnerTeam = (byte)team;
+                    GameOver = new ReplayGameOver(
+                        ev.T,
+                        TryField(ev.Fields, "team", out int team) ? (byte)team : (byte)255,
+                        TryField(ev.Fields, "reason", out int winReason) ? (byte)winReason : (byte)255);
                     ApplyGameOverRoles(ev.Fields);
                     break;
             }

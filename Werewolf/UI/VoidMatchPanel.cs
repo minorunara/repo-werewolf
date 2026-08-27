@@ -41,27 +41,18 @@ namespace Werewolf.UI
 
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            var go = new GameObject("WW_VoidMatch", typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(layerRoot, false);
-            UiKit.Stretch(rect);
+            RectTransform rect = UiKit.CreateStretched(layerRoot, "WW_VoidMatch");
+            var go = rect.gameObject;
             _root = go;
 
             var canvas = go.AddComponent<Canvas>();
             canvas.overrideSorting = true;
             canvas.sortingOrder = WerewolfUIManager.VoidMatchSortingOrder;
 
-            var confirm = new GameObject("Confirm", typeof(RectTransform));
-            var confirmRect = (RectTransform)confirm.transform;
-            confirmRect.SetParent(rect, false);
-            UiKit.Stretch(confirmRect);
-            _confirmRoot = confirm;
+            RectTransform confirmRect = UiKit.CreateStretched(rect, "Confirm");
+            _confirmRoot = confirmRect.gameObject;
 
-            Image backdrop = UiKit.CreateImage(confirmRect, "Backdrop", Vector2.zero,
-                new Vector2(1920f, 1080f), new Color(0f, 0f, 0f, BackdropAlpha));
-            backdrop.raycastTarget = false;
-            var bgRect = backdrop.rectTransform;
-            UiKit.Stretch(bgRect);
+            UiKit.CreateBackdrop(confirmRect, "Backdrop", new Color(0f, 0f, 0f, BackdropAlpha));
 
             Image box = UiKit.CreateImage(confirmRect, "Box", new Vector2(0f, 60f),
                 new Vector2(BoxWidth, BoxHeight), new Color(0.08f, 0.08f, 0.1f, 0.92f));

@@ -17,6 +17,36 @@ namespace Werewolf.Core.Replay
         Float = 2,
     }
 
+    public enum ReplayStampKind
+    {
+        Result = 0,
+
+        Win = 1,
+    }
+
+    public readonly struct ReplayStamp
+    {
+        public ReplayStamp(ReplayStampKind kind, int executedActor, byte team, byte reason,
+            double progress)
+        {
+            Kind = kind;
+            ExecutedActor = executedActor;
+            Team = team;
+            Reason = reason;
+            Progress = progress;
+        }
+
+        public ReplayStampKind Kind { get; }
+
+        public int ExecutedActor { get; }
+
+        public byte Team { get; }
+
+        public byte Reason { get; }
+
+        public double Progress { get; }
+    }
+
     public sealed class ReplayDanmakuComment
     {
         public int Actor;
@@ -71,31 +101,46 @@ namespace Werewolf.Core.Replay
         private readonly IReadOnlyList<(double T, int Actor, string Text)> _chats;
         private readonly IReadOnlyList<(double T, int ExecutedActor)> _results;
         private readonly ReplayPace _pace;
+        private readonly ReplayGameOver? _gameOver;
         private readonly List<ReplayDanmakuComment> _active = new List<ReplayDanmakuComment>();
 
         private int _chatCursor;
         private int _resultCursor;
         private bool _stampVisible;
+        private bool _stampIsWin;
         private int _stampExecutedActor;
         private double _stampElapsed;
 
         public ReplayDanmaku(
             IReadOnlyList<(double T, int Actor, string Text)> chats,
             IReadOnlyList<(double T, int ExecutedActor)> results,
-            ReplayPace pace)
+            ReplayPace pace,
+            ReplayGameOver? gameOver = null)
         {
             _chats = chats ?? Array.Empty<(double, int, string)>();
             _results = results ?? Array.Empty<(double, int)>();
             _pace = pace;
+            _gameOver = gameOver;
         }
 
         public IReadOnlyList<ReplayDanmakuComment> Active => _active;
 
-        public bool TryGetStamp(out int executedActor, out double progress)
+        public bool TryGetStamp(out ReplayStamp stamp)
         {
-            executedActor = _stampExecutedActor;
-            progress = _stampVisible ? _stampElapsed / StampLifeSec : 0;
-            return _stampVisible;
+            if (!_stampVisible)
+            {
+                stamp = default;
+                return false;
+            }
+            if (_stampIsWin)
+            {
+                ReplayGameOver go = _gameOver.Value;
+                stamp = new ReplayStamp(ReplayStampKind.Win, 0, go.Team, go.Reason, 0);
+                return true;
+            }
+            stamp = new ReplayStamp(ReplayStampKind.Result, _stampExecutedActor, 255, 255,
+                _stampElapsed / StampLifeSec);
+            return true;
         }
 
         public void Step(double prevT, double newT, double dtRealPlaying,
@@ -126,7 +171,7 @@ namespace Werewolf.Core.Replay
                     }
                 }
                 if (focusExpired) _active.Clear();
-                if (_stampVisible)
+                if (_stampVisible && !_stampIsWin)
                 {
                     _stampElapsed += dtRealPlaying;
                     if (_stampElapsed >= StampLifeSec) _stampVisible = false;
@@ -147,16 +192,31 @@ namespace Werewolf.Core.Replay
             while (_resultCursor < _results.Count && _results[_resultCursor].T <= newT)
             {
                 _stampVisible = true;
+                _stampIsWin = false;
                 _stampExecutedActor = _results[_resultCursor].ExecutedActor;
                 _stampElapsed = 0;
                 _resultCursor++;
             }
+
+            if (_gameOver.HasValue && prevT < _gameOver.Value.T && _gameOver.Value.T <= newT)
+            {
+                ShowWinStamp();
+                _active.Clear();
+            }
+        }
+
+        private void ShowWinStamp()
+        {
+            _stampVisible = true;
+            _stampIsWin = true;
+            _stampElapsed = 0;
         }
 
         public void ClearActive()
         {
             _active.Clear();
             _stampVisible = false;
+            _stampIsWin = false;
         }
 
         public void RebuildAtSeek(double t, bool fast, Func<ReplayDanmakuComment, double> measureWidth)
@@ -165,6 +225,11 @@ namespace Werewolf.Core.Replay
             _chatCursor = ReplayPlayback.LastIndexAtOrBefore(CollectChatTimes(), t) + 1;
             _resultCursor = 0;
             while (_resultCursor < _results.Count && _results[_resultCursor].T <= t) _resultCursor++;
+            if (_gameOver.HasValue && t >= _gameOver.Value.T)
+            {
+                ShowWinStamp();
+                return;
+            }
             if (_pace == null) return;
 
             if (_chatCursor > 0)
@@ -223,7 +288,7 @@ namespace Werewolf.Core.Replay
         public static double VisualDepthAt(ReplayDanmakuComment c)
         {
             if (c.Depth <= 0) return 0;
-            double tau = SmoothStep(Clamp01(c.HandoffElapsed / HandoffSec));
+            double tau = SmoothStep(MathUtil.Clamp01(c.HandoffElapsed / HandoffSec));
             return Lerp(c.DepthFrom, c.Depth, tau);
         }
 
@@ -257,7 +322,7 @@ namespace Werewolf.Core.Replay
             double outStart = ReplayChatText.SlideInSec + c.DwellSec;
             if (elapsed > outStart)
             {
-                double tau = Clamp01((elapsed - outStart) / ReplayChatText.SlideOutSec);
+                double tau = MathUtil.Clamp01((elapsed - outStart) / ReplayChatText.SlideOutSec);
                 x += sign * 0.16 * tau * tau;
             }
             return x;
@@ -279,7 +344,7 @@ namespace Werewolf.Core.Replay
 
             if (elapsed < ReplayChatText.SlideInSec)
             {
-                double tau = SmoothStep(Clamp01(elapsed / ReplayChatText.SlideInSec));
+                double tau = SmoothStep(MathUtil.Clamp01(elapsed / ReplayChatText.SlideInSec));
                 y += TiltSign(c) * 0.055 * (1 - tau);
             }
             return y;
@@ -336,7 +401,7 @@ namespace Werewolf.Core.Replay
             double outStart = ReplayChatText.SlideInSec + c.DwellSec;
             if (elapsed > outStart)
             {
-                double tau = Clamp01((elapsed - outStart) / ReplayChatText.SlideOutSec);
+                double tau = MathUtil.Clamp01((elapsed - outStart) / ReplayChatText.SlideOutSec);
                 arrival *= 1 - 0.10 * SmoothStep(tau);
             }
             return arrival * ScaleForDepth(VisualDepthAt(c));
@@ -363,7 +428,7 @@ namespace Werewolf.Core.Replay
             if (elapsed < ReplayChatText.SlideInSec)
             {
                 arrival = TrajectoryTiltSign(c) * Lerp(startAngle, Math.Abs(restingAngle),
-                    SmoothStep(Clamp01(elapsed / ReplayChatText.SlideInSec)));
+                    SmoothStep(MathUtil.Clamp01(elapsed / ReplayChatText.SlideInSec)));
             }
             else if (elapsed < ReplayChatText.SlideInSec + ArrivalTiltSettleSec)
             {
@@ -466,7 +531,7 @@ namespace Werewolf.Core.Replay
             double alpha;
             if (elapsed < ReplayChatText.SlideInSec)
             {
-                alpha = peak * SmoothStep(Clamp01(elapsed / 0.06));
+                alpha = peak * SmoothStep(MathUtil.Clamp01(elapsed / 0.06));
             }
             else if (elapsed >= ReplayChatText.SlideInSec + ArrivalTiltSettleSec)
             {
@@ -477,7 +542,7 @@ namespace Werewolf.Core.Replay
                 alpha = peak * (1 - SmoothStep(
                     (elapsed - ReplayChatText.SlideInSec) / ArrivalTiltSettleSec));
             }
-            return alpha * (1 - Clamp01(VisualDepthAt(c)));
+            return alpha * (1 - MathUtil.Clamp01(VisualDepthAt(c)));
         }
 
         public static double AccentWidthScaleAt(ReplayDanmakuComment c, double elapsed)
@@ -624,7 +689,7 @@ namespace Werewolf.Core.Replay
 
         private static double ScaleForDepth(double depth)
         {
-            depth = Clamp01(depth / 3) * 3;
+            depth = MathUtil.Clamp01(depth / 3) * 3;
             if (depth <= 1) return Lerp(1.0, 0.82, depth);
             if (depth <= 2) return Lerp(0.82, 0.68, depth - 1);
             return Lerp(0.68, 0.56, depth - 2);
@@ -632,17 +697,15 @@ namespace Werewolf.Core.Replay
 
         private static double SmoothStep(double t)
         {
-            t = Clamp01(t);
+            t = MathUtil.Clamp01(t);
             return t * t * (3 - 2 * t);
         }
 
         private static double EaseOutCubic(double t)
         {
-            double rest = 1 - Clamp01(t);
+            double rest = 1 - MathUtil.Clamp01(t);
             return 1 - rest * rest * rest;
         }
-
-        private static double Clamp01(double t) => t < 0 ? 0 : (t > 1 ? 1 : t);
 
         private static double Lerp(double a, double b, double t) => a + (b - a) * t;
 

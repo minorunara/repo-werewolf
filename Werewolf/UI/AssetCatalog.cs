@@ -211,6 +211,11 @@ namespace Werewolf.UI
             return HeartbeatPlaceholder();
         }
 
+        public static AudioClip GetConveneChargeClip()
+        {
+            return ConveneChargeClip();
+        }
+
         private static Sprite _bombIconPlaceholder;
 
         private static Sprite BombIconPlaceholder()
@@ -262,6 +267,35 @@ namespace Werewolf.UI
 
         private static AudioClip _heartbeatPlaceholder;
 
+        private static AudioClip _conveneChargeClip;
+
+        private static AudioClip ConveneChargeClip()
+        {
+            if (_conveneChargeClip != null) return _conveneChargeClip;
+
+            const int sampleRate = 22050;
+            const int durationSeconds = 1;
+            const float fundamentalHz = 110f;
+            int total = sampleRate * durationSeconds;
+            var samples = new float[total];
+
+            for (int i = 0; i < total; i++)
+            {
+                float t = i / (float)sampleRate;
+                float phase = 2f * Mathf.PI * fundamentalHz * t;
+                float tone = 0.70f * Mathf.Sin(phase)
+                           + 0.22f * Mathf.Sin(phase * 2f)
+                           + 0.08f * Mathf.Sin(phase * 3f);
+                samples[i] = tone * 0.55f;
+            }
+
+            var clip = AudioClip.Create("WW_ConveneCharge", total, 1, sampleRate, false);
+            if (clip == null) return null;
+            if (!clip.SetData(samples, 0)) return null;
+            _conveneChargeClip = clip;
+            return clip;
+        }
+
         private static AudioClip HeartbeatPlaceholder()
         {
             if (_heartbeatPlaceholder != null) return _heartbeatPlaceholder;
@@ -304,6 +338,7 @@ namespace Werewolf.UI
             _streamerSafeMode = false;
             _bombIconPlaceholder = null;
             _heartbeatPlaceholder = null;
+            _conveneChargeClip = null;
         }
 
         private static byte[] LoadEmbeddedBytes(string fileName)

@@ -26,6 +26,7 @@ namespace Werewolf.Tests
         [InlineData("sfx_page_turn_05")]
         [InlineData("sfx_page_turn_06")]
         [InlineData("sfx_page_turn_07")]
+        [InlineData("sfx_decode_type")]
         public void RequestedClips_AreEmbeddedSupportedPcm16Wav(string clipKey)
         {
             using var module = ModuleDefinition.ReadModule(Meta("Werewolf.ModDllPath"));
@@ -101,10 +102,10 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void TickRolesClient_ResolvesBellClipFromCrossedMark()
+        public void RolesClientTick_ResolvesBellClipFromCrossedMark()
         {
             using var module = ModuleDefinition.ReadModule(Meta("Werewolf.ModDllPath"));
-            MethodDefinition method = DirectorMethod(module, "TickRolesClient");
+            MethodDefinition method = TypeMethod(module, "Werewolf.Game.RolesClientController", "Tick");
 
             Assert.Contains(method.Body.Instructions, ins =>
                 (ins.OpCode == OpCodes.Call || ins.OpCode == OpCodes.Callvirt) &&
@@ -117,7 +118,7 @@ namespace Werewolf.Tests
         public void SharedMeetingChatAppend_PlaysPopOnlyAfterAcceptedAppend()
         {
             using var module = ModuleDefinition.ReadModule(Meta("Werewolf.ModDllPath"));
-            MethodDefinition method = DirectorMethod(module, "AppendMeetingChatMessageClient");
+            MethodDefinition method = TypeMethod(module, ChatControllerType, "AppendChatMessage");
             var instructions = method.Body.Instructions;
 
             int append = IndexOfCall(instructions, "Werewolf.Core.MeetingChatLog", "Append");
@@ -126,11 +127,11 @@ namespace Werewolf.Tests
                             (string)x.ins.Operand == "sfx_chat_message")
                 .Select(x => x.index)
                 .SingleOrDefault(-1);
-            int play = IndexOfCall(instructions, "Werewolf.UI.SfxPlayer", "Play");
+            int play = IndexOfCall(instructions, "Werewolf.Game.WerewolfDirector", "PlaySfx");
 
             Assert.True(append >= 0, "共通チャット追加経路から MeetingChatLog.Append が消えている");
             Assert.True(clip > append, "チャット音がログ追加より前、または配線されていない");
-            Assert.True(play > clip, "sfx_chat_message が SfxPlayer.Play へ渡されていない");
+            Assert.True(play > clip, "sfx_chat_message が PlaySfx へ渡されていない");
             Assert.Contains(instructions.Skip(append + 1).Take(clip - append - 1),
                 ins => ins.OpCode.FlowControl == FlowControl.Cond_Branch);
         }
@@ -139,11 +140,11 @@ namespace Werewolf.Tests
         public void TickMeetingClient_OpensDiscussionOnlyAfterTaxmanPost()
         {
             using var module = ModuleDefinition.ReadModule(Meta("Werewolf.ModDllPath"));
-            MethodDefinition method = DirectorMethod(module, "TickMeetingClient");
+            MethodDefinition method = TypeMethod(module, "Werewolf.Game.MeetingClientController", "TickMeetingClient");
             var instructions = method.Body.Instructions;
 
             int taxmanPost = IndexOfCall(instructions,
-                "Werewolf.Game.WerewolfDirector", "PostMeetingChatSystemLines");
+                ChatControllerType, "PostMeetingOpening");
             int openDiscussion = IndexOfCall(instructions,
                 "Werewolf.Core.MeetingClientState", "MarkDiscussionOpen");
 
@@ -152,26 +153,76 @@ namespace Werewolf.Tests
                 "議論受付がTaxman投稿より前、または明示的に開かれていない");
         }
 
-        [Theory]
-        [InlineData("RecordMeetingChatClient")]
-        [InlineData("DebugInjectChatCore")]
-        public void RealAndDebugChat_UseSharedAppendAndSfxPath(string methodName)
+        [Fact]
+        public void TickMeetingClient_DrivesConveneChargeSfxFromHoldState()
         {
             using var module = ModuleDefinition.ReadModule(Meta("Werewolf.ModDllPath"));
-            MethodDefinition method = DirectorMethod(module, methodName);
+            MethodDefinition method = TypeMethod(module,
+                "Werewolf.Game.MeetingClientController", "TickMeetingClient");
 
             Assert.Contains(method.Body.Instructions, ins =>
                 (ins.OpCode == OpCodes.Call || ins.OpCode == OpCodes.Callvirt) &&
                 ins.Operand is MethodReference mr &&
+                mr.DeclaringType.FullName == "Werewolf.Vanilla.MeetingButton" &&
+                mr.Name == "get_HoldRatio");
+            Assert.Contains(method.Body.Instructions, ins =>
+                (ins.OpCode == OpCodes.Call || ins.OpCode == OpCodes.Callvirt) &&
+                ins.Operand is MethodReference mr &&
                 mr.DeclaringType.FullName == "Werewolf.Game.WerewolfDirector" &&
-                mr.Name == "AppendMeetingChatMessageClient");
+                mr.Name == "PlayConveneChargeSfx");
+            Assert.Contains(method.Body.Instructions, ins =>
+                (ins.OpCode == OpCodes.Call || ins.OpCode == OpCodes.Callvirt) &&
+                ins.Operand is MethodReference mr &&
+                mr.DeclaringType.FullName == "Werewolf.Game.WerewolfDirector" &&
+                mr.Name == "StopConveneChargeSfx");
         }
 
-        private static MethodDefinition DirectorMethod(ModuleDefinition module, string name)
+        [Fact]
+        public void ConveneChargeSfx_UsesProgressPitchAndProceduralLoopClip()
         {
-            TypeDefinition director = module.GetType("Werewolf.Game.WerewolfDirector");
-            Assert.NotNull(director);
-            MethodDefinition method = director.Methods.SingleOrDefault(m => m.Name == name);
+            using var module = ModuleDefinition.ReadModule(Meta("Werewolf.ModDllPath"));
+            MethodDefinition play = TypeMethod(module, "Werewolf.UI.SfxPlayer", "PlayConveneCharge");
+            MethodDefinition clip = TypeMethod(module, "Werewolf.UI.AssetCatalog", "ConveneChargeClip");
+
+            Assert.Contains(play.Body.Instructions, ins =>
+                (ins.OpCode == OpCodes.Call || ins.OpCode == OpCodes.Callvirt) &&
+                ins.Operand is MethodReference mr &&
+                mr.DeclaringType.FullName == "Werewolf.Core.ConveneChargeTone" &&
+                mr.Name == "PitchFor");
+            Assert.Contains(play.Body.Instructions, ins =>
+                (ins.OpCode == OpCodes.Call || ins.OpCode == OpCodes.Callvirt) &&
+                ins.Operand is MethodReference mr &&
+                mr.DeclaringType.FullName == "UnityEngine.AudioSource" &&
+                mr.Name == "set_pitch");
+            Assert.Contains(clip.Body.Instructions, ins =>
+                (ins.OpCode == OpCodes.Call || ins.OpCode == OpCodes.Callvirt) &&
+                ins.Operand is MethodReference mr &&
+                mr.DeclaringType.FullName == "UnityEngine.AudioClip" &&
+                mr.Name == "Create");
+        }
+
+        [Theory]
+        [InlineData("RecordChat")]
+        [InlineData("DebugInjectChatCore")]
+        public void RealAndDebugChat_UseSharedAppendAndSfxPath(string methodName)
+        {
+            using var module = ModuleDefinition.ReadModule(Meta("Werewolf.ModDllPath"));
+            MethodDefinition method = TypeMethod(module, ChatControllerType, methodName);
+
+            Assert.Contains(method.Body.Instructions, ins =>
+                (ins.OpCode == OpCodes.Call || ins.OpCode == OpCodes.Callvirt) &&
+                ins.Operand is MethodReference mr &&
+                mr.DeclaringType.FullName == ChatControllerType &&
+                mr.Name == "AppendChatMessage");
+        }
+
+        private const string ChatControllerType = "Werewolf.Game.MeetingChatController";
+
+        private static MethodDefinition TypeMethod(ModuleDefinition module, string typeFullName, string name)
+        {
+            TypeDefinition type = module.GetType(typeFullName);
+            Assert.NotNull(type);
+            MethodDefinition method = type.Methods.SingleOrDefault(m => m.Name == name);
             Assert.NotNull(method);
             Assert.True(method.HasBody, $"{name} に IL Body が無い");
             return method;

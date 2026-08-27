@@ -5,7 +5,10 @@ using UnityEngine;
 using Werewolf.Core;
 using Werewolf.Game.Patches;
 using Werewolf.Net;
+using Werewolf.Scenarios.Core;
+using Werewolf.Scenarios.Game;
 using Werewolf.UI;
+using Werewolf.Vanilla;
 
 namespace Werewolf.Game
 {
@@ -16,15 +19,21 @@ namespace Werewolf.Game
         {
             try
             {
-                var rm = RunManager.instance;
-                if (rm == null)
+                if (!Session.HasRunManager)
                 {
                     WLog.Line("return_lobby_skipped", secret: false, ("reason", "no_run_manager"));
                     return;
                 }
+                if (ScenarioSessionGate.ReturnsToTitle(ScenarioRun.Active))
+                {
+                    Session.AllPlayersDeadSet(false);
+                    ScenarioRun.ExitToTitle("result_sequence", completed: true);
+                    return;
+                }
+
                 WLog.Line("return_lobby", secret: false, ("via", "result_sequence"));
-                rm.ChangeLevel(true, false, RunManager.ChangeLevelType.LobbyMenu);
-                rm.AllPlayersDeadSet(false);
+                Session.ReturnToLobbyMenu();
+                Session.AllPlayersDeadSet(false);
             }
             catch (Exception e)
             {
@@ -34,6 +43,8 @@ namespace Werewolf.Game
 
         private void ResetToLobby(string reason)
         {
+            ScenarioRun.Clear();
+
             if (_session != null)
             {
                 WorldgenApplier.RestoreOnLobbyReturn();
@@ -56,8 +67,8 @@ namespace Werewolf.Game
             {
                 _roles.OnSend -= SendViaBus;
                 _roles.OnInformantEstablished -= HandleInformantEstablished;
-                _roles.OnInformantEstablished -= HandleInformantDigest;
-                _roles.OnPerkUnlocked -= HandlePerkUnlockedDigest;
+                _roles.OnInformantEstablished -= _resultFlowFeature.HandleInformantDigest;
+                _roles.OnPerkUnlocked -= _resultFlowFeature.HandlePerkUnlockedDigest;
                 _roles.OnCurseKill -= ExecuteCurseKill;
                 _roles.OnEnemyIgnoreChanged -= ApplyEnemyIgnore;
                 _roles.OnBeaconTriggered -= TriggerBeacon;
@@ -65,10 +76,8 @@ namespace Werewolf.Game
                 _roles = null;
             }
             _bomber = null;
-            _checkmate = null;
-            _checkmateScanPending = false;
-            _checkmateLineNextSyncUnixMs = 0;
-            _eradicationConfirmAtUnixMs = 0;
+            _lastBombDeny.Clear();
+            _winCeremonyFeature.ResetHost();
             _enemyIgnoreRoster.ClearAll();
             _beaconEffect.CancelAll("reset");
             _beaconEffect.ResetSummonGate();
@@ -79,8 +88,7 @@ namespace Werewolf.Game
                 _session = null;
             }
             TeardownBus();
-            _pendingBots.Clear();
-            _pendingForcedRoles.Clear();
+            _reservations.Clear();
             ClearClientState();
             _clientPhase = GamePhase.Lobby;
             _resetArmed = false;
@@ -89,18 +97,28 @@ namespace Werewolf.Game
 
             _lifecycleGate.ResetForNextRound();
 
+            _lobbySettingsFeature.ResetForLobbyReturn();
+
             ClearCosmeticGrantState(reason);
 
             Patches.WipeGuardPatch.ResetLogThrottle();
 
-            _meetingButton?.Destroy();
             _movementFreezer?.End();
             _enemyFreezer?.End();
             Patches.PlayerSpawnPatch.MeetingActive = false;
-            _meetingUiActive = false;
 
             foreach (IClientPanel panel in _roundPanels) panel.Destroy();
-            _toastQueue = null;
+            _bomberFeature?.DestroyUi();
+            _shamanFeature?.DestroyUi();
+            _tutorialFeature?.DestroyUi();
+            _scenarioFeature?.DestroyUi();
+            _chatFeature?.DestroyUi();
+            _resultFlowFeature?.DestroyUi();
+            _roleRevealFeature?.DestroyUi();
+            _winCeremonyFeature?.DestroyUi();
+            _scatterFeature?.DestroyUi();
+            _rolesClientFeature?.DestroyUi();
+            _meetingClientFeature?.DestroyUi();
             _sfxPlayer.Destroy();
 
             WLog.Phase(GamePhase.GameOver, GamePhase.Lobby, reason);
@@ -109,89 +127,32 @@ namespace Werewolf.Game
 
         private void ClearClientState()
         {
-            ClearResultCountdown();
-            ResetVoidMatch();
-            _nextConveneHoldHintUnixMs = 0;
-            _localRole = null;
-            _knownWerewolves = null;
-            _knownTeammateRoles = null;
+            _resultFlowFeature.Reset();
+            _roundMirror.Reset();
+            _cfgMirror.Reset();
             IdRoster.Reset();
             ReplaySampler.ResetAll();
-            _clientRoundEndUnixMs = 0;
-            _clientWerewolfCount = 0;
-            _deathMirror.Clear();
-            ResetMeetingChat();
-            _chatRecapLostBaseline = 0;
-            _chatMeetingNumber = 0;
-            _lastScatterGroups = null;
-            _displayNameCache = null;
-            _clientMinimapHideEnabled = false;
-            _clientCatPossible = false;
-            _clientDebugSession = false;
-            _clientValuableMapMode = ValuableMapMode.MeetingSync;
-            _clientNecroVoiceMode = NecroVoiceMode.NonWerewolfDead;
-            _clientExtraJumpCount = null;
-            _clientConveneSuppressStartSec = null;
-            _clientConveneSuppressAfterSec = null;
-            _clientHealIntervalSec = null;
-            _clientOutfitChangeAllowed = null;
-
-            _clientBombPack = null;
-            _clientShamanPack = null;
+            _chatFeature.Reset();
             _voiceDriver?.ForceRestore("client_reset");
             _voiceDriver?.SanitizeAtRoundStart();
             _meetingClient.Reset();
-            _clientWarpUnixMs = 0;
-            _warpExecuted = false;
-            _meetingCutByCeremony = false;
-            _votePendulumPlayed = false;
-            _gameStartUnixMsClient = 0;
-            _lastMeetingEndUnixMsClient = 0;
-            _clientRevealDelaySec = 0;
-            _catAwakenGate.Reset();
-            _tutorialPresenter.Cancel();
-            _wasRoleRevealVisible = false;
-            _prevBeaconCharges = 0;
+            _meetingClientFeature.Reset();
+            _tutorialFeature.Reset();
+            _scenarioFeature.Reset();
             _truckWarper?.ResetWatchdog();
-            _scatterPlanAtUnixMs = 0;
-            _scatterAwaitCurse = false;
-            _extractionScatter?.ClearPlan();
-            _scatterGuard.Disarm();
-            _clientScatterGuard.Disarm();
+            _scatterFeature.Reset();
             _votePanel?.StopScatterReveal();
-            ResetRolesClient("client_reset");
+            _rolesClientFeature.Reset();
 
-            if (_revealCoroutine != null)
-            {
-                StopCoroutine(_revealCoroutine);
-                _revealCoroutine = null;
-            }
-            _revealCinematic.HideNow();
-            if (_catAwakenToastCoroutine != null)
-            {
-                StopCoroutine(_catAwakenToastCoroutine);
-                _catAwakenToastCoroutine = null;
-            }
-            _catAwakenToast.HideNow();
-            _revealStarted = false;
-            _awakeningRevealStarted = false;
+            _roleRevealFeature.Reset();
 
-            HideConveneCountdown();
-
-            _deathRevealPending = false;
-            HideDeathReveal();
-
-            HideCheckmateReveal();
-
-            HideEradicationReveal();
+            _winCeremonyFeature.Reset();
 
             _resultScreen.Hide();
 
-            ClearClientDigest();
+            _bomberFeature.Reset();
 
-            ResetBomberClient();
-
-            ResetShamanClient();
+            _shamanFeature.Reset();
         }
 
     }

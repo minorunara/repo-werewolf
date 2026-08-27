@@ -10,15 +10,20 @@ using UnityEngine;
 using Werewolf.Core;
 using Werewolf.Debugging;
 using Werewolf.Game;
+using Werewolf.Scenarios.Core;
+using Werewolf.Scenarios.Game;
 
 namespace Werewolf
 {
     [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
+    [BepInDependency(MenuLibGuid, BepInDependency.DependencyFlags.SoftDependency)]
     public class Plugin : BaseUnityPlugin
     {
         public const string PluginGuid = "minorunara.werewolf";
         public const string PluginName = "Werewolf";
         public const string PluginVersion = WerewolfBuildInfo.Version;
+
+        internal const string MenuLibGuid = "nickklmao.menulib";
 
         internal static new ManualLogSource Logger;
 
@@ -50,6 +55,7 @@ namespace Werewolf
         {
             if (Bindings == null) return;
             GameConfig = Bindings.Snapshot();
+            if (ScenarioRun.Active) GameConfig = ScenarioGameConfig.Build(GameConfig, ScenarioRun.Definition);
         }
 
         private void Awake()
@@ -101,6 +107,15 @@ namespace Werewolf
                 return;
             }
 
+            int scenarioRefFailures = GameRefs.ResolveScenarioRefs();
+            if (scenarioRefFailures > 0)
+            {
+                ScenarioRun.DisableForFailedRefs(scenarioRefFailures);
+                Logger.LogWarning($"{PluginName} {PluginVersion}: チュートリアル用の本体フィールド参照" +
+                    $"{scenarioRefFailures}件が解決できないため、チュートリアルの入口だけを閉じました" +
+                    "（本編は通常どおり動作します）");
+            }
+
             var harmony = new Harmony(PluginGuid);
             if (!ApplyPatchesIsolated(harmony))
             {
@@ -111,6 +126,8 @@ namespace Werewolf
             }
 
             gameObject.AddComponent<WerewolfDirector>();
+
+            ScenarioMenuEntry.TryInstall();
 
             Logger.LogInfo($"{PluginName} {PluginVersion} loaded! " +
                 $"(werewolfCount={GameConfig.WerewolfCount}, " +
@@ -129,6 +146,7 @@ namespace Werewolf
         private static bool ApplyPatchesIsolated(Harmony harmony)
         {
             var failures = new List<(string patchClass, Exception error)>();
+            int scenarioFailures = 0;
             foreach (var type in AccessTools.GetTypesFromAssembly(typeof(Plugin).Assembly))
             {
                 try
@@ -138,15 +156,8 @@ namespace Werewolf
                 catch (Exception e)
                 {
                     failures.Add((type.FullName, e));
+                    if (PatchTierPolicy.IsScenarioTier(type.FullName)) scenarioFailures++;
                 }
-            }
-
-            if (failures.Count == 0)
-            {
-                int patchedCount = 0;
-                foreach (var _ in harmony.GetPatchedMethods()) patchedCount++;
-                WLog.Line("harmony_patched", secret: false, ("methods", patchedCount));
-                return true;
             }
 
             foreach (var (patchClass, error) in failures)
@@ -156,9 +167,26 @@ namespace Werewolf
                     ("patchClass", patchClass), ("err", cause.Message));
                 Logger.LogError($"Harmony patch failed: {patchClass}\n{error}");
             }
-            harmony.UnpatchSelf();
-            WLog.Line("harmony_disabled", secret: false, ("failedClasses", failures.Count));
-            return false;
+
+            PatchApplyOutcome outcome = PatchTierPolicy.Decide(
+                failures.Count - scenarioFailures, scenarioFailures);
+            if (outcome == PatchApplyOutcome.ModDisabled)
+            {
+                harmony.UnpatchSelf();
+                WLog.Line("harmony_disabled", secret: false, ("failedClasses", failures.Count));
+                return false;
+            }
+
+            if (outcome == PatchApplyOutcome.ScenariosDisabled)
+            {
+                ScenarioRun.DisableForFailedPatches(scenarioFailures);
+            }
+
+            int patchedCount = 0;
+            foreach (var _ in harmony.GetPatchedMethods()) patchedCount++;
+            WLog.Line("harmony_patched", secret: false,
+                ("methods", patchedCount), ("scenariosDisabled", scenarioFailures > 0));
+            return true;
         }
 
         private void LoadLanguageOverride()

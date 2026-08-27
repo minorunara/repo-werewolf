@@ -6,6 +6,7 @@ using Werewolf.Core;
 using Werewolf.Game.Patches;
 using Werewolf.Net;
 using Werewolf.UI;
+using Werewolf.Vanilla;
 
 namespace Werewolf.Game
 {
@@ -16,8 +17,7 @@ namespace Werewolf.Game
 
         private void EnsureClientBus()
         {
-            bool multiRoom = GameManager.instance != null
-                && GameManager.instance.gameMode != 0
+            bool multiRoom = !Session.IsSoloMode
                 && Photon.Pun.PhotonNetwork.InRoom
                 && Photon.Pun.PhotonNetwork.CurrentRoom.PlayerCount >= 2;
 
@@ -25,13 +25,13 @@ namespace Werewolf.Game
                 && Photon.Pun.PhotonNetwork.InRoom
                 && Photon.Pun.PhotonNetwork.CurrentRoom.PlayerCount >= 2)
             {
-                long now = NowUnixMs();
+                long now = SessionClock.NowMs();
                 if (now - _busWaitLogAtMs >= 10000L)
                 {
                     _busWaitLogAtMs = now;
                     WLog.Line("client_bus_waiting", secret: false,
-                        ("hasGameManager", GameManager.instance != null),
-                        ("gameMode", GameManager.instance != null ? GameManager.instance.gameMode : -1),
+                        ("hasGameManager", Session.HasGameManager),
+                        ("gameMode", Session.GameModeOrMinusOne),
                         ("players", Photon.Pun.PhotonNetwork.CurrentRoom.PlayerCount));
                 }
             }
@@ -67,8 +67,7 @@ namespace Werewolf.Game
         {
             int roomPlayers = Photon.Pun.PhotonNetwork.CurrentRoom != null
                 ? Photon.Pun.PhotonNetwork.CurrentRoom.PlayerCount : 0;
-            bool solo = GameManager.instance == null
-                || GameManager.instance.gameMode == 0
+            bool solo = Session.IsSoloMode
                 || roomPlayers <= 1;
             bool reused = false;
             if (solo)
@@ -125,9 +124,9 @@ namespace Werewolf.Game
                     PushToast(SessionNotice.ForPlayerDisconnected(ResolveDisplayName(actorNumber)));
                 }
 
-                _modManifestAssemblies.Remove(actorNumber);
+                _modIntegrityFeature.NotifyPlayerLeft(actorNumber);
                 _meetingClient.ApplyPlayerLeft(actorNumber);
-                _meeting?.NotifyPlayerLeft(actorNumber, NowUnixMs());
+                _meeting?.NotifyPlayerLeft(actorNumber, SessionClock.NowMs());
                 if (_bomber != null)
                 {
                     int prevBomber = _bomber.BomberActor;
@@ -146,7 +145,7 @@ namespace Werewolf.Game
                     SendBomberStateIfDirty();
                 }
 
-                _session?.NotifyPlayerLeft(actorNumber, NowUnixMs());
+                _session?.NotifyPlayerLeft(actorNumber, SessionClock.NowMs());
             }
             catch (Exception e)
             {
@@ -161,16 +160,10 @@ namespace Werewolf.Game
             {
                 WLog.Line("local_disconnect_cleanup", secret: false,
                     ("hadSession", _session != null), ("clientPhase", _clientPhase));
-                ResetModIntegrity("local_disconnect");
+                _modIntegrityFeature.ResetSession("local_disconnect");
                 ClearClientState();
                 _clientPhase = GamePhase.Lobby;
-                _lastPublishedBlob = null;
-                _lobbyBlobMirror = null;
-                _lobbySettingsPanel.SetVisibility(panelVisible: false, hintVisible: false);
-                _lastPanelBlob = null;
-                _lastPanelModeEnabled = false;
-                _lobbyPanelUserHidden = false;
-                _debugInjectedBlob = null;
+                _lobbySettingsFeature.ResetForRoomLeave();
                 CrownRoster.Clear();
                 _autoStartWait.Disarm();
                 _resultSequence.Cancel();
@@ -191,7 +184,7 @@ namespace Werewolf.Game
                 if (changed.ContainsKey(RoomState.KeyMinimapHide) &&
                     _roomState.TryReadMinimapHide(out bool minimapHide))
                 {
-                    _clientMinimapHideEnabled = minimapHide;
+                    _cfgMirror.MinimapHideEnabled = minimapHide;
                     WLog.Line("room_props_applied", secret: false,
                         ("key", "minimapHide"), ("value", minimapHide ? 1 : 0));
                 }
@@ -199,7 +192,7 @@ namespace Werewolf.Game
                 if (changed.ContainsKey(RoomState.KeyCatPossible) &&
                     _roomState.TryReadCatPossible(out bool catPossible))
                 {
-                    _clientCatPossible = catPossible;
+                    _cfgMirror.CatPossible = catPossible;
                     WLog.Line("room_props_applied", secret: false,
                         ("key", "catPossible"), ("value", catPossible ? 1 : 0));
                 }
@@ -207,7 +200,7 @@ namespace Werewolf.Game
                 if (changed.ContainsKey(RoomState.KeyValuableMapMode) &&
                     _roomState.TryReadValuableMapMode(out ValuableMapMode valuableMode))
                 {
-                    _clientValuableMapMode = valuableMode;
+                    _cfgMirror.ValuableMapMode = valuableMode;
                     WLog.Line("room_props_applied", secret: false,
                         ("key", "valuableMapMode"), ("value", (int)valuableMode));
                 }
@@ -215,7 +208,7 @@ namespace Werewolf.Game
                 if (changed.ContainsKey(RoomState.KeyNecroVoiceMode) &&
                     _roomState.TryReadNecroVoiceMode(out NecroVoiceMode necroVoiceMode))
                 {
-                    _clientNecroVoiceMode = necroVoiceMode;
+                    _cfgMirror.NecroVoiceMode = necroVoiceMode;
                     WLog.Line("room_props_applied", secret: false,
                         ("key", "necroVoiceMode"), ("value", (int)necroVoiceMode));
                 }
@@ -223,7 +216,7 @@ namespace Werewolf.Game
                 if (changed.ContainsKey(RoomState.KeyExtraJump) &&
                     _roomState.TryReadExtraJump(out int extraJump))
                 {
-                    _clientExtraJumpCount = extraJump;
+                    _cfgMirror.ExtraJumpCount = extraJump;
                     WLog.Line("room_props_applied", secret: false,
                         ("key", "extraJump"), ("value", extraJump));
                 }
@@ -231,7 +224,7 @@ namespace Werewolf.Game
                 if (changed.ContainsKey(RoomState.KeyConveneSuppressStart) &&
                     _roomState.TryReadConveneSuppressStart(out int conveneSupStart))
                 {
-                    _clientConveneSuppressStartSec = conveneSupStart;
+                    _cfgMirror.ConveneSuppressStartSec = conveneSupStart;
                     WLog.Line("room_props_applied", secret: false,
                         ("key", "conveneSupStart"), ("value", conveneSupStart));
                 }
@@ -239,7 +232,7 @@ namespace Werewolf.Game
                 if (changed.ContainsKey(RoomState.KeyConveneSuppressAfter) &&
                     _roomState.TryReadConveneSuppressAfter(out int conveneSupAfter))
                 {
-                    _clientConveneSuppressAfterSec = conveneSupAfter;
+                    _cfgMirror.ConveneSuppressAfterSec = conveneSupAfter;
                     WLog.Line("room_props_applied", secret: false,
                         ("key", "conveneSupAfter"), ("value", conveneSupAfter));
                 }
@@ -247,7 +240,7 @@ namespace Werewolf.Game
                 if (changed.ContainsKey(RoomState.KeyHealInterval) &&
                     _roomState.TryReadHealInterval(out int healInterval))
                 {
-                    _clientHealIntervalSec = healInterval;
+                    _cfgMirror.HealIntervalSec = healInterval;
                     WLog.Line("room_props_applied", secret: false,
                         ("key", "healInterval"), ("value", healInterval));
                 }
@@ -255,7 +248,7 @@ namespace Werewolf.Game
                 if (changed.ContainsKey(RoomState.KeyOutfitChange) &&
                     _roomState.TryReadOutfitChange(out bool outfitAllowed))
                 {
-                    _clientOutfitChangeAllowed = outfitAllowed;
+                    _cfgMirror.OutfitChangeAllowed = outfitAllowed;
                     WLog.Line("room_props_applied", secret: false,
                         ("key", "outfitChange"), ("value", outfitAllowed ? 1 : 0));
                 }
@@ -263,7 +256,7 @@ namespace Werewolf.Game
                 if (changed.ContainsKey(RoomState.KeyBomb) &&
                     _roomState.TryReadBombPack(out int[] bombPack))
                 {
-                    _clientBombPack = bombPack;
+                    _cfgMirror.BombPack = bombPack;
                     WLog.Line("room_props_applied", secret: false,
                         ("key", "bomb"),
                         ("bomberPossible", bombPack[RoomStateKeys.BombIndex.BomberPossible]));
@@ -271,7 +264,7 @@ namespace Werewolf.Game
                 if (changed.ContainsKey(RoomState.KeyShaman) &&
                     _roomState.TryReadShamanPack(out int[] shamanPack))
                 {
-                    _clientShamanPack = shamanPack;
+                    _cfgMirror.ShamanPack = shamanPack;
                     WLog.Line("room_props_applied", secret: false,
                         ("key", "shaman"),
                         ("gazeFullMs", shamanPack[RoomStateKeys.ShamanIndex.GazeFullMs]));
@@ -280,7 +273,7 @@ namespace Werewolf.Game
                 if (changed.ContainsKey(RoomState.KeyCfgShared) &&
                     _roomState.TryReadSharedSettings(out string sharedBlob))
                 {
-                    UpdateLobbyBlobMirror(sharedBlob);
+                    _lobbySettingsFeature.UpdateBlobMirror(sharedBlob);
                 }
             }
             catch (Exception e)

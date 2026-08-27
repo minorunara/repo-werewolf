@@ -16,19 +16,14 @@ namespace Werewolf.UI
         {
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            var go = new GameObject(name, typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(layerRoot, false);
-            UiKit.Stretch(rect);
+            RectTransform rect = UiKit.CreateStretched(layerRoot, name);
 
-            group = go.AddComponent<CanvasGroup>();
+            group = rect.gameObject.AddComponent<CanvasGroup>();
             group.alpha = 0f;
             group.blocksRaycasts = false;
             group.interactable = false;
 
-            Image backdrop = UiKit.CreateImage(rect, "Backdrop", Vector2.zero,
-                new Vector2(1920f, 1080f), backdropColor);
-            UiKit.Stretch(backdrop.rectTransform);
+            UiKit.CreateBackdrop(rect, "Backdrop", backdropColor);
             return rect;
         }
 
@@ -67,9 +62,9 @@ namespace Werewolf.UI
                 UiTween.Fade(fadeGroup, 0f, 1f, durationSec, UiTween.EaseIn()));
         }
 
-        internal static void InvokeSfx(Action onSfx, string errorLogKey)
+        internal static void InvokeCallback(Action callback, string errorLogKey)
         {
-            try { onSfx?.Invoke(); }
+            try { callback?.Invoke(); }
             catch (Exception e)
             {
                 WLog.Line(errorLogKey, secret: false, ("err", e.Message));

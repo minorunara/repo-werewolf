@@ -13,22 +13,19 @@ namespace Werewolf.Tests
     {
         private const string DirectorTypeName = "Werewolf.Game.WerewolfDirector";
 
+        private const string ScenarioControllerTypeName = "Werewolf.Scenarios.Game.ScenarioController";
+
+        private const string ScenarioEntryMethodName = "Reset";
+
         private const string EntryMethodName = "ResetToLobby";
 
         private const string ReasonPermanentHolder =
             "Awake で1回生成し全ラウンド再利用する常駐ホルダ。中身の掃除は ResetToLobby が" +
             "各オブジェクトのメソッド（Destroy/End/ForceRestore/ResetWatchdog 等）で行い、参照自体は残す";
 
-        private const string ReasonMeetingScoped =
-            "会議スコープの保留値。会議外フレームの TickMeetingClient else 分岐が毎フレーム初期値へ戻すため、" +
-            "セッション境界を跨いだ持ち越しが構造的に起きない";
-
         private const string ReasonLobbyScoped =
             "ロビー滞在スコープ（試合セッションではない）。ロビー scope を外れたフレームで" +
             "ResetModIntegrity / TickLobbySettings 側の専用経路がクリアする";
-
-        private const string ReasonRoundStartSnapshot =
-            "ラウンド開始時にホスト設定から取り直すスナップショット。設定値と食い違ったフレームで自己再生成する";
 
         private const string ReasonDiagnosticOnly =
             "観測・ログスロットル専用でゲーム進行に影響しない（残っても次の観測で上書き・自然失効する）";
@@ -41,55 +38,28 @@ namespace Werewolf.Tests
             ["_uiManager"] = ReasonPermanentHolder,
             ["_votePanel"] = ReasonPermanentHolder,
             ["_roundPanels"] = ReasonPermanentHolder,
-            ["_meetingButton"] = ReasonPermanentHolder,
             ["_movementFreezer"] = ReasonPermanentHolder,
             ["_enemyFreezer"] = ReasonPermanentHolder,
             ["_truckWarper"] = ReasonPermanentHolder,
             ["_voiceDriver"] = ReasonPermanentHolder,
             ["_voiceIsDeadActor"] = ReasonPermanentHolder,
             ["_voiceIsEavesdropTarget"] = ReasonPermanentHolder,
-            ["_extractionScatter"] = ReasonPermanentHolder,
+            ["_bomberFeature"] = ReasonPermanentHolder,
+            ["_shamanFeature"] = ReasonPermanentHolder,
+            ["_modIntegrityFeature"] = ReasonPermanentHolder,
+            ["_tutorialFeature"] = ReasonPermanentHolder,
+            ["_scenarioFeature"] = ReasonPermanentHolder,
+            ["_chatFeature"] = ReasonPermanentHolder,
+            ["_resultFlowFeature"] = ReasonPermanentHolder,
+            ["_lobbySettingsFeature"] = ReasonPermanentHolder,
+            ["_roleRevealFeature"] = ReasonPermanentHolder,
+            ["_winCeremonyFeature"] = ReasonPermanentHolder,
+            ["_scatterFeature"] = ReasonPermanentHolder,
+            ["_rolesClientFeature"] = ReasonPermanentHolder,
+            ["_meetingClientFeature"] = ReasonPermanentHolder,
 
-            ["_pendingBeaconAudit"] = ReasonMeetingScoped,
-            ["_pendingMeetingTutorial"] = ReasonMeetingScoped,
-            ["_resultCeremonyAtMs"] = ReasonMeetingScoped,
-            ["_pendingCurseCatActor"] = ReasonMeetingScoped,
-            ["_pendingCurseDeadlineMs"] = ReasonMeetingScoped,
-
-            ["_modIntegritySessionActive"] = ReasonLobbyScoped,
-            ["_modIntegrityHostActor"] = ReasonLobbyScoped,
-            ["_modIntegrityHostSignal"] = ReasonLobbyScoped,
-            ["_modIntegrityEpochSeed"] = ReasonLobbyScoped,
-            ["_modIntegrityPendingRequest"] = ReasonLobbyScoped,
-            ["_modIntegrityRosterTickAtMs"] = ReasonLobbyScoped,
-            ["_modIntegrityUiEpoch"] = ReasonLobbyScoped,
-            ["_modIntegrityUiRevision"] = ReasonLobbyScoped,
-            ["_lastPanelBlob"] = ReasonLobbyScoped,
-            ["_lastPanelModeEnabled"] = ReasonLobbyScoped,
-            ["_lastPublishedBlob"] = ReasonLobbyScoped,
-            ["_lobbyBlobMirror"] = ReasonLobbyScoped,
-            ["_lobbyTickAtMs"] = ReasonLobbyScoped,
-            ["_lobbyPanelUserHidden"] = ReasonLobbyScoped,
-            ["_lobbyStartHeldPage"] = ReasonLobbyScoped,
-            ["_debugInjectedBlob"] = ReasonLobbyScoped,
-
-            ["_bomberProximity"] = ReasonRoundStartSnapshot,
-            ["_selfDefenseProximity"] = ReasonRoundStartSnapshot,
-            ["_bomberProximityFullSec"] = ReasonRoundStartSnapshot,
-            ["_shamanSense"] = ReasonRoundStartSnapshot,
-            ["_shamanCooldownSecSnapshot"] = ReasonRoundStartSnapshot,
-            ["_shamanGazeFullSecSnapshot"] = ReasonRoundStartSnapshot,
-
-            ["_warpVerifyTarget"] = ReasonDiagnosticOnly,
-            ["_warpVerifyDeadlineMs"] = ReasonDiagnosticOnly,
             ["_busWaitLogAtMs"] = ReasonDiagnosticOnly,
-            ["_inputGateLastFree"] = ReasonDiagnosticOnly,
-            ["_inputGateProbe"] = ReasonDiagnosticOnly,
-            ["_chatDebugAvatarFallback"] = ReasonDiagnosticOnly,
-            ["_chatDebugDueUnixMs"] = ReasonDiagnosticOnly,
-            ["_chatDebugPendingText"] = ReasonDiagnosticOnly,
 
-            ["_checkmateNextScanUnixMs"] = ReasonOwnerNulled,
         };
 
         private static string Meta(string key)
@@ -99,27 +69,27 @@ namespace Werewolf.Tests
                 .Single(a => a.Key == key).Value;
         }
 
-        private static IEnumerable<FieldDefinition> MutableInstanceFields(TypeDefinition director)
+        private static IEnumerable<FieldDefinition> MutableInstanceFields(TypeDefinition owner)
         {
-            return director.Fields.Where(f =>
+            return owner.Fields.Where(f =>
                 !f.IsStatic &&
                 !f.IsLiteral &&
                 !f.IsInitOnly &&
                 !f.Name.Contains('<'));
         }
 
-        private static HashSet<string> WrittenFieldsFrom(TypeDefinition director, string entryMethodName)
+        private static HashSet<string> WrittenFieldsFrom(TypeDefinition owner, string entryMethodName)
         {
             var written = new HashSet<string>(StringComparer.Ordinal);
             var visited = new HashSet<string>(StringComparer.Ordinal);
 
             var queue = new Queue<MethodDefinition>();
-            foreach (var m in director.Methods.Where(m => m.Name == entryMethodName && m.HasBody))
+            foreach (var m in owner.Methods.Where(m => m.Name == entryMethodName && m.HasBody))
             {
                 queue.Enqueue(m);
                 visited.Add(m.FullName);
             }
-            Assert.True(queue.Count > 0, $"{DirectorTypeName}.{entryMethodName} が見つからない（IL Body 付き）。");
+            Assert.True(queue.Count > 0, $"{owner.FullName}.{entryMethodName} が見つからない（IL Body 付き）。");
 
             while (queue.Count > 0)
             {
@@ -128,7 +98,7 @@ namespace Werewolf.Tests
                 {
                     if ((ins.OpCode == OpCodes.Stfld || ins.OpCode == OpCodes.Ldflda) &&
                         ins.Operand is FieldReference fr &&
-                        fr.DeclaringType.FullName == DirectorTypeName)
+                        fr.DeclaringType.FullName == owner.FullName)
                     {
                         written.Add(fr.Name);
                         continue;
@@ -138,7 +108,7 @@ namespace Werewolf.Tests
                         !(ins.Operand is MethodReference mr))
                         continue;
 
-                    if (mr.DeclaringType.FullName != DirectorTypeName) continue;
+                    if (mr.DeclaringType.FullName != owner.FullName) continue;
                     if (visited.Contains(mr.FullName)) continue;
 
                     MethodDefinition target = mr.Resolve();
@@ -151,30 +121,47 @@ namespace Werewolf.Tests
             return written;
         }
 
-        [Fact]
-        public void SessionTeardown_WritesEveryMutableDirectorField()
+        private static void AssertTeardownWritesEveryMutableField(
+            string typeName, string entryMethodName,
+            IReadOnlyDictionary<string, string> exempt, string fixHint)
         {
             var dllPath = Meta("Werewolf.ModDllPath");
             Assert.True(File.Exists(dllPath), $"MOD DLL が見つからない: {dllPath}");
 
             using var module = ModuleDefinition.ReadModule(dllPath);
-            var director = module.GetType(DirectorTypeName);
-            Assert.NotNull(director);
+            TypeDefinition owner = module.GetType(typeName);
+            Assert.NotNull(owner);
 
-            HashSet<string> written = WrittenFieldsFrom(director, EntryMethodName);
+            HashSet<string> written = WrittenFieldsFrom(owner, entryMethodName);
 
-            var missing = MutableInstanceFields(director)
+            var missing = MutableInstanceFields(owner)
                 .Select(f => f.Name)
-                .Where(n => !written.Contains(n) && !ExemptFields.ContainsKey(n))
+                .Where(n => !written.Contains(n) && !exempt.ContainsKey(n))
                 .OrderBy(n => n, StringComparer.Ordinal)
                 .ToList();
 
             Assert.True(missing.Count == 0,
-                $"{EntryMethodName} から到達する経路で掃除されていない可変フィールドが {missing.Count} 個ある:\n" +
+                $"{typeName}: {entryMethodName} から到達する経路で掃除されていない可変フィールドが " +
+                $"{missing.Count} 個ある:\n" +
                 string.Join("\n", missing.Select(n => "  - " + n)) + "\n" +
-                "セッション境界で前の試合の状態が次の試合へ持ち越される（ADR-0044 と同型の事故）。" +
-                $"修復手順: WerewolfDirector.Reset.cs の {EntryMethodName}()（またはそこから呼ばれる Reset*/Clear*/Hide* ）で" +
+                "境界の前後で状態が持ち越される（ADR-0044 と同型の事故）。修復手順: " + fixHint);
+        }
+
+        [Fact]
+        public void SessionTeardown_WritesEveryMutableDirectorField()
+        {
+            AssertTeardownWritesEveryMutableField(DirectorTypeName, EntryMethodName, ExemptFields,
+                $"WerewolfDirector.Reset.cs の {EntryMethodName}()（またはそこから呼ばれる Reset*/Clear*/Hide* ）で" +
                 "初期値へ戻すこと。掃除が不要なフィールドは ExemptFields へ理由付きで登録する。");
+        }
+
+        [Fact]
+        public void ScenarioReset_WritesEveryMutableScenarioControllerField()
+        {
+            AssertTeardownWritesEveryMutableField(ScenarioControllerTypeName, ScenarioEntryMethodName,
+                new Dictionary<string, string>(),
+                $"状態を足した partial の Reset*()（ScenarioController.{ScenarioEntryMethodName}() が呼ぶ）で" +
+                "初期値へ戻すこと。生成時に確定して掃除の要らない参照は readonly で持つ。");
         }
 
         [Fact]

@@ -90,18 +90,25 @@ namespace Werewolf.Core
         {
             if (e.ArgA == TeamCodes.VoidMatch) return Texts.Get(TextId.ResultBannerVoid);
 
-            string team;
-            switch ((Team)e.ArgA)
-            {
-                case Team.Villagers: team = Texts.Get(TextId.ResultBannerVillagerWin); break;
-                case Team.Werewolves: team = Texts.Get(TextId.ResultBannerWerewolfWin); break;
-                default: team = Texts.Get(TextId.ResultBannerDefault); break;
-            }
+            string team = OutcomeText((byte)e.ArgA);
             string reason = ReasonText(e.ArgB);
             return reason == null ? team : Texts.Format(TextId.DigestMatchEndFormat, team, reason);
         }
 
-        private static string ReasonText(int reason)
+        public static string OutcomeText(byte outcome)
+        {
+            switch (outcome)
+            {
+                case (byte)Team.Villagers: return Texts.Get(TextId.ResultBannerVillagerWin);
+                case (byte)Team.Werewolves: return Texts.Get(TextId.ResultBannerWerewolfWin);
+                case TeamCodes.VoidMatch: return Texts.Get(TextId.ResultBannerVoid);
+                case TeamCodes.PeacefulSurvived: return Texts.Get(TextId.ResultBannerPeacefulSurvived);
+                case TeamCodes.PeacefulCollapsed: return Texts.Get(TextId.ResultBannerPeacefulCollapsed);
+                default: return Texts.Get(TextId.ResultBannerDefault);
+            }
+        }
+
+        public static string ReasonText(int reason)
         {
             switch (reason)
             {
@@ -111,6 +118,23 @@ namespace Werewolf.Core
                 case (int)WinReason.TimerExpired: return Texts.Get(TextId.DigestReasonTimerExpired);
                 case (int)WinReason.ExtractionFailed: return Texts.Get(TextId.DigestReasonExtractionFailed);
                 case (int)WinReason.ValueCheckmate: return Texts.Get(TextId.DigestReasonValueCheckmate);
+                case (int)WinReason.PeacefulSurvived: return Texts.Get(TextId.DigestReasonExtractionCompleted);
+                default: return null;
+            }
+        }
+
+        public static string EpigraphText(int reason)
+        {
+            switch (reason)
+            {
+                case (int)WinReason.WerewolvesEradicated: return Texts.Get(TextId.EpigraphWerewolvesEradicated);
+                case (int)WinReason.VillagersEradicated: return Texts.Get(TextId.EpigraphVillagersEradicated);
+                case (int)WinReason.ExtractionCompleted: return Texts.Get(TextId.EpigraphExtractionCompleted);
+                case (int)WinReason.TimerExpired: return Texts.Get(TextId.EpigraphTimerExpired);
+                case (int)WinReason.ExtractionFailed: return Texts.Get(TextId.EpigraphExtractionFailed);
+                case (int)WinReason.ValueCheckmate: return Texts.Get(TextId.EpigraphValueCheckmate);
+                case (int)WinReason.PeacefulSurvived: return Texts.Get(TextId.EpigraphPeacefulSurvived);
+                case (int)WinReason.PeacefulCollapsed: return Texts.Get(TextId.EpigraphPeacefulCollapsed);
                 default: return null;
             }
         }

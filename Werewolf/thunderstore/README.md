@@ -6,26 +6,37 @@ REPO Werewolf turns a normal R.E.P.O. run into a social deduction game. It takes
 
 Each player gets a hidden role on either the villager team or the werewolf team. Villagers still have to finish the extractions and leave in the truck. Werewolves have to stop them without giving themselves away. Bodies can be reported, the truck has an emergency meeting button, and suspected werewolves can be voted out. PvP is enabled too, and melee weapons can kill other players.
 
-- Requires at least 3 players
-- Every player in the lobby needs the mod
-- English is the default language; Japanese is also included
-
-> The screenshots and gameplay preview currently show the Japanese UI. The same screens are available in English.
+The UI is available in English and Japanese. English is selected automatically on a fresh install.
 
 ![Meeting, voting, execution, and match results](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/match-flow-en.gif)
 
 ### What's included
 
+- A scenario-based tutorial where you can learn how to play on your own
 - Five roles: Villager, Shaman, Werewolf, Black Cat, and Bomber
-- Win conditions tied directly to valuable damage and deliveries
+- Win conditions tied directly to valuable damage and extraction progress
+- A "peaceful village" mixed in at a configurable chance, where nobody is on the werewolf team
 - Body reports, emergency meetings, discussion, voting, and executions handled inside the game
 - After some meetings, survivors are shuffled and sent back out in random groups
 - Participant numbers for public lobbies, so "No. 3 looks suspicious" is enough to identify someone
 - A valuable loss gauge and a meeting map with a coordinate grid
 - Settings for the stage, level, starting items, player upgrades, the truck's starting charge, and other match rules
 - A lobby check for room settings and differences between players' mod lists
-- A 28-page manual explaining all of the rules and roles, available at any time
+- A 29-page manual explaining all of the rules and roles, available at any time
 - Meeting chat, result screen chat, and a replay that can be saved and watched in a browser
+
+### Try the tutorial solo
+
+Select `REPO Werewolf Tutorial` in the bottom-right corner of the title screen for a quick, hands-on introduction that you can play alone with bots.
+
+![Starting the REPO Werewolf Tutorial](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/tutorial-en.gif)
+
+- Play as a Villager and experience discussion through the meeting chat log, voting, the ballot reveal, and the match results
+- Play as a Werewolf, destroy valuables around the map, unlock perks, and win by reaching value checkmate
+- Find a body hidden somewhere on the map, report it, call a meeting, and close in on the Werewolf
+- Use the ability to turn another player into a bomb and see how the other players piece together what happened.
+
+The tutorial runs as a self-contained round and does not modify your regular save data.
 
 ### Meetings and voting
 
@@ -59,7 +70,7 @@ Voice chat is optional. Messages sent during a meeting stay in the meeting log, 
 
 ![Top-down match replay](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/match-replay.gif)
 
-The `Replay` button on the result screen opens a top-down view of the match over the game map. It shows players, enemies, items (including valuables and carts), and bodies moving over time. You can also review damage to valuables, valuables that were lost or delivered, extraction point states, and the running loss total.
+The `Replay` button on the result screen opens a top-down view of the match over the game map. It shows players, enemies, items (including valuables and carts), and bodies moving over time. You can also review damage to valuables, valuables that were lost or extracted, extraction point states, and the running loss total.
 
 The viewer has play, pause, speed, and seek controls. Select a marker to follow its trail. During meetings, the replay shows the text chat and vote result. Playback slows down when someone posts a message and speeds through parts of the meeting with no chat.
 
@@ -67,12 +78,13 @@ The save button writes the replay file to your Downloads folder. To watch it lat
 
 ### Before installing
 
-- Every player in the lobby must use the same version of the mod
+- Both the host and every client must install the same version of the mod
+- The REPO Werewolf Tutorial can be played solo, but multiplayer Werewolf Mode requires at least 3 players
 - Vanilla rooms support up to 6 players. Larger groups need a compatible [MorePlayers mod](https://thunderstore.io/c/repo/p/linkoid/RoboUnion/)
 - If possible, make a separate mod manager profile and share it with your group. That keeps everyone's mods and settings in sync
 - Werewolf Mode is a one-level match. Starting it from an existing save replaces that save with the match state, so use a dedicated save slot
 
-English is selected automatically on a fresh install. Press `F1` to open the manual with the default keybind.
+Press `F1` to open the manual with the default keybind.
 
 The [full English guide on GitHub](https://github.com/minorunara/repo-werewolf/blob/main/README.md) has the complete rules, suggested room settings, default controls, streamer-safe mode, credits, and license information.
 
@@ -86,30 +98,42 @@ R.E.P.O.にAmong Us風の人狼モードを追加するMODです。
 
 ## 概要
 
-プレイヤーは村人陣営・人狼陣営のいずれかに秘密裏に割り当てられ、いつも通り探索・回収・納品を進めながら心理戦を行います。  
+プレイヤーは村人陣営・人狼陣営のいずれかに秘密裏に割り当てられ、いつも通り探索・回収・抽出を進めながら心理戦を行います。  
 人狼は影から妨害し、村人は死体を通報し、緊急会議を開き、ノルマ達成が不可能になる前に投票（あるいは実力行使）で人狼を処刑しましょう。
-
-- 3人以上でプレイ可能
-- ホストとクライアントの両方がこのMODを導入している必要があります
-- 表示言語は英語（デフォルト）・日本語に対応しています
 
 ## 主な機能
 
+- 1人でも遊び方を体験できるシナリオ型チュートリアル
 - 村人・祈祷師・人狼・黒猫・爆弾魔の複数役職による、陣営と特殊能力を活かした心理戦
-- 貴重品の破壊・納品状況が勝敗に直結する、REPOのゲーム性を活かした独自ルール
+- 貴重品の破壊・抽出状況が勝敗に直結する、REPOのゲーム性を活かした独自ルール
+- 設定した確率で混ざる、人狼陣営が一人も配役されない「平和村」
 - 死体通報、緊急会議、議論、投票、処刑までゲーム内で完結する会議システム
 - 生存者が多い時は会議後にランダムな組へ組み替え、マップ各所へ分散スポーンさせる
 - 野良部屋などで「3番が怪しい」のように使える参加者ID
 - 死者や貴重品の状況を確認できる減額ゲージと、座標グリッド付きの会議用全体マップ
 - ステージ、レベル、初期アイテム、プレイヤーのアップグレード、トラックの初期充電器容量などを調整できるルーム設定
 - ホストのルーム設定を参加者も確認でき、ロビーでは全員のMOD構成も簡単にチェック可能
-- ルールや各役職の能力をいつでも確認できる、全28ページのゲーム内説明書
+- ルールや各役職の能力をいつでも確認できる、全29ページのゲーム内説明書
 - プレイヤー・敵・アイテムの動きや会議での発言・開票結果を全体マップ上で見返せる試合リプレイ
+
+## 1人で試せるチュートリアル
+
+タイトル画面の右下にある「REPO人狼チュートリアル」から、1人でボットを相手に遊び方を手軽に体験できます。
+
+![REPO人狼チュートリアルの開始方法](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/tutorial-ja.gif)
+
+- 村人として会議チャットログによる議論、投票、開票、試合結果までを体験します
+- 人狼としてマップ中の貴重品を破壊してまわり、特典を解禁して詰み勝利を体験します
+- マップのどこかにある死体を見つけ出し、通報して会議を開くことで人狼を追い詰めます
+- 他のプレイヤーを爆弾に変える能力を使い、どのように推理されるのかを体験します
+
+チュートリアルは使い捨てのラウンドなので通常のセーブデータは変更されません。
+
 
 ## 会議・投票
 
 死体の通報やトラックの緊急ボタンから会議を開けます。  
-前回の会議以降の死者や貴重品の損失・納品状況が共有され、座標グリッド付きの全体マップを確認しながら議論・投票できます。
+前回の会議以降の死者や貴重品の損失・抽出状況が共有され、座標グリッド付きの全体マップを確認しながら議論・投票できます。
 
 ![座標グリッド付き全体マップ](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/meeting-map-grid.png)
 
@@ -118,6 +142,7 @@ R.E.P.O.にAmong Us風の人狼モードを追加するMODです。
 ![ロビーのルーム設定とMOD構成確認](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/lobby-settings-and-mods.png)
 
 参加者は、ホストが選んだステージやレベル、役職、初期アイテムなどのルーム設定をロビーで確認できます。  
+試合中も、Escメニューを開いている間は同じルーム設定を右側に表示します。  
 さらにホストのMOD構成を基準として各参加者と照合し、不足・追加・バージョン違い・内容の違いを試合開始前に確認できます。
 
 ## 役職
@@ -172,7 +197,7 @@ REPO人狼は、ボイスチャットを使用せずにテキストチャット�
 ![試合リプレイ](https://raw.githubusercontent.com/minorunara/repo-werewolf/main/docs/images/thunderstore/match-replay.gif)
 
 試合結果画面の左下の「リプレイ再生」ボタンからは、終わった試合の全体マップリプレイをその場で見返せます。  
-ゲーム内マップを背景に、プレイヤー・敵・貴重品・カートを含むアイテム・死体（頭部）の動きを俯瞰で再生できます。貴重品の減額・喪失・納品、抽出ポイントの状態、損失額の推移も時系列で確認できます。  
+ゲーム内マップを背景に、プレイヤー・敵・貴重品・カートを含むアイテム・死体（頭部）の動きを俯瞰で再生できます。貴重品の減額・喪失・抽出、抽出ポイントの状態、損失額の推移も時系列で確認できます。  
 再生・一時停止・速度変更・シークに対応し、マーカーを選ぶとその対象の移動軌跡を追跡できます。  
 会議中のテキストチャットは発言者のマーカー色のコメントとして表示され、開票時には処刑された参加者、または「処刑なし」の結果がマップ中央に表示されます。  
 テキストチャットがある場面では再生速度が下がり、発言のない会議区間は自動で早送りします。  
@@ -191,19 +216,20 @@ REPO人狼は、ボイスチャットを使用せずにテキストチャット�
 
 ## 初回プレイ向けルーム設定暫定目安
 
-| 参加人数 | 祈祷師 | 人狼の人数 | 黒猫 | 爆弾魔 |村人陣営 + 人狼陣営 |
-|---|---:|---:|---:|---:|---:|
-| 3人 | 0% | 1 | 0% | 0% | 2 + 1 |
-| 4人 | 50% | 1 | 0% | 0% | 3 + 1 |
-| 5人 | 100% | 1 | 100%（道連れ無し） | 0% | 3 + 2 |
-| 6人 | 100% | 1 | 100%（道連れ有り） | 0% | 4 + 2 |
-| 7～8人 | 100% | 2 | 0% | 50% | 5~6 + 2 |
-| 9～10人 | 100% | 2 | 100%（道連れ有り） | 50% | 6~7 + 3 |
+| 参加人数 | 祈祷師 | 人狼の人数 | 黒猫 | 爆弾魔 | 村人陣営 + 人狼陣営 | 平和村 | 
+|---|---:|---:|---:|---:|---:|---:|
+| 3人 | 0% | 1 | 0% | 0% | 2 + 1 | 35% |
+| 4人 | 50% | 1 | 0% | 0% | 3 + 1 | 25% |
+| 5人 | 100% | 1 | 0% | 0% | 4 + 1 | 15% |
+| 6人 | 100% | 1 | 100%（道連れ無し） | 0% | 4 + 2 | 0%  |
+| 7～8人 | 100% | 2 | 0% | 50% | 5~6 + 2 | 0% |
+| 9～10人 | 100% | 2 | 100%（道連れ有り） | 50% | 6~7 + 3 | 0% |
 
 バニラではルーム上限が6人までなので、それ以上の人数で遊ぶ場合は別途[MorePlayers](https://thunderstore.io/c/repo/p/linkoid/RoboUnion/)系のMODが必要です。  
 爆弾魔は指定された確率で人狼の1人が変化して出現します（素の人狼が最低1人は残るので、人狼が1人では出現しません）。  
 黒猫は指定された確率で村人から変異して人狼陣営に加わります（「人狼の人数」には含まれません。村人が最低1人残る人数構成でのみ出現します）。  
 祈祷師は指定された確率で村人の1人が変化して出現します（祈祷師が黒猫を兼ねることはありません）。  
+「平和村の確率」で、密かに人狼陣営が一人も配役されない試合が混ざります。平和村のときの勝利条件は時間内に抽出を完了させてトラックを出発させるしかなく、生存者が1人になると即座に全員敗北します。0にすると無効にできます。  
 Sledge HammerやGunはキル能力がかなり高いため、誰がどの武器を持っているかを参加者が精査できるようになるまでは持ち込まないことをお勧めします。  
 一般的には、アップグレードが少なく、エネルギー備蓄が少なく、ステージのレベルが高く、制限時間が短いほど人狼陣営が有利になり、逆もまた然りです。
 
@@ -216,7 +242,7 @@ Sledge HammerやGunはキル能力がかなり高いため、誰がどの武器�
 
 REPO人狼では、プレイヤーは村人陣営と人狼陣営に分かれ、それぞれの勝利を目指して水面下で争います。  
 村人陣営の目標は、通常のREPOと同じです。  
-マップから貴重品を集めて全ての抽出を完了させ、トラックを出発させることです。  
+マップから貴重品を集めて全ての抽出ポイントを完了させ、トラックを出発させることです。  
 人狼陣営の目標は、正体を隠したままそれを妨害することです。  
 誰が誰を疑い、誰が誰と手を組んでいるのか？  
 疑心暗鬼の中から真実を見つけ出せるでしょうか。  
@@ -237,7 +263,7 @@ REPO人狼を遊ぶには最低3人のプレイヤーが必要です。
 
 村人陣営の勝利条件は次の2つです。  
 どちらかを満たせば勝利します。  
-・全ての抽出を完了させ、村人陣営が1人以上生存した状態でトラックを出発させる  
+・全ての抽出ポイントを完了させ、村人陣営が1人以上生存した状態でトラックを出発させる  
 ・人狼陣営が全滅する（黒猫が生き残っていても勝利できます）  
 トラックを発車させた人物の陣営は勝敗に影響しません。  
 発車時の村人陣営の生存状況によって決まります。  
@@ -254,6 +280,15 @@ REPO人狼を遊ぶには最低3人のプレイヤーが必要です。
 「詰み」が成立すると、その瞬間に人狼陣営の勝利が確定します。  
 最終抽出が完了していても、トラックの発車までに村人陣営を全滅させれば人狼陣営の勝利です。  
 人狼がトラックを発車させ、置き去りによって村人陣営が全滅した場合もこれに含まれます。
+
+### 平和村
+
+ルーム設定によっては、人狼陣営が一人も配役されない「平和村」になることがあります。  
+平和村では倒すべき人狼陣営が初めから存在しないため、勝利条件は通常のREPOと同様に全ての抽出ポイントを完了させてトラックを出発させることだけです。  
+ただし、試合中に平和村であることを確かめる手段はありません。役職の公開、会議の議事録、黒猫の自覚通知、接近警告など、見える情報は通常村と同じです。  
+一方で、人狼陣営の活動によってビーコンが使われる、人狼でしかあり得ない行動をしている、爆弾魔による爆発が起きるなどした場合は、平和村ではないことが確定します。  
+疑いを捨てて互いに協力すべき平和村なのか、人狼が息を潜めて油断を誘っている通常村なのかはその時が来るまで分かりません。  
+平和村には、通常村における村人陣営の敗北条件に加えて特殊敗北条件があり、生存者が1人以下になるとその時点で平和村は崩壊して全員が敗北します。
 
 ### 貴重品とマップ
 
@@ -308,7 +343,7 @@ REPO人狼では、どんな方法でも死者は蘇生できません。
 ・未周知の死体の近くで通報キーを押す  
 ボタンで会議を開ける回数は1人1回までです（ルーム設定で変更できます）。  
 ゲーム開始直後と会議終了直後のしばらくは、ボタンで会議を開けません。  
-また、未完了の抽出地点が最後の1箇所になると、死体通報による会議の開催はできなくなります（例: 抽出ノルマが4箇所なら、3箇所目の完了以降は通報不可）。  
+また、未完了の抽出ポイントが最後の1箇所になると、死体通報による会議の開催はできなくなります（例: 抽出ポイントが4箇所なら、3箇所目の完了以降は通報不可）。  
 ボタンでの会議開催は最後まで可能です。
 
 ### 会議の流れ
@@ -334,10 +369,10 @@ REPO人狼では、どんな方法でも死者は蘇生できません。
 ### 会議後の散開
 
 ルーム設定によっては、会議が終わった時に生存者が6人以上いると、ランダムに3人以上の組へ分けられ、組ごとに別々の場所へワープして再出発します。  
-行き先はトラックか、2箇所目以降の納品済みの抽出ポイントのいずれかです（最初の抽出ポイントは行き先になりません）。  
+行き先はトラックか、2箇所目以降の完了済みの抽出ポイントのいずれかです（最初の抽出ポイントは行き先になりません）。  
 組分けは全員に発表されますが、どの組がどこへ行くのかは分かりません。  
 前回の組分けは、次の会議の冒頭に会議チャットログで再掲されます。  
-2箇所目の納品が完了するまでの間、全ての抽出を終えた後、生存者が6人に満たないときは、散開せず全員がトラックから再出発します。  
+2箇所目の抽出が完了するまでの間、最終抽出を完了させた後、生存者が6人に満たないときは、散開せず全員がトラックから再出発します。  
 散開の直後、画面上部に「引き継ぎ期間中…」と表示されている間に誰かが死亡すると、「引き継ぎトラブル発生」として自動で緊急会議が開かれます。  
 この会議は予告なしで即座に始まり、誰の会議開催回数も消費しません。
 
@@ -347,7 +382,7 @@ REPO人狼では、どんな方法でも死者は蘇生できません。
 試合開始時点でマップにある貴重品の総額が基準になります。
 
 ・黄色のゲージ（左から伸びる）…傷つき、失われた金額  
-・水色のゲージ（右から伸びる）…抽出を完了して納品した金額
+・水色のゲージ（右から伸びる）…抽出済みの金額
 
 ・青い縦線…ノルマ達成に必要な金額。  
 水色のゲージがここに届けば、トラックの発車が可能になります  
@@ -360,7 +395,7 @@ REPO人狼では、どんな方法でも死者は蘇生できません。
 
 所属陣営：村人陣営  
 村人に特殊な能力はありません。  
-通常のREPOプレイヤーとして貴重品を集め、抽出を目指します。  
+通常のREPOプレイヤーとして貴重品を集め、抽出完了と帰還を目指します。  
 最大の武器は観察と議論です。  
 貴重品マップの棚卸し・死体の発見・他プレイヤーの行動の記憶を持ち寄り、会議で人狼をあぶり出しましょう。
 
@@ -390,7 +425,7 @@ REPO人狼では、どんな方法でも死者は蘇生できません。
 
 霊障は近くの死体の距離を察知できる能力です。  
 未周知の死体の近くにいると霊障が発生し、その強さは距離に応じて弱・中・強の3段階に変化します。  
-未完了の抽出地点が最後の1箇所になると、霊障による視界の歪みは消え、音だけになります。  
+未完了の抽出ポイントが最後の1箇所になると、霊障による視界の歪みは消え、音だけになります。  
 会議で発表済みの死体には反応しません。
 
 ### 役職: 人狼
@@ -508,11 +543,13 @@ MODが追加する操作キーは、Mod Managerの設定ファイル編集機能
 | F1 | ゲーム内説明書 | `ManualKey` |
 | F5 | 試合結果からロビーへ戻る（ホストのみ） | `ResultReturnKey` |
 | F5 | 長押しで無効試合にする（ホストのみ） | `VoidMatchKey` |
-| F7 | ロビー設定パネルの表示・非表示 | `LobbySettingsPanelKey` |
+| F7 | ルーム設定パネルの表示・非表示（ロビー、試合中はEscメニューを開いている間） | `LobbySettingsPanelKey` |
 
 ## その他
 
-- 人狼モードには最低3人必要です。  
+- ホストとクライアントの両方がこのMODを導入している必要があります
+- 表示言語は英語（デフォルト）・日本語に対応しています
+- REPO人狼チュートリアルは1人で試せますが、マルチプレイの人狼モードで遊ぶには最低3人必要です。
   人数が足りない状態で開始しようとすると警告が出て開始できません
 - 人狼の人数（WerewolfCount）が参加人数以上の設定でも警告が出て開始できません（村人が1人もいない配役は成立しないため。  
   設定を下げるとそのまま開始できます）

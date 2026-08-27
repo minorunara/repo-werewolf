@@ -9,6 +9,8 @@ namespace Werewolf.Core
 
     public sealed class WPlayer
     {
+        public const int FirstBotActor = -101;
+
         public int ActorNumber;
 
         public string Name;

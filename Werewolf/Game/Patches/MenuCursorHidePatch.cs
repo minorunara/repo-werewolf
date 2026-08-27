@@ -1,5 +1,6 @@
 using HarmonyLib;
 using Werewolf.UI;
+using Werewolf.Vanilla;
 
 namespace Werewolf.Game.Patches
 {

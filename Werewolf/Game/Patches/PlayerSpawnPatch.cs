@@ -10,14 +10,12 @@ namespace Werewolf.Game.Patches
     {
         internal static volatile bool MeetingActive;
 
-        private static long s_scatterGraceUntilMs;
+        private static long s_warpGraceUntilMs;
 
-        internal static void ArmScatterGrace(long durationMs = 10_000L) =>
-            s_scatterGraceUntilMs = NowMs() + durationMs;
+        internal static void ArmWarpGrace(long durationMs = 10_000L) =>
+            s_warpGraceUntilMs = SessionClock.NowMs() + durationMs;
 
-        private static long NowMs() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-
-        private static bool WindowActive => MeetingActive || NowMs() <= s_scatterGraceUntilMs;
+        private static bool WindowActive => MeetingActive || SessionClock.NowMs() <= s_warpGraceUntilMs;
 
         private static void Prefix(PlayerAvatar __instance)
         {

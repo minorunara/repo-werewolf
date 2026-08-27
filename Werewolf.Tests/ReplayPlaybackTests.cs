@@ -39,6 +39,31 @@ namespace Werewolf.Tests
         }
 
         [Fact]
+        public void PositionCapT_IsInfiniteWithoutRecCap()
+        {
+            var rec = new ReplayRecorder();
+            rec.BeginSegment(Header(), 100.0);
+            rec.Sample(100.0, new[] { P(1, 0f) });
+            rec.EndSegment(101.0);
+            Assert.Equal(double.PositiveInfinity, ReplayPlayback.FromRecorder(rec).PositionCapT);
+        }
+
+        [Fact]
+        public void PositionCapT_TakesRecCapTime()
+        {
+            var rec = new ReplayRecorder(degradeEntries1: 2, degradeEntries2: 2, hardCapEntries: 2);
+            rec.BeginSegment(Header(), 100.0);
+            rec.Sample(105.0, new[] { P(1, 0f), P(2, 1f) });
+            rec.NoteEvent(120.0, "death", ("a", 1));
+            rec.EndSegment(130.0);
+
+            ReplayPlayback pb = ReplayPlayback.FromRecorder(rec);
+            Assert.Equal(5.0, pb.PositionCapT, 6);
+            Assert.Equal(30.0, pb.Duration, 6);
+            Assert.Single(pb.Deaths);
+        }
+
+        [Fact]
         public void PlayerTrack_InterpolatesBetweenSamples()
         {
             var rec = new ReplayRecorder();
@@ -374,11 +399,15 @@ namespace Werewolf.Tests
             rec.NoteEvent(60.0, "gameover",
                 ("team", 1),
                 ("actors", new[] { 1, 2 }),
-                ("roles", new[] { 0, 1 }));
+                ("roles", new[] { 0, 1 }),
+                ("reason", 5));
             rec.EndSegment(61.0);
 
             ReplayPlayback pb = ReplayPlayback.FromRecorder(rec);
-            Assert.Equal((byte)1, pb.WinnerTeam);
+            Assert.NotNull(pb.GameOver);
+            Assert.Equal((byte)1, pb.GameOver.Value.Team);
+            Assert.Equal((byte)5, pb.GameOver.Value.Reason);
+            Assert.Equal(60.0, pb.GameOver.Value.T, 3);
             Assert.Single(pb.Deaths);
             Assert.Equal(30.0, pb.Deaths[0].T, 3);
 
@@ -388,6 +417,33 @@ namespace Werewolf.Tests
             Assert.True(bob.IsWerewolfSide);
             ReplayPlayerEntry alice = pb.Players.Find(p => p.Actor == 1);
             Assert.False(alice.IsWerewolfSide);
+        }
+
+        [Fact]
+        public void GameOver_WithoutReasonField_FallsBackToUnknown()
+        {
+            var rec = new ReplayRecorder();
+            rec.BeginSegment(Header(), 0.0);
+            rec.NoteEvent(50.0, "gameover", ("team", 0));
+            rec.EndSegment(51.0);
+
+            ReplayPlayback pb = ReplayPlayback.FromRecorder(rec);
+            Assert.NotNull(pb.GameOver);
+            Assert.Equal((byte)0, pb.GameOver.Value.Team);
+            Assert.Equal((byte)255, pb.GameOver.Value.Reason);
+            Assert.Equal(50.0, pb.GameOver.Value.T, 3);
+        }
+
+        [Fact]
+        public void GameOver_Absent_LeavesNull()
+        {
+            var rec = new ReplayRecorder();
+            rec.BeginSegment(Header(), 0.0);
+            rec.NoteEvent(30.0, "death", ("a", 2), ("cause", "WolfKill"));
+            rec.EndSegment(31.0);
+
+            ReplayPlayback pb = ReplayPlayback.FromRecorder(rec);
+            Assert.Null(pb.GameOver);
         }
 
         [Fact]

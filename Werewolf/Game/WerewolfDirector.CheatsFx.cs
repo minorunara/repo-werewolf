@@ -7,34 +7,15 @@ using Werewolf.Core;
 using Werewolf.Game.Patches;
 using Werewolf.Net;
 using Werewolf.UI;
+using Werewolf.Vanilla;
 
 namespace Werewolf.Game
 {
     public sealed partial class WerewolfDirector
     {
 
-        public void DebugPlayConveneCountdown(string callerName, int totalSeconds)
-        {
-            try
-            {
-                EnsurePanelBuilt(_conveneCountdown);
-                if (!_conveneCountdown.Exists)
-                {
-                    WLog.Line("cmd_fx_countdown_skipped", secret: false, ("reason", "not_built"));
-                    return;
-                }
-                if (totalSeconds < 0) totalSeconds = 0;
-                if (_conveneTweenCoroutine != null) StopCoroutine(_conveneTweenCoroutine);
-                _conveneTweenCoroutine = StartCoroutine(
-                    _conveneCountdown.PlayStandalone(callerName, totalSeconds));
-                WLog.Line("cmd_fx_countdown", secret: false,
-                    ("caller", callerName ?? ""), ("seconds", totalSeconds));
-            }
-            catch (Exception e)
-            {
-                WLog.Line("cmd_fx_countdown_error", secret: false, ("err", e.Message));
-            }
-        }
+        public void DebugPlayConveneCountdown(string callerLabel, int totalSeconds)
+            => _meetingClientFeature.DebugPlayConveneCountdown(callerLabel, totalSeconds);
 
         private int DebugRevealSelfId
         {
@@ -60,19 +41,11 @@ namespace Werewolf.Game
                     ClientValuableMapMode, IsBlackCatCurseEnabledForClient(),
                     DebugRevealSelfId);
 
-                EnsurePanelBuilt(_revealCinematic);
-                if (!_revealCinematic.Exists)
+                if (!_roleRevealFeature.DebugPlay(content))
                 {
                     WLog.Line("cmd_fx_reveal_skipped", secret: false, ("reason", "not_built"));
                     return;
                 }
-
-                if (_revealCoroutine != null)
-                {
-                    StopCoroutine(_revealCoroutine);
-                    _revealCoroutine = null;
-                }
-                _revealCoroutine = StartCoroutine(_revealCinematic.Play(content));
                 WLog.Line("cmd_fx_reveal", secret: false, ("role", role));
             }
             catch (Exception e)
@@ -87,9 +60,7 @@ namespace Werewolf.Game
             {
                 if (string.IsNullOrEmpty(message)) message = "テスト通知";
 
-                EnsureToastQueue();
-                EnsureRolesUiBuilt();
-                _toastQueue.Push(message, NowUnixMs());
+                _rolesClientFeature.PushDebugToast(message);
                 WLog.Line("cmd_fx_toast", secret: false, ("message", message));
             }
             catch (Exception e)
@@ -102,7 +73,7 @@ namespace Werewolf.Game
         {
             try
             {
-                ClearResultCountdown();
+                _resultFlowFeature.ClearResultCountdown();
                 int[] actors = { 1, 2, 3, 4, 5 };
                 byte[] roles =
                 {
@@ -141,8 +112,9 @@ namespace Werewolf.Game
                     new DigestEntry(DigestKind.FinalBalance, 300, 9_500, 12_000, 8_000),
                 };
                 List<string> digestLines = ResultDigestText.FormatLines(digest, a => "デバッグ" + a);
-                _resultScreen.Show((byte)Team.Werewolves, rows, ResolveAvatar,
-                    digestLines, BuildResultFooterText(), ParticipantIdFor);
+                _resultScreen.Show((byte)Team.Werewolves, rows, Players.Resolve,
+                    digestLines, ResultFlowController.BuildResultFooterText(), ParticipantIdFor,
+                    (int)WinReason.TimerExpired);
                 PlayResultSfx((byte)Team.Werewolves);
                 SetCrownRosterFromRows(rows);
                 WLog.Line("cmd_fx_result", secret: false, ("rows", rows.Count));
@@ -171,20 +143,15 @@ namespace Werewolf.Game
         {
             try
             {
-                if (_revealCoroutine != null)
-                {
-                    StopCoroutine(_revealCoroutine);
-                    _revealCoroutine = null;
-                }
-                if (_revealCinematic.Exists) _revealCinematic.HideNow();
+                _roleRevealFeature.HideCinematicNow();
 
-                HideConveneCountdown();
+                _meetingClientFeature.HideConveneCountdown();
 
                 if (_resultScreen.Exists) _resultScreen.Hide();
-                ClearResultCountdown();
+                _resultFlowFeature.ClearResultCountdown();
 
-                if (_deadlineBanner.Exists) _deadlineBanner.Hide();
-                if (_discussionImpact.Exists) _discussionImpact.Hide();
+                _rolesClientFeature.HideDeadlineBanner();
+                _rolesClientFeature.HideDiscussionImpact();
 
                 CrownRoster.Clear();
 
@@ -198,14 +165,14 @@ namespace Werewolf.Game
 
         public void DebugInjectCfgBlob(string blob)
         {
-            _debugInjectedBlob = blob;
+            _lobbySettingsFeature.DebugInjectBlob(blob);
             WLog.Line("cmd_cfg_inject", secret: false,
                 ("len", blob == null ? 0 : blob.Length));
         }
 
         public void DebugClearCfgBlob()
         {
-            _debugInjectedBlob = null;
+            _lobbySettingsFeature.DebugClearInjectedBlob();
             WLog.Line("cmd_cfg_clear", secret: false);
         }
 

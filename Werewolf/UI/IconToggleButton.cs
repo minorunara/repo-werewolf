@@ -1,6 +1,7 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using Werewolf.Core;
 
 namespace Werewolf.UI
 {
@@ -47,7 +48,6 @@ namespace Werewolf.UI
     {
         private const float AlphaHitThreshold = 0.5f;
 
-        private const float IconLabelGap = 4f;
         private const float FallbackFontSize = 32f;
 
         private const float HoverOutlineThickness = 4f;
@@ -75,8 +75,8 @@ namespace Werewolf.UI
         public RectTransform Build(Transform parent, string name, IconToggleStyle style,
                                    string spriteKey, string initialLabel, string hoverSpriteKey = null)
         {
-            float width = Mathf.Max(style.IconSize, style.LabelWidth);
-            float height = style.IconSize + IconLabelGap + style.LabelHeight;
+            float width = HudGeometry.IconToggle.Width(style.IconSize, style.LabelWidth);
+            float height = HudGeometry.IconToggle.Height(style.IconSize, style.LabelHeight);
             _container = UiKit.CreateRect(parent, name, Vector2.zero, new Vector2(width, height));
 
             float iconCenterY = height * 0.5f - style.IconSize * 0.5f;

@@ -10,14 +10,16 @@ namespace Werewolf.UI
         private const float BadgeYOffsetFromName = 5f;
         private TextMeshProUGUI _label;
         private RectTransform _rect;
+        private RectTransform _nameRect;
         private int _lastRevision = -1;
         private ModIntegrityStatus _lastStatus;
 
-        public static ModIntegrityPlayerBadge GetOrCreate(MenuPlayerListed row)
+        public static ModIntegrityPlayerBadge GetOrCreate(GameObject rowObject, RectTransform nameRect)
         {
-            if (row == null) return null;
-            ModIntegrityPlayerBadge badge = row.GetComponent<ModIntegrityPlayerBadge>();
-            if (badge == null) badge = row.gameObject.AddComponent<ModIntegrityPlayerBadge>();
+            if (rowObject == null) return null;
+            ModIntegrityPlayerBadge badge = rowObject.GetComponent<ModIntegrityPlayerBadge>();
+            if (badge == null) badge = rowObject.AddComponent<ModIntegrityPlayerBadge>();
+            badge._nameRect = nameRect;
             badge.EnsureBuilt();
             return badge;
         }
@@ -62,8 +64,7 @@ namespace Werewolf.UI
         private void AlignWithPlayerName()
         {
             if (_rect == null) return;
-            MenuPlayerListed row = GetComponent<MenuPlayerListed>();
-            RectTransform nameRect = row != null && row.playerName != null ? row.playerName.rectTransform : null;
+            RectTransform nameRect = _nameRect;
             if (nameRect == null) return;
 
             Vector3 nameCenter = transform.InverseTransformPoint(nameRect.TransformPoint(nameRect.rect.center));

@@ -16,6 +16,16 @@ namespace Werewolf.Tests
         public CorpseReportTests() { WLog.Sink = (_, __) => { }; }
         public void Dispose() { WLog.Sink = null; }
 
+        [Theory]
+        [InlineData(2.999f, true)]
+        [InlineData(3.0f, true)]
+        [InlineData(3.001f, false)]
+        public void CorpseReportProximity_UsesExactBoundaryWithoutHistory(
+            float distanceMeters, bool expected)
+        {
+            Assert.Equal(expected, CorpseReportProximity.IsWithin(distanceMeters));
+        }
+
         [Fact]
         public void CorpseReport_BypassesStartSuppression()
         {
@@ -42,6 +52,25 @@ namespace Werewolf.Tests
             Assert.Equal(MeetingStage.Countdown, h.Session.Stage);
             Assert.Equal(0, h.Session.RightsRemaining(3));
             Assert.Empty(h.RightsChanges);
+        }
+
+        [Fact]
+        public void GrantRights_AddsToTheRemainingAndNotifiesOnce()
+        {
+            var h = MeetingSessionHarness.Create(tune: c => c.MeetingRightsPerPlayer = 0);
+
+            h.Session.GrantRights(3, 1);
+
+            Assert.Equal(1, h.Session.RightsRemaining(3));
+            Assert.Single(h.RightsChanges);
+
+            h.Session.GrantRights(3, 0);
+            h.Session.GrantRights(3, -2);
+            Assert.Equal(1, h.Session.RightsRemaining(3));
+            Assert.Single(h.RightsChanges);
+
+            Assert.Equal(ConveneRejectReason.None, h.Session.TryConvene(3, Now));
+            Assert.Equal(0, h.Session.RightsRemaining(3));
         }
 
         [Fact]

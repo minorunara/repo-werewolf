@@ -24,7 +24,7 @@ namespace Werewolf.Tests
 
             var page1 = content.Pages[0].BodyLines;
             Assert.Contains("◆ 勝利条件（いずれか）", page1);
-            Assert.Contains("・全ての抽出を完了し、トラックを発車させる", page1);
+            Assert.Contains("・全ての抽出ポイントを完了し、トラックを発車させる", page1);
             Assert.Contains("・人狼陣営を全滅させる", page1);
             Assert.DoesNotContain(page1, l => l.Contains("ヒント"));
 

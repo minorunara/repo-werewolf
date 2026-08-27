@@ -75,7 +75,8 @@ namespace Werewolf.Core
         }
 
         public BombDenyReason TryDetonate(int senderActor, long nowUnixMs,
-            bool meetingLocked, bool targetNearTruck, out int detonatedTargetActor)
+            bool meetingLocked, bool targetNearTruck, out int detonatedTargetActor,
+            BombDenyReason scenarioDeny = BombDenyReason.None)
         {
             detonatedTargetActor = -1;
 
@@ -83,6 +84,7 @@ namespace Werewolf.Core
             if (_targetActor == -1) return Deny(BombDenyReason.NoBomb);
             if (nowUnixMs < _detonateReadyUnixMs) return Deny(BombDenyReason.DetonateCooldown);
             if (meetingLocked) return Deny(BombDenyReason.MeetingLocked);
+            if (scenarioDeny != BombDenyReason.None) return Deny(scenarioDeny);
             if (targetNearTruck) return Deny(BombDenyReason.TruckZone);
 
             var target = FindPlayer(_targetActor);

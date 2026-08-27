@@ -91,6 +91,14 @@ namespace Werewolf.Core
         public int RightsRemaining(int actorNumber)
             => _rights.TryGetValue(actorNumber, out int r) ? r : 0;
 
+        public void GrantRights(int actorNumber, int count)
+        {
+            if (count <= 0) return;
+            int remaining = RightsRemaining(actorNumber) + count;
+            _rights[actorNumber] = remaining;
+            OnRightsChanged?.Invoke(actorNumber, remaining);
+        }
+
         public int VotedCount => _voteBox?.VotedActors.Count ?? 0;
 
         public int[] VotersFor(int targetActor) => _voteBox?.VotersFor(targetActor);
@@ -146,16 +154,21 @@ namespace Werewolf.Core
         public const int ScatterGuardCountdownSec = 0;
 
         public bool TryConveneScatterGuard(int victimActor, long nowUnixMs)
+            => TryConveneByHost(victimActor, nowUnixMs, ConveneKind.ScatterGuard);
+
+        public bool TryConveneByHost(int callerActor, long nowUnixMs, ConveneKind kind,
+                                     bool withCountdown = false)
         {
             if (Stage != MeetingStage.Idle || _gameSession.Phase != GamePhase.Play
-                || _gameSession.WinLocked || FindPlayer(victimActor) == null)
+                || _gameSession.WinLocked || FindPlayer(callerActor) == null)
             {
-                WLog.Line("scatter_guard_convene_rejected", secret: false,
-                    ("victim", victimActor), ("stage", Stage), ("phase", _gameSession.Phase));
+                WLog.Line("host_convene_rejected", secret: false,
+                    ("caller", callerActor), ("kind", kind), ("stage", Stage), ("phase", _gameSession.Phase));
                 return false;
             }
 
-            Accept(victimActor, nowUnixMs, ConveneKind.ScatterGuard, ScatterGuardCountdownSec);
+            Accept(callerActor, nowUnixMs, kind,
+                withCountdown ? _config.MeetingCountdownSec : ScatterGuardCountdownSec);
             return true;
         }
 
@@ -167,7 +180,8 @@ namespace Werewolf.Core
             _voteBox = null;
 
             _warpUnixMs = nowUnixMs + countdownSec * 1000L;
-            _timer.Start(_warpUnixMs + MeetingIntro.VotingUiDelayMs, _config.MeetingDurationSec);
+            _timer.Start(_warpUnixMs + MeetingIntro.VotingUiDelayMs, _config.MeetingDurationSec,
+                _config.TimeLimitDisabled);
             Stage = MeetingStage.Countdown;
 
             WLog.Line("convene_accepted", secret: false,

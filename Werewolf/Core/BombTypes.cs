@@ -15,6 +15,12 @@ namespace Werewolf.Core
 
         TargetDead = 9,
         TargetInvalid = 10,
+
+        ScenarioDistance = 11,
+
+        ScenarioTarget = 12,
+
+        ScenarioTargetMoving = 13,
     }
 
     public readonly struct BomberStateSnapshot

@@ -111,12 +111,38 @@ namespace Werewolf.Tests
             }
         }
 
+        [Fact]
+        public void Sections_StartOnTheirLeadPage()
+        {
+            var leadPages = new Dictionary<TextId, TextId>
+            {
+                { TextId.ManualSectionBasics, TextId.ManualWelcomeTitle },
+                { TextId.ManualSectionExploration, TextId.ManualValuablesMapTitle },
+                { TextId.ManualSectionMeeting, TextId.ManualCorpseTitle },
+                { TextId.ManualSectionGauge, TextId.ManualGaugeBasicsTitle },
+                { TextId.ManualSectionVillager, TextId.ManualRoleVillagerTitle },
+                { TextId.ManualSectionShaman, TextId.ManualRoleShamanTitle },
+                { TextId.ManualSectionWerewolf, TextId.ManualRoleWerewolfTitle },
+                { TextId.ManualSectionBlackCat, TextId.ManualRoleBlackCatTitle },
+                { TextId.ManualSectionBomber, TextId.ManualRoleBomberTitle },
+                { TextId.ManualSectionAfterDeath, TextId.ManualAfterDeathTitle },
+            };
+
+            Assert.Equal(leadPages.Count, ManualCatalog.Sections.Length);
+            foreach (var section in ManualCatalog.Sections)
+            {
+                Assert.True(leadPages.TryGetValue(section.TitleId, out var leadTitle),
+                    $"先頭ページ未登録の章: {section.TitleId}");
+                Assert.Equal(leadTitle, ManualCatalog.Pages[section.StartIndex].TitleId);
+            }
+        }
+
         [Theory]
-        [InlineData(0, 0, 4)]
-        [InlineData(7, 0, 8)]
-        [InlineData(17, 15, 21)]
-        [InlineData(20, 15, 21)]
-        [InlineData(27, 24, 27)]
+        [InlineData(0, 0, 5)]
+        [InlineData(7, 0, 9)]
+        [InlineData(17, 15, 18)]
+        [InlineData(20, 16, 22)]
+        [InlineData(28, 25, 28)]
         public void SectionNavigation_JumpsToAdjacentSectionStarts(int page, int previous, int next)
         {
             Assert.Equal(previous, ManualCatalog.PreviousSectionStart(page));

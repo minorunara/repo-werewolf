@@ -28,6 +28,10 @@ namespace Werewolf.Core
         public IReadOnlyDictionary<string, int> Upgrades;
 
         public int OrbDropMax;
+
+        public int HaulGoalPct;
+
+        public EnemySetCounts EnemySets;
     }
 
     public static class WorldgenPlanner
@@ -41,6 +45,9 @@ namespace Werewolf.Core
 
         private const int MinOrbDropMax = 0;
         private const int MaxOrbDropMax = 25;
+
+        private const int MinHaulGoalPct = 0;
+        private const int MaxHaulGoalPct = 100;
 
         public static WorldgenPlan BuildPlan(GameConfig config, IWorldgenCatalog catalog)
         {
@@ -59,6 +66,8 @@ namespace Werewolf.Core
                 PowerCrystals = (chargeTotal + PctPerCrystal - 1) / PctPerCrystal,
                 Upgrades = WorldgenSpec.Decode(config.StartUpgradesSpec),
                 OrbDropMax = Clamp(config.OrbDropMax, MinOrbDropMax, MaxOrbDropMax),
+                HaulGoalPct = Clamp(config.StartHaulGoalPct, MinHaulGoalPct, MaxHaulGoalPct),
+                EnemySets = EnemySetRules.Clamp(config.EnemySets),
             };
         }
 
@@ -95,21 +104,24 @@ namespace Werewolf.Core
 
     public static class WorldgenUpgrades
     {
+        public const string CrouchRest = "CrouchRest";
+        public const string DeathHeadBattery = "DeathHeadBattery";
+        public const string ExtraJump = "ExtraJump";
+        public const string Health = "Health";
+        public const string Launch = "Launch";
+        public const string MapPlayerCount = "MapPlayerCount";
+        public const string Range = "Range";
+        public const string Speed = "Speed";
+        public const string Stamina = "Stamina";
+        public const string Strength = "Strength";
+        public const string Throw = "Throw";
+        public const string TumbleClimb = "TumbleClimb";
+        public const string TumbleWings = "TumbleWings";
+
         public static readonly IReadOnlyList<string> Names = new[]
         {
-            "CrouchRest",
-            "DeathHeadBattery",
-            "ExtraJump",
-            "Health",
-            "Launch",
-            "MapPlayerCount",
-            "Range",
-            "Speed",
-            "Stamina",
-            "Strength",
-            "Throw",
-            "TumbleClimb",
-            "TumbleWings",
+            CrouchRest, DeathHeadBattery, ExtraJump, Health, Launch, MapPlayerCount,
+            Range, Speed, Stamina, Strength, Throw, TumbleClimb, TumbleWings,
         };
     }
 

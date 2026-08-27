@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.UI
 {
@@ -8,17 +9,24 @@ namespace Werewolf.UI
     {
         public string LayerName => "ShamanSense";
 
-        private const float StormAlphaWeak = 0.08f;
-        private const float StormAlphaMedium = 0.11f;
-        private const float StormAlphaStrong = 0.15f;
+        private const float StormAlphaWeak = 0.04f;
+        private const float StormAlphaMedium = 0.07f;
+        private const float StormAlphaStrong = 0.10f;
 
         private const float GhostBurstAlpha = 0.45f;
 
         private const int NoiseFrames = 4;
-        private const int NoiseSize = 192;
-        private const float NoiseFrameSec = 0.06f;
+        private const int NoiseSize = 96;
+        private const float NoiseFrameSec = 0.10f;
         private const float NoiseTilesX = 2.5f;
         private const float NoiseTilesY = 1.40625f;
+        private static readonly Vector2[] NoiseFrameOffsets =
+        {
+            new Vector2(0f, 0f),
+            new Vector2(0.37f, 0.61f),
+            new Vector2(0.73f, 0.19f),
+            new Vector2(0.11f, 0.83f),
+        };
 
         private const float TranceSaturation = -80;
         private const float PostProcessRefreshSec = 0.1f;
@@ -100,7 +108,6 @@ namespace Werewolf.UI
             _stormImage.enabled = false;
 
             _root.SetActive(false);
-            WLog.Line("shaman_sense_built", secret: false);
         }
 
         public void PlayDripRipple()
@@ -121,9 +128,9 @@ namespace Werewolf.UI
             float alpha = ghostBurst ? GhostBurstAlpha : StormAlpha(tier);
             TickDripRipple(deltaSeconds);
 
-            if (gazeArmed && PostProcessing.Instance != null)
+            if (gazeArmed)
             {
-                PostProcessing.Instance.SaturationOverride(
+                VisualEffects.OverrideSaturation(
                     TranceSaturation,
                     1f / TranceFadeInSec,
                     1f / TranceFadeOutSec,
@@ -156,8 +163,9 @@ namespace Werewolf.UI
                     _noiseClock = 0f;
                     _noiseFrame = (_noiseFrame + 1) % NoiseFrames;
                     _stormImage.texture = EnsureNoiseTextures()[_noiseFrame];
+                    Vector2 offset = NoiseFrameOffsets[_noiseFrame];
                     _stormImage.uvRect = new Rect(
-                        Random.value, Random.value, NoiseTilesX, NoiseTilesY);
+                        offset.x, offset.y, NoiseTilesX, NoiseTilesY);
                 }
             }
         }

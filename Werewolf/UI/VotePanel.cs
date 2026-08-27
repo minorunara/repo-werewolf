@@ -4,6 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.UI
 {
@@ -66,6 +67,8 @@ namespace Werewolf.UI
         private TextMeshProUGUI _pageLabel;
 
         private readonly MeetingTimeBarView _timeBarView = new MeetingTimeBarView();
+
+        public bool HideTimeLimit { get; set; }
 
         private ITargetSelectionSource _selectionSource;
         private DefaultVoteTargetProvider _defaultProvider;
@@ -163,11 +166,9 @@ namespace Werewolf.UI
             _pageLabel = UiKit.CreateText(rect, "PageLabel", new Vector2(-340f, -352f), new Vector2(90f, 50f),
                 "", 22f, Color.white, TextAlignmentOptions.Center);
             SetPagerVisible(false);
-
-            WLog.Line("vote_panel_built", secret: false);
         }
 
-        public void BeginMeeting(IReadOnlyList<WPlayer> roster, Func<int, PlayerAvatar> resolveAvatar, int localActor)
+        public void BeginMeeting(IReadOnlyList<WPlayer> roster, Func<int, PlayerHandle> resolveAvatar, int localActor)
         {
             if (_root == null) return;
             ClearRows();
@@ -206,8 +207,15 @@ namespace Werewolf.UI
                 }
             }
             LayoutRows();
+            int prefabRows = 0;
+            foreach (VoteRow row in _rows)
+            {
+                if (row != null && row.PrefabUsed) prefabRows++;
+            }
             WLog.Line("vote_panel_begin", secret: false,
-                ("rows", _rows.Count), ("localActor", localActor), ("pages", PageCount));
+                ("rows", _rows.Count), ("prefab", prefabRows),
+                ("fallback", _rows.Count - prefabRows),
+                ("localActor", localActor), ("pages", PageCount));
         }
 
         public void SetSelectionSource(ITargetSelectionSource source)
@@ -383,6 +391,12 @@ namespace Werewolf.UI
         private void UpdateTime(MeetingClientState state, long nowUnixMs)
         {
             if (_timeText == null) return;
+            if (HideTimeLimit && _timeOverrideEndUnixMs == 0)
+            {
+                if (_timeText.gameObject.activeSelf) _timeText.gameObject.SetActive(false);
+                return;
+            }
+            if (!_timeText.gameObject.activeSelf) _timeText.gameObject.SetActive(true);
             long remainMs = _timeOverrideEndUnixMs > 0
                 ? Math.Max(0L, _timeOverrideEndUnixMs - nowUnixMs)
                 : state.RemainingMs(nowUnixMs);
@@ -393,7 +407,8 @@ namespace Werewolf.UI
 
         private void UpdateTimeBar(MeetingClientState state, long nowUnixMs)
         {
-            bool visible = _timeOverrideEndUnixMs == 0 && state.MeetingActive && state.Result == null;
+            bool visible = !HideTimeLimit
+                && _timeOverrideEndUnixMs == 0 && state.MeetingActive && state.Result == null;
             _timeBarView.SetVisible(visible);
             if (_timeText != null)
             {
@@ -536,7 +551,7 @@ namespace Werewolf.UI
             if (!canConfirm && !pagerActive) return;
 
             Vector2 mouse = Input.mousePosition;
-            bool clicked = Input.GetMouseButtonDown(0) || SemiFunc.InputDown(InputKey.Confirm);
+            bool clicked = Input.GetMouseButtonDown(0) || Inputs.Down(GameKey.Confirm);
 
             bool blocked = IsPointerBlocked != null && IsPointerBlocked(mouse);
             if (blocked) clicked = false;

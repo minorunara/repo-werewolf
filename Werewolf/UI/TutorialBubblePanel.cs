@@ -2,6 +2,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.UI
 {
@@ -59,20 +60,15 @@ namespace Werewolf.UI
 
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            var go = new GameObject("WW_TutorialBubble", typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(layerRoot, false);
-            UiKit.Stretch(rect);
+            RectTransform rect = UiKit.CreateStretched(layerRoot, "WW_TutorialBubble");
+            var go = rect.gameObject;
             _root = go;
 
             var canvas = go.AddComponent<Canvas>();
             canvas.overrideSorting = true;
             canvas.sortingOrder = WerewolfUIManager.TutorialBubbleSortingOrder;
 
-            var sliderGo = new GameObject("Slider", typeof(RectTransform));
-            _slider = (RectTransform)sliderGo.transform;
-            _slider.SetParent(rect, false);
-            UiKit.Stretch(_slider);
+            _slider = UiKit.CreateStretched(rect, "Slider");
 
             Sprite taxman = AssetCatalog.GetSprite("img_taxman_death");
             if (taxman != null)
@@ -126,7 +122,7 @@ namespace Werewolf.UI
             _text.text = message;
             _hint.text = BuildSkipHintText();
 
-            Vector2 size = SemiFunc.PreferredAutoscaledTextSize(
+            Vector2 size = UiText.PreferredAutoscaledSize(
                 _text, TextMaxWidth, float.PositiveInfinity, 5);
             float textW = Mathf.Clamp(size.x, MinTextWidth, TextMaxWidth);
             float bodyH = PadTop + size.y + HintHeight;
@@ -189,13 +185,12 @@ namespace Werewolf.UI
 
             try
             {
-                GameDirector director = GameDirector.instance;
-                if (director != null) director.SetDisableEscMenu(1f);
+                Session.DisableEscMenu(1f);
             }
             catch { }
             try
             {
-                return SemiFunc.NoTextInputsActive() && SemiFunc.InputDown(InputKey.Menu);
+                return Inputs.NoTextInputsActive && Inputs.Down(GameKey.Menu);
             }
             catch
             {
@@ -229,11 +224,7 @@ namespace Werewolf.UI
             string hint = Texts.Get(TextId.RevealSkipHint);
             try
             {
-                InputManager input = InputManager.instance;
-                if (input != null)
-                {
-                    hint = input.InputDisplayReplaceTags(hint, "<color=#FF8500><u><b>", "</b></u></color>");
-                }
+                hint = Inputs.ReplaceDisplayTags(hint, "<color=#FF8500><u><b>", "</b></u></color>");
             }
             catch { }
             return hint;

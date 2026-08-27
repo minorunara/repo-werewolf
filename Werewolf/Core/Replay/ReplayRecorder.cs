@@ -127,6 +127,7 @@ namespace Werewolf.Core.Replay
             public double StartClock;
             public double EndClock = -1;
             public double EndTick = -1;
+            public bool CapNoted;
         }
 
         internal sealed class PosRecord
@@ -178,6 +179,8 @@ namespace Werewolf.Core.Replay
         public int PositionEntryCount => _positionEntries;
         public int EventCount => _eventCount;
 
+        public bool PositionCapped => _positionEntries >= _hardCapEntries;
+
         public double CurrentSampleIntervalSec
         {
             get
@@ -215,6 +218,8 @@ namespace Werewolf.Core.Replay
             _open = new Segment { Header = header, StartClock = nowSec };
             _segments.Add(_open);
             _lastSampleClock = double.NegativeInfinity;
+
+            if (PositionCapped) NoteCap(_open, 0.0);
         }
 
         public void EndSegment(double nowSec)
@@ -298,7 +303,15 @@ namespace Werewolf.Core.Replay
             {
                 _open.Records.Add(new PosRecord { T = t, Entries = entries });
                 _positionEntries += entries.Count;
+                if (PositionCapped) NoteCap(_open, t);
             }
+        }
+
+        private void NoteCap(Segment target, double t)
+        {
+            if (target.CapNoted) return;
+            target.CapNoted = true;
+            AppendEvent(target, t, "rec_cap", null);
         }
 
         public void NoteEntity(double nowSec, ReplayEntityKind kind, int id, string name, int vid = 0)

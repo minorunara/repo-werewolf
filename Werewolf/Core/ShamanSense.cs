@@ -42,6 +42,8 @@ namespace Werewolf.Core
 
         public bool TranceActive => _stillSec >= TranceEntrySec;
 
+        public bool CoolingDown => _cooldownRemainingSec > 0f;
+
         public bool GazeArmed => TranceActive
             && _stormTier == ShamanStormTier.None
             && _ghostRemainingSec <= 0f

@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
 using Werewolf.Core.Replay;
+using Werewolf.Vanilla;
 
 namespace Werewolf.UI
 {
@@ -12,13 +13,13 @@ namespace Werewolf.UI
     {
         public string LayerName => ResultScreen.Layer;
 
-        private const float PanelWidth = 1200f;
-        private const float MapHeight = 720f;
+        private const float PanelWidth = HudGeometry.MapOverlay.Width;
+        private const float MapHeight = HudGeometry.MapOverlay.Height;
         private const float MapCenterY = 10f;
         private const float BarHeight = 56f;
         private const float BarCenterY = MapCenterY - MapHeight * 0.5f - 6f - BarHeight * 0.5f;
         private const float StatusCenterY = BarCenterY - BarHeight * 0.5f - 14f;
-        private const float ToggleButtonMargin = 24f;
+        private const float ToggleButtonMargin = HudGeometry.ReplayEntry.Margin;
 
         private const float ButtonHeight = 40f;
         private const float PlayButtonWidth = 96f;
@@ -78,12 +79,16 @@ namespace Werewolf.UI
         private const float DanmakuLandingShakePx = 3f;
         private const float DanmakuAccentExtraWidth = 90f;
         private const float StampFontSize = 138f;
+        private const float StampEpigraphFontSize = StampFontSize * 0.4f;
+        private const float StampTitleWithEpigraphOffsetY = StampFontSize * 0.22f;
+        private const float StampEpigraphOffsetY = -StampFontSize * 0.4f;
         private const float DemoChatIntervalSec = 0.72f;
 
         private static readonly Color DanmakuMetaColor = new Color(0.85f, 0.85f, 0.88f, 0.75f);
         private static readonly Color DanmakuMetaWolfColor = new Color(1f, 0.5f, 0.5f, 0.85f);
         private static readonly Color StampExecutedColor = new Color(0.95f, 0.3f, 0.26f, 1f);
         private static readonly Color StampNoExecutionColor = new Color(0.92f, 0.92f, 0.95f, 1f);
+        private static readonly Color StampVillagerWinColor = new Color(0.31f, 0.75f, 0.42f, 1f);
 
         private static readonly string[] DemoChatTexts =
         {
@@ -112,6 +117,7 @@ namespace Werewolf.UI
         private static readonly Color SeekFillColor = new Color(1f, 0.85f, 0.35f, 0.9f);
         private static readonly Color SeekMeetingColor = new Color(0.5f, 0.7f, 1f, 0.35f);
         private static readonly Color SeekDeathColor = new Color(0.95f, 0.25f, 0.2f, 0.95f);
+        private static readonly Color SeekCapColor = new Color(0.45f, 0.45f, 0.5f, 0.55f);
         private static readonly Color EnemyColor = new Color(0.92f, 0.22f, 0.2f, 1f);
         private static readonly Color ValuableColor = new Color(0.95f, 0.8f, 0.3f, 1f);
         private static readonly Color ItemColor = new Color(0.25f, 0.82f, 0.9f, 1f);
@@ -134,9 +140,9 @@ namespace Werewolf.UI
         private static readonly Color StatusErrorColor = new Color(1f, 0.45f, 0.4f, 1f);
 
         private static readonly IconToggleStyle ToggleStyle = new IconToggleStyle(
-            iconSize: 288f,
-            labelWidth: 240f,
-            labelHeight: 32f,
+            iconSize: HudGeometry.ReplayEntry.IconSize,
+            labelWidth: HudGeometry.ReplayEntry.LabelWidth,
+            labelHeight: HudGeometry.ReplayEntry.LabelHeight,
             labelFontSize: 24f,
             labelColor: new Color(1f, 0.9f, 0.6f, 1f),
             fallbackText: "▶",
@@ -188,6 +194,7 @@ namespace Werewolf.UI
         private RectTransform _seekHandle;
         private readonly List<Image> _seekMeetingShades = new List<Image>();
         private readonly List<Image> _seekDeathTicks = new List<Image>();
+        private readonly List<Image> _seekCapBands = new List<Image>();
 
         private GameObject _gaugeRoot;
         private Image _gaugeLossFill;
@@ -236,6 +243,7 @@ namespace Werewolf.UI
 
         private readonly List<CommentView> _danmakuPool = new List<CommentView>();
         private TextMeshProUGUI _stampLabel;
+        private TextMeshProUGUI _stampEpigraphLabel;
         private TextMeshProUGUI _danmakuMeasurer;
         private Material _danmakuOutlineMaterial;
         private ReplayDanmaku _danmaku;
@@ -268,6 +276,7 @@ namespace Werewolf.UI
         private bool _resumeAfterSeek;
         private double _seekRebuiltT;
         private bool _saveDone;
+        private bool _capNoticeShown;
         private int _demoCount;
         private float _demoPhase;
 
@@ -282,18 +291,14 @@ namespace Werewolf.UI
             if (_root != null || layerRoot == null) return;
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            RectTransform rootRect = UiKit.CreateRect(layerRoot, "WW_ReplayViewer",
-                Vector2.zero, new Vector2(1920f, 1080f));
+            RectTransform rootRect = UiKit.CreateStretched(layerRoot, "WW_ReplayViewer");
             _root = rootRect.gameObject;
 
             RectTransform toggleRoot = _toggle.Build(rootRect, "ToggleButton", ToggleStyle,
                 "icon_replay_viewer", BuildToggleLabel(KeyCode.None), "icon_replay_viewer_hover");
-            Vector2 toggleSize = toggleRoot.sizeDelta;
-            toggleRoot.anchoredPosition = new Vector2(
-                -(1920f * 0.5f) + toggleSize.x * 0.5f + ToggleButtonMargin,
-                -(1080f * 0.5f) + toggleSize.y * 0.5f + ToggleButtonMargin);
+            UiKit.PinToCorner(toggleRoot, UiKit.BottomLeft, ToggleButtonMargin);
 
-            RectTransform viewerRect = UiKit.CreateRect(rootRect, "Viewer", Vector2.zero, new Vector2(1920f, 1080f));
+            RectTransform viewerRect = UiKit.CreateStretched(rootRect, "Viewer");
             _viewerRoot = viewerRect.gameObject;
 
             RectTransform mapPanel = UiKit.CreateRect(viewerRect, "MapPanel",
@@ -334,6 +339,14 @@ namespace Werewolf.UI
             _stampLabel.fontSizeMin = 46f;
             _stampLabel.fontSizeMax = StampFontSize;
             _stampLabel.gameObject.SetActive(false);
+            _stampEpigraphLabel = UiKit.CreateText(_stampRoot, "StampEpigraphLabel",
+                new Vector2(0f, StampEpigraphOffsetY), new Vector2(PanelWidth, 100f), "",
+                StampEpigraphFontSize, StampNoExecutionColor, TextAlignmentOptions.Center);
+            _stampEpigraphLabel.fontStyle = FontStyles.Italic;
+            _stampEpigraphLabel.enableAutoSizing = true;
+            _stampEpigraphLabel.fontSizeMin = 24f;
+            _stampEpigraphLabel.fontSizeMax = StampEpigraphFontSize;
+            _stampEpigraphLabel.gameObject.SetActive(false);
 
             _danmakuRoot = UiKit.CreateRect(mapPanel, "Danmaku", Vector2.zero, new Vector2(PanelWidth, MapHeight));
             _danmakuRoot.gameObject.AddComponent<RectMask2D>();
@@ -370,9 +383,7 @@ namespace Werewolf.UI
                 new Vector2(seekCenter, 0f), new Vector2(seekWidth, SeekHitHeight));
             _seekBarRect = UiKit.CreateRect(_seekHitRect, "SeekBar",
                 Vector2.zero, new Vector2(seekWidth, SeekBarThickness));
-            var seekBg = UiKit.CreateImage(_seekBarRect, "SeekBg", Vector2.zero,
-                new Vector2(seekWidth, SeekBarThickness), SeekBgColor);
-            UiKit.Stretch(seekBg.rectTransform);
+            UiKit.CreateBackdrop(_seekBarRect, "SeekBg", SeekBgColor);
 
             _seekFill = UiKit.CreateImage(_seekBarRect, "SeekFill", Vector2.zero,
                 new Vector2(0f, SeekBarThickness), SeekFillColor);
@@ -405,7 +416,6 @@ namespace Werewolf.UI
 
             _viewerRoot.SetActive(false);
             _root.SetActive(false);
-            WLog.Line("replay_viewer_built", secret: false, ("icon", _toggle.HasIcon ? 1 : 0));
         }
 
         private RectTransform CreateMarkerLayer(string name)
@@ -416,9 +426,7 @@ namespace Werewolf.UI
             RectTransform gauge = UiKit.CreateRect(viewerRect, "Gauge",
                 new Vector2(0f, GaugeCenterY), new Vector2(PanelWidth, GaugeHeight));
             _gaugeRoot = gauge.gameObject;
-            Image bg = UiKit.CreateImage(gauge, "Bg", Vector2.zero,
-                new Vector2(PanelWidth, GaugeHeight), GaugeBgColor);
-            UiKit.Stretch(bg.rectTransform);
+            UiKit.CreateBackdrop(gauge, "Bg", GaugeBgColor);
 
             var trackSize = new Vector2(GaugeTrackWidth, GaugeTrackHeight);
             Image lossTrack = UiKit.CreateImage(gauge, "LossTrack",
@@ -517,6 +525,7 @@ namespace Werewolf.UI
                 double prevT = _clock != null ? _clock.T : 0;
                 bool wasPlaying = _clock != null && _clock.Playing;
                 _clock?.Tick(Time.unscaledDeltaTime);
+                NoteCapCrossing();
 
                 HandleInput(pointerOnChat, export);
                 UpdateControls();
@@ -556,6 +565,7 @@ namespace Werewolf.UI
             _stampRoot = null;
             _danmakuRoot = null;
             _stampLabel = null;
+            _stampEpigraphLabel = null;
             _danmakuMeasurer = null;
             _danmakuPool.Clear();
             _danmaku = null;
@@ -600,6 +610,7 @@ namespace Werewolf.UI
             _seekHandle = null;
             _seekMeetingShades.Clear();
             _seekDeathTicks.Clear();
+            _seekCapBands.Clear();
             _gaugeRoot = null;
             _gaugeLossFill = null;
             _gaugeDeliveryFill = null;
@@ -646,6 +657,7 @@ namespace Werewolf.UI
             }
             ReplayPace pace = _playback != null ? _playback.BuildPace() : null;
             _clock = new ReplayClock(_playback != null ? _playback.Duration : 600.0, pace);
+            _clock.Fast = true;
             bool autoStarted = !DemoActive && !_openedReplayThisMatch;
             if (autoStarted)
             {
@@ -655,7 +667,8 @@ namespace Werewolf.UI
             _danmaku = new ReplayDanmaku(
                 _playback != null ? (IReadOnlyList<(double, int, string)>)_playback.Chats : null,
                 _playback != null ? (IReadOnlyList<(double, int)>)_playback.MeetingResults : null,
-                pace);
+                pace,
+                _playback?.GameOver);
             _danmakuPlayers.Clear();
             if (_playback != null)
             {
@@ -667,6 +680,7 @@ namespace Werewolf.UI
             _seeking = false;
             _resumeAfterSeek = false;
             _saveDone = false;
+            _capNoticeShown = false;
             _gaugeShownLoss = -1;
             _gaugeShownDelivered = -1;
             _gaugeHasDelivery = _playback != null && _playback.DeliveredDollarsAt(_playback.Duration) > 0;
@@ -770,8 +784,6 @@ namespace Werewolf.UI
             _clock?.SetPlaying(false);
             _seekRebuiltT = double.NegativeInfinity;
             SeekFromPointer(mouse);
-            WLog.Line("replay_viewer_seek", secret: false,
-                ("t", _clock != null ? _clock.T : 0.0), ("resume", _resumeAfterSeek));
         }
 
         private void EndSeek()
@@ -839,6 +851,9 @@ namespace Werewolf.UI
             }
         }
 
+        private static string CapSuffix(ReplayExportReport report)
+            => report.PositionCapped ? "  " + Texts.Get(TextId.ReplaySavedCapped) : "";
+
         private void DoSave(Func<ReplayExportReport> export)
         {
             if (export == null || DemoActive) return;
@@ -860,12 +875,14 @@ namespace Werewolf.UI
                     SetStatus(
                         Texts.Get(report.ToDownloads
                             ? TextId.ReplaySavedToDownloads
-                            : TextId.ReplaySavedToModFolder) + "  " + (report.FileName ?? ""),
+                            : TextId.ReplaySavedToModFolder) + "  " + (report.FileName ?? "")
+                        + CapSuffix(report),
                         StatusOkColor);
                     break;
                 case ReplayExportOutcome.AlreadyExists:
                     _saveDone = true;
-                    SetStatus(Texts.Get(TextId.ReplayAlreadySaved) + "  " + (report.FileName ?? ""),
+                    SetStatus(Texts.Get(TextId.ReplayAlreadySaved) + "  " + (report.FileName ?? "")
+                            + CapSuffix(report),
                         StatusMutedColor);
                     break;
                 case ReplayExportOutcome.Empty:
@@ -911,10 +928,31 @@ namespace Werewolf.UI
             }
         }
 
+        private void NoteCapCrossing()
+        {
+            if (_capNoticeShown || _clock == null || _playback == null) return;
+            if (_clock.T < _playback.PositionCapT) return;
+            _capNoticeShown = true;
+            SetStatus(Texts.Get(TextId.ReplayPositionCapped), StatusMutedColor);
+        }
+
         private void BuildSeekStatics()
         {
             float width = SeekRight - SeekLeft;
             double duration = _playback != null ? _playback.Duration : 0;
+
+            int capCount = 0;
+            if (_playback != null && duration > 0 && _playback.PositionCapT < duration)
+            {
+                float capX = (float)(Math.Max(0.0, _playback.PositionCapT) / duration) * width;
+                Image band = EnsureSeekOverlay(_seekCapBands, capCount++, "CapBand", SeekCapColor);
+                var capRect = band.rectTransform;
+                capRect.anchorMin = capRect.anchorMax = new Vector2(0f, 0.5f);
+                capRect.pivot = new Vector2(0f, 0.5f);
+                capRect.anchoredPosition = new Vector2(capX, 0f);
+                capRect.sizeDelta = new Vector2(Mathf.Max(2f, width - capX), SeekBarThickness);
+            }
+            HideExtra(_seekCapBands, capCount);
 
             int shadeCount = 0;
             if (_playback != null && duration > 0)
