@@ -24,7 +24,8 @@ namespace Werewolf.Core
     public static class SettingsPanelGate
     {
         public static bool IsMatchScope(GamePhase phase, bool inRunLevel)
-            => inRunLevel && (phase == GamePhase.Play || phase == GamePhase.Meeting);
+            => inRunLevel && (phase == GamePhase.RoleReveal
+                              || phase == GamePhase.Play || phase == GamePhase.Meeting);
 
         public static SettingsPanelView Lobby(bool inLobby, bool hasData, bool modeEnabled, bool userHidden)
         {

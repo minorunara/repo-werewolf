@@ -126,7 +126,8 @@ namespace Werewolf.Tests
 
             var visible = queue.Visible(Now);
             var entry = Assert.Single(visible);
-            Assert.Equal("会議を開催できません（開催権がありません）", entry.Message);
+            Assert.Equal(NoticeCatalog.Format(SessionNotice.ForConveneDenied(ConveneRejectReason.NoRight)),
+                entry.Message);
         }
 
         [Fact]
@@ -141,7 +142,8 @@ namespace Werewolf.Tests
             h.Session.TryConvene(callerActor, Now + 10_000);
 
             var entry = Assert.Single(queue.Visible(Now));
-            Assert.Equal("会議を開催できません（現在は抑止時間中です）", entry.Message);
+            Assert.Equal(NoticeCatalog.Format(SessionNotice.ForConveneDenied(ConveneRejectReason.Suppressed)),
+                entry.Message);
         }
 
         [Fact]

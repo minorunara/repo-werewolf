@@ -7,8 +7,6 @@ using UnityEngine;
 using UnityEngine.AI;
 using Werewolf.Core;
 using Werewolf.Core.Replay;
-using Werewolf.UI;
-using Werewolf.Game;
 
 namespace Werewolf.Vanilla
 {
@@ -20,11 +18,18 @@ namespace Werewolf.Vanilla
         private static readonly List<ReplayEntitySample> _samples = new List<ReplayEntitySample>(256);
         private static readonly List<int> _haulScratch = new List<int>(32);
 
+        private static EnemyParent[] _enemies = Array.Empty<EnemyParent>();
+        private static PhysGrabCart[] _carts = Array.Empty<PhysGrabCart>();
+        private static ValuableObject[] _valuables = Array.Empty<ValuableObject>();
+        private static ItemAttributes[] _items = Array.Empty<ItemAttributes>();
+        private static ExtractionPoint[] _extractionPoints = Array.Empty<ExtractionPoint>();
+        private static bool _rostersPrimed;
+        private static int _rosterCursor;
+
         private static double Now => Time.realtimeSinceStartupAsDouble;
 
-        internal static void Tick()
+        internal static void Tick(IReplayDirectorView dir)
         {
-            WerewolfDirector dir = WerewolfDirector.Instance;
             bool gate = dir != null && dir.IsRoundActiveClient && SemiFunc.RunIsLevel();
             if (gate != _segmentActive)
             {
@@ -36,6 +41,7 @@ namespace Werewolf.Vanilla
                 }
                 else
                 {
+                    ClearRosters();
                     Recorder.EndSegment(Now);
                     WLog.Line("replay_segment_end", secret: false,
                         ("segments", Recorder.SegmentCount),
@@ -52,6 +58,7 @@ namespace Werewolf.Vanilla
         {
             Recorder.Reset();
             _segmentActive = false;
+            ClearRosters();
             MapStillCapture.Invalidate();
         }
 
@@ -68,7 +75,7 @@ namespace Werewolf.Vanilla
             => Recorder.NoteEvent(Now, "meet", ("a", callerActor), ("kind", kind));
 
         internal static void NoteMeetingWarp()
-            => Recorder.NoteEvent(Now, "meet_warp");
+            => Recorder.NoteEvent(Now, ReplayEvents.MeetWarp);
 
         internal static void NoteMeetingCancelled(int reason)
             => Recorder.NoteEvent(Now, "meet_cancel", ("reason", reason));
@@ -76,11 +83,14 @@ namespace Werewolf.Vanilla
         internal static void NoteChat(int actor, string text)
             => Recorder.NoteEvent(Now, "chat", ("a", actor), ("text", text));
 
+        internal static void NoteStamp(int actor, byte stampId)
+            => Recorder.NoteEvent(Now, "stamp", ("a", actor), ("id", (int)stampId));
+
         internal static void NoteMeetingResult(int executedActor)
             => Recorder.NoteEvent(Now, "meeting_result", ("a", executedActor));
 
         internal static void NotePhase(string phase)
-            => Recorder.NoteEvent(Now, "phase", ("to", phase));
+            => Recorder.NoteEvent(Now, ReplayEvents.Phase, (ReplayEvents.PhaseToKey, phase));
 
         internal static void NoteScatterGroups(List<List<int>> groups)
             => Recorder.NoteEvent(Now, "scatter", ("groups", groups));
@@ -231,8 +241,9 @@ namespace Werewolf.Vanilla
                     }
                 }
             }
-            catch
+            catch (Exception e)
             {
+                WLog.Line("replay_downloads_probe_error", secret: false, ("err", e.Message));
             }
             toDownloads = false;
             return FallbackReplayDir();
@@ -244,7 +255,7 @@ namespace Werewolf.Vanilla
             return Path.Combine(dllDir, "Replays");
         }
 
-        private static void BeginSegment(WerewolfDirector dir)
+        private static void BeginSegment(IReplayDirectorView dir)
         {
             var header = new ReplaySegmentHeader
             {
@@ -268,6 +279,7 @@ namespace Werewolf.Vanilla
                         Actor = actor,
                         ParticipantId = dir.IdRoster.IdOf(actor),
                         Name = SemiFunc.PlayerGetName(avatar),
+                        Color = PlayerHeadColor.HexOf(avatar),
                     });
                 }
             }
@@ -280,6 +292,7 @@ namespace Werewolf.Vanilla
                     Actor = pair.Key,
                     ParticipantId = pair.Value,
                     Name = dir.DisplayNameForActor(pair.Key),
+                    Color = PlayerHeadColor.HexForBot(pair.Key),
                 });
             }
 
@@ -339,10 +352,13 @@ namespace Werewolf.Vanilla
             return new ReplayMapMesh { Vertices = verts, Triangles = tri.indices };
         }
 
-        private static void CollectAndSample(WerewolfDirector dir)
+        private static void CollectAndSample(IReplayDirectorView dir)
         {
             double now = Now;
             _samples.Clear();
+
+            if (_rostersPrimed) RefreshOneRoster(now);
+            else RefreshAllRosters(now);
 
             List<PlayerAvatar> players = GameDirector.instance != null ? GameDirector.instance.PlayerList : null;
             if (players != null)
@@ -363,8 +379,9 @@ namespace Werewolf.Vanilla
                 }
             }
 
-            foreach (EnemyParent parent in UnityEngine.Object.FindObjectsOfType<EnemyParent>())
+            foreach (EnemyParent parent in _enemies)
             {
+                if (parent == null) continue;
                 if (!GameRefs.EnemyParent_Spawned(parent)) continue;
                 Enemy enemy = GameRefs.EnemyParent_Enemy(parent);
                 if (enemy == null) continue;
@@ -375,20 +392,19 @@ namespace Werewolf.Vanilla
                 _samples.Add(new ReplayEntitySample(ReplayEntityKind.Enemy, id, pos.x, pos.y, pos.z));
             }
 
-            foreach (PhysGrabCart cart in UnityEngine.Object.FindObjectsOfType<PhysGrabCart>())
+            foreach (PhysGrabCart cart in _carts)
             {
+                if (cart == null) continue;
                 int id = cart.GetInstanceID();
                 Vector3 pos = cart.transform.position;
-                Recorder.NoteEntity(now, ReplayEntityKind.Cart, id, CleanName(cart.gameObject.name));
                 _samples.Add(new ReplayEntitySample(ReplayEntityKind.Cart, id, pos.x, pos.y, pos.z));
             }
 
-            foreach (ValuableObject valuable in UnityEngine.Object.FindObjectsOfType<ValuableObject>())
+            foreach (ValuableObject valuable in _valuables)
             {
+                if (valuable == null) continue;
                 int id = valuable.GetInstanceID();
                 Vector3 pos = valuable.transform.position;
-                Recorder.NoteEntity(now, ReplayEntityKind.Valuable, id,
-                    CleanName(valuable.gameObject.name), ReplayVid(valuable));
                 Recorder.NoteValuableValue(now, id, (int)GameRefs.ValuableObject_dollarValueCurrent(valuable));
                 _samples.Add(new ReplayEntitySample(ReplayEntityKind.Valuable, id, pos.x, pos.y, pos.z));
             }
@@ -406,21 +422,80 @@ namespace Werewolf.Vanilla
             }
             Recorder.NoteHaulIds(now, _haulScratch);
 
-            foreach (ItemAttributes item in UnityEngine.Object.FindObjectsOfType<ItemAttributes>())
+            foreach (ItemAttributes item in _items)
             {
+                if (item == null) continue;
                 int id = item.GetInstanceID();
                 Vector3 pos = item.transform.position;
-                Recorder.NoteEntity(now, ReplayEntityKind.Item, id, CleanName(item.gameObject.name));
                 _samples.Add(new ReplayEntitySample(ReplayEntityKind.Item, id, pos.x, pos.y, pos.z));
             }
 
-            foreach (ExtractionPoint ep in UnityEngine.Object.FindObjectsOfType<ExtractionPoint>())
+            foreach (ExtractionPoint ep in _extractionPoints)
             {
+                if (ep == null) continue;
                 ExtractionPoint.State state = GameRefs.ExtractionPoint_currentState(ep);
                 Recorder.NoteEpState(now, ep.GetInstanceID(), (byte)state, state.ToString());
             }
 
             Recorder.Sample(now, _samples);
+        }
+
+        private static void RefreshAllRosters(double now)
+        {
+            for (int i = 0; i < 5; i++) RefreshOneRoster(now);
+            _rostersPrimed = true;
+        }
+
+        private static void RefreshOneRoster(double now)
+        {
+            switch (_rosterCursor)
+            {
+                case 0:
+                    _enemies = FindAll<EnemyParent>();
+                    break;
+                case 1:
+                    _carts = FindAll<PhysGrabCart>();
+                    foreach (PhysGrabCart cart in _carts)
+                    {
+                        Recorder.NoteEntity(now, ReplayEntityKind.Cart, cart.GetInstanceID(),
+                            CleanName(cart.gameObject.name));
+                    }
+                    break;
+                case 2:
+                    _valuables = FindAll<ValuableObject>();
+                    foreach (ValuableObject valuable in _valuables)
+                    {
+                        Recorder.NoteEntity(now, ReplayEntityKind.Valuable, valuable.GetInstanceID(),
+                            CleanName(valuable.gameObject.name), ReplayVid(valuable));
+                    }
+                    break;
+                case 3:
+                    _items = FindAll<ItemAttributes>();
+                    foreach (ItemAttributes item in _items)
+                    {
+                        Recorder.NoteEntity(now, ReplayEntityKind.Item, item.GetInstanceID(),
+                            CleanName(item.gameObject.name));
+                    }
+                    break;
+                default:
+                    _extractionPoints = FindAll<ExtractionPoint>();
+                    break;
+            }
+            _rosterCursor = (_rosterCursor + 1) % 5;
+        }
+
+        private static T[] FindAll<T>() where T : UnityEngine.Object
+            => UnityEngine.Object.FindObjectsByType<T>(FindObjectsSortMode.None);
+
+        private static void ClearRosters()
+        {
+            _enemies = Array.Empty<EnemyParent>();
+            _carts = Array.Empty<PhysGrabCart>();
+            _valuables = Array.Empty<ValuableObject>();
+            _items = Array.Empty<ItemAttributes>();
+            _extractionPoints = Array.Empty<ExtractionPoint>();
+            _rostersPrimed = false;
+            _rosterCursor = 0;
         }
 
         private static string CleanName(string goName)

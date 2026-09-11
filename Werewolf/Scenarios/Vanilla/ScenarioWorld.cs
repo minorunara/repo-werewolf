@@ -7,7 +7,7 @@ namespace Werewolf.Scenarios.Vanilla
 {
     internal static class ScenarioWorld
     {
-        private static readonly AccessTools.FieldRef<StatsManager, string> SaveFileCurrentRef =
+        private static AccessTools.FieldRef<StatsManager, string> SaveFileCurrentRef =>
             GameRefs.StatsManager_saveFileCurrent;
 
         public static bool CheckStart(ScenarioEnvironmentSpec environment, out string rejectReason)

@@ -72,6 +72,7 @@ namespace Werewolf.UI
         private RectTransform _panelRect;
         private readonly IconToggleButton _toggle = new IconToggleButton();
         private KeyCode _labelKey = KeyCode.None;
+        private RectTransform _scrollRect;
         private TextMeshProUGUI _footerHint;
         private GameObject _emptyHint;
 
@@ -90,6 +91,10 @@ namespace Werewolf.UI
         private readonly ChatSpeakerFilter _speakerFilter = new ChatSpeakerFilter();
 
         private readonly Vector3[] _cornerScratch = new Vector3[4];
+        private readonly ChatStampTray _stampTray = new ChatStampTray();
+
+        private static float StampBarInset
+            => FeatureFlags.ChatStamps ? ChatStampTray.BarHeight : 0f;
 
         private Func<ChatLogEntry, ChatBlockSize> _measureFn;
         private Func<int, GameObject> _createBlockFn;
@@ -152,58 +157,31 @@ namespace Werewolf.UI
                 new Vector2(PanelWidth - 16f, HeaderHeight - 8f),
                 Texts.Get(TitleTextId), TitleFontSize, TitleTextColor, TextAlignmentOptions.Center);
 
-            var scrollGo = new GameObject("Scroll", typeof(RectTransform));
-            var scrollRect = (RectTransform)scrollGo.transform;
-            scrollRect.SetParent(rootRect, false);
-            scrollRect.anchorMin = Vector2.zero;
-            scrollRect.anchorMax = Vector2.one;
-            scrollRect.offsetMin = new Vector2(0f, FooterHeight);
+            ScrollRect scroll = UiKit.CreateScrollArea(rootRect, "Scroll", ScrollSensitivity,
+                out RectTransform scrollRect, out RectTransform viewportRect,
+                out RectTransform contentRect);
+            _scrollRect = scrollRect;
+            scrollRect.offsetMin = new Vector2(0f, StampBarInset);
             scrollRect.offsetMax = new Vector2(0f, -HeaderHeight);
-            var scroll = scrollGo.AddComponent<ScrollRect>();
-            scroll.horizontal = false;
-            scroll.vertical = true;
-            scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.inertia = false;
-            scroll.scrollSensitivity = ScrollSensitivity;
-            var scrollBgImg = scrollGo.AddComponent<Image>();
-            scrollBgImg.color = new Color(0f, 0f, 0f, 0.001f);
-            scrollBgImg.raycastTarget = true;
-
-            var viewportGo = new GameObject("Viewport", typeof(RectTransform));
-            var viewportRect = (RectTransform)viewportGo.transform;
-            viewportRect.SetParent(scrollRect, false);
-            viewportRect.anchorMin = Vector2.zero;
-            viewportRect.anchorMax = Vector2.one;
-            viewportRect.offsetMin = Vector2.zero;
             viewportRect.offsetMax = new Vector2(-ScrollbarWidth, 0f);
-            var vpImg = viewportGo.AddComponent<Image>();
-            vpImg.color = new Color(0f, 0f, 0f, 0.001f);
-            vpImg.raycastTarget = true;
-            viewportGo.AddComponent<RectMask2D>();
-            scroll.viewport = viewportRect;
-
-            var contentGo = new GameObject("Content", typeof(RectTransform));
-            var contentRect = (RectTransform)contentGo.transform;
-            contentRect.SetParent(viewportRect, false);
-            contentRect.anchorMin = new Vector2(0f, 1f);
-            contentRect.anchorMax = new Vector2(1f, 1f);
-            contentRect.pivot = new Vector2(0.5f, 1f);
-            contentRect.anchoredPosition = Vector2.zero;
-            contentRect.sizeDelta = Vector2.zero;
-            scroll.content = contentRect;
             _view.Attach(scroll, viewportRect, contentRect);
             _rows.Attach(contentRect);
 
             RectTransform scrollbar = BuildScrollbar(scrollRect, scroll);
             _nav.Build(rootRect, headerY, PanelWidth, scrollbar);
             _speakerFilter.Attach(title, viewportRect);
+            if (FeatureFlags.ChatStamps) _stampTray.Build(rootRect, PanelWidth, PanelHeight, HeaderHeight);
 
-            _footerHint = UiKit.CreateText(rootRect, "DeadHint",
-                new Vector2(0f, -PanelHeight * 0.5f + FooterHeight * 0.5f),
-                new Vector2(PanelWidth - 12f, FooterHeight),
-                _surface == ChatPanelSurface.Result ? Texts.Get(TextId.ResultChatHint) : string.Empty,
-                HintFontSize, HintTextColor, TextAlignmentOptions.Center);
-            _footerHint.enableWordWrapping = true;
+            if (_surface == ChatPanelSurface.Meeting)
+            {
+                _footerHint = UiKit.CreateText(rootRect, "DeadHint",
+                    new Vector2(0f, -PanelHeight * 0.5f + FooterHeight * 0.5f),
+                    new Vector2(PanelWidth - 12f, FooterHeight),
+                    Texts.Get(TextId.ChatLogDeadHint),
+                    HintFontSize, HintTextColor, TextAlignmentOptions.Center);
+                _footerHint.enableWordWrapping = true;
+                _footerHint.gameObject.SetActive(false);
+            }
 
             _rows.Build(containerRect);
             _measureFn = _rows.MeasureBubble;
@@ -226,6 +204,7 @@ namespace Werewolf.UI
             else
             {
                 ClearSpeakerFilter();
+                _stampTray.ClosePalette();
                 ClearLiveBlocks();
             }
         }
@@ -288,7 +267,7 @@ namespace Werewolf.UI
                 _nav.Tick(_layout, _log.SectionSeqs, _view);
             }
 
-            if (_open && _speakerFilter.Tick())
+            if (_open && !_stampTray.IsPaletteOpen && _speakerFilter.Tick())
             {
                 _layout.SetFilter(_speakerFilter.Predicate);
                 _scrollToBottomPending = true;
@@ -313,10 +292,17 @@ namespace Werewolf.UI
                 else
                 {
                     ClearSpeakerFilter();
+                    _stampTray.ClosePalette();
                     ClearLiveBlocks();
                 }
                 WLog.Line("chat_panel_toggle", secret: false, ("open", _open));
             }
+        }
+
+        public void TickStamps(bool windowOpen, bool cooldownReady, bool defaultChatter, Action<byte> send)
+        {
+            if (_root == null || !_open) return;
+            _stampTray.Tick(windowOpen, cooldownReady, defaultChatter, send);
         }
 
         public bool IsPointerOverPanel(Vector2 screenPoint)
@@ -432,10 +418,8 @@ namespace Werewolf.UI
             if (_surface == ChatPanelSurface.Meeting && localDead != _renderedLocalDead)
             {
                 _renderedLocalDead = localDead;
-                if (_footerHint != null)
-                {
-                    _footerHint.text = localDead ? Texts.Get(TextId.ChatLogDeadHint) : string.Empty;
-                }
+                SetFooterShown(localDead);
+                if (stickToBottom) _scrollToBottomPending = true;
             }
 
             _layout.Sync(log, _measureFn);
@@ -458,6 +442,17 @@ namespace Werewolf.UI
             }
 
             SyncVirtualization();
+        }
+
+        private void SetFooterShown(bool shown)
+        {
+            float footer = shown ? FooterHeight : 0f;
+            if (_scrollRect != null)
+            {
+                _scrollRect.offsetMin = new Vector2(0f, footer + StampBarInset);
+            }
+            _stampTray.SetFooterHeight(footer);
+            if (_footerHint != null) _footerHint.gameObject.SetActive(shown);
         }
 
         private void ApplyContentHeight()
@@ -527,6 +522,7 @@ namespace Werewolf.UI
         public void ResetView()
         {
             ClearSpeakerFilter();
+            _stampTray.ClosePalette();
             _renderedVersion = int.MinValue;
             _scrollToBottomPending = true;
             ClearLiveBlocks();
@@ -559,7 +555,9 @@ namespace Werewolf.UI
             _toggle.Clear();
             _nav.Clear();
             _speakerFilter.Clear();
+            _stampTray.Clear();
             _labelKey = KeyCode.None;
+            _scrollRect = null;
             _footerHint = null;
             _renderedLocalDead = false;
             ResetView();

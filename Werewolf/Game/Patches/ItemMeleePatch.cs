@@ -8,7 +8,7 @@ namespace Werewolf.Game.Patches
 {
     internal static class ItemMeleeFriendlyFire
     {
-        private static readonly AccessTools.FieldRef<ItemMelee, HurtCollider> HurtColliderRef =
+        private static AccessTools.FieldRef<ItemMelee, HurtCollider> HurtColliderRef =>
             GameRefs.ItemMelee_hurtCollider;
 
         internal static void Apply(ItemMelee melee)

@@ -445,7 +445,6 @@ namespace Werewolf.Game
             _modIntegrityPanel.Close();
             _modIntegrityHeader.Tick(false);
             _modManifestCollector.ResetSessionView();
-            WLog.Line("mod_integrity_epoch", secret: false, ("state", "cleared"), ("reason", reason));
         }
 
         private static bool IsModIntegrityLobbyScope()

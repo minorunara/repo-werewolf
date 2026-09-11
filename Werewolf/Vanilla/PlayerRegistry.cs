@@ -15,8 +15,8 @@ namespace Werewolf.Vanilla
         {
             _deadSetRef = GameRefs.PlayerAvatar_deadSet;
             Available = _deadSetRef != null;
-            WLog.Line("registry_init", secret: false,
-                ("status", Available ? "ok" : "field_resolve_failed"));
+            if (!Available)
+                WLog.Line("registry_init_failed", secret: false, ("reason", "field_unresolved"));
         }
 
         public List<WPlayer> BuildRealPlayers()
@@ -29,12 +29,24 @@ namespace Werewolf.Vanilla
                 return result;
             }
 
+            HashSet<int> currentRoomActors = null;
+            if (SemiFunc.IsMultiplayer())
+            {
+                Photon.Realtime.Room room = Photon.Pun.PhotonNetwork.CurrentRoom;
+                if (room?.Players == null) return result;
+                currentRoomActors = new HashSet<int>(room.Players.Keys);
+            }
+
+            var addedActors = new HashSet<int>();
             foreach (PlayerAvatar avatar in director.PlayerList)
             {
                 if (avatar == null) continue;
+                int actor = ResolveActor(avatar);
+                if (actor <= 0 || (currentRoomActors != null && !currentRoomActors.Contains(actor))
+                    || !addedActors.Add(actor)) continue;
                 var player = new WPlayer
                 {
-                    ActorNumber = ResolveActor(avatar),
+                    ActorNumber = actor,
                     Name = SemiFunc.PlayerGetName(avatar),
                     SteamId = SemiFunc.PlayerGetSteamID(avatar),
                     IsBot = false,

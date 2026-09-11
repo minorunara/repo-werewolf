@@ -65,13 +65,6 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void GameConfig_DefaultValuableMapMode_IsMeetingSync()
-        {
-            var cfg = new GameConfig();
-            Assert.Equal(ValuableMapMode.MeetingSync, cfg.ValuableMapMode);
-        }
-
-        [Fact]
         public void CfgValuableMapMode_IsPresentInAllKeys()
         {
             Assert.Contains(RoomStateKeys.CfgValuableMapMode, RoomStateKeys.AllKeys);

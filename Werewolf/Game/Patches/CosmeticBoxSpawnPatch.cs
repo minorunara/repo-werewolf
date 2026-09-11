@@ -10,7 +10,7 @@ namespace Werewolf.Game.Patches
 
         private static bool _blockLogged;
 
-        private static readonly AccessTools.FieldRef<RunManager, bool> RestartingRef =
+        private static AccessTools.FieldRef<RunManager, bool> RestartingRef =>
             GameRefs.RunManager_restarting;
 
         private static bool IsRunLevelTransition(RunManager run, RunManager.ChangeLevelType changeLevelType)

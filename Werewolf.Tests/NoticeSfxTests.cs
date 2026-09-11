@@ -10,14 +10,12 @@ namespace Werewolf.Tests
         {
             var notice = SessionNotice.ForConveneStarted("Alice");
             Assert.Equal(NoticeSfx.ConveneStartedClipKey, NoticeSfx.Resolve(notice));
-            Assert.Equal("sfx_notice_convene", NoticeSfx.Resolve(notice));
         }
 
         [Fact]
         public void Null_FallsBackToDefault()
         {
             Assert.Equal(NoticeSfx.DefaultClipKey, NoticeSfx.Resolve(null));
-            Assert.Equal("sfx_toast", NoticeSfx.Resolve(null));
         }
 
         [Theory]
@@ -43,8 +41,6 @@ namespace Werewolf.Tests
         [Fact]
         public void BomberProximityWarning_UsesDedicatedClipKey()
         {
-            Assert.Equal("sfx_bomb_proximity_warning",
-                NoticeSfx.BomberProximityWarningClipKey);
             Assert.NotEqual(NoticeSfx.DefaultClipKey,
                 NoticeSfx.BomberProximityWarningClipKey);
         }
@@ -54,7 +50,6 @@ namespace Werewolf.Tests
         {
             var notice = SessionNotice.ForPlayerDisconnected("Eve");
             Assert.Equal(NoticeSfx.PlayerDisconnectedClipKey, NoticeSfx.Resolve(notice));
-            Assert.Equal("sfx_player_disconnected", NoticeSfx.Resolve(notice));
             Assert.NotEqual(NoticeSfx.DefaultClipKey, NoticeSfx.PlayerDisconnectedClipKey);
         }
 

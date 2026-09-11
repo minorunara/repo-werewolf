@@ -11,18 +11,9 @@ namespace Werewolf.Game.Patches
 
         private static int _reviveCount;
         private static bool _disabled;
-        private static bool _firstTickLogged;
 
         private static void Postfix(RunManager __instance)
         {
-            if (!_firstTickLogged)
-            {
-                _firstTickLogged = true;
-                WLog.Line("director_watchdog_first_tick", secret: false,
-                    ("directorAlive", WerewolfDirector.Instance != null),
-                    ("scene", UnityEngine.SceneManagement.SceneManager.GetActiveScene().name));
-            }
-
             if (_disabled || WerewolfDirector.Instance != null) return;
             try
             {

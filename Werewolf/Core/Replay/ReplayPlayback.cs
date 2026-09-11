@@ -114,6 +114,8 @@ namespace Werewolf.Core.Replay
         public int Actor;
         public int ParticipantId;
         public string Name = "";
+
+        public string Color;
         public ReplayEntityTrack Track;
 
         public ReplayEntityTrack CorpseTrack;
@@ -388,7 +390,8 @@ namespace Werewolf.Core.Replay
             if (header == null) return;
             foreach (ReplayPlayerInfo p in header.Players)
             {
-                ResolvePlayer(p.Actor, p.ParticipantId, p.Name);
+                ReplayPlayerEntry entry = ResolvePlayer(p.Actor, p.ParticipantId, p.Name);
+                if (p.Color != null) entry.Color = p.Color;
             }
             foreach (ReplayValuableInfo v in header.Valuables)
             {
@@ -542,15 +545,15 @@ namespace Werewolf.Core.Replay
                     }
                     break;
 
-                case "phase":
-                    if (TryFieldString(ev.Fields, "to", out string to)
+                case ReplayEvents.Phase:
+                    if (TryFieldString(ev.Fields, ReplayEvents.PhaseToKey, out string to)
                         && !string.Equals(to, "Meeting", StringComparison.Ordinal))
                     {
                         meetings.Close(ev.T, Meetings);
                     }
                     break;
 
-                case "meet_warp":
+                case ReplayEvents.MeetWarp:
                     meetings.NoteWarp(ev.T);
                     break;
 
@@ -572,6 +575,15 @@ namespace Werewolf.Core.Replay
                     {
                         string clean = ReplayChatText.SanitizeForRecord(chatText);
                         if (clean.Length > 0) Chats.Add((ev.T, chatActor, clean));
+                    }
+                    break;
+
+                case "stamp":
+                    if (TryField(ev.Fields, "a", out int stampActor)
+                        && TryField(ev.Fields, "id", out int stampId))
+                    {
+                        string stampText = ChatStampCatalog.ReplayText((byte)stampId);
+                        if (!string.IsNullOrEmpty(stampText)) Chats.Add((ev.T, stampActor, stampText));
                     }
                     break;
 
@@ -868,13 +880,6 @@ namespace Werewolf.Core.Replay
         }
 
         private static object FieldValue((string Key, object Value)[] fields, string key)
-        {
-            if (fields == null) return null;
-            for (int i = 0; i < fields.Length; i++)
-            {
-                if (fields[i].Key == key) return fields[i].Value;
-            }
-            return null;
-        }
+            => ReplayRecorder.EventRecord.FieldValue(fields, key);
     }
 }

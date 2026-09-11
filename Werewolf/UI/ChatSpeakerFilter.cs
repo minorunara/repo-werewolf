@@ -27,6 +27,7 @@ namespace Werewolf.UI
         private Color _titleBaseColor;
 
         private readonly List<Target> _targets = new List<Target>();
+        private readonly ClickGate _click = new ClickGate();
         private Image _hoverPlate;
 
         private int _actor;
@@ -86,7 +87,7 @@ namespace Werewolf.UI
             bool hoverTitle = IsOverTitle(mouse);
             _title.color = hoverTitle ? TitleHoverColor : _titleBaseColor;
 
-            if (!Input.GetMouseButtonDown(0)) return false;
+            if (!_click.Tick(Input.GetMouseButtonDown(0), Input.GetMouseButtonUp(0), mouse.x, mouse.y)) return false;
             if (hoverTitle)
             {
                 Deactivate();
@@ -174,6 +175,7 @@ namespace Werewolf.UI
             _viewport = null;
             _normalTitle = string.Empty;
             _targets.Clear();
+            _click.Reset();
             _hoverPlate = null;
             _active = false;
             _actor = 0;

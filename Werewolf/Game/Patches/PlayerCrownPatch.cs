@@ -7,10 +7,10 @@ namespace Werewolf.Game.Patches
     [HarmonyPatch(typeof(PlayerCrown), "FetchLogic")]
     internal static class PlayerCrownPatch
     {
-        private static readonly AccessTools.FieldRef<PlayerCrown, PlayerAvatar> PlayerAvatarRef =
+        private static AccessTools.FieldRef<PlayerCrown, PlayerAvatar> PlayerAvatarRef =>
             GameRefs.PlayerCrown_playerAvatar;
 
-        private static readonly AccessTools.FieldRef<PlayerCrown, bool> ActiveRef =
+        private static AccessTools.FieldRef<PlayerCrown, bool> ActiveRef =>
             GameRefs.PlayerCrown_active;
 
         private static bool _errorLogged;

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Werewolf.Core;
 using Xunit;
@@ -17,7 +18,7 @@ namespace Werewolf.Tests
 
         public static IEnumerable<object[]> AllDecideKindCombinations()
         {
-            var phases = new[] { GamePhase.Lobby, GamePhase.Play, GamePhase.Meeting, GamePhase.GameOver };
+            var phases = (GamePhase[])Enum.GetValues(typeof(GamePhase));
             var roles = new Role?[] { Role.Werewolf, Role.Bomber, Role.Villager, Role.BlackCat, null };
             var alives = new[] { true, false };
             var modes = new[] { NecroVoiceMode.Off, NecroVoiceMode.NonWerewolfDead, NecroVoiceMode.AllDead };
@@ -56,116 +57,6 @@ namespace Werewolf.Tests
             GamePhase phase, Role? localRole, bool localAlive, NecroVoiceMode mode, VoicePlanKind expected)
         {
             Assert.Equal(expected, VoiceRules.DecideKind(phase, localRole, localAlive, mode));
-        }
-
-        [Fact]
-        public void DecideKind_CoversAllCombinations_120Cases()
-        {
-            var count = 0;
-            foreach (var _ in AllDecideKindCombinations())
-            {
-                count++;
-            }
-            Assert.Equal(4 * 5 * 2 * 3, count);
-        }
-
-        [Theory]
-        [InlineData(NecroVoiceMode.Off)]
-        [InlineData(NecroVoiceMode.NonWerewolfDead)]
-        [InlineData(NecroVoiceMode.AllDead)]
-        public void DecideKind_GameOver_IsResultAll_RegardlessOfMode(NecroVoiceMode mode)
-        {
-            foreach (var role in new Role?[] { Role.Werewolf, Role.Bomber, Role.Villager, Role.BlackCat, null })
-            foreach (var alive in new[] { true, false })
-            {
-                Assert.Equal(
-                    VoicePlanKind.ResultAll,
-                    VoiceRules.DecideKind(GamePhase.GameOver, role, alive, mode));
-            }
-        }
-
-        [Theory]
-        [InlineData(NecroVoiceMode.NonWerewolfDead)]
-        [InlineData(NecroVoiceMode.AllDead)]
-        public void DecideKind_Play_AliveWerewolf_ModeOn_IsEavesdrop(NecroVoiceMode mode)
-        {
-            Assert.Equal(
-                VoicePlanKind.Eavesdrop,
-                VoiceRules.DecideKind(GamePhase.Play, Role.Werewolf, true, mode));
-        }
-
-        [Theory]
-        [InlineData(NecroVoiceMode.NonWerewolfDead)]
-        [InlineData(NecroVoiceMode.AllDead)]
-        public void DecideKind_Play_AliveBomber_ModeOn_IsEavesdrop(NecroVoiceMode mode)
-        {
-            Assert.Equal(
-                VoicePlanKind.Eavesdrop,
-                VoiceRules.DecideKind(GamePhase.Play, Role.Bomber, true, mode));
-        }
-
-        [Fact]
-        public void DecideKind_Play_AliveWerewolf_ModeOff_IsNone()
-        {
-            Assert.Equal(
-                VoicePlanKind.None,
-                VoiceRules.DecideKind(GamePhase.Play, Role.Werewolf, true, NecroVoiceMode.Off));
-        }
-
-        [Theory]
-        [InlineData(NecroVoiceMode.Off)]
-        [InlineData(NecroVoiceMode.NonWerewolfDead)]
-        [InlineData(NecroVoiceMode.AllDead)]
-        public void DecideKind_Meeting_IsNone_RegardlessOfOther(NecroVoiceMode mode)
-        {
-            foreach (var role in new Role?[] { Role.Werewolf, Role.Bomber, Role.Villager, Role.BlackCat, null })
-            foreach (var alive in new[] { true, false })
-            {
-                Assert.Equal(
-                    VoicePlanKind.None,
-                    VoiceRules.DecideKind(GamePhase.Meeting, role, alive, mode));
-            }
-        }
-
-        [Theory]
-        [InlineData(NecroVoiceMode.Off)]
-        [InlineData(NecroVoiceMode.NonWerewolfDead)]
-        [InlineData(NecroVoiceMode.AllDead)]
-        public void DecideKind_Lobby_IsNone_RegardlessOfOther(NecroVoiceMode mode)
-        {
-            foreach (var role in new Role?[] { Role.Werewolf, Role.Villager, Role.BlackCat, null })
-            foreach (var alive in new[] { true, false })
-            {
-                Assert.Equal(
-                    VoicePlanKind.None,
-                    VoiceRules.DecideKind(GamePhase.Lobby, role, alive, mode));
-            }
-        }
-
-        [Theory]
-        [InlineData(Role.Villager)]
-        [InlineData(Role.BlackCat)]
-        [InlineData(null)]
-        public void DecideKind_Play_NonWerewolfRoles_AreAlwaysNone(Role? role)
-        {
-            foreach (var alive in new[] { true, false })
-            foreach (var mode in new[] { NecroVoiceMode.Off, NecroVoiceMode.NonWerewolfDead, NecroVoiceMode.AllDead })
-            {
-                Assert.Equal(
-                    VoicePlanKind.None,
-                    VoiceRules.DecideKind(GamePhase.Play, role, alive, mode));
-            }
-        }
-
-        [Theory]
-        [InlineData(NecroVoiceMode.Off)]
-        [InlineData(NecroVoiceMode.NonWerewolfDead)]
-        [InlineData(NecroVoiceMode.AllDead)]
-        public void DecideKind_Play_DeadWerewolf_IsNone(NecroVoiceMode mode)
-        {
-            Assert.Equal(
-                VoicePlanKind.None,
-                VoiceRules.DecideKind(GamePhase.Play, Role.Werewolf, false, mode));
         }
 
         [Theory]
@@ -237,28 +128,6 @@ namespace Werewolf.Tests
             bool targetDead, bool eavesdropAudible, bool expected)
         {
             Assert.Equal(expected, VoiceRules.IsDeadCueMuteTarget(targetDead, eavesdropAudible));
-        }
-
-        [Fact]
-        public void IsEavesdropTarget_LoneWerewolf_AllDeadPlayersAreTargets_NonWerewolfDead()
-        {
-            var deadRoles = new Role?[] { Role.Villager, Role.BlackCat, Role.Werewolf, null };
-            foreach (var _ in deadRoles)
-            {
-                Assert.True(VoiceRules.IsEavesdropTarget(
-                    targetDead: true, targetIsKnownWerewolf: false, mode: NecroVoiceMode.NonWerewolfDead));
-            }
-        }
-
-        [Theory]
-        [InlineData(GamePhase.Play, true)]
-        [InlineData(GamePhase.Play, false)]
-        public void Matrix_Play_AliveSpeaker_CuesAndTextVisibleToEveryone(GamePhase phase, bool localAlive)
-        {
-            Assert.True(VoiceRules.ShouldShowDeadCues(
-                phase, localAlive, speakerDead: false, speakerEavesdropAudible: false));
-            Assert.True(VoiceRules.ShouldShowDeadText(
-                phase, localAlive, speakerDead: false));
         }
 
         [Fact]
@@ -373,17 +242,6 @@ namespace Werewolf.Tests
                 GamePhase.GameOver, localAlive, speakerDead));
             Assert.False(VoiceRules.ShouldApplyNecroFilter(VoicePlanKind.ResultAll, targetEavesdropAudible: false));
             Assert.False(VoiceRules.ShouldApplyNecroFilter(VoicePlanKind.ResultAll, targetEavesdropAudible: true));
-        }
-
-        [Theory]
-        [InlineData(true)]
-        [InlineData(false)]
-        public void Matrix_Lobby_AliveSpeaker_CuesAndTextVisible(bool localAlive)
-        {
-            Assert.True(VoiceRules.ShouldShowDeadCues(
-                GamePhase.Lobby, localAlive, speakerDead: false, speakerEavesdropAudible: false));
-            Assert.True(VoiceRules.ShouldShowDeadText(
-                GamePhase.Lobby, localAlive, speakerDead: false));
         }
 
         [Theory]

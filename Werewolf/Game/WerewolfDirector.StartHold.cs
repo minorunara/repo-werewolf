@@ -1,4 +1,5 @@
 using Werewolf.Core;
+using Werewolf.Scenarios.Game;
 using Werewolf.Vanilla;
 using Werewolf.UI;
 
@@ -14,36 +15,24 @@ namespace Werewolf.Game
 
         internal bool IsWerewolfRoundExpected()
         {
+            if (ScenarioRun.Active) return true;
             if (Session.IsHost) return LiveConfig.WerewolfModeEnabled();
             return _lobbySettingsFeature.PanelModeEnabled;
         }
 
-        private void TickStartHold(long now)
+        private void TickStartHold()
         {
             bool inRunLevel = Session.InRunLevel;
             bool operable = inRunLevel && Session.IsGameStateMain;
 
             StartHoldPhase before = _startHold.Phase;
-            long heldMsBefore = _startHold.HeldMs(now);
             bool freeze = _startHold.Tick(
                 inRunLevel, operable, IsWerewolfRoundExpected(),
-                _roundMirror.GameStartUnixMs > 0, now, out StartHoldRelease released);
+                _roundMirror.GameStartUnixMs > 0);
 
             if (before != StartHoldPhase.Holding && _startHold.Phase == StartHoldPhase.Holding)
             {
-                WLog.Line("start_hold_begin", secret: false);
                 if (_uiManager.EnsureCreated(gameObject)) EnsurePanelBuilt(_startHoldOverlay);
-            }
-            if (released != StartHoldRelease.None)
-            {
-                WLog.Line("start_hold_end", secret: false,
-                    ("reason", released == StartHoldRelease.GameStart ? "game_start" : "failsafe"),
-                    ("heldMs", heldMsBefore));
-            }
-            if (_startHold.LateGameStartGapMs >= 0)
-            {
-                WLog.Line("start_hold_late_gamestart", secret: false,
-                    ("gapMs", _startHold.LateGameStartGapMs));
             }
 
             if (freeze)
@@ -52,7 +41,10 @@ namespace Werewolf.Game
                 LocalPlayer.DisableGrab(StartHoldKeepAliveSeconds);
             }
 
-            _startHoldOverlay.Tick(freeze);
+            bool showWaiting = freeze
+                && ClientPhase != GamePhase.RoleReveal
+                && ClientPhase != GamePhase.PreplayAborted;
+            _startHoldOverlay.Tick(showWaiting);
         }
     }
 }

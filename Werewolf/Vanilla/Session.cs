@@ -6,6 +6,11 @@ namespace Werewolf.Vanilla
 
         public static bool IsMultiplayer => SemiFunc.IsMultiplayer();
 
+        public static string RoomId => Photon.Pun.PhotonNetwork.CurrentRoom?.Name;
+
+        public static bool IsRoleUnsettled
+            => Photon.Pun.PhotonNetwork.InRoom && !SemiFunc.IsMultiplayer();
+
         public static bool HasGameManager => GameManager.instance != null;
 
         public static int GameModeOrMinusOne

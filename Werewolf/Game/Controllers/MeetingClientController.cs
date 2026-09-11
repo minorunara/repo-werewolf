@@ -171,8 +171,7 @@ namespace Werewolf.Game
         {
             TryRestoreMeetingFromRoomState();
 
-            bool gameActive = _d.HostSession != null
-                || _d.ClientPhaseMirror == GamePhase.Play || _d.ClientPhaseMirror == GamePhase.Meeting;
+            bool gameActive = _d.IsRoundActiveClient;
             if (gameActive && Session.InRunLevel)
             {
                 if (!_meetingButton.Exists && MeetingButton.AnchorExists)
@@ -258,6 +257,7 @@ namespace Werewolf.Game
                     _warpExecuted = true;
                     ReplaySampler.NoteMeetingWarp();
                     ExecuteWarpMoment();
+                    RefreshMeetingMapOwnPath();
                     Patches.ValuableMapSyncPatch.RefreshSnapshot("meeting_warp");
                     if (_deathRevealPending)
                     {
@@ -421,6 +421,25 @@ namespace Werewolf.Game
             if (!_mapToolBlockedHintGate.TryPass(now, RolesClientController.ToastDurationSec())) return;
 
             _d.PushRawToast(Texts.Get(TextId.MapOverlayMapToolBlocked), logKind: "map_overlay");
+        }
+
+        private void RefreshMeetingMapOwnPath()
+        {
+            try
+            {
+                bool alive = _d.IsLocalAlive();
+                MeetingPath path = alive ? MeetingPath.FromRecorder(ReplaySampler.Recorder, _d.LocalActor) : null;
+                _meetingMapOverlay.SetOwnPath(path, _d.IdRoster.IdOf(_d.LocalActor), PlayerHeadColor.HexOfLocal());
+                WLog.Line("meeting_path", secret: false,
+                    ("alive", alive ? 1 : 0),
+                    ("points", path != null ? path.Count : 0),
+                    ("durationSec", path != null ? path.DurationSec : 0.0));
+            }
+            catch (Exception e)
+            {
+                _meetingMapOverlay.ClearOwnPath();
+                WLog.Line("meeting_path_error", secret: false, ("err", e.Message));
+            }
         }
 
         private void ExecuteWarpMoment()

@@ -17,7 +17,7 @@ namespace Werewolf.Vanilla
             FallbackDirect,
         }
 
-        private static readonly AccessTools.FieldRef<MetaManager, List<int>> CosmeticTokensRef =
+        private static AccessTools.FieldRef<MetaManager, List<int>> CosmeticTokensRef =>
             GameRefs.MetaManager_cosmeticTokens;
 
         internal static ApplyRun BeginRun(int[] countsByRarity)
@@ -218,8 +218,9 @@ namespace Werewolf.Vanilla
             {
                 return CosmeticTokensRef != null ? (CosmeticTokensRef(instance)?.Count ?? -1) : -1;
             }
-            catch
+            catch (Exception e)
             {
+                WLog.Line("cosmetic_token_count_error", secret: false, ("err", e.Message));
                 return -1;
             }
         }
@@ -232,8 +233,9 @@ namespace Werewolf.Vanilla
                     ? PhotonNetwork.LocalPlayer.ActorNumber
                     : -1;
             }
-            catch
+            catch (Exception e)
             {
+                WLog.Line("cosmetic_actor_probe_error", secret: false, ("err", e.Message));
                 return -1;
             }
         }

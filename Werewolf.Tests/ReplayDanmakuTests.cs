@@ -55,7 +55,8 @@ namespace Werewolf.Tests
             d.Step(109.0, 110.1, 0.1, FixedWidth);
             Assert.Single(d.Active);
 
-            d.Step(110.1, 110.2, 1.79, FixedWidth);
+            double total = d.Active[0].TotalSec;
+            d.Step(110.1, 110.2, total - 0.01, FixedWidth);
             Assert.Single(d.Active);
             d.Step(110.2, 110.3, 0.02, FixedWidth);
             Assert.Empty(d.Active);
@@ -84,12 +85,16 @@ namespace Werewolf.Tests
                 HandoffElapsed = ReplayDanmaku.HandoffSec,
             };
 
-            Assert.Equal(0.65, ReplayDanmaku.CenterXAt(right, 0), 6);
-            Assert.Equal(0.10, ReplayDanmaku.CenterXAt(right, ReplayChatText.SlideInSec), 6);
-            Assert.Equal(ReplayDanmaku.CenterXAt(right, 0.8),
-                ReplayDanmaku.CenterXAt(right, 1.2), 6);
-            Assert.Equal(-0.65, ReplayDanmaku.CenterXAt(left, 0), 6);
-            Assert.Equal(-0.10, ReplayDanmaku.CenterXAt(left, ReplayChatText.SlideInSec), 6);
+            foreach ((ReplayDanmakuComment c, int sign) in new[] { (right, 1), (left, -1) })
+            {
+                double entry = ReplayDanmaku.CenterXAt(c, 0);
+                double landed = ReplayDanmaku.CenterXAt(c, ReplayChatText.SlideInSec);
+                Assert.Equal(sign, Math.Sign(entry));
+                Assert.Equal(sign, Math.Sign(landed));
+                Assert.True(Math.Abs(landed) < Math.Abs(entry));
+                Assert.Equal(ReplayDanmaku.CenterXAt(c, 0.8),
+                    ReplayDanmaku.CenterXAt(c, 1.2), 6);
+            }
         }
 
         [Fact]
@@ -243,16 +248,20 @@ namespace Werewolf.Tests
                 HandoffElapsed = ReplayDanmaku.HandoffSec,
             };
 
-            Assert.Equal(1.55, ReplayDanmaku.FontScaleFor(c), 6);
-            Assert.Equal(1.27, ReplayDanmaku.FontScaleFor(
-                new ReplayDanmakuComment { DisplayChars = 20 }), 6);
-            Assert.Equal(1.09, ReplayDanmaku.FontScaleFor(
-                new ReplayDanmakuComment { DisplayChars = 34 }), 6);
-            Assert.Equal(0.95, ReplayDanmaku.FontScaleFor(
-                new ReplayDanmakuComment { DisplayChars = 50 }), 6);
-            Assert.Equal(0.70, ReplayDanmaku.ScaleAt(c, 0.0), 6);
-            Assert.Equal(1.18, ReplayDanmaku.ScaleAt(c,
-                ReplayChatText.SlideInSec * 0.70), 6);
+            double previous = double.MaxValue;
+            for (int chars = 1; chars <= ReplayChatText.MaxDisplayChars; chars++)
+            {
+                double scale = ReplayDanmaku.FontScaleFor(new ReplayDanmakuComment { DisplayChars = chars });
+                Assert.True(scale <= previous);
+                previous = scale;
+            }
+            Assert.True(ReplayDanmaku.FontScaleFor(new ReplayDanmakuComment { DisplayChars = 1 })
+                > ReplayDanmaku.FontScaleFor(new ReplayDanmakuComment { DisplayChars = ReplayChatText.MaxDisplayChars }));
+
+            double start = ReplayDanmaku.ScaleAt(c, 0.0);
+            double peak = ReplayDanmaku.ScaleAt(c, ReplayChatText.SlideInSec * 0.70);
+            Assert.True(start < 1.0);
+            Assert.True(peak > 1.0);
             Assert.Equal(1.0, ReplayDanmaku.ScaleAt(c, ReplayChatText.SlideInSec), 6);
             Assert.Equal(1.0, ReplayDanmaku.ScaleAt(c, 1.0), 6);
             Assert.True(ReplayDanmaku.ScaleAt(c, c.TotalSec - 0.01) < 1.0);
@@ -463,8 +472,9 @@ namespace Werewolf.Tests
             Assert.Equal(4, d.Active.Select(c => c.Slot).Distinct().Count());
             Assert.Equal(new[] { 3, 2, 1, 0 }, d.Active.Select(c => c.Depth).ToArray());
             d.Step(112.0, 112.0, ReplayDanmaku.HandoffSec, FixedWidth);
-            Assert.Equal(new[] { 0.56, 0.68, 0.82, 1.0 },
-                d.Active.Select(c => ReplayDanmaku.ScaleAt(c, 1.0)).ToArray());
+            double[] scales = d.Active.Select(c => ReplayDanmaku.ScaleAt(c, 1.0)).ToArray();
+            for (int i = 1; i < scales.Length; i++) Assert.True(scales[i - 1] < scales[i]);
+            Assert.Equal(1.0, scales[scales.Length - 1], 6);
             Assert.All(d.Active, c => Assert.Equal(1.0, ReplayDanmaku.OpacityAt(c, 1.0), 6));
         }
 

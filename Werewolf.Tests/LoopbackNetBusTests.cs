@@ -29,12 +29,6 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void LocalActorNumber_DefaultsToOne()
-        {
-            Assert.Equal(1, new LoopbackNetBus().LocalActorNumber);
-        }
-
-        [Fact]
         public void SendToAll_DeliversToSelf()
         {
             var (bus, received) = NewBus();

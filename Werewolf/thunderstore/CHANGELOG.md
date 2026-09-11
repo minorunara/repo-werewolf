@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.5.0
+
+### 日本語
+
+- 前回の会議から今回の招集までの自分の移動経路を会議の全体マップに表示するようにしました
+- 会議招集ボタンを押し始めた瞬間に凹むようにしました
+- リプレイの自機の色をアバターの頭部の色に合わせました
+- ステージ内の敵やアイテムの数が多いときにCPU性能によっては起きていたカクつきを減らしました
+- 先にロードを終えた人が全員の準備を待たずに動けることがある問題を修正しました
+- 役職開示演出をリニューアルして、試合開始と同時に全員が一斉に動き始められるようにしました
+
+### English
+
+- The meeting overview map now shows your route from the previous meeting up to the current meeting call
+- The meeting button now sinks in as soon as you start pressing it
+- Your color in replays now matches your avatar's head color
+- Reduced stuttering that could occur on some CPUs when there are many enemies or items in the stage
+- Fixed an issue where players who finished loading early could start moving before everyone else was ready
+- Revamped the role reveal sequence so everyone can start moving at the same time as soon as the match begins
+
 ## 1.4.0
 
 ### 日本語

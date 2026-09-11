@@ -18,7 +18,7 @@ namespace Werewolf.Tests
 
         [Theory]
         [InlineData("ResetToLobby")]
-        [InlineData("HandleLocalDisconnected")]
+        [InlineData("CleanupAfterRoomLeave")]
         [InlineData("StartHosted")]
         public void SessionBoundary_CallsResultSequenceCancel(string methodName)
         {
@@ -43,7 +43,7 @@ namespace Werewolf.Tests
             Assert.True(foundCall,
                 $"WerewolfDirector.{methodName} 内で ResultSequence.Cancel が呼ばれていない。" +
                 "前試合の帰還タイマーが次試合へ持ち越され「開始直後に勝手にロビーへ戻る」バグが再発する。" +
-                "修復手順: セッション境界の掃除（ResetToLobby / HandleLocalDisconnected / StartHosted）で " +
+                "修復手順: セッション境界の掃除（ResetToLobby / CleanupAfterRoomLeave / StartHosted）で " +
                 "_resultSequence.Cancel() を呼ぶこと。");
         }
     }

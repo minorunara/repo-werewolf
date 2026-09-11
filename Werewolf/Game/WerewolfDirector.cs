@@ -13,11 +13,14 @@ using Werewolf.Vanilla;
 
 namespace Werewolf.Game
 {
-    public sealed partial class WerewolfDirector : MonoBehaviour
+    public sealed partial class WerewolfDirector : MonoBehaviour, IReplayDirectorView
     {
         public static WerewolfDirector Instance { get; private set; }
 
         public PlayerRegistry Registry { get; private set; }
+
+        int IReplayDirectorView.LocalActor => LocalActor;
+        string IReplayDirectorView.DisplayNameForActor(int actorNumber) => DisplayNameForActor(actorNumber);
 
         private readonly RoomState _roomState = new RoomState();
 
@@ -39,7 +42,7 @@ namespace Werewolf.Game
         private readonly EnemyIgnoreRoster _enemyIgnoreRoster = new EnemyIgnoreRoster();
         private readonly BeaconEffect _beaconEffect = new BeaconEffect();
 
-        private readonly CursorMirror _cursorMirror = new CursorMirror();
+        private readonly CursorMirror _cursorMirror = new CursorMirror { SortingOrder = WerewolfUIManager.CursorSortingOrder };
 
         private readonly ReplayViewerPanel _replayViewer = new ReplayViewerPanel();
 
@@ -84,6 +87,8 @@ namespace Werewolf.Game
         private bool _resetArmed;
 
         public bool IsHostSessionActive => _session != null;
+
+        public bool IsHostMatchLive => _session != null && CombatRules.IsMatchLive(_session.Phase);
 
         public GamePhase HostPhase => _session?.Phase ?? GamePhase.Lobby;
 
@@ -242,7 +247,7 @@ namespace Werewolf.Game
 
         public void HostAddValueLoss(float lostDollars, bool isOrb, int vid, bool destroyed)
         {
-            if (_roles == null || !Session.IsHost) return;
+            if (_roles == null || !Session.IsHost || !IsHostMatchLive) return;
             if (destroyed) HostValuablesDestroyed++;
             _roles.AddValueLoss(lostDollars, isOrb);
             ReplaySampler.NoteValueLoss(lostDollars, isOrb, vid, destroyed);
@@ -252,9 +257,6 @@ namespace Werewolf.Game
         private void Awake()
         {
             Instance = this;
-            WLog.Line("director_awake", secret: false,
-                ("host", gameObject.name),
-                ("scene", UnityEngine.SceneManagement.SceneManager.GetActiveScene().name));
             Registry = new PlayerRegistry();
             Registry.Initialize();
 
@@ -312,10 +314,6 @@ namespace Werewolf.Game
 
         private void OnDestroy()
         {
-            WLog.Line("director_destroyed", secret: false,
-                ("hadSession", _session != null),
-                ("host", gameObject != null ? gameObject.name : "?"),
-                ("scene", UnityEngine.SceneManagement.SceneManager.GetActiveScene().name));
             if (Instance == this) Instance = null;
             TeardownBus();
         }
@@ -333,6 +331,10 @@ namespace Werewolf.Game
                 WorldgenItemBindings.TryInitialize();
 
                 WorldgenMapBinding.TryInitialize();
+
+                MeetingButtonAssetResolver.TryWarmup();
+
+                CachePreplayRosterIfNeeded();
 
                 TickAutoStartWait(now);
 
@@ -359,7 +361,9 @@ namespace Werewolf.Game
 
                 TickScenarioSelect();
 
-                TickStartHold(now);
+                TickRoomLeaveOnTitle();
+
+                TickStartHold();
 
                 _meetingClientFeature.Tick(now);
 
@@ -392,9 +396,9 @@ namespace Werewolf.Game
 
                 _winCeremonyFeature.Tick(now);
 
-                EnemyMapIcons.Tick();
+                EnemyMapIcons.Tick(IsRoundActiveClient && LocalRoleClient == Role.Werewolf);
 
-                ReplaySampler.Tick();
+                ReplaySampler.Tick(this);
 
                 MapHidePatch.Tick();
 
@@ -508,14 +512,23 @@ namespace Werewolf.Game
             _scenarioSelect.Tick();
         }
 
+        private static readonly HashSet<string> _sessionProbeErrorsLogged = new HashSet<string>();
+
+        private static void LogSessionProbeError(string probe, Exception e)
+        {
+            if (!_sessionProbeErrorsLogged.Add(probe)) return;
+            WLog.Line("session_probe_error", secret: false, ("probe", probe), ("err", e.Message));
+        }
+
         private static bool IsLobbyMenu()
         {
             try
             {
                 return Session.InLobbyMenu;
             }
-            catch
+            catch (Exception e)
             {
+                LogSessionProbeError("lobby_menu", e);
                 return false;
             }
         }
@@ -526,8 +539,9 @@ namespace Werewolf.Game
             {
                 return Session.IsTitleScreenBuilt;
             }
-            catch
+            catch (Exception e)
             {
+                LogSessionProbeError("title_built", e);
                 return false;
             }
         }
@@ -538,8 +552,9 @@ namespace Werewolf.Game
             {
                 return Session.InMainMenu;
             }
-            catch
+            catch (Exception e)
             {
+                LogSessionProbeError("main_menu", e);
                 return false;
             }
         }
@@ -550,8 +565,9 @@ namespace Werewolf.Game
             {
                 return Session.InMenuLevel;
             }
-            catch
+            catch (Exception e)
             {
+                LogSessionProbeError("menu_level", e);
                 return true;
             }
         }

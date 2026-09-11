@@ -23,6 +23,12 @@ namespace Werewolf.Tests
                 .Single(a => a.Key == key).Value;
         }
 
+        public static string GameDataDir()
+        {
+            string managed = Meta("Werewolf.GameManagedDir").TrimEnd('\\', '/');
+            return Path.GetDirectoryName(managed);
+        }
+
         public static DefaultAssemblyResolver CreateResolver()
         {
             var resolver = new DefaultAssemblyResolver();

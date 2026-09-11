@@ -89,12 +89,9 @@ namespace Werewolf
         public static AccessTools.FieldRef<LevelGenerator, float> LevelGenerator_DebugLevelSize;
 
         private static List<string> s_failures;
-        private static int s_resolvedCount;
-
         public static bool ResolveAll()
         {
             s_failures = new List<string>();
-            s_resolvedCount = 0;
 
             PlayerAvatar_deadSet = Field<PlayerAvatar, bool>("deadSet");
             PlayerAvatar_isDisabled = Field<PlayerAvatar, bool>("isDisabled");
@@ -175,7 +172,6 @@ namespace Werewolf
 
             if (s_failures.Count == 0)
             {
-                WLog.Line("game_refs_resolved", secret: false, ("count", s_resolvedCount));
                 return true;
             }
             WLog.Line("game_refs_disabled", secret: false, ("failedFields", s_failures.Count));
@@ -191,7 +187,6 @@ namespace Werewolf
             LevelGenerator_DebugLevelSize = Field<LevelGenerator, float>("DebugLevelSize");
 
             int failed = s_failures.Count - before;
-            WLog.Line("game_refs_scenario", secret: false, ("failed", failed));
             return failed;
         }
 
@@ -201,7 +196,6 @@ namespace Werewolf
             try
             {
                 var fieldRef = AccessTools.FieldRefAccess<TObj, TField>(fieldName);
-                s_resolvedCount++;
                 return fieldRef;
             }
             catch (Exception e)
@@ -219,7 +213,6 @@ namespace Werewolf
                 Fail(type.Name, methodName, "method not found");
                 return null;
             }
-            s_resolvedCount++;
             return method;
         }
 
@@ -231,7 +224,6 @@ namespace Werewolf
                 Fail(type.Name, fieldName, "field not found");
                 return null;
             }
-            s_resolvedCount++;
             return field;
         }
 

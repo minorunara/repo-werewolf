@@ -136,7 +136,7 @@ namespace Werewolf.UI
             }
             if (_trailScratch.Count < 2) return trailCount;
 
-            ReplayMarkerPalette.ColorFor(entry.ParticipantId, out float r, out float g, out float b);
+            ReplayMarkerPalette.ColorFor(entry.ParticipantId, entry.Color, out float r, out float g, out float b);
             var color = new Color(r, g, b, 0.8f);
             for (int i = 1; i < _trailScratch.Count; i++)
             {
@@ -149,12 +149,15 @@ namespace Werewolf.UI
                 float len = d.magnitude;
                 if (len < 0.5f) continue;
 
-                Image seg = EnsureTrailSegment(trailCount++);
+                Vector2 center = (a + c) * 0.5f;
+                float angle = Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg;
+                Image under = EnsureTrailSegment(_trailUnderPool, _trailUnderLayer, "TrailUnder", trailCount);
+                under.color = TrailUnderColor;
+                PlaceTrailSegment(under, center, len + (TrailUnderThickness - TrailThickness), TrailUnderThickness, angle);
+                Image seg = EnsureTrailSegment(_trailPool, _trailLayer, "Trail", trailCount);
                 seg.color = color;
-                var rect = seg.rectTransform;
-                rect.anchoredPosition = (a + c) * 0.5f;
-                rect.sizeDelta = new Vector2(len, TrailThickness);
-                rect.localEulerAngles = new Vector3(0f, 0f, Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg);
+                PlaceTrailSegment(seg, center, len, TrailThickness, angle);
+                trailCount++;
             }
             return trailCount;
         }
@@ -164,7 +167,7 @@ namespace Werewolf.UI
         {
             marker.Rect.anchoredPosition = pos;
 
-            ReplayMarkerPalette.ColorFor(entry.ParticipantId, out float r, out float g, out float b);
+            ReplayMarkerPalette.ColorFor(entry.ParticipantId, entry.Color, out float r, out float g, out float b);
             Color fill = dead ? new Color(0.45f, 0.45f, 0.45f, 1f) : new Color(r, g, b, 1f);
             Color frame = entry.IsWerewolfSide ? FrameWolfColor : (self ? FrameSelfColor : FrameDefaultColor);
             Color name = entry.IsWerewolfSide ? NameWolfColor : NameDefaultColor;
@@ -182,7 +185,8 @@ namespace Werewolf.UI
                 marker.Id.text = idText;
                 marker.Id.fontSize = idText.Length >= 3 ? PlayerIdFontSize - 3f : PlayerIdFontSize;
             }
-            Color idColor = new Color(0f, 0f, 0f, 0.9f * alpha);
+            Color idColor = dead ? UiKit.MarkerIdInkOnLight : UiKit.MarkerIdInk(r, g, b);
+            idColor.a *= alpha;
             if (marker.Id.color != idColor) marker.Id.color = idColor;
 
             bool showName = !dimmed;
@@ -397,21 +401,14 @@ namespace Werewolf.UI
             while (_playerPool.Count <= index)
             {
                 var marker = new PlayerMarker();
-                RectTransform root = UiKit.CreateRect(_playerLayer, "Player" + _playerPool.Count,
-                    Vector2.zero, new Vector2(PlayerFrameSize, PlayerFrameSize));
+                UiKit.DiamondMarker diamond = UiKit.CreateDiamondMarker(_playerLayer, "Player" + _playerPool.Count,
+                    PlayerFrameSize, PlayerFillSize, PlayerIdFontSize, FrameDefaultColor);
+                RectTransform root = diamond.Rect;
                 marker.Root = root.gameObject;
                 marker.Rect = root;
-
-                marker.Frame = UiKit.CreateImage(root, "Frame", Vector2.zero,
-                    new Vector2(PlayerFrameSize, PlayerFrameSize), FrameDefaultColor);
-                marker.Frame.rectTransform.localEulerAngles = new Vector3(0f, 0f, 45f);
-                marker.Fill = UiKit.CreateImage(root, "Fill", Vector2.zero,
-                    new Vector2(PlayerFillSize, PlayerFillSize), Color.white);
-                marker.Fill.rectTransform.localEulerAngles = new Vector3(0f, 0f, 45f);
-
-                marker.Id = UiKit.CreateText(root, "Id", Vector2.zero,
-                    new Vector2(PlayerFrameSize * 2f, PlayerFrameSize),
-                    "", PlayerIdFontSize, Color.black, TextAlignmentOptions.Center);
+                marker.Frame = diamond.Frame;
+                marker.Fill = diamond.Fill;
+                marker.Id = diamond.Id;
                 marker.Name = UiKit.CreateText(root, "Name", new Vector2(0f, PlayerNameOffsetY),
                     new Vector2(160f, 18f),
                     "", PlayerNameFontSize, NameDefaultColor, TextAlignmentOptions.Center);
@@ -508,25 +505,39 @@ namespace Werewolf.UI
             }
         }
 
-        private Image EnsureTrailSegment(int index)
+        private static Image EnsureTrailSegment(List<Image> pool, RectTransform layer, string namePrefix, int index)
         {
-            while (_trailPool.Count <= index)
+            while (pool.Count <= index)
             {
-                Image seg = UiKit.CreateImage(_trailLayer, "Trail" + _trailPool.Count,
+                Image seg = UiKit.CreateImage(layer, namePrefix + pool.Count,
                     Vector2.zero, new Vector2(1f, TrailThickness), Color.white);
                 seg.gameObject.SetActive(false);
-                _trailPool.Add(seg);
+                pool.Add(seg);
             }
-            Image result = _trailPool[index];
+            Image result = pool[index];
             if (!result.gameObject.activeSelf) result.gameObject.SetActive(true);
             return result;
         }
 
+        private static void PlaceTrailSegment(Image seg, Vector2 center, float length, float thickness, float angleDeg)
+        {
+            var rect = seg.rectTransform;
+            rect.anchoredPosition = center;
+            rect.sizeDelta = new Vector2(length, thickness);
+            rect.localEulerAngles = new Vector3(0f, 0f, angleDeg);
+        }
+
         private void HideTrailExtra(int used)
         {
-            for (int i = used; i < _trailPool.Count; i++)
+            HideTrailExtra(_trailPool, used);
+            HideTrailExtra(_trailUnderPool, used);
+        }
+
+        private static void HideTrailExtra(List<Image> pool, int used)
+        {
+            for (int i = used; i < pool.Count; i++)
             {
-                if (_trailPool[i].gameObject.activeSelf) _trailPool[i].gameObject.SetActive(false);
+                if (pool[i].gameObject.activeSelf) pool[i].gameObject.SetActive(false);
             }
         }
 

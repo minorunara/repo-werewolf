@@ -47,8 +47,10 @@ namespace Werewolf.Core
         private static readonly IReadOnlyList<Disclosure> Empty = Array.Empty<Disclosure>();
 
         private readonly IReadOnlyList<WPlayer> _players;
-        private readonly long _selfAwarenessDueUnixMs;
+        private long _selfAwarenessDueUnixMs;
         private readonly bool _selfAwarenessImmediate;
+        private readonly int _blackCatRevealDelaySec;
+        private bool _playClockStarted;
 
         private bool _initialIssued;
         private bool _selfAwarenessIssued;
@@ -57,10 +59,23 @@ namespace Werewolf.Core
         public bool SelfAwarenessIssued => _selfAwarenessIssued;
 
         public DisclosureManager(IReadOnlyList<WPlayer> players, long gameStartUnixMs, int blackCatRevealDelaySec)
+            : this(players, blackCatRevealDelaySec)
+        {
+            BeginPlay(gameStartUnixMs);
+        }
+
+        public DisclosureManager(IReadOnlyList<WPlayer> players, int blackCatRevealDelaySec)
         {
             _players = players ?? throw new ArgumentNullException(nameof(players));
-            _selfAwarenessDueUnixMs = gameStartUnixMs + blackCatRevealDelaySec * 1000L;
+            _blackCatRevealDelaySec = blackCatRevealDelaySec;
             _selfAwarenessImmediate = blackCatRevealDelaySec <= 0;
+        }
+
+        public void BeginPlay(long gameStartUnixMs)
+        {
+            if (_playClockStarted) return;
+            _playClockStarted = true;
+            _selfAwarenessDueUnixMs = gameStartUnixMs + _blackCatRevealDelaySec * 1000L;
         }
 
         public IReadOnlyList<Disclosure> IssueInitialDisclosures()
@@ -95,6 +110,7 @@ namespace Werewolf.Core
 
         public IReadOnlyList<Disclosure> Tick(long nowUnixMs)
         {
+            if (!_playClockStarted) return Empty;
             if (nowUnixMs < _selfAwarenessDueUnixMs) return Empty;
             return IssueSelfAwareness();
         }

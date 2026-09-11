@@ -8,7 +8,7 @@ namespace Werewolf.Game.Patches
     [HarmonyPatch(typeof(MenuPlayerListed), "Update")]
     internal static class MenuPlayerCrownPatch
     {
-        private static readonly AccessTools.FieldRef<MenuPlayerListed, PlayerAvatar> PlayerAvatarRef =
+        private static AccessTools.FieldRef<MenuPlayerListed, PlayerAvatar> PlayerAvatarRef =>
             GameRefs.MenuPlayerListed_playerAvatar;
 
         private static bool _errorLogged;

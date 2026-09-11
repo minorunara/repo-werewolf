@@ -17,10 +17,10 @@ namespace Werewolf.Game.Patches
         private static readonly Dictionary<ValuableObject, GhostRef> _ghosts =
             new Dictionary<ValuableObject, GhostRef>();
 
-        private static readonly AccessTools.FieldRef<ValuableObject, bool> DiscoveredRef =
+        private static AccessTools.FieldRef<ValuableObject, bool> DiscoveredRef =>
             GameRefs.ValuableObject_discovered;
 
-        private static readonly AccessTools.FieldRef<MapCustom, MapCustomEntity> MapCustomEntityRef =
+        private static AccessTools.FieldRef<MapCustom, MapCustomEntity> MapCustomEntityRef =>
             GameRefs.MapCustom_mapCustomEntity;
 
         private static ValuableMapMode _prevMode = ValuableMapMode.MeetingSync;

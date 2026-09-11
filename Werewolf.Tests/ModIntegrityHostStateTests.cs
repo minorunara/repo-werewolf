@@ -94,10 +94,12 @@ namespace Werewolf.Tests
         public void SnapshotPublish_IsCoalesced()
         {
             var state = Begin();
-            Assert.False(state.ShouldPublishSnapshot(249, false));
-            Assert.True(state.ShouldPublishSnapshot(250, false));
-            state.MarkSnapshotPublished(250);
-            Assert.False(state.ShouldPublishSnapshot(1000, false));
+            int window = ModIntegrityHostState.SnapshotCoalesceMs;
+
+            Assert.False(state.ShouldPublishSnapshot(window - 1, false));
+            Assert.True(state.ShouldPublishSnapshot(window, false));
+            state.MarkSnapshotPublished(window);
+            Assert.False(state.ShouldPublishSnapshot(window + window - 1, false));
         }
 
         private static ModIntegrityHostState Begin()

@@ -693,5 +693,50 @@ namespace Werewolf.Tests
             Assert.Equal("Level - Second", pb.Header.LevelName);
             Assert.Equal(50.0, pb.Duration, 3);
         }
+
+        [Fact]
+        public void StampEvent_ResolvesToLocalizedTextInChats()
+        {
+            var rec = new ReplayRecorder();
+            rec.BeginSegment(Header(), 0.0);
+            rec.NoteEvent(1.0, "stamp", ("a", 2), ("id", 20));
+            rec.EndSegment(10.0);
+
+            ReplayPlayback pb = ReplayPlayback.FromRecorder(rec);
+            Assert.Single(pb.Chats);
+            Assert.Equal(2, pb.Chats[0].Actor);
+            Assert.Equal(Werewolf.Core.Texts.Get(Werewolf.Core.TextId.ChatStampClaimTheyDidIt),
+                pb.Chats[0].Text);
+        }
+
+        [Fact]
+        public void StampEvent_UnknownId_FallsBackToUnknownText()
+        {
+            var rec = new ReplayRecorder();
+            rec.BeginSegment(Header(), 0.0);
+            rec.NoteEvent(1.0, "stamp", ("a", 1), ("id", 250));
+            rec.EndSegment(10.0);
+
+            ReplayPlayback pb = ReplayPlayback.FromRecorder(rec);
+            Assert.Single(pb.Chats);
+            Assert.Equal(Werewolf.Core.Texts.Get(Werewolf.Core.TextId.ChatStampUnknown),
+                pb.Chats[0].Text);
+        }
+
+        [Fact]
+        public void FromRecorder_PlayerEntries_CarryHeadColorFromHeader()
+        {
+            var rec = new ReplayRecorder();
+            rec.BeginSegment(Header(new List<ReplayPlayerInfo>
+            {
+                new ReplayPlayerInfo { Actor = 1, ParticipantId = 1, Name = "Alice", Color = "#102030" },
+                new ReplayPlayerInfo { Actor = 2, ParticipantId = 2, Name = "Bob" },
+            }), 0.0);
+            rec.Sample(0.0, new[] { P(1, 0f), P(2, 1f) });
+            rec.EndSegment(1.0);
+            ReplayPlayback pb = ReplayPlayback.FromRecorder(rec);
+            Assert.Equal("#102030", pb.Players.Find(p => p.Actor == 1).Color);
+            Assert.Null(pb.Players.Find(p => p.Actor == 2).Color);
+        }
     }
 }

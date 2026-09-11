@@ -58,6 +58,12 @@ namespace Werewolf.Game
                     case MessageCodes.GameStart:
                         RecvGameStart(p);
                         break;
+                    case MessageCodes.PreplayStart:
+                        RecvPreplayStart(p);
+                        break;
+                    case MessageCodes.PreplayAborted:
+                        RecvPreplayAborted((PreplayAbortReason)(byte)p[0]);
+                        break;
                     case MessageCodes.PhaseChanged:
                         RecvPhaseChanged(p);
                         break;
@@ -115,6 +121,10 @@ namespace Werewolf.Game
 
                     case MessageCodes.EradicationReveal:
                         _winCeremonyFeature.HandleEradicationReveal(p);
+                        break;
+
+                    case MessageCodes.ChatStamp:
+                        _chatFeature.RecvStamp(p);
                         break;
                 }
             }
@@ -182,21 +192,19 @@ namespace Werewolf.Game
 
         private void RecvGameStart(object[] p)
         {
-            ClearCosmeticGrantState("game_start");
-            _resultFlowFeature.ClearClientDigest();
-            CrownRoster.Clear();
-            _chatFeature.ResetForNewMatch();
-            Patches.WipeGuardPatch.ResetLogThrottle();
-            _voiceDriver?.SanitizeAtRoundStart();
-            _roundMirror.RoundEndUnixMs = (long)p[0];
-            _roundMirror.WerewolfCount = (byte)p[2];
-            _roundMirror.GameStartUnixMs = SessionClock.NowMs();
-            _resultFlowFeature.FreezeResultAutoReturnConfig();
-            if (!Session.IsHost) _lobbySettingsFeature.NoteMatchBlob(LobbyBlobMirror);
-            _roundMirror.RevealDelaySec = (int)p[4];
-            _cfgMirror.CatPossible = (byte)p[3] != 0;
-            _cfgMirror.DebugSession = (byte)p[5] != 0;
-            IdRoster.Apply((int[])p[6]);
+            if (!RoundStartWire.TryReadGameStart(
+                    p, out long roundEndUnixMs, out RoundStartPublicData publicData))
+            {
+                WLog.Line("recv_payload_invalid", secret: false,
+                    ("code", (int)MessageCodes.GameStart));
+                return;
+            }
+
+            _roleRevealFeature.HideCinematicNow();
+            PrepareClientRoundOnce("game_start", publicData);
+            _roundMirror.RoundEndUnixMs = roundEndUnixMs;
+            long inferredStart = _roundMirror.RoundEndUnixMs - publicData.RoundSeconds * 1000L;
+            _roundMirror.GameStartUnixMs = inferredStart > 0 ? inferredStart : SessionClock.NowMs();
             SessionClock.RequestResync();
             WLog.Line("recv_gamestart", secret: false,
                 ("roundEnd", _roundMirror.RoundEndUnixMs),
@@ -207,6 +215,77 @@ namespace Werewolf.Game
                 ("revealDelaySec", _roundMirror.RevealDelaySec),
                 ("debugSession", _cfgMirror.DebugSession ? 1 : 0));
             _roleRevealFeature.TryStartRoleReveal();
+        }
+
+        private void RecvPreplayStart(object[] p)
+        {
+            if (!RoundStartWire.TryReadPreplay(
+                    p,
+                    out long revealStartUnixMs,
+                    out long revealEndUnixMs,
+                    out RoundStartPublicData publicData))
+            {
+                WLog.Line("recv_payload_invalid", secret: false,
+                    ("code", (int)MessageCodes.PreplayStart));
+                return;
+            }
+
+            PrepareClientRoundOnce("preplay_start", publicData);
+            _roundMirror.RoleRevealStartUnixMs = revealStartUnixMs;
+            _roundMirror.RoleRevealEndUnixMs = revealEndUnixMs;
+            _roundMirror.RoundEndUnixMs = 0;
+            SessionClock.RequestResync();
+            _roleRevealFeature.TryStartRoleReveal();
+        }
+
+        private void PrepareClientRoundOnce(string trigger, RoundStartPublicData data)
+        {
+            if (!_roundMirror.StartBoundaryPrepared)
+            {
+                ClearCosmeticGrantState(trigger);
+                _resultFlowFeature.ClearClientDigest();
+                CrownRoster.Clear();
+                _chatFeature.ResetForNewMatch();
+                Patches.WipeGuardPatch.ResetLogThrottle();
+                _voiceDriver?.SanitizeAtRoundStart();
+                _resultFlowFeature.FreezeResultAutoReturnConfig();
+                if (!Session.IsHost) _lobbySettingsFeature.NoteMatchBlob(LobbyBlobMirror);
+                _roundMirror.StartBoundaryPrepared = true;
+            }
+
+            _roundMirror.WerewolfCount = data.WerewolfCount;
+            _roundMirror.RevealDelaySec = data.RevealDelaySec;
+            _cfgMirror.CatPossible = data.BlackCatPossible;
+            _cfgMirror.DebugSession = data.DebugMode;
+            IdRoster.Apply(data.ActorsByIdOrder);
+        }
+
+        private void RecvPreplayAborted(PreplayAbortReason reason)
+        {
+            _clientPhase = GamePhase.PreplayAborted;
+            _roleRevealFeature.HideCinematicNow();
+            _roundMirror.ClearAssignedRoles();
+            _rolesClientFeature.ResetRoles("preplay_abort");
+            IdRoster.Reset();
+            CrownRoster.Clear();
+            _resultFlowFeature.FreezeResultAutoReturnConfig();
+            EnsurePanelBuilt(_resultScreen);
+            if (_resultScreen.Exists)
+            {
+                _resultScreen.ShowPreplayAbort(
+                    Texts.Get(TextId.PreplayAbortTitle),
+                    Texts.Get(reason == PreplayAbortReason.TooFewPlayersAfterLoad
+                        ? TextId.PreplayAbortTooFewPlayers
+                        : reason == PreplayAbortReason.InvalidConfigAfterLoad
+                            ? TextId.PreplayAbortInvalidConfig
+                            : TextId.PreplayAbortRoleRevealDisconnect),
+                    Texts.Get(reason == PreplayAbortReason.RoleRevealRosterInvalid
+                        ? TextId.PreplayAbortRolesDiscarded
+                        : TextId.PreplayAbortNoRoles),
+                    ResultFlowController.BuildResultFooterText());
+            }
+            _resultFlowFeature.BeginResultCountdown();
+            WLog.Line("recv_preplay_aborted", secret: false, ("reason", reason));
         }
 
         private void RecvPhaseChanged(object[] p)
@@ -265,6 +344,11 @@ namespace Werewolf.Game
                     break;
                 case MessageCodes.RoleAction:
                     {
+                        if (_session == null || !CombatRules.IsMatchLive(_session.Phase))
+                        {
+                            DropMasterInbound(msg, "wrong_phase");
+                            return;
+                        }
                         byte subtype = (byte)msg.Payload[0];
                         int arg = (int)msg.Payload[1];
                         if (subtype == BombRoleActionSubtype.Plant)
@@ -283,10 +367,13 @@ namespace Werewolf.Game
                         _roles.HandleRoleAction(msg.SenderActor, subtype, arg, (byte)msg.Payload[2], now);
                     }
                     break;
+                case MessageCodes.ChatStampRequest:
+                    _chatFeature.HandleStampRequestHost(msg, now);
+                    break;
             }
         }
 
-        private static void DropMasterInbound(InboundMessage msg, string reason)
+        internal static void DropMasterInbound(InboundMessage msg, string reason)
         {
             WLog.Line("recv_master_dropped", secret: false,
                 ("code", (int)msg.Code), ("sender", msg.SenderActor), ("reason", reason));

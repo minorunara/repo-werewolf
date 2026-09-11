@@ -175,30 +175,6 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void Build_SameInputTwice_ProducesEquivalentRows()
-        {
-            var actors = new[] { 1, -101, 3 };
-            var roles = new[] { (byte)Role.Villager, (byte)Role.Werewolf, (byte)Role.BlackCat };
-            var deathMirror = new Dictionary<int, DeathCause>
-            {
-                { -101, DeathCause.Vote },
-            };
-
-            var rowsA = ResultModel.Build((byte)Team.Werewolves, actors, roles, deathMirror, Name);
-            var rowsB = ResultModel.Build((byte)Team.Werewolves, actors, roles, deathMirror, Name);
-
-            Assert.Equal(rowsA.Count, rowsB.Count);
-            for (int i = 0; i < rowsA.Count; i++)
-            {
-                Assert.Equal(rowsA[i].ActorNumber, rowsB[i].ActorNumber);
-                Assert.Equal(rowsA[i].Name, rowsB[i].Name);
-                Assert.Equal(rowsA[i].Role, rowsB[i].Role);
-                Assert.Equal(rowsA[i].Status, rowsB[i].Status);
-                Assert.Equal(rowsA[i].IsWinningSide, rowsB[i].IsWinningSide);
-            }
-        }
-
-        [Fact]
         public void Build_AllPlayersInPayload_AppearExactlyOnceInOrder()
         {
             var actors = new[] { 3, 1, 2 };

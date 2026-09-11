@@ -84,6 +84,10 @@ namespace Werewolf.Core
 
         public long StartUnixMs { get; private set; }
 
+        public long RoleRevealStartUnixMs { get; private set; }
+
+        public long RoleRevealEndUnixMs { get; private set; }
+
         public event Action<OutboundMessage> OnSend;
 
         public event Action<SessionEvent> OnSessionEvent;
@@ -100,6 +104,14 @@ namespace Werewolf.Core
 
         public StartResult Start(GameConfig config, IReadOnlyList<WPlayer> players,
                                  long nowUnixMs, Random rng)
+            => StartInternal(config, players, nowUnixMs, rng, preplay: false);
+
+        public StartResult StartPreplay(GameConfig config, IReadOnlyList<WPlayer> players,
+                                        long nowUnixMs, Random rng)
+            => StartInternal(config, players, nowUnixMs, rng, preplay: true);
+
+        private StartResult StartInternal(GameConfig config, IReadOnlyList<WPlayer> players,
+                                           long nowUnixMs, Random rng, bool preplay)
         {
             if (config == null) throw new ArgumentNullException(nameof(config));
             if (players == null) throw new ArgumentNullException(nameof(players));
@@ -132,6 +144,9 @@ namespace Werewolf.Core
             Voided = false;
             _pendingWin = null;
             _voteMarked.Clear();
+            StartUnixMs = 0;
+            RoleRevealStartUnixMs = preplay ? nowUnixMs : 0;
+            RoleRevealEndUnixMs = preplay ? nowUnixMs + Preplay.RoleRevealDurationMs : 0;
 
             var assigned = RoleAssigner.Assign(_players, config, rng, _forcedRoles, _forcedPeaceful);
             _forcedRoles.Clear();
@@ -139,36 +154,94 @@ namespace Werewolf.Core
             Peaceful = assigned.Peaceful;
 
             _timer = new RoundTimer();
-            _timer.Start(nowUnixMs, config.RoundSeconds, config.TimeLimitDisabled);
-            StartUnixMs = nowUnixMs;
-            _disclosures = new DisclosureManager(_players, nowUnixMs, config.BlackCatRevealDelaySec);
+            _disclosures = preplay
+                ? new DisclosureManager(_players, config.BlackCatRevealDelaySec)
+                : new DisclosureManager(_players, nowUnixMs, config.BlackCatRevealDelaySec);
 
             foreach (var disclosure in _disclosures.IssueInitialDisclosures())
             {
                 Send(ToMessage(disclosure));
             }
 
-            bool blackCatPossible = config.BlackCatPossible(_players.Count);
+            RoundStartPublicData publicData = BuildRoundStartPublicData(assigned.WerewolfSlots);
+            if (preplay)
+            {
+                Send(new OutboundMessage(
+                    WWEventCodes.PreplayStart,
+                    RoundStartWire.ToPreplay(
+                        publicData, RoleRevealStartUnixMs, RoleRevealEndUnixMs),
+                    MessageTarget.All, null));
+                SetPhase(GamePhase.RoleReveal, "role_reveal", nowUnixMs);
+            }
+            else
+            {
+                _timer.Start(nowUnixMs, config.RoundSeconds, config.TimeLimitDisabled);
+                StartUnixMs = nowUnixMs;
+                Send(new OutboundMessage(
+                    WWEventCodes.GameStart,
+                    RoundStartWire.ToGameStart(publicData, _timer.EndUnixMs),
+                    MessageTarget.All, null));
+                SetPhase(GamePhase.Play, "start", nowUnixMs);
+            }
+            return StartResult.Ok();
+        }
+
+        public BeginPlayResult BeginPlay(long nowUnixMs)
+        {
+            if (Phase != GamePhase.RoleReveal) return BeginPlayResult.NotReady;
+            if (nowUnixMs < RoleRevealEndUnixMs) return BeginPlayResult.NotReady;
+
+            if (WinJudge.Judge(_players, peaceful: Peaceful) != null)
+            {
+                AbortPreplay(PreplayAbortReason.RoleRevealRosterInvalid, nowUnixMs);
+                return BeginPlayResult.Aborted;
+            }
+
+            long playStartUnixMs = nowUnixMs;
+            _timer.Start(playStartUnixMs, _config.RoundSeconds, _config.TimeLimitDisabled);
+            StartUnixMs = playStartUnixMs;
+            _disclosures.BeginPlay(playStartUnixMs);
+
+            int werewolfSlots = RoleAssigner.CorrectedWerewolfSlots(_config, _players.Count);
             Send(new OutboundMessage(
                 WWEventCodes.GameStart,
-                new object[]
-                {
-                    _timer.EndUnixMs,
-                    config.RoundSeconds,
-                    (byte)assigned.WerewolfSlots,
-                    (byte)(blackCatPossible ? 1 : 0),
-                    config.BlackCatRevealDelaySec,
-                    (byte)(config.DebugMode ? 1 : 0),
-                    ParticipantIds.AssignOrder(_players),
-                },
+                RoundStartWire.ToGameStart(
+                    BuildRoundStartPublicData(werewolfSlots), _timer.EndUnixMs),
                 MessageTarget.All, null));
 
             SetPhase(GamePhase.Play, "start", nowUnixMs);
-            return StartResult.Ok();
+            return BeginPlayResult.Started;
+        }
+
+        private RoundStartPublicData BuildRoundStartPublicData(int werewolfSlots)
+            => new RoundStartPublicData(
+                _config.RoundSeconds,
+                werewolfSlots,
+                _config.BlackCatPossible(_players.Count),
+                _config.BlackCatRevealDelaySec,
+                _config.DebugMode,
+                ParticipantIds.AssignOrder(_players));
+
+        private void AbortPreplay(PreplayAbortReason reason, long nowUnixMs)
+        {
+            Send(new OutboundMessage(
+                WWEventCodes.PreplayAborted,
+                new object[] { (byte)reason },
+                MessageTarget.All, null));
+            SetPhase(GamePhase.PreplayAborted, "preplay_aborted", nowUnixMs);
+
+            _players.Clear();
+            _disclosures = null;
+            Peaceful = false;
         }
 
         public void Tick(long nowUnixMs)
         {
+            if (Phase == GamePhase.RoleReveal)
+            {
+                BeginPlay(nowUnixMs);
+                return;
+            }
             if (Winner != null || (Phase != GamePhase.Play && Phase != GamePhase.Meeting)) return;
 
             if (Phase == GamePhase.Play)
@@ -230,7 +303,8 @@ namespace Werewolf.Core
 
         public void NotifyPlayerLeft(int actorNumber, long nowUnixMs)
         {
-            if (Winner != null || (Phase != GamePhase.Play && Phase != GamePhase.Meeting)) return;
+            if (Winner != null || (Phase != GamePhase.RoleReveal
+                && Phase != GamePhase.Play && Phase != GamePhase.Meeting)) return;
 
             WPlayer player = null;
             foreach (var candidate in _players)
@@ -245,6 +319,8 @@ namespace Werewolf.Core
 
             player.Alive = false;
             WLog.Line("player_left_roster", secret: false, ("actor", actorNumber));
+
+            if (Phase == GamePhase.RoleReveal) return;
 
             if (_pendingWin != null) return;
 

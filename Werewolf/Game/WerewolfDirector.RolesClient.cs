@@ -102,7 +102,6 @@ namespace Werewolf.Game
                         return p.Name;
                     }
                 }
-                return "#" + actorNumber;
             }
 
             if (_roundMirror.DisplayNameCache != null && _roundMirror.DisplayNameCache.TryGetValue(actorNumber, out string cached))

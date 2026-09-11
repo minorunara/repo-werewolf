@@ -50,6 +50,8 @@ namespace Werewolf.Game
                 WorldgenApplier.RestoreOnLobbyReturn();
             }
 
+            Plugin.RefreshGameConfig();
+
             FakeBodies.Clear();
 
             if (_meeting != null)
@@ -93,6 +95,7 @@ namespace Werewolf.Game
             _clientPhase = GamePhase.Lobby;
             _resetArmed = false;
             _autoStartWait.Disarm();
+            PreplayEnemySpawnHold.Cancel();
             _resultSequence.Cancel();
 
             _lifecycleGate.ResetForNextRound();

@@ -7,7 +7,7 @@ namespace Werewolf.Net
     {
         public const byte MinCode = 160;
 
-        public const byte MaxCode = 192;
+        public const byte MaxCode = 196;
 
         public const byte AssignRole = WWEventCodes.AssignRole;
 
@@ -22,6 +22,10 @@ namespace Werewolf.Net
         public const byte GameStart = WWEventCodes.GameStart;
 
         public const byte PhaseChanged = WWEventCodes.PhaseChanged;
+
+        public const byte PreplayStart = WWEventCodes.PreplayStart;
+
+        public const byte PreplayAborted = WWEventCodes.PreplayAborted;
 
         public const byte StartMeeting = 163;
 
@@ -65,6 +69,10 @@ namespace Werewolf.Net
 
         public const byte EradicationReveal = WWEradicationCodes.EradicationReveal;
 
+        public const byte ChatStampRequest = 193;
+
+        public const byte ChatStamp = 194;
+
         public const byte ModManifestRequest = 182;
 
         public const byte ModManifestReport = 183;
@@ -83,7 +91,8 @@ namespace Werewolf.Net
 
         public static bool IsMasterInbound(byte code) =>
             code == CastVote || code == RequestMeeting || code == RoleAction ||
-            code == ModManifestReport || code == ModIntegrityDetailRequest;
+            code == ModManifestReport || code == ModIntegrityDetailRequest ||
+            code == ChatStampRequest;
 
         public static bool IsSecret(byte code) =>
             IsTargetOnly(code) || code == CastVote || code == RoleAction || code == BombDetonation;
@@ -99,6 +108,8 @@ namespace Werewolf.Net
                 case GameOver:        return new[] { typeof(byte), typeof(int[]), typeof(byte[]) };
                 case GameStart:       return new[] { typeof(long), typeof(int), typeof(byte), typeof(byte), typeof(int), typeof(byte), typeof(int[]) };
                 case PhaseChanged:    return new[] { typeof(byte), typeof(long), typeof(long) };
+                case PreplayStart:    return new[] { typeof(long), typeof(long), typeof(int), typeof(byte), typeof(byte), typeof(int), typeof(byte), typeof(int[]) };
+                case PreplayAborted:  return new[] { typeof(byte) };
                 case StartMeeting:    return new[] { typeof(int), typeof(long), typeof(long), typeof(byte) };
                 case CastVote:        return new[] { typeof(int) };
                 case VoteProgress:    return new[] { typeof(int[]), typeof(long) };
@@ -123,6 +134,8 @@ namespace Werewolf.Net
                     return new[] { typeof(int), typeof(int[]), typeof(int[]), typeof(int[]), typeof(byte[]) };
                 case EradicationReveal:
                     return new[] { typeof(int), typeof(byte), typeof(byte), typeof(string) };
+                case ChatStampRequest: return new[] { typeof(byte) };
+                case ChatStamp:        return new[] { typeof(int), typeof(byte) };
                 case ModManifestRequest:
                     return new[] { typeof(int), typeof(byte), typeof(string) };
                 case ModManifestReport:

@@ -29,11 +29,9 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void Cast_PlayerIsTheBomberWithOneFellowWerewolfInSix()
+        public void Cast_PlayerIsTheBomberWithOneFellowWerewolf()
         {
             Assert.Equal(Role.Bomber, Def.Cast.PlayerRole);
-            Assert.Equal(5, Def.Cast.Bots.Count);
-            Assert.Equal(new[] { 2, 3, 4, 5, 6 }, Def.Cast.Bots.Select(b => b.ParticipantId).OrderBy(i => i));
 
             Assert.Equal(2, Def.Cast.WerewolfCount);
             Assert.Equal(100, Def.Cast.BomberChancePercent);

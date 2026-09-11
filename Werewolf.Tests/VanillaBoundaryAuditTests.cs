@@ -12,10 +12,6 @@ namespace Werewolf.Tests
         private const string VanillaScope = "Assembly-CSharp";
         private const string GameRefsTypeName = "Werewolf.GameRefs";
 
-        private static readonly Dictionary<string, int> Baseline = new Dictionary<string, int>(StringComparer.Ordinal)
-        {
-        };
-
         internal static bool MayNameVanilla(string rootTypeFullName)
         {
             if (rootTypeFullName == GameRefsTypeName) return true;
@@ -49,37 +45,105 @@ namespace Werewolf.Tests
             foreach (var entry in refsByType)
             {
                 if (MayNameVanilla(entry.Key)) continue;
-                int allowed = Baseline.TryGetValue(entry.Key, out var b) ? b : 0;
-                if (entry.Value.Count <= allowed) continue;
-                violations.Add($"[\"{entry.Key}\"] = {entry.Value.Count},   // 台帳={allowed}\n      "
+                violations.Add($"{entry.Key} ({entry.Value.Count})\n      "
                     + string.Join("\n      ", entry.Value));
             }
-            var stale = Baseline.Keys
-                .Where(k => !refsByType.ContainsKey(k) || MayNameVanilla(k))
-                .OrderBy(k => k, StringComparer.Ordinal)
-                .ToList();
 
             Assert.True(violations.Count == 0,
                 "接着層（Werewolf.Vanilla.* / *.Patches.* / GameRefs）の外で本体を名指ししている型。"
-                + "接着層の語彙へ寄せるか、型ごと接着層へ移す（移行中の台帳 Baseline は減らすことしかできない）:\n  "
+                + "接着層の語彙へ寄せるか、型ごと接着層へ移す:\n  "
                 + string.Join("\n  ", violations));
-            Assert.True(stale.Count == 0,
-                "本体参照が無くなった（または接着層へ移った）のに台帳 Baseline に残っている型（消す）:\n  "
-                + string.Join("\n  ", stale));
         }
 
-        [Fact]
-        public void Baseline_OnlyShrinks()
+        private static readonly string[] UpperLayerPrefixes =
         {
-            var refsByType = VanillaRefsByRootType();
+            "Werewolf.Game.",
+            "Werewolf.UI.",
+            "Werewolf.Scenarios.Game.",
+            "Werewolf.Scenarios.UI.",
+            "Werewolf.Debugging.",
+        };
 
-            var loose = Baseline
-                .Where(kv => refsByType.TryGetValue(kv.Key, out var set) && set.Count < kv.Value)
-                .Select(kv => $"[\"{kv.Key}\"] = {refsByType[kv.Key].Count},   // 台帳={kv.Value}")
-                .OrderBy(s => s, StringComparer.Ordinal)
-                .ToList();
-            Assert.True(loose.Count == 0,
-                "台帳 Baseline の値が実態より大きい（実態の値へ下げる）:\n  " + string.Join("\n  ", loose));
+        internal static bool IsGlueLayer(string rootTypeFullName)
+            => rootTypeFullName.StartsWith("Werewolf.Vanilla.", StringComparison.Ordinal)
+               || rootTypeFullName.StartsWith("Werewolf.Scenarios.Vanilla.", StringComparison.Ordinal);
+
+        internal static bool IsUpperLayer(string typeFullName)
+            => !typeFullName.Contains(".Patches.", StringComparison.Ordinal)
+               && UpperLayerPrefixes.Any(p => typeFullName.StartsWith(p, StringComparison.Ordinal));
+
+        [Fact]
+        public void GlueLayerDoesNotReachUpperLayers()
+        {
+            var dllPath = AuditEnvironment.Meta("Werewolf.ModDllPath");
+            using var module = ModuleDefinition.ReadModule(dllPath);
+
+            var violations = new SortedDictionary<string, SortedSet<string>>(StringComparer.Ordinal);
+            foreach (var type in CecilTypes.AllTypes(module))
+            {
+                TypeDefinition root = type;
+                while (root.DeclaringType != null) root = root.DeclaringType;
+                if (!IsGlueLayer(root.FullName)) continue;
+
+                foreach (var referenced in ReferencedTypes(type))
+                {
+                    if (!IsUpperLayer(referenced.FullName)) continue;
+                    if (!violations.TryGetValue(root.FullName, out var set))
+                        violations[root.FullName] = set = new SortedSet<string>(StringComparer.Ordinal);
+                    set.Add(referenced.FullName);
+                }
+            }
+
+            Assert.True(violations.Count == 0,
+                "接着層（Werewolf.Vanilla.* / Werewolf.Scenarios.Vanilla.*）が上位層（Game / UI / Debugging。"
+                + "パッチ層を除く）を参照している。読み口の反転（例: IReplayDirectorView / ITutorialBubble）か"
+                + "構築時の流し込み（例: CursorMirror.SortingOrder）で依存方向を Vanilla ← Game / UI に戻す:\n  "
+                + string.Join("\n  ", violations.Select(kv => kv.Key + "\n      " + string.Join("\n      ", kv.Value))));
+        }
+
+        private static IEnumerable<TypeReference> ReferencedTypes(TypeDefinition type)
+        {
+            foreach (var t in Flatten(type.BaseType)) yield return t;
+            foreach (var i in type.Interfaces)
+            foreach (var t in Flatten(i.InterfaceType))
+                yield return t;
+            foreach (var f in type.Fields)
+            foreach (var t in Flatten(f.FieldType))
+                yield return t;
+
+            foreach (var m in type.Methods)
+            {
+                foreach (var t in Flatten(m.ReturnType)) yield return t;
+                foreach (var p in m.Parameters)
+                foreach (var t in Flatten(p.ParameterType))
+                    yield return t;
+                if (!m.HasBody) continue;
+
+                foreach (var v in m.Body.Variables)
+                foreach (var t in Flatten(v.VariableType))
+                    yield return t;
+
+                foreach (var instr in m.Body.Instructions)
+                {
+                    switch (instr.Operand)
+                    {
+                        case TypeReference tr:
+                            foreach (var t in Flatten(tr)) yield return t;
+                            break;
+                        case MethodReference method:
+                            foreach (var t in Flatten(method.DeclaringType)) yield return t;
+                            foreach (var t in Flatten(method.ReturnType)) yield return t;
+                            foreach (var p in method.Parameters)
+                            foreach (var t in Flatten(p.ParameterType))
+                                yield return t;
+                            break;
+                        case FieldReference field:
+                            foreach (var t in Flatten(field.DeclaringType)) yield return t;
+                            foreach (var t in Flatten(field.FieldType)) yield return t;
+                            break;
+                    }
+                }
+            }
         }
 
         private static SortedDictionary<string, SortedSet<string>> VanillaRefsByRootType()

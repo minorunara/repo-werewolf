@@ -97,8 +97,6 @@ namespace Werewolf
                 WLog.Line("streamer_safe_mode", secret: false, ("enabled", true));
             }
 
-            WLog.Line("init", false, ("plugin", PluginName), ("version", PluginVersion));
-
             if (!GameRefs.ResolveAll())
             {
                 Logger.LogError($"{PluginName} {PluginVersion}: 本体フィールド参照の解決に失敗したため" +
@@ -116,6 +114,9 @@ namespace Werewolf
                     "（本編は通常どおり動作します）");
             }
 
+            Vanilla.EnemyMapIcons.TextureResolver = UI.AssetCatalog.GetTexture;
+            Vanilla.MeetingButton.PrefabResolver = UI.AssetCatalog.GetPrefab;
+
             var harmony = new Harmony(PluginGuid);
             if (!ApplyPatchesIsolated(harmony))
             {
@@ -128,14 +129,6 @@ namespace Werewolf
             gameObject.AddComponent<WerewolfDirector>();
 
             ScenarioMenuEntry.TryInstall();
-
-            Logger.LogInfo($"{PluginName} {PluginVersion} loaded! " +
-                $"(werewolfCount={GameConfig.WerewolfCount}, " +
-                $"blackCatChancePercent={GameConfig.BlackCatChancePercent}, " +
-                $"bomberChancePercent={GameConfig.BomberChancePercent}, " +
-                $"roundSeconds={GameConfig.RoundSeconds}, " +
-                $"blackCatRevealDelaySec={GameConfig.BlackCatRevealDelaySec}, " +
-                $"debugMode={GameConfig.DebugMode})");
         }
 
         private void OnDestroy()
@@ -182,10 +175,6 @@ namespace Werewolf
                 ScenarioRun.DisableForFailedPatches(scenarioFailures);
             }
 
-            int patchedCount = 0;
-            foreach (var _ in harmony.GetPatchedMethods()) patchedCount++;
-            WLog.Line("harmony_patched", secret: false,
-                ("methods", patchedCount), ("scenariosDisabled", scenarioFailures > 0));
             return true;
         }
 
@@ -200,7 +189,6 @@ namespace Werewolf
                 if (english)
                 {
                     Texts.Current = Language.English;
-                    WLog.Line("lang_loaded", secret: false, ("code", "en"), ("source", "builtin"));
                 }
 
                 string code = english ? "en" : value;
@@ -230,7 +218,6 @@ namespace Werewolf
                 string content = File.ReadAllText(path, Encoding.UTF8);
                 var table = LangFile.Parse(content);
                 Texts.SetOverride(table);
-                WLog.Line("lang_loaded", secret: false, ("code", code), ("entries", table.Count));
             }
             catch (Exception e)
             {

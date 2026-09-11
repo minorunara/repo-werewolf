@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
-using Werewolf.UI;
 
 namespace Werewolf.Vanilla
 {
@@ -20,6 +19,8 @@ namespace Werewolf.Vanilla
         internal static bool SuppressVanillaCursor;
 
         public float SizeScale { get; set; } = 1f;
+
+        public int SortingOrder { get; set; }
 
         private GameObject _root;
         private Image _image;
@@ -42,10 +43,13 @@ namespace Werewolf.Vanilla
             var go = new GameObject("WW_CursorMirror", typeof(RectTransform));
             var rect = (RectTransform)go.transform;
             rect.SetParent(layerRoot, false);
-            UiKit.Stretch(rect);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
             var canvas = go.AddComponent<Canvas>();
             canvas.overrideSorting = true;
-            canvas.sortingOrder = WerewolfUIManager.CursorSortingOrder;
+            canvas.sortingOrder = SortingOrder;
             _canvas = canvas;
             _root = go;
 
@@ -203,33 +207,21 @@ namespace Werewolf.Vanilla
             if (img != null && img.sprite != null)
             {
                 tint = img.color;
-                WLog.Line("cursor_mirror_strategy", secret: false, ("mode", "image_sprite"),
-                    ("name", img.sprite.name), ("tint", tint.ToString()),
-                    ("mat", img.material != null ? img.material.name : "null"));
                 return img.sprite;
             }
             SpriteRenderer sr = visual.GetComponentInChildren<SpriteRenderer>(false);
             if (sr != null && sr.sprite != null)
             {
                 tint = sr.color;
-                WLog.Line("cursor_mirror_strategy", secret: false, ("mode", "sprite_renderer"),
-                    ("name", sr.sprite.name), ("tint", tint.ToString()));
                 return sr.sprite;
             }
             RawImage raw = visual.GetComponentInChildren<RawImage>(false);
             if (raw != null && raw.texture is Texture2D rawTex)
             {
                 tint = raw.color;
-                WLog.Line("cursor_mirror_strategy", secret: false, ("mode", "raw_image"),
-                    ("name", rawTex.name), ("tint", tint.ToString()),
-                    ("mat", raw.material != null ? raw.material.name : "null"));
                 return Sprite.Create(rawTex, new Rect(0f, 0f, rawTex.width, rawTex.height), new Vector2(0.5f, 0.5f));
             }
             Sprite snap = SnapshotRenderers(visual, vanillaRoot, bounds);
-            if (snap != null)
-            {
-                WLog.Line("cursor_mirror_strategy", secret: false, ("mode", "snapshot"));
-            }
             return snap;
         }
 

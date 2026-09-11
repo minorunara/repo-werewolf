@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.AI;
 
-namespace Werewolf.Game
+namespace Werewolf.Vanilla
 {
     internal static class GroundProbe
     {

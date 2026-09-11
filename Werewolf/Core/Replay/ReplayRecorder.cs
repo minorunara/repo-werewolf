@@ -37,6 +37,7 @@ namespace Werewolf.Core.Replay
         public int Actor;
         public int ParticipantId;
         public string Name;
+        public string Color;
     }
 
     public sealed class ReplayEpInfo
@@ -141,6 +142,18 @@ namespace Werewolf.Core.Replay
             public double T;
             public string Name;
             public (string Key, object Value)[] Fields;
+
+            public object FieldValue(string key) => FieldValue(Fields, key);
+
+            public static object FieldValue((string Key, object Value)[] fields, string key)
+            {
+                if (fields == null) return null;
+                for (int i = 0; i < fields.Length; i++)
+                {
+                    if (fields[i].Key == key) return fields[i].Value;
+                }
+                return null;
+            }
         }
 
         internal sealed class EntityRecord
@@ -481,6 +494,44 @@ namespace Werewolf.Core.Replay
 
         public ReplaySegmentHeader FirstSegmentHeader
             => _segments.Count > 0 ? _segments[0].Header : null;
+
+        public void OpenSegmentPlayerTrackInto(int actor, List<ReplayTrailPoint> into)
+        {
+            if (_open == null || into == null) return;
+            foreach (object record in _open.Records)
+            {
+                if (!(record is PosRecord pos)) continue;
+                List<ReplayEntitySample> entries = pos.Entries;
+                for (int i = 0; i < entries.Count; i++)
+                {
+                    ReplayEntitySample s = entries[i];
+                    if (s.Kind != ReplayEntityKind.Player || s.Id != actor) continue;
+                    into.Add(new ReplayTrailPoint { T = pos.T, X = s.X, Z = s.Z });
+                    break;
+                }
+            }
+        }
+
+        public void OpenSegmentEventTimesInto(string name, List<double> into,
+            string fieldKey = null, string fieldValue = null)
+        {
+            if (_open == null || into == null || string.IsNullOrEmpty(name)) return;
+            foreach (object record in _open.Records)
+            {
+                if (!(record is EventRecord ev) || ev.Name != name) continue;
+                if (fieldKey != null && !HasField(ev, fieldKey, fieldValue)) continue;
+                into.Add(ev.T);
+            }
+        }
+
+        private static bool HasField(EventRecord ev, string key, string value)
+        {
+            object actual = ev.FieldValue(key);
+            if (actual == null) return false;
+            return string.Equals(
+                Convert.ToString(actual, System.Globalization.CultureInfo.InvariantCulture), value,
+                StringComparison.Ordinal);
+        }
 
         public void AttachMapImage(ReplayMapImage image)
         {

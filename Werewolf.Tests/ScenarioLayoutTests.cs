@@ -434,6 +434,19 @@ namespace Werewolf.Tests
             Assert.Equal(Texts.Get(TextId.RecapBeaconNone), Body(lines, ScenarioHighlight.RecapBeacon));
         }
 
+        [Theory]
+        [InlineData(ScenarioHighlight.ChatLogPanel, true)]
+        [InlineData(ScenarioHighlight.RecapTitle, true)]
+        [InlineData(ScenarioHighlight.RecapDeaths, true)]
+        [InlineData(ScenarioHighlight.RecapBeacon, true)]
+        [InlineData(ScenarioHighlight.ChatLogButton, false)]
+        [InlineData(ScenarioHighlight.MeetingGauge, false)]
+        [InlineData(ScenarioHighlight.None, false)]
+        public void Highlight_OccupiesChatLog_OnlyForTargetsInsideTheLog(ScenarioHighlight highlight, bool expected)
+        {
+            Assert.Equal(expected, ScenarioHighlightLayout.OccupiesChatLog(highlight));
+        }
+
         private static string Body(IReadOnlyList<string> lines, ScenarioHighlight highlight)
             => lines[ScenarioHighlightLayout.RecapLineIndex(highlight) - 1];
     }

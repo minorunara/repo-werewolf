@@ -12,7 +12,7 @@ namespace Werewolf.Game
 
         private readonly LobbySettingsPanel _lobbySettingsPanel = new LobbySettingsPanel();
 
-        private string _lastPublishedBlob;
+        private readonly SharedSettingsPublishPolicy _publish = new SharedSettingsPublishPolicy();
         private long _panelTickAtMs;
 
         private string _lastPanelBlob;
@@ -62,6 +62,7 @@ namespace Werewolf.Game
         private void TickShare()
         {
             if (!Photon.Pun.PhotonNetwork.InRoom) return;
+            if (Session.IsRoleUnsettled) return;
             if (!(Session.InLobby || Session.InLobbyMenu)) return;
 
             if (Session.IsHost)
@@ -70,10 +71,9 @@ namespace Werewolf.Game
 
                 GameConfig snapshot = Plugin.Bindings.Snapshot();
                 string blob = SettingsCatalog.EncodeBlob(snapshot);
-                if (string.Equals(blob, _lastPublishedBlob, StringComparison.Ordinal)) return;
+                if (!_publish.Claim(Session.RoomId, blob)) return;
 
                 _d.RoomStateView.PublishSharedSettings(blob);
-                _lastPublishedBlob = blob;
             }
             else if (string.IsNullOrEmpty(_lobbyBlobMirror))
             {
@@ -89,7 +89,7 @@ namespace Werewolf.Game
         internal string ResolveLobbySettingsBlob()
         {
             if (!string.IsNullOrEmpty(_debugInjectedBlob)) return _debugInjectedBlob;
-            if (Session.IsHost)
+            if (Session.IsHost && !Session.IsRoleUnsettled)
             {
                 if (Plugin.Bindings == null) return null;
                 GameConfig snapshot = Plugin.Bindings.Snapshot();
@@ -199,7 +199,7 @@ namespace Werewolf.Game
 
         internal void NotePublishedBlob(string blob)
         {
-            _lastPublishedBlob = blob;
+            _publish.Claim(Session.RoomId, blob);
         }
 
         internal void NoteMatchBlob(string blob)
@@ -227,7 +227,7 @@ namespace Werewolf.Game
 
         internal void ResetForRoomLeave()
         {
-            _lastPublishedBlob = null;
+            _publish.Reset();
             _lobbyBlobMirror = null;
             _lobbySettingsPanel.SetVisibility(SettingsPanelView.Hidden);
             _lastPanelBlob = null;

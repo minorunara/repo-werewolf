@@ -137,10 +137,12 @@ namespace Werewolf.Tests
         {
             var attempt = new LobbyStartAttempt();
             Assert.True(attempt.TryBeginFinalCheck(true, 1000));
-            Assert.Equal(2500, attempt.FinalCheckDeadlineUnixMs);
+
+            long deadline = 1000 + LobbyStartGate.FinalCheckWaitMs;
+            Assert.Equal(deadline, attempt.FinalCheckDeadlineUnixMs);
             Assert.False(attempt.TryBeginFinalCheck(true, 2000));
-            Assert.False(attempt.ShouldCompleteFinalCheck(true, 2499));
-            Assert.True(attempt.ShouldCompleteFinalCheck(true, 2500));
+            Assert.False(attempt.ShouldCompleteFinalCheck(true, deadline - 1));
+            Assert.True(attempt.ShouldCompleteFinalCheck(true, deadline));
             Assert.False(attempt.IsFinalCheckPending);
         }
 

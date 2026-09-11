@@ -35,6 +35,7 @@ namespace Werewolf
         internal ConfigEntry<int> BlackCatRevealDelaySec;
         internal ConfigEntry<bool> BlackCatCurseEnabled;
         internal ConfigEntry<bool> DebugMode;
+        internal ConfigEntry<bool> DebugLogging;
 
         internal ConfigEntry<int> ShamanChancePercent;
         internal ConfigEntry<int> ShamanGazeFullSec;
@@ -952,12 +953,23 @@ namespace Werewolf
             DebugMode = config.Bind(
                 SecDebug, "DebugMode", defaults.DebugMode,
                 new ConfigDescription(
-                    "Debug mode. true allows cheat commands (/ww ...), writes secret log lines immediately " +
-                    "(false batches them until the match ends), and shows a persistent TEST PLAY banner " +
-                    "to every participant when the host enables it / " +
-                    "デバッグモード。true でチートコマンド（/ww ...）を許可し、secret ログ行を即時出力する" +
-                    "（false は試合終了時に一括出力）。ホストが有効にすると全参加者に" +
+                    "Debug gameplay mode. true allows cheat commands (/ww ...), enables detailed logs, " +
+                    "and shows a persistent TEST PLAY banner to every participant when the host enables it / " +
+                    "ゲームプレイのデバッグモード。true でチートコマンド（/ww ...）と詳細ログを有効にする。" +
+                    "ホストが有効にすると全参加者に" +
                     "テストプレイ常設バナーが表示される",
+                    null, "HideFromREPOConfig"));
+
+            DebugLogging = config.Bind(
+                SecDebug, "DebugLogging", false,
+                new ConfigDescription(
+                    "Verbose diagnostics for this client, independently of gameplay DebugMode. Public trace " +
+                    "lines are written at Debug level; secret role/vote lines are held until the match ends or " +
+                    "you disconnect. This does not affect gameplay or reveal secrets during a normal match; " +
+                    "disable it only to reduce log volume / " +
+                    "この端末だけ、ゲームプレイの DebugMode とは独立して詳細な診断ログを出力する。" +
+                    "公開情報のトレースは Debug レベル、役職・投票などの秘密情報は試合終了または切断後に一括出力する。" +
+                    "通常試合中のゲーム進行や秘密情報の見え方には影響せず、false にするとログ量だけを減らせる",
                     null, "HideFromREPOConfig"));
         }
 

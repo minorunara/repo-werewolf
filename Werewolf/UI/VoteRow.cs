@@ -96,7 +96,12 @@ namespace Werewolf.UI
         {
             if (player.IsBot || resolveAvatar == null) return PlayerHandle.None;
             try { return resolveAvatar(player.ActorNumber); }
-            catch { return PlayerHandle.None; }
+            catch (Exception e)
+            {
+                WLog.Line("voterow_avatar_error", secret: false,
+                    ("actor", player.ActorNumber), ("err", e.Message));
+                return PlayerHandle.None;
+            }
         }
 
         private void BuildInternal(Transform parent, Vector2 size)
@@ -425,7 +430,12 @@ namespace Werewolf.UI
         {
             if (s_participantId == null) return 0;
             try { return s_participantId(actorNumber); }
-            catch { return 0; }
+            catch (Exception e)
+            {
+                WLog.Line("voterow_id_error", secret: false,
+                    ("actor", actorNumber), ("err", e.Message));
+                return 0;
+            }
         }
 
         public void Tick()

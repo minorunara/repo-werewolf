@@ -79,6 +79,154 @@ namespace Werewolf.Tests
                 + string.Join("\n  ", shouldBeScenario));
         }
 
+        [Fact]
+        public void StaticConstructors_DoNotReadGameRefsTransitively()
+        {
+            var dllPath = AuditEnvironment.Meta("Werewolf.ModDllPath");
+            Assert.True(File.Exists(dllPath), $"MOD DLL が見つからない: {dllPath}");
+            using var module = ModuleDefinition.ReadModule(dllPath);
+
+            var methods = CecilTypes.AllTypes(module)
+                .SelectMany(type => type.Methods)
+                .Where(method => method.HasBody)
+                .ToList();
+
+            var readers = new HashSet<string>(methods
+                .Where(method => method.Body.Instructions.Any(instruction =>
+                    (instruction.OpCode.Code == Code.Ldsfld || instruction.OpCode.Code == Code.Ldsflda)
+                    && instruction.Operand is FieldReference field
+                    && field.DeclaringType.FullName == "Werewolf.GameRefs"))
+                .Select(method => method.FullName), StringComparer.Ordinal);
+            Assert.NotEmpty(readers);
+
+            bool changed;
+            do
+            {
+                changed = false;
+                foreach (var method in methods)
+                {
+                    if (readers.Contains(method.FullName)) continue;
+                    if (!method.Body.Instructions.Any(instruction =>
+                        instruction.Operand is MethodReference called
+                        && readers.Contains(called.FullName)))
+                    {
+                        continue;
+                    }
+                    changed |= readers.Add(method.FullName);
+                }
+            }
+            while (changed);
+
+            var offenders = methods
+                .Where(method => method.IsConstructor && method.IsStatic
+                    && method.DeclaringType.FullName != "Werewolf.GameRefs"
+                    && readers.Contains(method.FullName))
+                .Select(method => method.DeclaringType.FullName)
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToList();
+
+            Assert.True(offenders.Count == 0,
+                "静的コンストラクタが GameRefs を読んでいる（ResolveAll 前の型初期化で null を固定する）:\n  "
+                + string.Join("\n  ", offenders));
+        }
+
+        [Fact]
+        public void PluginAwake_ResolvesGameRefsBeforeDependencyInjectionAndPatching()
+        {
+            var dllPath = AuditEnvironment.Meta("Werewolf.ModDllPath");
+            Assert.True(File.Exists(dllPath), $"MOD DLL が見つからない: {dllPath}");
+            using var module = ModuleDefinition.ReadModule(dllPath);
+
+            var plugin = module.GetType("Werewolf.Plugin");
+            Assert.NotNull(plugin);
+            var awake = plugin.Methods.Single(method => method.Name == "Awake");
+            var instructions = awake.Body.Instructions;
+
+            int resolveAll = InstructionIndex(instructions, instruction =>
+                instruction.Operand is MethodReference method
+                && method.DeclaringType.FullName == "Werewolf.GameRefs"
+                && method.Name == "ResolveAll");
+            int resolveScenario = InstructionIndex(instructions, instruction =>
+                instruction.Operand is MethodReference method
+                && method.DeclaringType.FullName == "Werewolf.GameRefs"
+                && method.Name == "ResolveScenarioRefs");
+            int enemyMapInjection = InstructionIndex(instructions, instruction =>
+                instruction.OpCode.Code == Code.Stsfld
+                && instruction.Operand is FieldReference field
+                && field.DeclaringType.FullName == "Werewolf.Vanilla.EnemyMapIcons"
+                && field.Name == "TextureResolver");
+            int meetingButtonInjection = InstructionIndex(instructions, instruction =>
+                instruction.OpCode.Code == Code.Stsfld
+                && instruction.Operand is FieldReference field
+                && field.DeclaringType.FullName == "Werewolf.Vanilla.MeetingButton"
+                && field.Name == "PrefabResolver");
+            int patching = InstructionIndex(instructions, instruction =>
+                instruction.Operand is MethodReference method
+                && method.DeclaringType.FullName == "Werewolf.Plugin"
+                && method.Name == "ApplyPatchesIsolated");
+            int executionStart = InstructionIndex(instructions, instruction =>
+                instruction.Operand is GenericInstanceMethod method
+                && method.Name == "AddComponent"
+                && method.GenericArguments.Any(argument =>
+                    argument.FullName == "Werewolf.Game.WerewolfDirector"));
+
+            Assert.True(resolveAll >= 0 && resolveScenario >= 0,
+                "Plugin.Awake に GameRefs の二層解決が見つからない");
+            Assert.True(enemyMapInjection > resolveAll && enemyMapInjection > resolveScenario,
+                "EnemyMapIcons の依存注入が GameRefs 解決より前にある");
+            Assert.True(meetingButtonInjection > resolveAll && meetingButtonInjection > resolveScenario,
+                "MeetingButton の依存注入が GameRefs 解決より前にある");
+            Assert.True(patching > enemyMapInjection && patching > meetingButtonInjection,
+                "Harmonyパッチ適用が依存注入より前にある");
+            Assert.True(executionStart > patching,
+                "WerewolfDirector の生成が参照解決・依存注入・パッチ適用より前にある");
+        }
+
+        [Fact]
+        public void EnemyMapGate_CommitsStateAfterAttachOrClearSucceeds()
+        {
+            var dllPath = AuditEnvironment.Meta("Werewolf.ModDllPath");
+            Assert.True(File.Exists(dllPath), $"MOD DLL が見つからない: {dllPath}");
+            using var module = ModuleDefinition.ReadModule(dllPath);
+
+            var enemyMap = module.GetType("Werewolf.Vanilla.EnemyMapIcons");
+            Assert.NotNull(enemyMap);
+            var tick = enemyMap.Methods.Single(method => method.Name == "Tick");
+            var instructions = tick.Body.Instructions;
+
+            int attach = InstructionIndex(instructions, instruction =>
+                instruction.Operand is MethodReference method
+                && method.DeclaringType.FullName == enemyMap.FullName
+                && method.Name == "AttachAll");
+            int clear = InstructionIndex(instructions, instruction =>
+                instruction.Operand is MethodReference method
+                && method.DeclaringType.FullName == enemyMap.FullName
+                && method.Name == "ClearAll");
+            var stateStores = instructions
+                .Select((instruction, index) => (instruction, index))
+                .Where(pair => pair.instruction.OpCode.Code == Code.Stsfld
+                    && pair.instruction.Operand is FieldReference field
+                    && field.DeclaringType.FullName == enemyMap.FullName
+                    && field.Name == "_active")
+                .Select(pair => pair.index)
+                .ToList();
+
+            Assert.True(attach >= 0 && clear >= 0 && stateStores.Count == 2,
+                "EnemyMapIcons.Tick の付与・掃除・状態確定が一意に見つからない");
+            Assert.True(attach < stateStores[0] && clear < stateStores[1],
+                "EnemyMapIcons が付与または掃除の成功前にゲート状態を確定している");
+        }
+
+        private static int InstructionIndex(Mono.Collections.Generic.Collection<Instruction> instructions,
+                                            Func<Instruction, bool> predicate)
+        {
+            for (int i = 0; i < instructions.Count; i++)
+            {
+                if (predicate(instructions[i])) return i;
+            }
+            return -1;
+        }
+
         private static SortedSet<string> AssignedFields(TypeDefinition owner, string methodName)
         {
             var method = owner.Methods.SingleOrDefault(m => m.Name == methodName);

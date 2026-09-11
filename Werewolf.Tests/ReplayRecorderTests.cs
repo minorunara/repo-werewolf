@@ -537,5 +537,22 @@ namespace Werewolf.Tests
             Assert.Contains("\"k\":\"ev\"", lines[4]);
             Assert.StartsWith("{\"k\":\"segend\"", lines[5]);
         }
+
+        [Fact]
+        public void ToJsonLines_HeaderPlayers_CarryHeadColorOnlyWhenKnown()
+        {
+            var rec = new ReplayRecorder();
+            ReplaySegmentHeader header = Header();
+            header.Players = new List<ReplayPlayerInfo>
+            {
+                new ReplayPlayerInfo { Actor = 1, ParticipantId = 1, Name = "A", Color = "#ff8000" },
+                new ReplayPlayerInfo { Actor = 2, ParticipantId = 2, Name = "B" },
+            };
+            rec.BeginSegment(header, 0.0);
+            rec.EndSegment(1.0);
+            string seg = rec.ToJsonLines().First();
+            Assert.Contains("{\"a\":1,\"id\":1,\"n\":\"A\",\"c\":\"#ff8000\"}", seg);
+            Assert.Contains("{\"a\":2,\"id\":2,\"n\":\"B\"}", seg);
+        }
     }
 }

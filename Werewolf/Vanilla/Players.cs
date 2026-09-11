@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using Werewolf.Core;
 
 namespace Werewolf.Vanilla
 {
@@ -78,7 +79,17 @@ namespace Werewolf.Vanilla
             if (SemiFunc.IsMultiplayer())
             {
                 Photon.Realtime.Room room = Photon.Pun.PhotonNetwork.CurrentRoom;
-                if (room != null && avatars.Count < room.PlayerCount) return false;
+                if (room?.Players == null || room.Players.Count == 0) return false;
+
+                var currentActors = new List<int>(room.Players.Keys);
+                var states = new List<ParticipantLoadState>(avatars.Count);
+                foreach (PlayerAvatar avatar in avatars)
+                {
+                    if (avatar == null) continue;
+                    states.Add(new ParticipantLoadState(
+                        ActorOf(avatar), GameRefs.PlayerAvatar_levelAnimationCompleted(avatar)));
+                }
+                return PreplayRosterGate.AllCurrentParticipantsLoaded(currentActors, states);
             }
             foreach (PlayerAvatar avatar in avatars)
             {
@@ -86,6 +97,20 @@ namespace Werewolf.Vanilla
                 if (!GameRefs.PlayerAvatar_levelAnimationCompleted(avatar)) return false;
             }
             return true;
+        }
+
+        public static Dictionary<int, string> RoomRosterNames()
+        {
+            var result = new Dictionary<int, string>();
+            Photon.Realtime.Room room = Photon.Pun.PhotonNetwork.CurrentRoom;
+            if (room?.Players == null) return result;
+            foreach (var pair in room.Players)
+            {
+                Photon.Realtime.Player player = pair.Value;
+                if (player == null || string.IsNullOrEmpty(player.NickName)) continue;
+                result[pair.Key] = player.NickName;
+            }
+            return result;
         }
     }
 }

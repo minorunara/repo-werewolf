@@ -97,6 +97,11 @@ namespace Werewolf.Core.Replay
                 if (i > 0) sb.Append(',');
                 sb.Append("{\"a\":").Append(p.Actor).Append(",\"id\":").Append(p.ParticipantId).Append(",\"n\":");
                 AppendEscaped(sb, p.Name);
+                if (p.Color != null)
+                {
+                    sb.Append(",\"c\":");
+                    AppendEscaped(sb, p.Color);
+                }
                 sb.Append('}');
             }
             sb.Append(']');

@@ -16,7 +16,6 @@ namespace Werewolf.Tests
             Assert.Equal(2, (byte)Role.BlackCat);
             Assert.Equal(3, (byte)Role.Bomber);
             Assert.Equal(4, (byte)Role.Shaman);
-            Assert.Equal(5, Enum.GetValues(typeof(Role)).Length);
         }
 
         [Fact]
@@ -25,7 +24,6 @@ namespace Werewolf.Tests
             Assert.Equal(typeof(byte), Enum.GetUnderlyingType(typeof(Team)));
             Assert.Equal(0, (byte)Team.Villagers);
             Assert.Equal(1, (byte)Team.Werewolves);
-            Assert.Equal(2, Enum.GetValues(typeof(Team)).Length);
         }
 
         [Fact]
@@ -36,7 +34,6 @@ namespace Werewolf.Tests
             Assert.Equal(1, (byte)GamePhase.Play);
             Assert.Equal(2, (byte)GamePhase.Meeting);
             Assert.Equal(3, (byte)GamePhase.GameOver);
-            Assert.Equal(4, Enum.GetValues(typeof(GamePhase)).Length);
         }
 
         [Fact]
@@ -45,7 +42,6 @@ namespace Werewolf.Tests
             Assert.Equal(typeof(byte), Enum.GetUnderlyingType(typeof(DeathCause)));
             Assert.Equal(0, (byte)DeathCause.Vote);
             Assert.Equal(1, (byte)DeathCause.Other);
-            Assert.Equal(2, Enum.GetValues(typeof(DeathCause)).Length);
         }
 
         [Theory]

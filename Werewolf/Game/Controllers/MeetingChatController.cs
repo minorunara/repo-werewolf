@@ -50,6 +50,7 @@ namespace Werewolf.Game
         internal MeetingChatController(WerewolfDirector director)
         {
             _d = director;
+            _stampSendAction = SendStampClient;
         }
 
         internal static bool LogEnabled
@@ -283,6 +284,7 @@ namespace Werewolf.Game
             _chatPanel.Tick(
                 Plugin.MeetingChatLogKey != null ? Plugin.MeetingChatLogKey.Value : KeyCode.L,
                 InputGate.KeysFree);
+            TickStamps(_chatPanel);
 
             _chatPanel.Render(_chatLog, _d.LocalActor, ChatAvatarResolver,
                 _d.ParticipantIdFor,
@@ -303,6 +305,7 @@ namespace Werewolf.Game
             _resultChatPanel.Tick(
                 Plugin.MeetingChatLogKey != null ? Plugin.MeetingChatLogKey.Value : KeyCode.L,
                 InputGate.KeysFree);
+            TickStamps(_resultChatPanel);
             _resultChatPanel.Render(_chatLog, _d.LocalActor, ChatAvatarResolver,
                 _d.ParticipantIdFor, markedRole, localDead: false);
 
@@ -323,6 +326,78 @@ namespace Werewolf.Game
             _chatLog.Clear();
             _chatUnread.Clear();
             if (_resultChatPanel.Exists) _resultChatPanel.ResetView();
+        }
+
+        private readonly ChatStampCooldown _stampCooldownHost = new ChatStampCooldown();
+
+        private readonly ChatStampCooldown _stampCooldownClient = new ChatStampCooldown();
+
+        private readonly Action<byte> _stampSendAction;
+
+        private bool IsStampReadyClient
+            => _stampCooldownClient.IsReady(_d.LocalActor, SessionClock.NowMs());
+
+        private void TickStamps(MeetingChatPanel panel)
+        {
+            if (!FeatureFlags.ChatStamps || !panel.IsOpen) return;
+            bool defaultChatter = _d.ClientPhase == GamePhase.GameOver || !_d.IsLocalAlive();
+            bool usable = IsWindowOpen && !_d.ScenarioChatLogExplanationPending;
+            panel.TickStamps(usable, IsStampReadyClient, defaultChatter, _stampSendAction);
+        }
+
+        internal void SendStampClient(byte stampId)
+        {
+            if (!FeatureFlags.ChatStamps || !LogEnabled || !IsWindowOpen) return;
+            if (!_stampCooldownClient.TryTake(_d.LocalActor, SessionClock.NowMs())) return;
+            _d.ClientBus?.SendToMaster(MessageCodes.ChatStampRequest, new object[] { stampId });
+        }
+
+        internal void HandleStampRequestHost(InboundMessage msg, long now)
+        {
+            if (!FeatureFlags.ChatStamps)
+            {
+                WerewolfDirector.DropMasterInbound(msg, "stamp_disabled");
+                return;
+            }
+            if (!IsWindowOpen)
+            {
+                WerewolfDirector.DropMasterInbound(msg, "stamp_window_closed");
+                return;
+            }
+            byte stampId = (byte)msg.Payload[0];
+            if (!ChatStampCatalog.TryGet(stampId, out _))
+            {
+                WerewolfDirector.DropMasterInbound(msg, "stamp_unknown");
+                return;
+            }
+            if (!_stampCooldownHost.TryTake(msg.SenderActor, now))
+            {
+                WerewolfDirector.DropMasterInbound(msg, "stamp_cooldown");
+                return;
+            }
+            _d.ClientBus?.SendToAll(MessageCodes.ChatStamp, new object[] { msg.SenderActor, stampId });
+        }
+
+        internal void RecvStamp(object[] p)
+        {
+            int actor = (int)p[0];
+            byte stampId = (byte)p[1];
+            if (!FeatureFlags.ChatStamps || !IsWindowOpen) return;
+
+            bool alive = _d.MeetingClientView.GetRowStatus(actor) == RowStatus.Alive;
+            if (ReplayChatGate.ShouldRecord(_d.ClientPhase, IsDiscussionOpen, alive))
+            {
+                ReplaySampler.NoteStamp(actor, stampId);
+            }
+
+            if (!LogEnabled) return;
+            if (!_d.ShouldShowDeadTextClient(actor)) return;
+
+            bool added = AppendChatMessage(
+                actor, _d.ResolveDisplayName(actor), ChatStampCatalog.ChatText(stampId),
+                ChatSpeakerKindFor(actor), playSfx: true);
+            WLog.Line("recv_chat_stamp", secret: false,
+                ("actor", actor), ("id", stampId), ("added", added));
         }
 
         internal bool DebugInjectChat(int actor, string name, string text)

@@ -8,12 +8,14 @@ namespace Werewolf.Vanilla
 {
     public sealed class TruckWarper
     {
-        private static readonly AccessTools.FieldRef<PlayerAvatar, PlayerDeathHead> DeathHeadRef =
+        private static AccessTools.FieldRef<PlayerAvatar, PlayerDeathHead> DeathHeadRef =>
             GameRefs.PlayerAvatar_playerDeathHead;
-        private static readonly AccessTools.FieldRef<PlayerDeathHead, PhysGrabObject> HeadGrabObjectRef =
+        private static AccessTools.FieldRef<PlayerDeathHead, PhysGrabObject> HeadGrabObjectRef =>
             GameRefs.PlayerDeathHead_physGrabObject;
-        private static readonly AccessTools.FieldRef<PlayerAvatar, bool> IsTumblingRef =
+        private static AccessTools.FieldRef<PlayerAvatar, bool> IsTumblingRef =>
             GameRefs.PlayerAvatar_isTumbling;
+
+        private static bool _deathHeadProbeErrorLogged;
 
         private static PhysGrabObject TumbleGrabObject(PlayerAvatar avatar)
         {
@@ -33,8 +35,13 @@ namespace Werewolf.Vanilla
                 pos = grab != null ? grab.transform.position : head.transform.position;
                 return true;
             }
-            catch
+            catch (Exception e)
             {
+                if (!_deathHeadProbeErrorLogged)
+                {
+                    _deathHeadProbeErrorLogged = true;
+                    WLog.Line("death_head_probe_error", secret: false, ("err", e.Message));
+                }
                 return false;
             }
         }

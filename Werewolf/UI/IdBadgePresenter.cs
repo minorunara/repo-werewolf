@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.UI
 {

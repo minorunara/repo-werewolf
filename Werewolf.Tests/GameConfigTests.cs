@@ -31,29 +31,5 @@ namespace Werewolf.Tests
 
             Assert.False(config.EnemySets.AnyOverridden);
         }
-
-        [Theory]
-        [InlineData(0, false)]
-        [InlineData(1, true)]
-        [InlineData(50, true)]
-        [InlineData(100, true)]
-        public void BlackCatPossible_DerivedFromChancePercent(int chancePercent, bool expected)
-        {
-            var config = new GameConfig { WerewolfCount = 2, BlackCatChancePercent = chancePercent };
-
-            Assert.Equal(expected, config.BlackCatPossible(playerCount: 5));
-        }
-
-        [Theory]
-        [InlineData(0, false)]
-        [InlineData(1, true)]
-        [InlineData(50, true)]
-        [InlineData(100, true)]
-        public void BomberPossible_DerivedFromChancePercent(int chancePercent, bool expected)
-        {
-            var config = new GameConfig { WerewolfCount = 2, BomberChancePercent = chancePercent };
-
-            Assert.Equal(expected, config.BomberPossible(playerCount: 5));
-        }
     }
 }

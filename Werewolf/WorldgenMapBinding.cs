@@ -49,8 +49,6 @@ namespace Werewolf
                 _bindings.StartMapName = entry;
 
                 _initialized = true;
-                WLog.Line("worldgen_mapbind_init", secret: false,
-                    ("levels", values.Count - 1), ("value", entry.Value));
                 if (!string.Equals(entry.Value, oldValue, StringComparison.Ordinal))
                 {
                     WLog.Line("worldgen_mapbind_fallback", secret: false, ("from", oldValue));

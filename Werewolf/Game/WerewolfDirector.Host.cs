@@ -1,22 +1,16 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using HarmonyLib;
 using UnityEngine;
 using Werewolf.Core;
-using Werewolf.Game.Patches;
 using Werewolf.Net;
 using Werewolf.Scenarios.Core;
 using Werewolf.Scenarios.Game;
-using Werewolf.UI;
 using Werewolf.Vanilla;
 
 namespace Werewolf.Game
 {
     public sealed partial class WerewolfDirector
     {
-
-        private readonly LifecycleGate _lifecycleGate = new LifecycleGate();
 
         public StartResult StartHosted()
         {
@@ -30,6 +24,12 @@ namespace Werewolf.Game
                 WLog.Line("start_rejected", secret: false, ("reason", "not_host"));
                 return StartResult.Rejected(StartRejectReason.NotInLobby);
             }
+            if (_session != null || _clientPhase != GamePhase.Lobby)
+            {
+                WLog.Line("start_rejected", secret: false,
+                    ("reason", "round_already_started"), ("phase", ClientPhase));
+                return StartResult.Rejected(StartRejectReason.NotInLobby);
+            }
 
             if (ScenarioRun.Active) SeedScenarioRoster();
 
@@ -39,11 +39,12 @@ namespace Werewolf.Game
             _roomState.PublishSharedSettings(roundSettingsBlob);
             _lobbySettingsFeature.NotePublishedBlob(roundSettingsBlob);
             _lobbySettingsFeature.NoteMatchBlob(roundSettingsBlob);
-            _resultFlowFeature.FreezeAutoReturnForHost();
 
             long now = SessionClock.NowMs();
 
             SelectBus();
+
+            if (Session.InRunLevel) PreplayEnemySpawnHold.Begin(now);
 
             var players = Registry.BuildRealPlayers();
             players.AddRange(_reservations.Bots);
@@ -59,26 +60,22 @@ namespace Werewolf.Game
             if (ScenarioRun.Active) ReserveScenarioPlayerRole();
 
             ClearClientState();
+            _resultFlowFeature.FreezeAutoReturnForHost();
             _resultSequence.Cancel();
 
-            StartResult result = _session.Start(Plugin.GameConfig, players, now, new System.Random());
+            StartResult result = _session.StartPreplay(Plugin.GameConfig, players, now, new System.Random());
             if (!result.Success)
             {
                 _session.OnSend -= SendViaBus;
                 _session.OnSessionEvent -= HandleSessionEvent;
                 _session = null;
+                PreplayEnemySpawnHold.Cancel();
                 return result;
             }
 
             _reservations.ClearRoles();
             _lifecycleGate.MarkStarted();
-
-            _meeting = new MeetingSession(Plugin.GameConfig, _session, _session.Players, now);
-            _meeting.OnSend += SendViaBus;
-            _meeting.OnExecutePlayer += ExecuteVotedPlayer;
-            _meeting.OnPhaseChangeRequest += HandleMeetingPhaseRequest;
-            _meeting.OnMeetingStateChanged += _roomState.PublishMeeting;
-            _meeting.OnRightsChanged += _roomState.PublishRights;
+            HostValuablesDestroyed = 0;
 
             _roomState.PublishSettings(Plugin.GameConfig, players.Count);
             _cfgMirror.ValuableMapMode = Plugin.GameConfig.ValuableMapMode;
@@ -90,14 +87,27 @@ namespace Werewolf.Game
             _cfgMirror.OutfitChangeAllowed = Plugin.GameConfig.OutfitChangeAllowed;
             _cfgMirror.BombPack = RoomStateKeys.EncodeBomb(Plugin.GameConfig, players.Count);
             _cfgMirror.ShamanPack = RoomStateKeys.EncodeShaman(Plugin.GameConfig);
-            foreach (var p in players)
-            {
-                _roomState.PublishRights(p.ActorNumber, _meeting.RightsRemaining(p.ActorNumber));
-            }
+            _resetArmed = true;
+            return result;
+        }
+
+        private void InitializeHostPlayFeatures(long playStartUnixMs)
+        {
+            if (_session == null || _session.Phase != GamePhase.Play || _meeting != null) return;
+
+            _meeting = new MeetingSession(Plugin.GameConfig, _session, _session.Players, playStartUnixMs);
+            _meeting.OnSend += SendViaBus;
+            _meeting.OnExecutePlayer += ExecuteVotedPlayer;
+            _meeting.OnPhaseChangeRequest += HandleMeetingPhaseRequest;
+            _meeting.OnMeetingStateChanged += _roomState.PublishMeeting;
+            _meeting.OnRightsChanged += _roomState.PublishRights;
+
+            foreach (WPlayer player in _session.Players)
+                _roomState.PublishRights(player.ActorNumber, _meeting.RightsRemaining(player.ActorNumber));
 
             _winCeremonyFeature.BeginHostRound();
 
-            _roles = new RolesSession(Plugin.GameConfig, _session, now, new System.Random());
+            _roles = new RolesSession(Plugin.GameConfig, _session, playStartUnixMs, new System.Random());
             HostValuablesDestroyed = 0;
             _roles.OnSend += SendViaBus;
             _roles.OnInformantEstablished += HandleInformantEstablished;
@@ -110,89 +120,14 @@ namespace Werewolf.Game
             _meeting.OnMeetingStateChanged += HandleMeetingStateChangedForRolesAndBomber;
             _meeting.OnVotingStarted += HandleVotingStartedForRoles;
 
-            _bomber = new BombSession(Plugin.GameConfig, _session, now);
+            _bomber = new BombSession(Plugin.GameConfig, _session, playStartUnixMs);
             _roles.OnGaugePctChanged += HandleGaugePctChangedForBomber;
             SendBomberStateIfDirty();
 
-            if (Session.LevelGenerated)
-            {
-                Patches.ValueTrackPatch.ScanAndFreezeBase();
-            }
+            if (Session.LevelGenerated) Patches.ValueTrackPatch.ScanAndFreezeBase();
 
             if (ScenarioRun.Active) SeedScenarioLoss();
 
-            _resetArmed = true;
-            WLog.Line("start", secret: false, ("players", players.Count), ("mode", BusMode()));
-            return result;
-        }
-
-        public void OnLevelGenerated()
-        {
-            try
-            {
-                if (!Session.IsHost) return;
-
-                if (Plugin.GameConfig == null) return;
-                if (!ScenarioSessionGate.ShouldEngage(Plugin.GameConfig.WerewolfModeEnabled, ScenarioRun.Active)) return;
-
-                if (_session != null) return;
-
-                bool isRunLevel = Session.InRunLevel;
-                GamePhase phase = HostPhase;
-                if (!_lifecycleGate.ShouldAutoStart(true, isRunLevel, phase))
-                {
-                    WLog.Line("autostart_skipped", secret: false,
-                        ("isRunLevel", isRunLevel), ("phase", phase));
-                    return;
-                }
-
-                _autoStartWait.Arm(SessionClock.NowMs());
-                WLog.Line("autostart_armed", secret: false,
-                    ("phase", phase), ("timeoutSec", AutoStartWaitGate.DefaultTimeoutSec));
-            }
-            catch (Exception e)
-            {
-                WLog.Line("autostart_error", secret: false, ("err", e.Message));
-            }
-        }
-
-        private void TickAutoStartWait(long now)
-        {
-            if (!_autoStartWait.Armed) return;
-
-            if (_session != null || !Session.InRunLevel || !Session.IsHost)
-            {
-                _autoStartWait.Disarm();
-                return;
-            }
-
-            AutoStartFireReason fire = _autoStartWait.ShouldFire(AllPlayersLevelLoadCompleted(), now);
-            if (fire == AutoStartFireReason.None) return;
-
-            WLog.Line("autostart_trigger", secret: false,
-                ("phase", HostPhase), ("reason", fire == AutoStartFireReason.AllLoaded ? "all_loaded" : "timeout"));
-            StartResult result = StartHosted();
-            if (!result.Success)
-            {
-                WLog.Line("autostart_rejected", secret: false, ("reason", result.Reason));
-            }
-        }
-
-        private bool AllPlayersLevelLoadCompleted()
-        {
-            try
-            {
-                if (!Session.IsGameStateMain)
-                {
-                    return false;
-                }
-                return Players.AllLoadAnimationsCompleted();
-            }
-            catch (Exception e)
-            {
-                WLog.Line("autostart_probe_error", secret: false, ("err", e.Message));
-                return true;
-            }
         }
 
         private void SeedScenarioRoster()
@@ -681,6 +616,26 @@ namespace Werewolf.Game
                 {
                     case SessionEventKind.PhaseChanged:
                         _roomState.PublishPhase(e.Phase, e.RoundEndUnixMs);
+                        if (e.Phase == GamePhase.Play)
+                        {
+                            try
+                            {
+                                InitializeHostPlayFeatures(
+                                    _session != null && _session.StartUnixMs > 0
+                                        ? _session.StartUnixMs
+                                        : SessionClock.NowMs());
+                            }
+                            finally
+                            {
+                                PreplayEnemySpawnHold.Release();
+                            }
+                        }
+                        else if (e.Phase == GamePhase.PreplayAborted && Session.IsHost)
+                        {
+                            CacheHostSessionRosterNames();
+                            _resultSequence.Begin(SessionClock.NowMs(),
+                                _resultFlowFeature.RoundGameOverAutoReturnSec);
+                        }
                         if (e.Phase == GamePhase.GameOver || e.Phase == GamePhase.Lobby)
                         {
                             Debugging.StructuredLog.FlushDeferredSecrets("host_phase");

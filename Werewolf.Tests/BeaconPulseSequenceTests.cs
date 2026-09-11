@@ -45,10 +45,8 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void Constants_MatchSpec()
+        public void PulseWindow_CoversSummonClampMax()
         {
-            Assert.Equal(10, BeaconPulseSequence.PulseCount);
-            Assert.Equal(2500, BeaconPulseSequence.IntervalMs);
             Assert.True((BeaconPulseSequence.PulseCount - 1) * BeaconPulseSequence.IntervalMs
                 >= BeaconSummonPlan.MaxSeconds * 1000, "pulse window does not cover summon clamp max");
         }

@@ -117,7 +117,6 @@ namespace Werewolf.Vanilla
 
         public void ForceRestore(string reason)
         {
-            int touchedCount = _touched.Count;
             if (_debugSelfEchoOn)
             {
                 SetDebugSelfEcho(false);
@@ -150,8 +149,6 @@ namespace Werewolf.Vanilla
             {
                 _lastKind = VoicePlanKind.None;
                 _deadCueMuteWasActive = false;
-                WLog.Line("voice_restore", secret: false,
-                    ("reason", reason), ("touched", touchedCount));
             }
         }
 
@@ -165,13 +162,10 @@ namespace Werewolf.Vanilla
                 List<PlayerVoiceChat> voices = rm != null ? s_voiceChatsRef(rm) : null;
                 if (voices == null)
                 {
-                    WLog.Line("voice_sanitize", secret: false, ("status", "no_voicechats"));
                     ClearInternalTracking();
                     return;
                 }
 
-                int localCount = 0;
-                int remoteCount = 0;
                 foreach (PlayerVoiceChat vc in voices)
                 {
                     if (vc == null) continue;
@@ -180,7 +174,6 @@ namespace Werewolf.Vanilla
                     if (vc == PlayerVoiceChat.instance)
                     {
                         vc.ToggleMixer(false, false);
-                        localCount++;
                         continue;
                     }
 
@@ -195,12 +188,9 @@ namespace Werewolf.Vanilla
                         AudioReverbFilter reverb = go.GetComponent<AudioReverbFilter>();
                         if (reverb != null) reverb.enabled = false;
                     }
-                    remoteCount++;
                 }
 
                 ClearInternalTracking();
-                WLog.Line("voice_sanitize", secret: false,
-                    ("remote", remoteCount), ("local", localCount), ("listed", voices.Count));
             }
             catch (Exception e)
             {

@@ -13,40 +13,46 @@ namespace Werewolf.Tests
             ValuableMapMode valuableMapMode = ValuableMapMode.MeetingSync) =>
             RevealScript.Build(role, teammates, blackCatPossible, valuableMapMode);
 
+        private static string T(TextId id) => Texts.Get(id);
+
+        private static string B(TextId id) => "・" + Texts.Get(id);
+
+        private static string TeammatePrefix => Texts.Get(TextId.RevealTeammatePrefix);
+
         [Fact]
         public void Villager_WithoutCatPossible_ShowsWinConditionsThenTips()
         {
             var content = Build(Role.Villager, new string[0], blackCatPossible: false);
 
-            Assert.Equal("あなたは村人です", content.Title);
+            Assert.Equal(T(TextId.RevealVillagerTitle), content.Title);
             Assert.Equal(RoleIcon.Villager, content.Icon);
             Assert.Equal(2, content.Pages.Length);
 
             var page1 = content.Pages[0].BodyLines;
-            Assert.Contains("◆ 勝利条件（いずれか）", page1);
-            Assert.Contains("・全ての抽出ポイントを完了し、トラックを発車させる", page1);
-            Assert.Contains("・人狼陣営を全滅させる", page1);
-            Assert.DoesNotContain(page1, l => l.Contains("ヒント"));
+            Assert.Contains(T(TextId.RevealHeadingWinCondition), page1);
+            Assert.Contains(B(TextId.RevealVillagerWinCondition1), page1);
+            Assert.Contains(B(TextId.RevealVillagerWinCondition2), page1);
+            Assert.DoesNotContain(T(TextId.RevealHeadingTips), page1);
 
             var page2 = content.Pages[1].BodyLines;
-            Assert.Contains("◆ ヒント", page2);
-            Assert.Contains("・トラック最奥の赤いボタン長押しで会議を開ける", page2);
-            Assert.Contains("・死体の近くで通報キーを押すと会議を開ける", page2);
-            Assert.Contains("特別な能力はない。貴重品の回収と会議で人狼に立ち向かえ。", page2);
+            Assert.Contains(T(TextId.RevealHeadingTips), page2);
+            Assert.Contains(B(TextId.RevealVillagerTipConvene), page2);
+            Assert.Contains(B(TextId.RevealVillagerTipReport), page2);
+            Assert.Contains(T(TextId.RevealVillagerFlavor), page2);
         }
 
         [Fact]
         public void Villager_TipThree_FollowsValuableMapMode()
         {
             var meetingSync = Build(Role.Villager, new string[0], false, ValuableMapMode.MeetingSync);
-            Assert.Contains("・会議のたびにマップの貴重品情報が更新される", AllLines(meetingSync));
-            Assert.DoesNotContain("・会議では全プレイヤーの生死を確認できる", AllLines(meetingSync));
+            Assert.Contains(B(TextId.RevealVillagerTipValuableMap), AllLines(meetingSync));
+            Assert.DoesNotContain(B(TextId.RevealVillagerTipAliveCheck), AllLines(meetingSync));
 
             foreach (var mode in new[] { ValuableMapMode.Realtime, ValuableMapMode.Hidden })
             {
                 var content = Build(Role.Villager, new string[0], false, mode);
-                Assert.DoesNotContain("・会議のたびにマップの貴重品情報が更新される", AllLines(content));
-                Assert.Contains("・会議では全プレイヤーの生死を確認できる", AllLines(content));
+                Assert.DoesNotContain(B(TextId.RevealVillagerTipValuableMap), AllLines(content));
+                Assert.Contains(B(TextId.RevealVillagerTipAliveCheck), AllLines(content));
             }
         }
 
@@ -55,7 +61,8 @@ namespace Werewolf.Tests
         {
             var content = Build(Role.Villager, new string[0], blackCatPossible: true);
 
-            Assert.Equal("あなたは村人…かもしれません。", content.Title);
+            Assert.Equal(T(TextId.RevealVillagerTitleMaybeCat), content.Title);
+            Assert.NotEqual(T(TextId.RevealVillagerTitle), content.Title);
             Assert.Equal(RoleIcon.Villager, content.Icon);
         }
 
@@ -65,8 +72,8 @@ namespace Werewolf.Tests
             var wolf = Build(Role.Werewolf, new[] { "A" }, blackCatPossible: true);
             var cat = Build(Role.BlackCat, new string[0], blackCatPossible: true);
 
-            Assert.Equal("あなたは人狼です", wolf.Title);
-            Assert.Equal("あなたは黒猫です", cat.Title);
+            Assert.Equal(T(TextId.RevealWerewolfTitle), wolf.Title);
+            Assert.Equal(T(TextId.RevealBlackCatTitle), cat.Title);
         }
 
         [Fact]
@@ -74,21 +81,22 @@ namespace Werewolf.Tests
         {
             var content = Build(Role.Werewolf, new[] { "Alice", "Bob" }, blackCatPossible: false);
 
-            Assert.Equal("あなたは人狼です", content.Title);
+            Assert.Equal(T(TextId.RevealWerewolfTitle), content.Title);
             Assert.Equal(RoleIcon.Werewolf, content.Icon);
             Assert.Equal(2, content.Pages.Length);
 
             var page1 = content.Pages[0].BodyLines;
-            Assert.Contains("◆ 勝利条件（いずれか）", page1);
-            Assert.Contains("・その時点で存在する貴重品を全て集めても、最後の抽出を完了できない状態にする", page1);
-            Assert.Contains("・時間切れまでトラックを発車させない", page1);
-            Assert.Contains("・村人陣営を全滅させる", page1);
+            Assert.Contains(page1, l => l.StartsWith(TeammatePrefix));
+            Assert.Contains(T(TextId.RevealHeadingWinCondition), page1);
+            Assert.Contains(B(TextId.RevealWolfTeamWinCondition1), page1);
+            Assert.Contains(B(TextId.RevealWolfTeamWinCondition2), page1);
+            Assert.Contains(B(TextId.RevealWolfTeamWinCondition3), page1);
 
             var page2 = content.Pages[1].BodyLines;
-            Assert.Contains("◆ あなたの能力", page2);
-            Assert.Contains("・貴重品を壊すほどバフがかかる", page2);
-            Assert.Contains("・マップで敵の位置が分かる", page2);
-            Assert.Contains("・ビーコンで敵を今いる場所におびき寄せる", page2);
+            Assert.Contains(T(TextId.RevealHeadingAbility), page2);
+            Assert.Contains(B(TextId.RevealWolfAbility1), page2);
+            Assert.Contains(B(TextId.RevealWolfAbility2), page2);
+            Assert.Contains(B(TextId.RevealWolfAbility3), page2);
             Assert.DoesNotContain(page2, l => l.Contains("Alice") || l.Contains("Bob"));
         }
 
@@ -97,9 +105,9 @@ namespace Werewolf.Tests
         {
             var content = Build(Role.Werewolf, new[] { "Alice", "Bob" }, blackCatPossible: false);
 
-            var teammateLines = content.Pages[0].BodyLines.Where(l => l.StartsWith("人狼仲間：")).ToArray();
+            var teammateLines = content.Pages[0].BodyLines.Where(l => l.StartsWith(TeammatePrefix)).ToArray();
             Assert.Single(teammateLines);
-            Assert.Equal("人狼仲間：Alice,Bob", teammateLines[0]);
+            Assert.Equal(TeammatePrefix + "Alice,Bob", teammateLines[0]);
         }
 
         [Fact]
@@ -107,9 +115,9 @@ namespace Werewolf.Tests
         {
             var content = Build(Role.Werewolf, new string[0], blackCatPossible: false);
 
-            var teammateLines = AllLines(content).Where(l => l.StartsWith("人狼仲間：")).ToArray();
+            var teammateLines = AllLines(content).Where(l => l.StartsWith(TeammatePrefix)).ToArray();
             Assert.Single(teammateLines);
-            Assert.Equal("人狼仲間：", teammateLines[0]);
+            Assert.Equal(TeammatePrefix, teammateLines[0]);
         }
 
         [Fact]
@@ -119,7 +127,7 @@ namespace Werewolf.Tests
             var content = Build(Role.Werewolf, teammates, blackCatPossible: false);
 
             var teammateLines = content.Pages[0].BodyLines
-                .Where(l => l.StartsWith("人狼仲間：") || IsWrappedContinuationLine(l, teammates))
+                .Where(l => l.StartsWith(TeammatePrefix) || IsWrappedContinuationLine(l, teammates))
                 .ToArray();
 
             Assert.True(teammateLines.Length > 1, "1行に収まらない仲間列挙は複数行に折返されるべき");
@@ -139,7 +147,7 @@ namespace Werewolf.Tests
 
             foreach (var line in AllLines(content))
             {
-                if (line.StartsWith("人狼仲間：") || teammates.Any(line.Contains))
+                if (line.StartsWith(TeammatePrefix) || teammates.Any(line.Contains))
                 {
                     Assert.True(line.Length <= 30, $"行が長すぎる: '{line}' ({line.Length}文字)");
                 }
@@ -171,9 +179,9 @@ namespace Werewolf.Tests
                 var content = RevealScript.Build(role, new[] { "Alice" }, blackCatPossible: false,
                     ValuableMapMode.MeetingSync, blackCatCurseEnabled: true, selfParticipantId: 7);
 
-                Assert.Equal("あなたの識別番号はNo.7", content.SelfIdLine);
+                Assert.Equal(Texts.Format(TextId.RevealSelfIdFormat, 7), content.SelfIdLine);
 
-                Assert.DoesNotContain(AllLines(content), l => l.Contains("識別番号"));
+                Assert.DoesNotContain(content.SelfIdLine, AllLines(content));
             }
         }
 
@@ -200,14 +208,14 @@ namespace Werewolf.Tests
             Assert.Equal(2, content.Pages.Length);
 
             var page1 = content.Pages[0].BodyLines;
-            Assert.Contains(page1, l => l.StartsWith("人狼仲間："));
-            Assert.Contains("・村人陣営を全滅させる", page1);
+            Assert.Contains(page1, l => l.StartsWith(TeammatePrefix));
+            Assert.Contains(B(TextId.RevealWolfTeamWinCondition3), page1);
 
             var page2 = content.Pages[1].BodyLines;
-            Assert.Contains("◆ あなたの能力", page2);
-            Assert.Contains("・十分な時間近くで過ごした他のプレイヤーを爆弾に変えられる", page2);
-            Assert.Contains("・好きなタイミングで起爆し、周囲を破壊する。爆弾にされた本人もダメージを受けるが、HP1で耐える", page2);
-            Assert.Contains("・その爆発に巻き込まれると自分が即死する", page2);
+            Assert.Contains(T(TextId.RevealHeadingAbility), page2);
+            Assert.Contains(B(TextId.RevealBomberAbility1), page2);
+            Assert.Contains(B(TextId.RevealBomberAbility2), page2);
+            Assert.Contains(B(TextId.RevealBomberAbility3), page2);
         }
 
         [Fact]
@@ -216,13 +224,12 @@ namespace Werewolf.Tests
             var content = RevealScript.Build(Role.BlackCat, new string[0], blackCatPossible: true,
                 ValuableMapMode.MeetingSync, blackCatCurseEnabled: false);
 
-            string body = string.Join("\n", content.Pages.SelectMany(p => p.BodyLines));
-            Assert.Contains("互いに正体を知らされない", body);
-            Assert.DoesNotContain("道連れ", body);
+            var lines = AllLines(content);
+            Assert.Contains(B(TextId.RevealBlackCatNoCurse), lines);
+            Assert.DoesNotContain(B(TextId.RevealBlackCatAbility), lines);
 
             var awakening = RevealScript.BuildBlackCatAwakening(blackCatCurseEnabled: false);
-            Assert.Contains("互いに正体を知らされない", awakening.Pages[0].BodyLines[0]);
-            Assert.DoesNotContain("道連れ", awakening.Pages[0].BodyLines[0]);
+            Assert.Equal(T(TextId.RevealBlackCatNoCurse), awakening.Pages[0].BodyLines[0]);
         }
 
         [Fact]
@@ -230,21 +237,22 @@ namespace Werewolf.Tests
         {
             var content = Build(Role.BlackCat, new[] { "Alice", "Bob" }, blackCatPossible: false);
 
-            Assert.Equal("あなたは黒猫です", content.Title);
+            Assert.Equal(T(TextId.RevealBlackCatTitle), content.Title);
             Assert.Equal(RoleIcon.BlackCat, content.Icon);
             Assert.Equal(2, content.Pages.Length);
 
             var page1 = content.Pages[0].BodyLines;
-            Assert.Contains("・村人陣営を全滅させる", page1);
-            Assert.Contains("・時間切れまでトラックを発車させない", page1);
-            Assert.DoesNotContain(page1, l => l.Contains("あなたの能力"));
+            Assert.Contains(T(TextId.RevealHeadingWinCondition), page1);
+            Assert.Contains(B(TextId.RevealWolfTeamWinCondition2), page1);
+            Assert.Contains(B(TextId.RevealWolfTeamWinCondition3), page1);
+            Assert.DoesNotContain(T(TextId.RevealHeadingAbility), page1);
 
             var page2 = content.Pages[1].BodyLines;
-            Assert.Contains("◆ あなたの能力", page2);
-            Assert.Contains("・処刑対象に選ばれると、自分に投票したプレイヤーのうち1人を道連れに死亡させる", page2);
+            Assert.Contains(T(TextId.RevealHeadingAbility), page2);
+            Assert.Contains(B(TextId.RevealBlackCatAbility), page2);
 
             var lines = AllLines(content);
-            Assert.DoesNotContain(lines, l => l.Contains("人狼仲間"));
+            Assert.DoesNotContain(lines, l => l.StartsWith(TeammatePrefix));
             Assert.DoesNotContain(lines, l => l.Contains("Alice"));
             Assert.DoesNotContain(lines, l => l.Contains("Bob"));
         }
@@ -254,43 +262,17 @@ namespace Werewolf.Tests
         {
             var awakening = RevealScript.BuildBlackCatAwakening();
 
-            Assert.Equal("あなたは黒猫でした。", awakening.Title);
+            Assert.Equal(T(TextId.RevealBlackCatAwakeningTitle), awakening.Title);
+            Assert.NotEqual(T(TextId.RevealBlackCatTitle), awakening.Title);
             Assert.Equal(RoleIcon.BlackCat, awakening.Icon);
 
             Assert.Single(awakening.Pages);
-            var lines = AllLines(awakening);
-            Assert.Equal(
-                new[]
-                {
-                    "処刑対象に選ばれると、自分に投票したプレイヤーのうち1人を道連れに死亡させる",
-                },
-                lines);
-            Assert.DoesNotContain(lines, l => l.Contains("人狼陣営"));
-            Assert.DoesNotContain(lines, l => l.Contains("人狼仲間"));
-            Assert.DoesNotContain(lines, l => l.Contains("勝利条件"));
-        }
-
-        [Fact]
-        public void Output_NeverContainsOtherRoleLabels()
-        {
-            var villager = Build(Role.Villager, new string[0], blackCatPossible: false);
-            var werewolf = Build(Role.Werewolf, new[] { "Alice" }, blackCatPossible: false);
-            var blackCat = Build(Role.BlackCat, new[] { "Alice" }, blackCatPossible: false);
-
-            foreach (var content in new[] { villager, werewolf, blackCat })
-            {
-                foreach (var line in AllLines(content))
-                {
-                    Assert.DoesNotContain("村人です", line);
-                    Assert.DoesNotContain("黒猫です", line);
-                }
-                Assert.DoesNotContain("人狼です", content.Title == "あなたは人狼です" ? "" : content.Title);
-            }
+            Assert.Equal(new[] { T(TextId.RevealBlackCatAbility) }, AllLines(awakening));
         }
 
         private static bool IsWrappedContinuationLine(string line, string[] teammates)
         {
-            return teammates.Any(line.Contains) && !line.StartsWith("人狼仲間：");
+            return teammates.Any(line.Contains) && !line.StartsWith(TeammatePrefix);
         }
     }
 }

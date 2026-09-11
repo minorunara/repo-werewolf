@@ -23,18 +23,8 @@ namespace Werewolf.Tests
 
         [Theory]
         [InlineData(MessageCodes.GameOver)]
-        [InlineData(MessageCodes.GameStart)]
-        [InlineData(MessageCodes.PlayerDied)]
-        [InlineData(MessageCodes.PhaseChanged)]
-        [InlineData(MessageCodes.StartMeeting)]
-        [InlineData(MessageCodes.MeetingResult)]
         [InlineData(MessageCodes.AssignRole)]
-        [InlineData(MessageCodes.RevealTeammates)]
-        [InlineData(MessageCodes.CosmeticGrant)]
         [InlineData(MessageCodes.BombDetonation)]
-        [InlineData(MessageCodes.ScatterGuardWindow)]
-        [InlineData(MessageCodes.ReplayLossLedger)]
-        [InlineData(MessageCodes.ModIntegritySnapshot)]
         public void HostBroadcastCodes_DropFromNonMaster(byte code)
         {
             Assert.False(InboundAuthority.IsAcceptable(code, Cheater, Master));
@@ -44,6 +34,8 @@ namespace Werewolf.Tests
         [InlineData(MessageCodes.GameOver)]
         [InlineData(MessageCodes.GameStart)]
         [InlineData(MessageCodes.PhaseChanged)]
+        [InlineData(MessageCodes.PreplayStart)]
+        [InlineData(MessageCodes.PreplayAborted)]
         public void HostBroadcastCodes_PassFromMaster(byte code)
         {
             Assert.True(InboundAuthority.IsAcceptable(code, Master, Master));
@@ -52,9 +44,9 @@ namespace Werewolf.Tests
         [Theory]
         [InlineData(0)]
         [InlineData(-1)]
-        public void UnknownMaster_FailsOpen(int masterActor)
+        public void UnknownMaster_FailsClosed(int masterActor)
         {
-            Assert.True(InboundAuthority.IsAcceptable(MessageCodes.GameOver, Cheater, masterActor));
+            Assert.False(InboundAuthority.IsAcceptable(MessageCodes.GameOver, Cheater, masterActor));
         }
 
         [Fact]

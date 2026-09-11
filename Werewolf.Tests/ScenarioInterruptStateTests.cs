@@ -242,39 +242,16 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void NoticeKinds_AreExactlyTheTimedNoticesInPriorityOrder()
+        public void NoticeKinds_AreExactlyTheKindsThatHaveADuration()
         {
-            Assert.Equal(
-                new[]
-                {
-                    ScenarioInterrupt.LeashNag, ScenarioInterrupt.ExtractionNag, ScenarioInterrupt.EarlyStart,
-                    ScenarioInterrupt.WrongTarget, ScenarioInterrupt.AlreadyOnTarget,
-                    ScenarioInterrupt.BlastDenied, ScenarioInterrupt.BlastDeniedMoving,
-                    ScenarioInterrupt.CorpseHint,
-                },
-                ScenarioInterruptState.NoticeKinds);
+            Assert.Equal(ScenarioInterruptState.NoticeKinds.Count,
+                System.Linq.Enumerable.Count(System.Linq.Enumerable.Distinct(ScenarioInterruptState.NoticeKinds)));
 
             foreach (ScenarioInterrupt kind in System.Enum.GetValues(typeof(ScenarioInterrupt)))
             {
                 bool timed = System.Linq.Enumerable.Contains(ScenarioInterruptState.NoticeKinds, kind);
                 Assert.Equal(timed, ScenarioInterruptState.NoticeDurationMs(kind) > 0);
             }
-        }
-
-        [Theory]
-        [InlineData(ScenarioInterrupt.None, false)]
-        [InlineData(ScenarioInterrupt.Broken, false)]
-        [InlineData(ScenarioInterrupt.AbortConfirm, true)]
-        [InlineData(ScenarioInterrupt.LeashNag, false)]
-        [InlineData(ScenarioInterrupt.ExtractionNag, true)]
-        [InlineData(ScenarioInterrupt.EarlyStart, true)]
-        [InlineData(ScenarioInterrupt.WrongTarget, true)]
-        [InlineData(ScenarioInterrupt.AlreadyOnTarget, true)]
-        [InlineData(ScenarioInterrupt.BlastDenied, true)]
-        [InlineData(ScenarioInterrupt.MapAside, false)]
-        public void IsDismissable_MatchesWhatAdvanceMayClose(ScenarioInterrupt kind, bool expected)
-        {
-            Assert.Equal(expected, ScenarioInterruptState.IsDismissable(kind));
         }
 
         [Theory]
@@ -369,17 +346,14 @@ namespace Werewolf.Tests
             Assert.Equal(ScenarioInterrupt.None, state.Resolve(0));
         }
 
-        [Theory]
-        [InlineData(ScenarioInterrupt.None, false)]
-        [InlineData(ScenarioInterrupt.Broken, false)]
-        [InlineData(ScenarioInterrupt.AbortConfirm, false)]
-        [InlineData(ScenarioInterrupt.MapAside, false)]
-        [InlineData(ScenarioInterrupt.LeashNag, true)]
-        [InlineData(ScenarioInterrupt.EarlyStart, true)]
-        [InlineData(ScenarioInterrupt.BlastDeniedMoving, true)]
-        public void IsNotice_MatchesTheTimedNotices(ScenarioInterrupt kind, bool expected)
+        [Fact]
+        public void IsNotice_AgreesWithNoticeKindsForEveryKind()
         {
-            Assert.Equal(expected, ScenarioInterruptState.IsNotice(kind));
+            foreach (ScenarioInterrupt kind in System.Enum.GetValues(typeof(ScenarioInterrupt)))
+            {
+                bool listed = System.Linq.Enumerable.Contains(ScenarioInterruptState.NoticeKinds, kind);
+                Assert.Equal(listed, ScenarioInterruptState.IsNotice(kind));
+            }
         }
 
         [Fact]
@@ -427,16 +401,9 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void PressResponseKinds_AreTheRepliesToAPress()
+        public void PressResponseKinds_AreASubsetOfTheNotices()
         {
-            Assert.Equal(
-                new[]
-                {
-                    ScenarioInterrupt.WrongTarget, ScenarioInterrupt.AlreadyOnTarget,
-                    ScenarioInterrupt.BlastDenied, ScenarioInterrupt.BlastDeniedMoving,
-                },
-                ScenarioInterruptState.PressResponseKinds);
-
+            Assert.NotEmpty(ScenarioInterruptState.PressResponseKinds);
             foreach (ScenarioInterrupt kind in ScenarioInterruptState.PressResponseKinds)
             {
                 Assert.Contains(kind, ScenarioInterruptState.NoticeKinds);

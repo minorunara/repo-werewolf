@@ -55,6 +55,7 @@ namespace Werewolf.UI
         private const float EpStateFontSize = 13f;
         private const float EpStateOffsetY = 17f;
         private const float TrailThickness = 2f;
+        private const float TrailUnderThickness = 4f;
         private const double TrailSeconds = 15.0;
         private const float MarkerClickRadius = 16f;
         private const float DimFactor = 0.35f;
@@ -125,6 +126,7 @@ namespace Werewolf.UI
         private static readonly Color FrameDefaultColor = new Color(0.06f, 0.06f, 0.1f, 0.95f);
         private static readonly Color FrameSelfColor = new Color(1f, 1f, 1f, 1f);
         private static readonly Color FrameWolfColor = new Color(0.95f, 0.2f, 0.18f, 1f);
+        private static readonly Color TrailUnderColor = new Color(0.02f, 0.02f, 0.05f, 0.8f);
         private static readonly Color NameDefaultColor = new Color(1f, 1f, 1f, 0.95f);
         private static readonly Color NameWolfColor = new Color(1f, 0.45f, 0.45f, 1f);
         private static readonly Color DeathMarkFallbackColor = new Color(0.90f, 0.15f, 0.15f, 0.95f);
@@ -158,6 +160,7 @@ namespace Werewolf.UI
         private RectTransform _stampRoot;
         private RectTransform _danmakuRoot;
 
+        private RectTransform _trailUnderLayer;
         private RectTransform _trailLayer;
         private RectTransform _epLayer;
         private RectTransform _deathMarkLayer;
@@ -261,6 +264,7 @@ namespace Werewolf.UI
         private readonly List<RectTransform> _deathMarkPool = new List<RectTransform>();
         private Sprite _deathMarkSprite;
         private readonly List<Image> _trailPool = new List<Image>();
+        private readonly List<Image> _trailUnderPool = new List<Image>();
         private readonly List<TextMeshProUGUI> _popupPool = new List<TextMeshProUGUI>();
 
         private readonly List<(int Actor, Vector2 Pos)> _playerHits = new List<(int, Vector2)>();
@@ -318,6 +322,7 @@ namespace Werewolf.UI
 
             _markersRoot = UiKit.CreateRect(mapPanel, "Markers", Vector2.zero, new Vector2(PanelWidth, MapHeight));
             _markersRoot.gameObject.AddComponent<RectMask2D>();
+            _trailUnderLayer = CreateMarkerLayer("TrailUnders");
             _trailLayer = CreateMarkerLayer("Trails");
             _epLayer = CreateMarkerLayer("Eps");
             _deathMarkLayer = CreateMarkerLayer("DeathMarks");
@@ -577,6 +582,7 @@ namespace Werewolf.UI
             }
             _demoChatTimer = 0f;
             _demoChatSeq = 0;
+            _trailUnderLayer = null;
             _trailLayer = null;
             _epLayer = null;
             _deathMarkLayer = null;
@@ -631,6 +637,7 @@ namespace Werewolf.UI
             _deathMarkPool.Clear();
             _deathMarkSprite = null;
             _trailPool.Clear();
+            _trailUnderPool.Clear();
             _playerHits.Clear();
             _placeholderTex = null;
             _placeholderResolved = false;

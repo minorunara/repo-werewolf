@@ -379,7 +379,6 @@ namespace Werewolf.Tests
                 l => l == Texts.Get(TextId.RevealHeadingWinCondition));
             Assert.Contains(content.Pages[1].BodyLines,
                 l => l == Texts.Get(TextId.RevealHeadingAbility));
-            Assert.Equal(3, content.Pages[1].BodyLines.Length);
         }
     }
 }

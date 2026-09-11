@@ -4,7 +4,6 @@ using HarmonyLib;
 using Photon.Pun;
 using Werewolf.Core;
 using Werewolf.Scenarios.Core;
-using Werewolf.Scenarios.Game;
 using Werewolf.Scenarios.Vanilla;
 
 namespace Werewolf.Vanilla
@@ -23,16 +22,16 @@ namespace Werewolf.Vanilla
 
         private const int DefaultPlayerHealth = 100;
 
-        private static readonly AccessTools.FieldRef<RunManager, Level> DebugLevelRef =
+        private static AccessTools.FieldRef<RunManager, Level> DebugLevelRef =>
             GameRefs.RunManager_debugLevel;
-        private static readonly AccessTools.FieldRef<RunManager, bool> RestartingRef =
+        private static AccessTools.FieldRef<RunManager, bool> RestartingRef =>
             GameRefs.RunManager_restarting;
-        private static readonly AccessTools.FieldRef<StatsManager, string> SaveFileCurrentRef =
+        private static AccessTools.FieldRef<StatsManager, string> SaveFileCurrentRef =>
             GameRefs.StatsManager_saveFileCurrent;
-        private static readonly AccessTools.FieldRef<StatsManager,
-            SortedDictionary<string, Dictionary<string, int>>> DictOfDictsRef =
+        private static AccessTools.FieldRef<StatsManager,
+            SortedDictionary<string, Dictionary<string, int>>> DictOfDictsRef =>
             GameRefs.StatsManager_dictionaryOfDictionaries;
-        private static readonly AccessTools.FieldRef<PunManager, PhotonView> PunPhotonViewRef =
+        private static AccessTools.FieldRef<PunManager, PhotonView> PunPhotonViewRef =>
             GameRefs.PunManager_photonView;
 
         internal static bool DebugLevelArmed { get; private set; }
@@ -80,9 +79,9 @@ namespace Werewolf.Vanilla
                 HaulGoalOverride.Clear();
                 EnemySetOverride.Clear();
 
-                if (ScenarioRun.Active)
+                if (ScenarioRunState.Active)
                 {
-                    ScenarioDefinition definition = ScenarioRun.Definition;
+                    ScenarioDefinition definition = ScenarioRunState.Definition;
                     if (definition != null) ScenarioEnvironment.Apply(run, definition.Environment);
                     else WLog.Line("worldgen_apply_skip", secret: false, ("reason", "no_scenario_definition"));
                     return;
@@ -96,7 +95,7 @@ namespace Werewolf.Vanilla
                 int playerCount = PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom != null
                     ? PhotonNetwork.CurrentRoom.PlayerCount
                     : 1;
-                if (!ScenarioSessionGate.PlayerCountSatisfied(playerCount, config.DebugMode, ScenarioRun.Active))
+                if (!ScenarioSessionGate.PlayerCountSatisfied(playerCount, config.DebugMode, ScenarioRunState.Active))
                 {
                     WLog.Line("worldgen_apply_skip", secret: false,
                         ("reason", "too_few_players"), ("players", playerCount),
@@ -104,7 +103,7 @@ namespace Werewolf.Vanilla
                     return;
                 }
 
-                if (ScenarioSessionGate.RequiresConfigValidation(config.DebugMode, ScenarioRun.Active))
+                if (ScenarioSessionGate.RequiresConfigValidation(config.DebugMode, ScenarioRunState.Active))
                 {
                     var configIssues = ConfigValidator.Validate(config, playerCount);
                     if (configIssues.Count > 0)

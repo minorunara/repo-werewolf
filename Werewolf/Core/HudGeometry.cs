@@ -62,6 +62,7 @@ namespace Werewolf.Core
             public const float LeftMargin = 40f;
             public const float TopMargin = 220f;
             public const float RowHeight = 132f;
+            public const float IconSize = 128f;
         }
 
         public static class ManualIcon

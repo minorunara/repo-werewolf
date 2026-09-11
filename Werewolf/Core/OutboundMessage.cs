@@ -35,5 +35,9 @@ namespace Werewolf.Core
         public const byte GameStart = 170;
 
         public const byte PhaseChanged = 172;
+
+        public const byte PreplayStart = 195;
+
+        public const byte PreplayAborted = 196;
     }
 }

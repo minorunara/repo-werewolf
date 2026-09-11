@@ -7,7 +7,7 @@ namespace Werewolf.Vanilla
 {
     public sealed class EnemyIgnoreRoster
     {
-        private static readonly AccessTools.FieldRef<EnemyDirector, List<string>> DebugNoVision =
+        private static AccessTools.FieldRef<EnemyDirector, List<string>> DebugNoVision =>
             GameRefs.EnemyDirector_debugNoVision;
 
         private readonly HashSet<string> _added = new HashSet<string>();

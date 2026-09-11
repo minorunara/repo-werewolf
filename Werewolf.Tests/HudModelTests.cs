@@ -23,6 +23,8 @@ namespace Werewolf.Tests
         [Theory]
         [InlineData(GamePhase.Lobby)]
         [InlineData(GamePhase.GameOver)]
+        [InlineData(GamePhase.RoleReveal)]
+        [InlineData(GamePhase.PreplayAborted)]
         public void Compute_SessionInactivePhase_HidesAllElements(GamePhase phase)
         {
             var model = new HudModel();

@@ -95,7 +95,6 @@ namespace Werewolf
                 _entries = entries;
                 _initialized = true;
                 if (_bindings != null) _bindings.ItemsSpecProvider = ComposeSpec;
-                WLog.Line("worldgen_itembind_init", secret: false, ("count", entries.Count));
             }
             catch (Exception e)
             {

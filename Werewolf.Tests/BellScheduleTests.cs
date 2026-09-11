@@ -158,15 +158,14 @@ namespace Werewolf.Tests
         {
             Assert.Equal(BellSchedule.FiveMinuteVolumeScale,
                 BellSchedule.VolumeScaleFor(BellSchedule.AlertThresholdSec));
-            Assert.Equal(1.0f, BellSchedule.FiveMinuteVolumeScale);
             Assert.True(BellSchedule.FiveMinuteVolumeScale > BellSchedule.BaseVolumeScale);
         }
 
         [Fact]
         public void VolumeScaleFor_FinalTier_RampsLinearlyToDouble()
         {
-            Assert.Equal(0.5f, BellSchedule.VolumeScaleFor(10), precision: 5);
-            Assert.Equal(1.0f, BellSchedule.VolumeScaleFor(1), precision: 5);
+            Assert.Equal(BellSchedule.BaseVolumeScale, BellSchedule.VolumeScaleFor(10), precision: 5);
+            Assert.Equal(BellSchedule.BaseVolumeScale * 2f, BellSchedule.VolumeScaleFor(1), precision: 5);
 
             float prev = BellSchedule.VolumeScaleFor(10);
             for (int mark = 9; mark >= 1; mark--)

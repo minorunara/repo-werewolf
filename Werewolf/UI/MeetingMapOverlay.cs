@@ -5,6 +5,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
+using Werewolf.Core.Replay;
 using Werewolf.Vanilla;
 
 namespace Werewolf.UI
@@ -62,6 +63,38 @@ namespace Werewolf.UI
         private readonly List<TextMeshProUGUI> _gridColLabels = new List<TextMeshProUGUI>();
         private readonly List<TextMeshProUGUI> _gridRowLabels = new List<TextMeshProUGUI>();
 
+        private const float PathThickness = 2f;
+        private const float PathUnderThickness = 4f;
+        private const float PathMarkerFillSize = 16f;
+        private const float PathMarkerFrameSize = 20f;
+        private const float PathMarkerIdFontSize = 12f;
+        private const float PathEndMarkSize = 32f;
+        private const float PathEndMarkFontSize = 24f;
+        private const int PathMaxPoints = 4000;
+        private static readonly Color PathMarkerFrameColor = new Color(1f, 1f, 1f, 1f);
+        private static readonly Color PathUnderColor = new Color(0.02f, 0.02f, 0.05f, 0.85f);
+        private static readonly Color PathEndMarkBgColor = new Color(0.04f, 0.04f, 0.08f, 1f);
+        private static readonly Color PathEndMarkTextColor = new Color(1f, 1f, 1f, 1f);
+
+        private RectTransform _pathRoot;
+        private UiPolyline _pathUnderLine;
+        private UiPolyline _pathLine;
+        private RectTransform _pathStartMark;
+        private RectTransform _pathGoalMark;
+        private CanvasGroup _pathStartMarkGroup;
+        private CanvasGroup _pathGoalMarkGroup;
+        private RectTransform _pathMarker;
+        private Image _pathMarkerFill;
+        private TextMeshProUGUI _pathMarkerId;
+        private MeetingPath _ownPath;
+        private int _ownParticipantId;
+        private string _ownColorHex;
+        private bool _pathDirty;
+        private float _pathOpenedAt;
+        private MapProjectionInputs _pathProjInputs;
+        private readonly List<ReplayTrailPoint> _pathPointScratch = new List<ReplayTrailPoint>();
+        private readonly List<Vector2> _pathScratch = new List<Vector2>();
+
         public bool Exists => _root != null;
 
         public bool IsOpen => _open;
@@ -99,6 +132,10 @@ namespace Werewolf.UI
             _gridRoot = UiKit.CreateRect(panelRect, "GridRoot", Vector2.zero, new Vector2(PanelWidth, PanelHeight));
             _gridRoot.gameObject.SetActive(false);
 
+            _pathRoot = UiKit.CreateRect(panelRect, "PathRoot", Vector2.zero, new Vector2(PanelWidth, PanelHeight));
+            BuildPathVisuals(_pathRoot);
+            _pathRoot.gameObject.SetActive(false);
+
             _mapPanel.SetActive(false);
 
             RectTransform toggleRoot = _toggle.Build(rootRect, "ToggleButton", ToggleStyle,
@@ -116,6 +153,7 @@ namespace Werewolf.UI
             if (_prevMeetingActive && !meetingActive)
             {
                 ForceClose();
+                ClearOwnPath();
             }
             _prevMeetingActive = meetingActive;
 
@@ -155,12 +193,28 @@ namespace Werewolf.UI
                     Texture tex = _rt.Tick(orthoSize);
                     if (_mapImage != null) _mapImage.texture = tex != null ? tex : ResolvePlaceholder();
                     UpdateGrid(gridEnabled);
+                    UpdateOwnPath();
                 }
             }
             catch (Exception e)
             {
                 WLog.Line("mapoverlay_tick_error", secret: false, ("err", e.Message));
             }
+        }
+
+        public void SetOwnPath(MeetingPath path, int participantId, string colorHex)
+        {
+            _ownPath = path;
+            _ownParticipantId = participantId;
+            _ownColorHex = colorHex;
+            _pathDirty = true;
+        }
+
+        public void ClearOwnPath()
+        {
+            _ownPath = null;
+            _pathDirty = true;
+            if (_pathRoot != null) _pathRoot.gameObject.SetActive(false);
         }
 
         public void ForceClose()
@@ -193,12 +247,26 @@ namespace Werewolf.UI
             _gridHLines.Clear();
             _gridColLabels.Clear();
             _gridRowLabels.Clear();
+            _pathRoot = null;
+            _pathUnderLine = null;
+            _pathLine = null;
+            _pathStartMark = null;
+            _pathGoalMark = null;
+            _pathStartMarkGroup = null;
+            _pathGoalMarkGroup = null;
+            _pathMarker = null;
+            _pathMarkerFill = null;
+            _pathMarkerId = null;
+            _ownPath = null;
+            _pathDirty = false;
         }
 
         private void OpenInternal(float orthoSizeConfig, int resolutionPreset)
         {
             _open = true;
             if (_mapPanel != null) _mapPanel.SetActive(true);
+            _pathOpenedAt = Time.unscaledTime;
+            _pathDirty = true;
 
             _rt.Open(orthoSizeConfig, resolutionPreset);
             Texture tex = _rt.Tick(orthoSizeConfig);
@@ -216,7 +284,123 @@ namespace Werewolf.UI
             _gridModuleRangeResolved = false;
             _gridModuleRange = null;
             if (_gridRoot != null) _gridRoot.gameObject.SetActive(false);
+            if (_pathRoot != null) _pathRoot.gameObject.SetActive(false);
             WLog.Line("mapoverlay_close", secret: false);
+        }
+
+        private bool TryReadMapView(out int levelWidth, out int levelHeight, out MapProjectionInputs inputs)
+        {
+            inputs = default;
+            Camera cam = _rt.Camera;
+            if (cam == null || !MapGeometry.TryReadLevelGrid(
+                    out levelWidth, out levelHeight, out float mapScale, out Vector3 origin))
+            {
+                levelWidth = levelHeight = 0;
+                return false;
+            }
+            Vector3 camPos = cam.transform.position;
+            inputs.MapScale = mapScale;
+            inputs.OriginX = origin.x;
+            inputs.OriginZ = origin.z;
+            inputs.CamX = camPos.x;
+            inputs.CamZ = camPos.z;
+            inputs.Ortho = cam.orthographicSize;
+            inputs.Aspect = Mathf.Max(0.01f, cam.aspect);
+            return true;
+        }
+
+        private void BuildPathVisuals(RectTransform root)
+        {
+            _pathUnderLine = CreatePathLine(root, "UnderLine", PathUnderThickness, PathUnderColor);
+            _pathLine = CreatePathLine(root, "Line", PathThickness, Color.white);
+
+            _pathStartMark = CreateEndMark(root, "Start", "S");
+            _pathGoalMark = CreateEndMark(root, "Goal", "G");
+            _pathStartMarkGroup = _pathStartMark.gameObject.AddComponent<CanvasGroup>();
+            _pathGoalMarkGroup = _pathGoalMark.gameObject.AddComponent<CanvasGroup>();
+
+            UiKit.DiamondMarker marker = UiKit.CreateDiamondMarker(root, "Marker",
+                PathMarkerFrameSize, PathMarkerFillSize, PathMarkerIdFontSize, PathMarkerFrameColor);
+            _pathMarker = marker.Rect;
+            _pathMarkerFill = marker.Fill;
+            _pathMarkerId = marker.Id;
+        }
+
+        private static UiPolyline CreatePathLine(RectTransform root, string name, float thickness, Color color)
+        {
+            RectTransform lineRect = UiKit.CreateRect(root, name, Vector2.zero, new Vector2(PanelWidth, PanelHeight));
+            UiPolyline line = lineRect.gameObject.AddComponent<UiPolyline>();
+            line.raycastTarget = false;
+            line.Thickness = thickness;
+            line.color = color;
+            return line;
+        }
+
+        private static RectTransform CreateEndMark(RectTransform root, string name, string letter)
+        {
+            RectTransform mark = UiKit.CreateRect(root, name, Vector2.zero, new Vector2(PathEndMarkSize, PathEndMarkSize));
+            Image bg = UiKit.CreateImage(mark, "Bg", Vector2.zero, new Vector2(PathEndMarkSize, PathEndMarkSize), PathEndMarkBgColor);
+            bg.raycastTarget = false;
+            UiKit.CreateText(mark, "Letter", Vector2.zero, new Vector2(PathEndMarkSize, PathEndMarkSize),
+                letter, PathEndMarkFontSize, PathEndMarkTextColor, TextAlignmentOptions.Center);
+            return mark;
+        }
+
+        private void UpdateOwnPath()
+        {
+            if (_pathRoot == null) return;
+            MapProjectionInputs inputs = default;
+            MapPanelProjection proj = default;
+            bool visible = _ownPath != null
+                && TryReadMapView(out _, out _, out inputs)
+                && (proj = inputs.ToProjection(PanelWidth, PanelHeight)).Valid;
+            if (_pathRoot.gameObject.activeSelf != visible) _pathRoot.gameObject.SetActive(visible);
+            if (!visible) return;
+
+            if (_pathDirty || !inputs.SameAs(_pathProjInputs))
+            {
+                _pathProjInputs = inputs;
+                _pathDirty = false;
+                LayoutPath(proj);
+            }
+
+            double elapsed = Time.unscaledTime - _pathOpenedAt;
+            double t = _ownPath.PathTimeAt(elapsed);
+            UpdatePathTrail(proj, t);
+            _ownPath.PositionAt(t, out float x, out float z);
+            _pathMarker.anchoredPosition = new Vector2(proj.PanelX(x), proj.PanelY(z));
+            float blink = MeetingPath.BlinkBrightness(elapsed);
+            _pathStartMarkGroup.alpha = blink;
+            _pathGoalMarkGroup.alpha = blink;
+        }
+
+        private void LayoutPath(MapPanelProjection proj)
+        {
+            ReplayMarkerPalette.ColorFor(_ownParticipantId, _ownColorHex, out float r, out float g, out float b);
+            _pathLine.color = new Color(r, g, b, 0.9f);
+            _pathMarkerFill.color = new Color(r, g, b, 1f);
+            _pathMarkerId.color = UiKit.MarkerIdInk(r, g, b);
+            string idText = _ownParticipantId > 0 ? _ownParticipantId.ToString() : "?";
+            if (_pathMarkerId.text != idText) _pathMarkerId.text = idText;
+
+            _pathStartMark.anchoredPosition = new Vector2(
+                proj.PanelX(_ownPath.Start.X), proj.PanelY(_ownPath.Start.Z));
+            _pathGoalMark.anchoredPosition = new Vector2(
+                proj.PanelX(_ownPath.Goal.X), proj.PanelY(_ownPath.Goal.Z));
+        }
+
+        private void UpdatePathTrail(MapPanelProjection proj, double pathT)
+        {
+            _pathPointScratch.Clear();
+            _ownPath.TrailInto(pathT, PathMaxPoints, _pathPointScratch);
+            _pathScratch.Clear();
+            for (int i = 0; i < _pathPointScratch.Count; i++)
+            {
+                ReplayTrailPoint p = _pathPointScratch[i];
+                _pathScratch.Add(new Vector2(proj.PanelX(p.X), proj.PanelY(p.Z)));
+            }
+            _pathUnderLine.SetPoints(_pathScratch);
+            _pathLine.SetPoints(_pathScratch);
         }
 
         private void UpdateGrid(bool show)
@@ -241,27 +425,24 @@ namespace Werewolf.UI
         {
             try
             {
-                Camera cam = _rt.Camera;
-                if (cam == null || !MapGeometry.TryReadLevelGrid(
-                        out int levelWidth, out int levelHeight, out float mapScale, out Vector3 origin))
+                if (!TryReadMapView(out int levelWidth, out int levelHeight, out MapProjectionInputs view))
                 {
                     return null;
                 }
-                Vector3 camPos = cam.transform.position;
 
                 EnsureGridModuleRange(levelWidth, levelHeight);
                 MapGridCellRange? range = _gridModuleRange ?? MapGridMath.RangeFromBounds(
                     levelWidth, levelHeight,
-                    mapScale, origin.x, origin.z,
+                    view.MapScale, view.OriginX, view.OriginZ,
                     _rt.BoundsCenterXZ.x - _rt.BoundsHalfW, _rt.BoundsCenterXZ.x + _rt.BoundsHalfW,
                     _rt.BoundsCenterXZ.y - _rt.BoundsHalfH, _rt.BoundsCenterXZ.y + _rt.BoundsHalfH);
                 if (range == null) return null;
 
                 return MapGridMath.Compute(
                     levelWidth, range.Value,
-                    mapScale, origin.x, origin.z,
-                    camPos.x, camPos.z,
-                    cam.orthographicSize, Mathf.Max(0.01f, cam.aspect),
+                    view.MapScale, view.OriginX, view.OriginZ,
+                    view.CamX, view.CamZ,
+                    view.Ortho, view.Aspect,
                     PanelWidth, PanelHeight);
             }
             catch (Exception e)
@@ -393,14 +574,21 @@ namespace Werewolf.UI
             return keyPressed || _toggle.WasClicked();
         }
 
+        private static bool _textInputErrorLogged;
+
         private static bool NoTextInputsActive()
         {
             try
             {
                 return Inputs.NoTextInputsActive;
             }
-            catch
+            catch (Exception e)
             {
+                if (!_textInputErrorLogged)
+                {
+                    _textInputErrorLogged = true;
+                    WLog.Line("mapoverlay_text_input_error", secret: false, ("err", e.Message));
+                }
                 return true;
             }
         }

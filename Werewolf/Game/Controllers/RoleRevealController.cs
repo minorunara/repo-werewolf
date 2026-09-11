@@ -36,14 +36,21 @@ namespace Werewolf.Game
             try
             {
                 if (_revealStarted) return;
-                if (_d.LocalRoleClient == null) return;
-                if (_d.ClientRoundEndUnixMs == 0) return;
+                if (!RoleRevealStartGate.IsReady(
+                        _d.LocalRoleClient,
+                        _d.KnownWerewolves,
+                        _d.ClientWerewolfCount,
+                        _d.ClientPhase,
+                        _d.ClientRoleRevealStartUnixMs,
+                        _d.ClientRoleRevealEndUnixMs))
+                {
+                    return;
+                }
 
                 Role role = _d.LocalRoleClient.Value;
                 int[] knownWerewolves = _d.KnownWerewolves;
                 byte[] knownTeammateRoles = _d.KnownTeammateRoles;
                 bool isWolfTeam = role == Role.Werewolf || role == Role.Bomber;
-                if (isWolfTeam && knownWerewolves == null && _d.ClientWerewolfCount != 1) return;
 
                 string[] teammateNames;
                 if (isWolfTeam && knownWerewolves != null)
@@ -86,20 +93,26 @@ namespace Werewolf.Game
                     _d.StopCoroutine(_revealCoroutine);
                     _revealCoroutine = null;
                 }
-                _revealCoroutine = _d.StartCoroutine(_revealCinematic.Play(content));
+                _revealCoroutine = _d.StartCoroutine(_revealCinematic.Play(
+                    content,
+                    _d.ClientRoleRevealStartUnixMs,
+                    _d.ClientRoleRevealEndUnixMs,
+                    HudOffset(),
+                    onFlip: () => _d.PlaySfx("sfx_page_turn_01"),
+                    onPage: () => _d.PlaySfx("sfx_page_turn_02"),
+                    onStow: () => _d.PlaySfx("sfx_page_turn_03")));
                 _revealStarted = true;
-                WLog.Line("reveal_start", secret: true,
-                    ("role", role), ("catPossible", _d.ClientCatPossible),
-                    ("teammates", teammateNames.Length));
             }
             catch (Exception e)
             {
+                _revealStarted = true;
                 WLog.Line("reveal_start_error", secret: false, ("err", e.Message));
             }
         }
 
         public void Tick(long now)
         {
+            TryStartRoleReveal();
             if (_catAwakenGate.ShouldFire(_d.ClientPhaseMirror, _d.ClientCatPossible,
                     _d.GameStartUnixMsClient, _d.ClientRevealDelaySec, now))
             {
@@ -109,6 +122,20 @@ namespace Werewolf.Game
                 if (_d.LocalIsVillagerTeam) _d.MaybeShowTutorial(TutorialId.VillagerSeesCatAwakened);
                 else if (_d.LocalRoleClient == Role.Werewolf) _d.MaybeShowTutorial(TutorialId.WerewolfSeesCatAwakened);
             }
+        }
+
+        private static Vector2 HudOffset()
+        {
+            float offsetX = 0f;
+            float offsetY = 0f;
+            ConfigBindings bindings = Plugin.Bindings;
+            if (bindings != null)
+            {
+                offsetX = bindings.HudOffsetX.Value;
+                offsetY = bindings.HudOffsetY.Value;
+            }
+
+            return new Vector2(offsetX, offsetY);
         }
 
         internal void TryStartAwakeningReveal()
@@ -142,7 +169,6 @@ namespace Werewolf.Game
                 }
                 _catAwakenToastCoroutine = _d.StartCoroutine(PlayBlackCatAwakeningAndTutorial(content));
                 _awakeningRevealStarted = true;
-                WLog.Line("awakening_reveal_start", secret: true);
             }
             catch (Exception e)
             {

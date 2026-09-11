@@ -7,7 +7,7 @@ namespace Werewolf.Game.Patches
     [HarmonyPatch(typeof(TruckScreenText), nameof(TruckScreenText.ChatMessageLevel))]
     internal static class MailSendWinPatch
     {
-        private static readonly AccessTools.FieldRef<TruckScreenText, TruckScreenText.PlayerChatBoxState> StateRef =
+        private static AccessTools.FieldRef<TruckScreenText, TruckScreenText.PlayerChatBoxState> StateRef =>
             GameRefs.TruckScreenText_playerChatBoxState;
 
         private static void Postfix(TruckScreenText __instance)

@@ -6,11 +6,11 @@ namespace Werewolf.Vanilla
 {
     internal static class LastRunGate
     {
-        private static readonly AccessTools.FieldRef<RoundDirector, int> PointsRef =
+        private static AccessTools.FieldRef<RoundDirector, int> PointsRef =>
             GameRefs.RoundDirector_extractionPoints;
-        private static readonly AccessTools.FieldRef<RoundDirector, int> PointsCompletedRef =
+        private static AccessTools.FieldRef<RoundDirector, int> PointsCompletedRef =>
             GameRefs.RoundDirector_extractionPointsCompleted;
-        private static readonly AccessTools.FieldRef<RoundDirector, bool> AllCompletedRef =
+        private static AccessTools.FieldRef<RoundDirector, bool> AllCompletedRef =>
             GameRefs.RoundDirector_allExtractionPointsCompleted;
 
         public static bool IsLastRunActive()

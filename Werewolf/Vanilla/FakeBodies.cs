@@ -253,8 +253,9 @@ namespace Werewolf.Vanilla
                 float hue = Mathf.Repeat(Mathf.Abs(actor) * 0.13f, 1f);
                 renderer.material.color = Color.HSVToRGB(hue, 0.6f, 0.9f);
             }
-            catch
+            catch (Exception e)
             {
+                WLog.Line("fakebody_tint_error", secret: false, ("actor", actor), ("err", e.Message));
             }
         }
     }

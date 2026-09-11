@@ -12,7 +12,7 @@ namespace Werewolf.Vanilla
 
         private const float HurtColliderBaseRadiusMeters = 1.5f;
 
-        private static readonly FieldInfo ExplosionPrefabField =
+        private static FieldInfo ExplosionPrefabField =>
             GameRefs.ParticleScriptExplosion_explosionPrefab;
 
         private static readonly string[] PresetDonorPrefabPaths =

@@ -50,6 +50,9 @@ namespace Werewolf.Scenarios.Core
         public static bool IsLive(ScenarioHighlight highlight)
             => highlight == ScenarioHighlight.MeetingGauge || RecapLineIndex(highlight) >= 0;
 
+        public static bool OccupiesChatLog(ScenarioHighlight highlight)
+            => highlight == ScenarioHighlight.ChatLogPanel || RecapLineIndex(highlight) >= 0;
+
         public static bool TryPlace(CanvasBounds canvas, ScenarioHighlight highlight, bool hudIconsAboveGauge,
                                     out GuideBox box)
         {

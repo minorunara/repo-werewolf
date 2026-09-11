@@ -150,7 +150,11 @@ namespace Werewolf.Vanilla
                 view.Close();
                 if (!mapWasActive)
                 {
-                    try { map.ActiveSet(false); } catch { }
+                    try { map.ActiveSet(false); }
+                    catch (Exception e)
+                    {
+                        WLog.Line("map_still_restore_error", secret: false, ("err", e.Message));
+                    }
                 }
             }
         }

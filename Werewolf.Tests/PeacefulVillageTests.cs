@@ -481,20 +481,30 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void Texts_OutcomeReasonAndEpigraph_UsePeacefulPhrases()
+        public void Texts_PeacefulOutcomesReasonsAndEpigraphs_AreDistinctAndPresent()
         {
             Texts.Current = Language.Japanese;
-            Assert.Equal("平和村は生き延びた", ResultDigestText.OutcomeText(TeamCodes.PeacefulSurvived));
-            Assert.Equal("平和村は崩壊した", ResultDigestText.OutcomeText(TeamCodes.PeacefulCollapsed));
-            Assert.Equal("無効試合", ResultDigestText.OutcomeText(TeamCodes.VoidMatch));
-            Assert.Equal("村人陣営の勝利", ResultDigestText.OutcomeText((byte)Team.Villagers));
-            Assert.Equal("トラック発車", ResultDigestText.ReasonText((int)WinReason.PeacefulSurvived));
+            var survived = ResultDigestText.OutcomeText(TeamCodes.PeacefulSurvived);
+            var collapsed = ResultDigestText.OutcomeText(TeamCodes.PeacefulCollapsed);
+
+            foreach (var text in new[] { survived, collapsed })
+            {
+                Assert.False(string.IsNullOrEmpty(text));
+                Assert.NotEqual(ResultDigestText.OutcomeText((byte)Team.Villagers), text);
+                Assert.NotEqual(ResultDigestText.OutcomeText(TeamCodes.VoidMatch), text);
+            }
+            Assert.NotEqual(survived, collapsed);
+
+            Assert.False(string.IsNullOrEmpty(ResultDigestText.ReasonText((int)WinReason.PeacefulSurvived)));
             Assert.Null(ResultDigestText.ReasonText((int)WinReason.PeacefulCollapsed));
-            Assert.Equal("人狼かと疑った。それでも手を取り合った。",
-                ResultDigestText.EpigraphText((int)WinReason.PeacefulSurvived));
-            Assert.Equal("人狼などいなかった。それでも村は滅びた。",
-                ResultDigestText.EpigraphText((int)WinReason.PeacefulCollapsed));
-            Assert.Equal("平和村が消滅した", Texts.Get(TextId.EradicationPeacefulCollapsed));
+
+            var survivedEpigraph = ResultDigestText.EpigraphText((int)WinReason.PeacefulSurvived);
+            var collapsedEpigraph = ResultDigestText.EpigraphText((int)WinReason.PeacefulCollapsed);
+            Assert.False(string.IsNullOrEmpty(survivedEpigraph));
+            Assert.False(string.IsNullOrEmpty(collapsedEpigraph));
+            Assert.NotEqual(survivedEpigraph, collapsedEpigraph);
+
+            Assert.False(string.IsNullOrEmpty(Texts.Get(TextId.EradicationPeacefulCollapsed)));
         }
 
         [Fact]
@@ -509,7 +519,7 @@ namespace Werewolf.Tests
 
             var lines = ResultDigestText.FormatLines(digest.Entries, a => "P" + a);
 
-            Assert.Contains("01:05  平和村は崩壊した", lines);
+            Assert.Contains("01:05  " + ResultDigestText.OutcomeText(TeamCodes.PeacefulCollapsed), lines);
         }
     }
 }

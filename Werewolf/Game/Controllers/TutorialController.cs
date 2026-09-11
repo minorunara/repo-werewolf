@@ -8,7 +8,7 @@ namespace Werewolf.Game
     {
         private readonly WerewolfDirector _d;
 
-        private readonly TutorialPresenter _tutorialPresenter = new TutorialPresenter();
+        private readonly TutorialPresenter _tutorialPresenter = new TutorialPresenter { ElevatedSortingOrder = WerewolfUIManager.TutorialSortingOrder };
 
         private readonly TutorialBubblePanel _tutorialBubble = new TutorialBubblePanel();
 
@@ -69,9 +69,13 @@ namespace Werewolf.Game
 
         private void TickTriggers()
         {
+            bool revealVisibleNow = _d.RoleRevealVisible;
             if (!_d.IsRoundActiveClient)
             {
-                _wasRoleRevealVisible = false;
+                if (revealVisibleNow) _wasRoleRevealVisible = true;
+                else if (_d.ClientPhaseMirror == GamePhase.Lobby
+                         || _d.ClientPhaseMirror == GamePhase.PreplayAborted)
+                    _wasRoleRevealVisible = false;
                 return;
             }
 
@@ -138,7 +142,6 @@ namespace Werewolf.Game
                     : TutorialId.FinalExtractionWerewolf);
             }
 
-            bool revealVisibleNow = _d.RoleRevealVisible;
             if (_wasRoleRevealVisible && !revealVisibleNow)
             {
                 if (localRole == Role.Werewolf) MaybeShowTutorial(TutorialId.WerewolfRoleDrawn);

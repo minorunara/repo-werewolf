@@ -4,18 +4,17 @@ using HarmonyLib;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Werewolf.Core;
-using Werewolf.Game;
 
 namespace Werewolf.Vanilla
 {
     public sealed class MovementFreezer
     {
-        private static readonly AccessTools.FieldRef<RunManager, List<PlayerVoiceChat>> VoiceChatsRef =
+        private static AccessTools.FieldRef<RunManager, List<PlayerVoiceChat>> VoiceChatsRef =>
             GameRefs.RunManager_voiceChats;
 
-        private static readonly AccessTools.FieldRef<InputManager, Dictionary<InputKey, InputAction>> InputActionsRef =
+        private static AccessTools.FieldRef<InputManager, Dictionary<InputKey, InputAction>> InputActionsRef =>
             GameRefs.InputManager_inputActions;
-        private static readonly AccessTools.FieldRef<DataDirector, bool> ToggleMuteRef =
+        private static AccessTools.FieldRef<DataDirector, bool> ToggleMuteRef =>
             GameRefs.DataDirector_toggleMute;
 
         private const float KeepAliveSeconds = 0.1f;

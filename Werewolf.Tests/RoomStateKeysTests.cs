@@ -1,3 +1,5 @@
+using System.Linq;
+using System.Reflection;
 using Werewolf.Core;
 using Xunit;
 
@@ -50,25 +52,18 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void AllKeys_ContainsExactlyExpectedPublicKeys()
+        public void AllKeys_ListsEveryPublicKeyConstantOnceWithTheSharedPrefix()
         {
-            var expected = new[]
-            {
-                "WW_Phase", "WW_RoundEndTime", "WW_IsAlive", "WW_MeetingCaller", "WW_MeetingEndTime",
-                "WW_CfgMinimapHide", "WW_CfgCatPossible", "WW_CfgValuableMapMode", "WW_Rights", "WW_CfgShared",
-                "WW_CfgNecroVoiceMode",
-                "WW_CfgExtraJump", "WW_CfgConveneSuppressStart", "WW_CfgConveneSuppressAfter",
-                "WW_CfgHealInterval",
-                "WW_CfgOutfitChange",
-                "WW_CfgBomb",
-                "WW_CfgShaman",
-            };
+            string[] constants = typeof(RoomStateKeys)
+                .GetFields(BindingFlags.Public | BindingFlags.Static)
+                .Where(f => f.IsLiteral && f.FieldType == typeof(string))
+                .Select(f => (string)f.GetRawConstantValue())
+                .ToArray();
 
-            Assert.Equal(expected.Length, RoomStateKeys.AllKeys.Length);
-            foreach (var key in expected)
-            {
-                Assert.Contains(key, RoomStateKeys.AllKeys);
-            }
+            Assert.NotEmpty(constants);
+            Assert.All(RoomStateKeys.AllKeys, key => Assert.StartsWith("WW_", key));
+            Assert.Equal(RoomStateKeys.AllKeys.Length, RoomStateKeys.AllKeys.Distinct().Count());
+            Assert.Equal(constants.OrderBy(k => k), RoomStateKeys.AllKeys.OrderBy(k => k));
         }
 
         [Theory]
@@ -84,23 +79,6 @@ namespace Werewolf.Tests
             {
                 Assert.DoesNotContain(forbiddenSubstring, key);
             }
-        }
-
-        [Theory]
-        [InlineData(RoomStateKeys.CfgMinimapHide)]
-        [InlineData(RoomStateKeys.CfgCatPossible)]
-        [InlineData(RoomStateKeys.Rights)]
-        [InlineData(RoomStateKeys.CfgShared)]
-        [InlineData(RoomStateKeys.CfgNecroVoiceMode)]
-        [InlineData(RoomStateKeys.CfgExtraJump)]
-        [InlineData(RoomStateKeys.CfgConveneSuppressStart)]
-        [InlineData(RoomStateKeys.CfgConveneSuppressAfter)]
-        [InlineData(RoomStateKeys.CfgOutfitChange)]
-        [InlineData(RoomStateKeys.CfgBomb)]
-        [InlineData(RoomStateKeys.CfgShaman)]
-        public void NewKeys_ArePresentInAllKeys(string key)
-        {
-            Assert.Contains(key, RoomStateKeys.AllKeys);
         }
 
         [Fact]
@@ -191,7 +169,7 @@ namespace Werewolf.Tests
                 RoomStateKeys.BombIndex.InitialCooldownMs,
             };
             Assert.Equal(RoomStateKeys.BombIndex.Length, indexes.Length);
-            Assert.Equal(indexes.Length, System.Linq.Enumerable.Count(System.Linq.Enumerable.Distinct(indexes)));
+            Assert.Equal(indexes.Length, indexes.Distinct().Count());
             for (int i = 0; i < indexes.Length; i++)
             {
                 Assert.InRange(indexes[i], 0, RoomStateKeys.BombIndex.Length - 1);

@@ -11,7 +11,7 @@ namespace Werewolf.Scenarios.Game
 {
     public static class ScenarioRun
     {
-        public static bool Active { get; private set; }
+        public static bool Active { get => ScenarioRunState.Active; private set => ScenarioRunState.Active = value; }
 
         public static bool Available { get; private set; } = true;
 
@@ -27,12 +27,9 @@ namespace Werewolf.Scenarios.Game
             WLog.Line("scenario_unavailable", secret: false, ("reason", reason), ("failed", failed));
         }
 
-        public static ScenarioId Scenario { get; private set; }
+        public static ScenarioId Scenario { get => ScenarioRunState.Scenario; private set => ScenarioRunState.Scenario = value; }
 
-        public static ScenarioDefinition Definition
-            => Active && ScenarioCatalog.TryGetDefinition(Scenario, out var definition)
-                ? definition
-                : null;
+        public static ScenarioDefinition Definition => ScenarioRunState.Definition;
 
         public static ScenarioSafetySpec Safety
         {

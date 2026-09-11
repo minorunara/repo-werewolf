@@ -118,7 +118,9 @@ namespace Werewolf.Game
         {
             try
             {
-                bool gameActive = _session != null || _clientPhase != GamePhase.Lobby;
+                bool gameActive = _autoStartWait.Armed || _session != null
+                    || _clientPhase != GamePhase.Lobby
+                    || (Session.InRunLevel && IsWerewolfRoundExpected());
                 if (gameActive)
                 {
                     PushToast(SessionNotice.ForPlayerDisconnected(ResolveDisplayName(actorNumber)));
@@ -156,21 +158,35 @@ namespace Werewolf.Game
 
         private void HandleLocalDisconnected()
         {
+            CleanupAfterRoomLeave("local_disconnect");
+        }
+
+        private readonly RisingEdge _titleArrival = new RisingEdge();
+
+        private void TickRoomLeaveOnTitle()
+        {
+            if (_titleArrival.Observe(IsTitleScreenBuilt()) && !Photon.Pun.PhotonNetwork.InRoom)
+            {
+                CleanupAfterRoomLeave("title");
+            }
+        }
+
+        private void CleanupAfterRoomLeave(string via)
+        {
             try
             {
-                WLog.Line("local_disconnect_cleanup", secret: false,
-                    ("hadSession", _session != null), ("clientPhase", _clientPhase));
-                _modIntegrityFeature.ResetSession("local_disconnect");
+                _modIntegrityFeature.ResetSession(via);
                 ClearClientState();
                 _clientPhase = GamePhase.Lobby;
                 _lobbySettingsFeature.ResetForRoomLeave();
                 CrownRoster.Clear();
                 _autoStartWait.Disarm();
+                PreplayEnemySpawnHold.Cancel();
                 _resultSequence.Cancel();
             }
             catch (Exception e)
             {
-                WLog.Line("local_disconnect_error", secret: false, ("err", e.Message));
+                WLog.Line("room_leave_cleanup_error", secret: false, ("via", via), ("err", e.Message));
             }
         }
 

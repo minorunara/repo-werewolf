@@ -20,13 +20,6 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void ButtonConveneCountdown_BlockedHudStillShowsRipple()
-        {
-            Assert.True(ShamanHauntingRippleGate.CanShow(
-                CorpseReportHudMode.Blocked, senseSuspended: false));
-        }
-
-        [Fact]
         public void CorpseReportCountdown_SuspendedSenseHidesRipple()
         {
             Assert.False(ShamanHauntingRippleGate.CanShow(

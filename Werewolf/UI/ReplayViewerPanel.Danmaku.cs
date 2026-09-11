@@ -209,7 +209,7 @@ namespace Werewolf.UI
         {
             _danmakuPlayers.TryGetValue(c.Actor, out ReplayPlayerEntry entry);
             int pid = entry != null ? entry.ParticipantId : (DemoActive ? c.Actor : 0);
-            ReplayMarkerPalette.ColorFor(pid, out float r, out float g, out float b);
+            ReplayMarkerPalette.ColorFor(pid, entry != null ? entry.Color : null, out float r, out float g, out float b);
             var bodyColor = new Color(r, g, b, 1f);
             Color accentColor = bodyColor;
             accentColor.a = 0f;

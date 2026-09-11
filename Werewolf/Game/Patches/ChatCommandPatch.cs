@@ -8,7 +8,7 @@ namespace Werewolf.Game.Patches
     [HarmonyPatch(typeof(ChatManager), "MessageSend")]
     internal static class ChatCommandPatch
     {
-        private static readonly AccessTools.FieldRef<ChatManager, string> ChatMessageRef =
+        private static AccessTools.FieldRef<ChatManager, string> ChatMessageRef =>
             GameRefs.ChatManager_chatMessage;
 
         private static bool Prefix(ChatManager __instance)

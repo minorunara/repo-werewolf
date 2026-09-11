@@ -11,6 +11,8 @@ namespace Werewolf.Tests
         [InlineData(true,  true,  GamePhase.Play,     false)]
         [InlineData(true,  true,  GamePhase.Meeting,  false)]
         [InlineData(true,  true,  GamePhase.GameOver, false)]
+        [InlineData(true,  true,  GamePhase.RoleReveal, false)]
+        [InlineData(true,  true,  GamePhase.PreplayAborted, false)]
         [InlineData(true,  false, GamePhase.Lobby,    false)]
         [InlineData(true,  false, GamePhase.Play,     false)]
         [InlineData(false, true,  GamePhase.Lobby,    false)]

@@ -22,11 +22,11 @@ namespace Werewolf.Vanilla
 
         private static readonly Color DimNameColor = new Color(0.2f, 0.2f, 0.2f);
 
-        private static readonly AccessTools.FieldRef<MenuPlayerListed, int> _listSpotRef =
+        private static AccessTools.FieldRef<MenuPlayerListed, int> _listSpotRef =>
             GameRefs.MenuPlayerListed_listSpot;
-        private static readonly AccessTools.FieldRef<MenuPlayerHead, bool> _headIsTalkingRef =
+        private static AccessTools.FieldRef<MenuPlayerHead, bool> _headIsTalkingRef =>
             GameRefs.MenuPlayerHead_isTalking;
-        private static readonly AccessTools.FieldRef<MenuPlayerHead, RectTransform> _headTransformRef =
+        private static AccessTools.FieldRef<MenuPlayerHead, RectTransform> _headTransformRef =>
             GameRefs.MenuPlayerHead_headTransform;
 
         public static ListedRow TryCreate(Transform holder, PlayerHandle player, string playerName)

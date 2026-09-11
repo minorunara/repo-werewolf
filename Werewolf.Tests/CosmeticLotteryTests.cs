@@ -37,13 +37,12 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void WeightConstants_SumTo547()
+        public void TotalWeight_IsTheSumOfRarityWeights()
         {
             Assert.Equal(
-                547,
                 CosmeticLottery.WeightCommon + CosmeticLottery.WeightUncommon
-                    + CosmeticLottery.WeightRare + CosmeticLottery.WeightUltraRare);
-            Assert.Equal(547, CosmeticLottery.TotalWeight);
+                    + CosmeticLottery.WeightRare + CosmeticLottery.WeightUltraRare,
+                CosmeticLottery.TotalWeight);
         }
 
         [Fact]

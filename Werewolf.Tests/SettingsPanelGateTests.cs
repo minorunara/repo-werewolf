@@ -8,6 +8,8 @@ namespace Werewolf.Tests
         [Theory]
         [InlineData(GamePhase.Play, true, true)]
         [InlineData(GamePhase.Meeting, true, true)]
+        [InlineData(GamePhase.RoleReveal, true, true)]
+        [InlineData(GamePhase.PreplayAborted, true, false)]
         [InlineData(GamePhase.Lobby, true, false)]
         [InlineData(GamePhase.GameOver, true, false)]
         [InlineData(GamePhase.Play, false, false)]

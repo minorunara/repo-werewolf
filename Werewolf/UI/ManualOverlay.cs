@@ -73,6 +73,10 @@ namespace Werewolf.UI
         private bool _offsetApplied;
         private bool _lobbyLayout;
 
+        private static bool _escSuppressErrorLogged;
+        private static bool _menuKeyErrorLogged;
+        private static bool _textInputErrorLogged;
+
         public bool Exists => _root != null;
 
         public bool IsOpen => _open;
@@ -123,10 +127,6 @@ namespace Werewolf.UI
             _iconContainer = _toggle.Build(rootRect, "ToggleButton", ToggleStyle,
                 "manual_icon", Texts.Format(TextId.ManualToggleLabelFormat, "-"));
             ApplyIconOffset(force: true);
-
-            WLog.Line("manual_built", secret: false,
-                ("pages", ManualCatalog.PageCount),
-                ("icon", _toggle.HasIcon ? 1 : 0));
         }
 
         public void Tick(KeyCode key, bool available, bool suppressed, bool lobbyMenu)
@@ -342,8 +342,9 @@ namespace Werewolf.UI
             {
                 measured = label.GetPreferredValues(text, width, 0f).y;
             }
-            catch
+            catch (Exception e)
             {
+                WLog.Line("manual_measure_error", secret: false, ("err", e.Message));
                 measured = 0f;
             }
             if (measured > 0f) return Mathf.Ceil(measured);
@@ -380,7 +381,12 @@ namespace Werewolf.UI
             {
                 Session.DisableEscMenu(1f);
             }
-            catch { }
+            catch (Exception e)
+            {
+                if (_escSuppressErrorLogged) return;
+                _escSuppressErrorLogged = true;
+                WLog.Line("manual_esc_suppress_error", secret: false, ("err", e.Message));
+            }
         }
 
         private static bool MenuKeyDown()
@@ -389,8 +395,13 @@ namespace Werewolf.UI
             {
                 return Inputs.Down(GameKey.Menu);
             }
-            catch
+            catch (Exception e)
             {
+                if (!_menuKeyErrorLogged)
+                {
+                    _menuKeyErrorLogged = true;
+                    WLog.Line("manual_menu_key_error", secret: false, ("err", e.Message));
+                }
                 return false;
             }
         }
@@ -401,8 +412,13 @@ namespace Werewolf.UI
             {
                 return Inputs.NoTextInputsActive;
             }
-            catch
+            catch (Exception e)
             {
+                if (!_textInputErrorLogged)
+                {
+                    _textInputErrorLogged = true;
+                    WLog.Line("manual_text_input_error", secret: false, ("err", e.Message));
+                }
                 return true;
             }
         }
@@ -414,7 +430,10 @@ namespace Werewolf.UI
             {
                 hint = Inputs.ReplaceDisplayTags(hint, "<color=#FF8500>", "</color>");
             }
-            catch { }
+            catch (Exception e)
+            {
+                WLog.Line("manual_hint_tags_error", secret: false, ("err", e.Message));
+            }
             return hint;
         }
 

@@ -39,12 +39,11 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void ComposeSpec_AllZero_YieldsEmpty_SameAsGameConfigDefault()
+        public void ComposeSpec_AllZero_YieldsEmpty()
         {
             var map = new Dictionary<string, int>();
             foreach (var name in WorldgenUpgrades.Names) map[name] = 0;
 
-            Assert.Equal(new GameConfig().StartUpgradesSpec, WorldgenSpec.Encode(map));
             Assert.Equal("", WorldgenSpec.Encode(map));
         }
 

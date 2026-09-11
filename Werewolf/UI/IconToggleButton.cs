@@ -1,3 +1,4 @@
+using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -68,6 +69,8 @@ namespace Werewolf.UI
         private bool _hovering;
         private Image _badge;
 
+        private bool _alphaSampleErrorLogged;
+
         public RectTransform Container => _container;
 
         public bool HasIcon => _sprite != null;
@@ -96,7 +99,11 @@ namespace Werewolf.UI
                 _icon.sprite = _sprite;
                 _icon.preserveAspect = true;
                 try { _icon.alphaHitTestMinimumThreshold = AlphaHitThreshold; }
-                catch {  }
+                catch (Exception e)
+                {
+                    WLog.Line("icon_alpha_hit_error", secret: false,
+                        ("key", spriteKey), ("err", e.Message));
+                }
 
                 _hoverOutline = _icon.gameObject.AddComponent<Outline>();
                 _hoverOutline.effectColor = HoverOutlineColor;
@@ -211,8 +218,13 @@ namespace Werewolf.UI
                 if (u < 0f || u > 1f || v < 0f || v > 1f) return 1f;
                 return tex.GetPixelBilinear(u, v).a;
             }
-            catch
+            catch (Exception e)
             {
+                if (!_alphaSampleErrorLogged)
+                {
+                    _alphaSampleErrorLogged = true;
+                    WLog.Line("icon_alpha_sample_error", secret: false, ("err", e.Message));
+                }
                 return 1f;
             }
         }

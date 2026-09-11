@@ -4,6 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
+using Werewolf.Game;
 using Werewolf.Vanilla;
 
 namespace Werewolf.UI
@@ -12,109 +13,96 @@ namespace Werewolf.UI
     {
         public string LayerName => "RoleReveal";
 
-        public const float MoonUiWaitTimeoutSec = 10f;
-
-        private static readonly Vector2 IconSize = new Vector2(256f, 256f);
+        private static readonly Vector2 CardSize = new Vector2(320f, 320f);
+        private static readonly Vector2 CardRestPosition = new Vector2(0f, 180f);
+        private static readonly Vector2 CardEntryPosition = new Vector2(0f, 780f);
+        private const float HudCardScale = 128f / 320f;
         private const float TitleFontSize = 64f;
         private const float BodyFontSize = 34f;
-
         private const float SelfIdFontSize = 40f;
-        private const float SelfIdPosY = 370f;
-
-        private const float PageCrossfadeSec = 0.3f;
-
-        private const float SkipFadeOutSec = 0.2f;
-
-        private const float SkipHintFontSize = 24f;
-
+        private const float SelfIdPosY = 390f;
         private const string HeadingColorTag = "<color=#FFF2B3>";
 
         private GameObject _root;
         private CanvasGroup _group;
         private Image _background;
-        private Image _iconImage;
+        private RectTransform _cardRect;
+        private Image _cardBack;
+        private Image _cardFront;
+        private CanvasGroup _textGroup;
         private TextMeshProUGUI _selfIdText;
         private TextMeshProUGUI _titleText;
         private TextMeshProUGUI _bodyText;
         private CanvasGroup _bodyGroup;
-        private TextMeshProUGUI _skipHintText;
-        private bool _skipRequested;
+        private int _shownPage = -1;
 
         public bool Exists => _root != null;
-
         public bool Visible => _root != null && _root.activeSelf;
 
         public void Build(Transform layerRoot)
         {
             if (_root != null || layerRoot == null) return;
-
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
             RectTransform rect = UiKit.CreateStretched(layerRoot, "WW_RoleReveal");
-            var go = rect.gameObject;
-            _root = go;
-
-            _group = go.AddComponent<CanvasGroup>();
-            _group.alpha = 0f;
+            _root = rect.gameObject;
+            _group = _root.AddComponent<CanvasGroup>();
+            _group.alpha = 1f;
             _group.blocksRaycasts = false;
             _group.interactable = false;
 
-            _background = UiKit.CreateBackdrop(rect, "Bg", new Color(0f, 0f, 0f, 0.85f));
+            _background = UiKit.CreateBackdrop(rect, "Bg", Color.clear);
 
-            _selfIdText = UiKit.CreateText(rect, "SelfId", new Vector2(0f, SelfIdPosY),
-                new Vector2(1200f, 56f), "", SelfIdFontSize,
+            _cardRect = UiKit.CreateRect(rect, "Card", CardEntryPosition, CardSize);
+            _cardBack = UiKit.CreateImage(_cardRect, "Back", Vector2.zero, CardSize,
+                new Color(0.06f, 0.07f, 0.09f, 1f));
+            _cardBack.raycastTarget = false;
+            _cardFront = UiKit.CreateImage(_cardRect, "Front", Vector2.zero, CardSize, Color.white);
+            _cardFront.raycastTarget = false;
+            _cardFront.enabled = false;
+
+            RectTransform textRoot = UiKit.CreateStretched(rect, "Text");
+            _textGroup = textRoot.gameObject.AddComponent<CanvasGroup>();
+            _textGroup.alpha = 0f;
+            _textGroup.blocksRaycasts = false;
+            _textGroup.interactable = false;
+
+            _selfIdText = UiKit.CreateText(textRoot, "SelfId", new Vector2(0f, SelfIdPosY),
+                new Vector2(1200f, 56f), string.Empty, SelfIdFontSize,
                 new Color(0.92f, 0.94f, 1f, 0.9f), TextAlignmentOptions.Center);
-
-            _iconImage = UiKit.CreateImage(rect, "Icon", new Vector2(0f, 180f), IconSize, Color.white);
-            _iconImage.raycastTarget = false;
-            _iconImage.enabled = false;
-
-            _titleText = UiKit.CreateText(rect, "Title", new Vector2(0f, -40f),
-                new Vector2(1600f, 100f), "", TitleFontSize,
+            _titleText = UiKit.CreateText(textRoot, "Title", new Vector2(0f, -40f),
+                new Vector2(1600f, 100f), string.Empty, TitleFontSize,
                 new Color(1f, 0.95f, 0.7f), TextAlignmentOptions.Center);
             _titleText.enableWordWrapping = false;
-
-            _bodyText = UiKit.CreateText(rect, "Body", new Vector2(0f, -220f),
-                new Vector2(1600f, 400f), "", BodyFontSize,
+            _bodyText = UiKit.CreateText(textRoot, "Body", new Vector2(0f, -220f),
+                new Vector2(1600f, 400f), string.Empty, BodyFontSize,
                 new Color(1f, 1f, 1f, 0.95f), TextAlignmentOptions.Center);
             _bodyText.enableWordWrapping = true;
-
             _bodyGroup = _bodyText.gameObject.AddComponent<CanvasGroup>();
-            _bodyGroup.alpha = 1f;
+            _bodyGroup.alpha = 0f;
             _bodyGroup.blocksRaycasts = false;
             _bodyGroup.interactable = false;
-
-            _skipHintText = UiKit.CreateText(rect, "SkipHint", new Vector2(0f, -470f),
-                new Vector2(1200f, 40f), "", SkipHintFontSize,
-                new Color(1f, 1f, 1f, 0.65f), TextAlignmentOptions.Center);
 
             _root.SetActive(false);
         }
 
         private void Populate(RevealContent content)
         {
-            if (_root == null || content == null) return;
-
             _titleText.text = content.Title ?? string.Empty;
-            _skipHintText.text = BuildSkipHintText();
-
             bool hasSelfId = !string.IsNullOrEmpty(content.SelfIdLine);
             _selfIdText.text = hasSelfId ? content.SelfIdLine : string.Empty;
-            if (_selfIdText.gameObject.activeSelf != hasSelfId) _selfIdText.gameObject.SetActive(hasSelfId);
+            _selfIdText.gameObject.SetActive(hasSelfId);
 
-            Sprite icon = AssetCatalog.GetSprite(IconKey(content.Icon));
-            if (icon != null)
-            {
-                _iconImage.sprite = icon;
-                _iconImage.preserveAspect = true;
-                _iconImage.color = Color.white;
-                _iconImage.enabled = true;
-            }
-            else
-            {
-                _iconImage.sprite = null;
-                _iconImage.enabled = false;
-            }
+            Sprite back = AssetCatalog.GetSprite("role_card_back");
+            _cardBack.sprite = back;
+            _cardBack.preserveAspect = true;
+            _cardBack.color = back != null ? Color.white : new Color(0.06f, 0.07f, 0.09f, 1f);
+
+            Sprite front = AssetCatalog.GetSprite(IconKey(content.Icon));
+            _cardFront.sprite = front;
+            _cardFront.preserveAspect = true;
+            _cardFront.color = Color.white;
+            _cardFront.enabled = front != null;
         }
 
         private void SetPage(RevealPage page)
@@ -126,17 +114,13 @@ namespace Werewolf.UI
             }
 
             var sb = new System.Text.StringBuilder();
-            foreach (var line in page.BodyLines)
+            foreach (string line in page.BodyLines)
             {
                 if (sb.Length > 0) sb.Append('\n');
                 if (line != null && line.StartsWith("◆"))
-                {
                     sb.Append(HeadingColorTag).Append(line).Append("</color>");
-                }
                 else
-                {
                     sb.Append(line);
-                }
             }
             _bodyText.text = sb.ToString();
         }
@@ -154,177 +138,127 @@ namespace Werewolf.UI
             }
         }
 
-        public IEnumerator Play(RevealContent content)
+        public IEnumerator Play(RevealContent content, long revealStartUnixMs, long revealEndUnixMs,
+            Vector2 hudOffset, Action onFlip = null, Action onPage = null, Action onStow = null)
         {
-            if (_root == null || content == null || content.Pages == null || content.Pages.Length == 0)
+            if (_root == null || content?.Pages == null || content.Pages.Length == 0)
             {
-                WLog.Line("reveal_skip", secret: false, ("reason", _root == null ? "not_built" : "no_content"));
+                WLog.Line("reveal_skip", secret: false,
+                    ("reason", _root == null ? "not_built" : "no_content"));
                 yield break;
             }
 
-            yield return WaitForMoonUiFinish(MoonUiWaitTimeoutSec);
+            long now = SessionClock.NowMs();
+            if (revealStartUnixMs <= 0) revealStartUnixMs = now;
+            if (revealEndUnixMs <= revealStartUnixMs)
+                revealEndUnixMs = revealStartUnixMs + Preplay.RoleRevealDurationMs;
+            if (now >= revealEndUnixMs)
+            {
+                WLog.Line("reveal_skip", secret: false, ("reason", "late"));
+                yield break;
+            }
 
-            _skipRequested = false;
             Populate(content);
-            SetPage(content.Pages[0]);
-            _group.alpha = 0f;
-            _bodyGroup.alpha = 1f;
+            _shownPage = -1;
             _root.SetActive(true);
-            WLog.Line("reveal_show", secret: true, ("icon", content.Icon), ("pages", content.Pages.Length));
-
-            yield return DriveWithSkip(UiTween.Fade(_group, 0f, 1f, content.FadeInSec, UiTween.EaseInOut()));
-
-            for (int i = 0; i < content.Pages.Length && !_skipRequested; i++)
+            long initialElapsed = Math.Max(0, now - revealStartUnixMs);
+            bool flipSfx = initialElapsed >= RoleRevealTimeline.FlipMidMs;
+            bool pageSfx = initialElapsed >= Preplay.PageBoundaryMs;
+            bool stowSfx = initialElapsed >= RoleRevealTimeline.StowStartMs;
+            while ((now = SessionClock.NowMs()) < revealEndUnixMs)
             {
-                if (i > 0)
+                long elapsed = now - revealStartUnixMs;
+                if (elapsed < 0) elapsed = 0;
+                RoleRevealFrame frame = RoleRevealTimeline.At(elapsed);
+                _group.alpha = Session.IsEscMenuOpen ? 0f : 1f;
+
+                int page = Math.Min(frame.PageIndex, content.Pages.Length - 1);
+                if (_shownPage != page)
                 {
-                    yield return DriveWithSkip(UiTween.Fade(_bodyGroup, 1f, 0f, PageCrossfadeSec, UiTween.EaseInOut()));
-                    if (_skipRequested) break;
-                    SetPage(content.Pages[i]);
-                    yield return DriveWithSkip(UiTween.Fade(_bodyGroup, 0f, 1f, PageCrossfadeSec, UiTween.EaseInOut()));
-                    if (_skipRequested) break;
-                }
-                yield return DriveWithSkip(UiTween.Hold(content.Pages[i].HoldSec));
-            }
-
-            float fadeOutSec = _skipRequested ? SkipFadeOutSec : content.FadeOutSec;
-            yield return DriveSuppressOnly(UiTween.Fade(_group, _group.alpha, 0f, fadeOutSec, UiTween.EaseInOut()));
-
-            HideNow();
-            WLog.Line("reveal_end", secret: false, ("skipped", _skipRequested));
-        }
-
-        private IEnumerator DriveWithSkip(IEnumerator step)
-        {
-            while (true)
-            {
-                SuppressEscMenu();
-                if (!_skipRequested && SkipInputDown())
-                {
-                    _skipRequested = true;
-                    WLog.Line("reveal_skip_input", secret: false);
-                }
-                if (_skipRequested) yield break;
-
-                bool moved;
-                try
-                {
-                    moved = step != null && step.MoveNext();
-                }
-                catch (Exception e)
-                {
-                    WLog.Line("reveal_tick_error", secret: false, ("err", e.Message));
-                    moved = false;
-                }
-                if (!moved) yield break;
-                yield return step.Current;
-            }
-        }
-
-        private static IEnumerator DriveSuppressOnly(IEnumerator step)
-        {
-            while (true)
-            {
-                SuppressEscMenu();
-
-                bool moved;
-                try
-                {
-                    moved = step != null && step.MoveNext();
-                }
-                catch (Exception e)
-                {
-                    WLog.Line("reveal_tick_error", secret: false, ("err", e.Message));
-                    moved = false;
-                }
-                if (!moved) yield break;
-                yield return step.Current;
-            }
-        }
-
-        private static void SuppressEscMenu()
-        {
-            try
-            {
-                Session.DisableEscMenu(1f);
-            }
-            catch { }
-        }
-
-        private static bool SkipInputDown()
-        {
-            try
-            {
-                return Inputs.NoTextInputsActive && Inputs.Down(GameKey.Menu);
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private static string BuildSkipHintText()
-        {
-            string hint = Texts.Get(TextId.RevealSkipHint);
-            try
-            {
-                hint = Inputs.ReplaceDisplayTags(hint, "<color=#FF8500><u><b>", "</b></u></color>");
-            }
-            catch { }
-            return hint;
-        }
-
-        private static IEnumerator WaitForMoonUiFinish(float timeoutSec)
-        {
-            bool playing;
-            try { playing = MoonPhaseUi.IsPlaying; }
-            catch { playing = false; }
-
-            if (!playing)
-            {
-                yield break;
-            }
-
-            float elapsed = 0f;
-            while (elapsed < timeoutSec)
-            {
-                try { playing = MoonPhaseUi.IsPlaying; }
-                catch { playing = false; }
-
-                if (!playing)
-                {
-                    WLog.Line("reveal_moon_ok", secret: false, ("waitedSec", elapsed));
-                    yield break;
+                    _shownPage = page;
+                    SetPage(content.Pages[page]);
                 }
 
-                elapsed += Time.unscaledDeltaTime;
+                if (!flipSfx && elapsed >= RoleRevealTimeline.FlipMidMs)
+                {
+                    flipSfx = true;
+                    Invoke(onFlip, "reveal_flip_callback_error");
+                }
+                if (!pageSfx && elapsed >= Preplay.PageBoundaryMs)
+                {
+                    pageSfx = true;
+                    Invoke(onPage, "reveal_page_callback_error");
+                }
+                if (!stowSfx && elapsed >= RoleRevealTimeline.StowStartMs)
+                {
+                    stowSfx = true;
+                    Invoke(onStow, "reveal_stow_callback_error");
+                }
+
+                _background.color = new Color(0f, 0f, 0f, 0.85f * frame.BackdropAlpha);
+                _cardBack.gameObject.SetActive(frame.ShowBack);
+                _cardFront.gameObject.SetActive(!frame.ShowBack);
+
+                Vector2 resting = Vector2.LerpUnclamped(CardEntryPosition, CardRestPosition, frame.CardDropRatio);
+                _cardRect.anchoredPosition = Vector2.LerpUnclamped(resting, HudTarget(hudOffset), frame.StowRatio);
+                float uniform = Mathf.LerpUnclamped(1f, HudCardScale, frame.StowRatio);
+                _cardRect.localScale = new Vector3(uniform * frame.CardFlipScaleX, uniform, 1f);
+                _textGroup.alpha = frame.TextAlpha;
+                _bodyGroup.alpha = frame.BodyAlpha;
                 yield return null;
             }
-            WLog.Line("reveal_moon_timeout", secret: false, ("timeoutSec", timeoutSec));
+
+            HideNow();
+        }
+
+        public IEnumerator Play(RevealContent content)
+        {
+            long start = SessionClock.NowMs();
+            return Play(content, start, start + Preplay.RoleRevealDurationMs,
+                Vector2.zero);
+        }
+
+        private Vector2 HudTarget(Vector2 offset)
+        {
+            RectTransform rootRect = (RectTransform)_root.transform;
+            float halfWidth = rootRect.rect.width * 0.5f;
+            float halfHeight = rootRect.rect.height * 0.5f;
+            return new Vector2(
+                -halfWidth + HudGeometry.RoleBadge.LeftMargin + offset.x
+                    + HudGeometry.RoleBadge.IconSize * 0.5f,
+                halfHeight - HudGeometry.RoleBadge.TopMargin - offset.y
+                    - HudGeometry.RoleBadge.RowHeight * 0.5f);
+        }
+
+        private static void Invoke(Action callback, string logKey)
+        {
+            try { callback?.Invoke(); }
+            catch (Exception e) { WLog.Line(logKey, secret: false, ("err", e.Message)); }
         }
 
         public void HideNow()
         {
             if (_root == null) return;
-            _group.alpha = 0f;
+            _group.alpha = 1f;
             _root.SetActive(false);
+            _shownPage = -1;
         }
 
         public void Destroy()
         {
-            if (_root != null)
-            {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
-            }
+            if (_root != null) UnityEngine.Object.Destroy(_root);
+            _root = null;
             _group = null;
             _background = null;
-            _iconImage = null;
+            _cardRect = null;
+            _cardBack = null;
+            _cardFront = null;
+            _textGroup = null;
             _selfIdText = null;
             _titleText = null;
             _bodyText = null;
             _bodyGroup = null;
-            _skipHintText = null;
+            _shownPage = -1;
         }
     }
 }

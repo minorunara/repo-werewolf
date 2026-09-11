@@ -13,6 +13,8 @@ namespace Werewolf.Tests
         [InlineData(GamePhase.Meeting, false, false)]
         [InlineData(GamePhase.Meeting, true, true)]
         [InlineData(GamePhase.Lobby, false, false)]
+        [InlineData(GamePhase.RoleReveal, false, false)]
+        [InlineData(GamePhase.PreplayAborted, false, false)]
         public void ShouldHoldEnemyFreeze_DuringGameOverOrWinCeremony(
             GamePhase phase, bool winCeremonyActive, bool expected)
         {
@@ -30,6 +32,8 @@ namespace Werewolf.Tests
         [InlineData(GamePhase.Play, false, false, false, false)]
         [InlineData(GamePhase.Play, false, true, false, false)]
         [InlineData(GamePhase.Lobby, false, false, false, false)]
+        [InlineData(GamePhase.RoleReveal, false, false, false, false)]
+        [InlineData(GamePhase.PreplayAborted, false, false, false, false)]
         public void ShouldInjectInvincibility_MeetingWarpOrCeremonyOrGameOver(
             GamePhase phase, bool meetingActive, bool warpDone, bool winCeremonyActive, bool expected)
         {

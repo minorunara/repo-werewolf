@@ -9,5 +9,9 @@ namespace Werewolf.Core
         Meeting = 2,
 
         GameOver = 3,
+
+        RoleReveal = 4,
+
+        PreplayAborted = 5,
     }
 }

@@ -2,6 +2,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.UI
 {

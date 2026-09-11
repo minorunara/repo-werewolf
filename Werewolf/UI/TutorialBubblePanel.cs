@@ -1,3 +1,4 @@
+using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -6,7 +7,7 @@ using Werewolf.Vanilla;
 
 namespace Werewolf.UI
 {
-    public sealed class TutorialBubblePanel : IClientPanel
+    public sealed class TutorialBubblePanel : IClientPanel, ITutorialBubble
     {
         public string LayerName => "TutorialBubble";
 
@@ -45,6 +46,9 @@ namespace Werewolf.UI
         private float _animFrom;
         private float _animT;
         private float _slideDistance;
+
+        private static bool _escSuppressErrorLogged;
+        private static bool _skipInputErrorLogged;
 
         public bool Exists => _root != null;
 
@@ -187,13 +191,25 @@ namespace Werewolf.UI
             {
                 Session.DisableEscMenu(1f);
             }
-            catch { }
+            catch (Exception e)
+            {
+                if (!_escSuppressErrorLogged)
+                {
+                    _escSuppressErrorLogged = true;
+                    WLog.Line("bubble_esc_suppress_error", secret: false, ("err", e.Message));
+                }
+            }
             try
             {
                 return Inputs.NoTextInputsActive && Inputs.Down(GameKey.Menu);
             }
-            catch
+            catch (Exception e)
             {
+                if (!_skipInputErrorLogged)
+                {
+                    _skipInputErrorLogged = true;
+                    WLog.Line("bubble_skip_input_error", secret: false, ("err", e.Message));
+                }
                 return false;
             }
         }
@@ -209,7 +225,7 @@ namespace Werewolf.UI
         {
             if (_root != null)
             {
-                Object.Destroy(_root);
+                UnityEngine.Object.Destroy(_root);
                 _root = null;
             }
             _slider = null;
@@ -221,12 +237,15 @@ namespace Werewolf.UI
 
         private static string BuildSkipHintText()
         {
-            string hint = Texts.Get(TextId.RevealSkipHint);
+            string hint = Texts.Get(TextId.TutorialSkipHint);
             try
             {
                 hint = Inputs.ReplaceDisplayTags(hint, "<color=#FF8500><u><b>", "</b></u></color>");
             }
-            catch { }
+            catch (Exception e)
+            {
+                WLog.Line("bubble_hint_tags_error", secret: false, ("err", e.Message));
+            }
             return hint;
         }
     }

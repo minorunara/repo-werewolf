@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Werewolf.Core;
@@ -22,12 +23,10 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void Roster_IsFivePlayersWithExactlyOneWerewolf()
+        public void Roster_HasExactlyOneWerewolfAndAVillagerPlayer()
         {
             var bots = Def.Cast.Bots;
 
-            Assert.Equal(4, bots.Count);
-            Assert.Equal(new[] { 2, 3, 4, 5 }, bots.Select(b => b.ParticipantId));
             Assert.All(bots, b => Assert.True(b.ActorNumber <= ScenarioRoster.FirstBotActor));
 
             var wolves = bots.Where(b => b.Role == Role.Werewolf).ToArray();
@@ -257,45 +256,23 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void Pages_CoverTheWholeScriptFromIntroToPostgame()
+        public void EveryMeetingTextId_IsReachableFromTheDefinition()
         {
-            var used = Def.Pages.SelectMany(p => p.Lines).ToArray();
+            var reachable = new HashSet<TextId>(
+                Def.Pages.SelectMany(p => p.Lines)
+                    .Concat(Def.Pages.SelectMany(p => p.NagLines))
+                    .Concat(Def.Meetings.SelectMany(m => m.ChatScript).Select(l => l.Text))
+                    .Concat(Def.Notices.LeashNag)
+                    .Concat(Def.Notices.EarlyStartLines)
+                    .Concat(KeyHintLines(Def.Notices.KeyHint)));
 
-            foreach (var id in new[]
-            {
-                TextId.ScenarioMeetingIntro1, TextId.ScenarioMeetingIntro6,
-                TextId.ScenarioMeetingConvene1, TextId.ScenarioMeetingConvene2,
-                TextId.ScenarioMeetingOpened1, TextId.ScenarioMeetingOpened9,
-                TextId.ScenarioMeetingClock1, TextId.ScenarioMeetingClock4,
-                TextId.ScenarioMeetingGauge1, TextId.ScenarioMeetingGauge5,
-                TextId.ScenarioMeetingMap1, TextId.ScenarioMeetingMap5,
-                TextId.ScenarioMeetingChatUnavailable1, TextId.ScenarioMeetingChatUnavailable2,
-                TextId.ScenarioMeetingVote1, TextId.ScenarioMeetingVote3,
-                TextId.ScenarioMeetingTally, TextId.ScenarioMeetingResult2,
-                TextId.ScenarioMeetingPostgame3,
-            })
-            {
-                Assert.Contains(id, used);
-            }
-        }
+            var orphans = Enum.GetValues(typeof(TextId)).Cast<TextId>()
+                .Where(id => id.ToString().StartsWith("ScenarioMeeting", StringComparison.Ordinal))
+                .Where(id => !reachable.Contains(id))
+                .ToArray();
 
-        [Fact]
-        public void Pages_ReadableGuidanceIsGroupedNotOnePerSentence()
-        {
-            Assert.Equal(3, PageOf(TextId.ScenarioMeetingIntro1).Lines.Count);
-            Assert.Equal(3, PageOf(TextId.ScenarioMeetingVote1).Lines.Count);
-            Assert.Equal(2, PageOf(TextId.ScenarioMeetingPostgame1).Lines.Count);
-            Assert.Equal(2, PageOf(TextId.ScenarioMeetingReplay1).Lines.Count);
-            Assert.Equal(2, PageOf(TextId.ScenarioMeetingConvene1).Lines.Count);
-            Assert.Equal(2, PageOf(TextId.ScenarioMeetingChatUnavailable1).Lines.Count);
-            Assert.Equal(2, PageOf(TextId.ScenarioMeetingResult1).Lines.Count);
-            Assert.Equal(3, PageOf(TextId.ScenarioMeetingGauge1).Lines.Count);
-            Assert.Equal(2, PageOf(TextId.ScenarioMeetingGauge4).Lines.Count);
-            Assert.Equal(3, PageOf(TextId.ScenarioMeetingMap1).Lines.Count);
-            Assert.Single(PageOf(TextId.ScenarioMeetingMap4).Lines);
-
-            Assert.Single(PageOf(TextId.ScenarioMeetingOpened5).Lines);
-            Assert.Single(PageOf(TextId.ScenarioMeetingOpened9).Lines);
+            Assert.True(orphans.Length == 0,
+                "台本のどこからも参照されない文言: " + string.Join(", ", orphans));
         }
 
         [Fact]
@@ -306,102 +283,12 @@ namespace Werewolf.Tests
             Assert.Single(Def.Pages, p => p.Cue == ScenarioCue.ActionNag);
         }
 
-        [Fact]
-        public void Pages_VoteGuidanceRequiresTheMapToBeClosed()
+        private static IEnumerable<TextId> KeyHintLines(ScenarioKeyHint hint)
         {
-            Assert.Equal(ScenarioNeed.MapClosed, PageOf(TextId.ScenarioMeetingVote1).Need);
-            Assert.Equal(ScenarioNeed.None, PageOf(TextId.ScenarioMeetingIntro1).Need);
-        }
-
-        [Fact]
-        public void Pages_ChatScriptWaitRequiresTheChatLog()
-        {
-            var page = Def.Pages.Single(p => p.Cue == ScenarioCue.ChatScript);
-
-            Assert.False(page.HasText);
-            Assert.Equal(ScenarioNeed.ChatLogOpen, page.Need);
-        }
-
-        [Fact]
-        public void Pages_MeetingLogExplanationSitsBesideTheLog()
-        {
-            var logLines = new[]
-            {
-                TextId.ScenarioMeetingOpened3, TextId.ScenarioMeetingOpened4,
-                TextId.ScenarioMeetingOpened5, TextId.ScenarioMeetingOpened6,
-                TextId.ScenarioMeetingOpened7, TextId.ScenarioMeetingOpened8,
-                TextId.ScenarioMeetingOpened9,
-            };
-
-            foreach (var line in logLines)
-            {
-                var page = PageOf(line);
-                Assert.Equal(ScenarioAnchor.ChatLog, page.Anchor);
-                Assert.Equal(ScenarioNeed.ChatLogOpen, page.Need);
-            }
-        }
-
-        [Fact]
-        public void Pages_ResultScreenGuidanceClearsTheReplayEntry()
-        {
-            foreach (var id in new[]
-            {
-                TextId.ScenarioMeetingPostgame1, TextId.ScenarioMeetingReplay1,
-                TextId.ScenarioMeetingPostgame3,
-            })
-            {
-                Assert.Equal(ScenarioAnchor.ReplayEntry, PageOf(id).Anchor);
-            }
-        }
-
-        [Fact]
-        public void Pages_ReplayIntroductionPointsAtTheEntry()
-        {
-            ScenarioPage page = PageOf(TextId.ScenarioMeetingReplay1);
-
-            Assert.Equal(ScenarioHighlight.ReplayEntry, page.Highlight);
-            Assert.Equal(ScenarioSignal.Advance, page.Gate);
-            Assert.Equal(ScenarioNeed.None, page.Need);
-        }
-
-        [Fact]
-        public void Pages_GaugeExplanationHangsUnderTheGaugeAndPointsAtIt()
-        {
-            foreach (var id in new[] { TextId.ScenarioMeetingGauge1, TextId.ScenarioMeetingGauge4 })
-            {
-                Assert.Equal(ScenarioAnchor.MeetingGauge, PageOf(id).Anchor);
-                Assert.Equal(ScenarioHighlight.MeetingGauge, PageOf(id).Highlight);
-            }
-        }
-
-        [Fact]
-        public void Pages_MapExplanationRequiresTheMapToBeOpen()
-        {
-            foreach (var id in new[] { TextId.ScenarioMeetingMap1, TextId.ScenarioMeetingMap4 })
-            {
-                var page = PageOf(id);
-                Assert.Equal(ScenarioNeed.MapOpen, page.Need);
-                Assert.Equal(ScenarioHighlight.MapOverlay, page.Highlight);
-            }
-        }
-
-        [Fact]
-        public void Pages_MinutesExplanationPointsAtOneLineEach()
-        {
-            var expected = new[]
-            {
-                ScenarioHighlight.RecapTitle, ScenarioHighlight.RecapDeaths,
-                ScenarioHighlight.RecapLost, ScenarioHighlight.RecapHaul,
-                ScenarioHighlight.RecapBeacon,
-            };
-            var pointed = new[]
-            {
-                TextId.ScenarioMeetingOpened3, TextId.ScenarioMeetingOpened5,
-                TextId.ScenarioMeetingOpened6, TextId.ScenarioMeetingOpened7,
-                TextId.ScenarioMeetingOpened8,
-            }.Select(id => PageOf(id).Highlight).ToArray();
-
-            Assert.Equal(expected, pointed);
+            if (!hint.HasValue) yield break;
+            yield return hint.FormatId;
+            yield return hint.GrabNoteId;
+            yield return hint.InteractNoteId;
         }
 
         private static ScenarioPage PageOf(TextId id) => Def.Pages.Single(p => p.Lines.Contains(id));

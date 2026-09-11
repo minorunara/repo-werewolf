@@ -4,11 +4,11 @@ namespace Werewolf.Vanilla
 {
     internal static class Extraction
     {
-        private static readonly AccessTools.FieldRef<RoundDirector, int> HaulGoalRef =
+        private static AccessTools.FieldRef<RoundDirector, int> HaulGoalRef =>
             GameRefs.RoundDirector_haulGoal;
-        private static readonly AccessTools.FieldRef<RoundDirector, int> PointsRef =
+        private static AccessTools.FieldRef<RoundDirector, int> PointsRef =>
             GameRefs.RoundDirector_extractionPoints;
-        private static readonly AccessTools.FieldRef<RoundDirector, int> PointsCompletedRef =
+        private static AccessTools.FieldRef<RoundDirector, int> PointsCompletedRef =>
             GameRefs.RoundDirector_extractionPointsCompleted;
 
         public static bool RoundDirectorAlive => RoundDirector.instance != null;

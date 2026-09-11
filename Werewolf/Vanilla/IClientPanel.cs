@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Werewolf.UI
+namespace Werewolf.Vanilla
 {
     public interface IClientPanel
     {

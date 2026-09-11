@@ -176,13 +176,23 @@ namespace Werewolf.UI
                     if (resolveAvatar != null && rows[i] != null && rows[i].ActorNumber > 0)
                     {
                         try { avatar = resolveAvatar(rows[i].ActorNumber); }
-                        catch { avatar = PlayerHandle.None; }
+                        catch (Exception e)
+                        {
+                            WLog.Line("result_row_avatar_error", secret: false,
+                                ("actor", rows[i].ActorNumber), ("err", e.Message));
+                            avatar = PlayerHandle.None;
+                        }
                     }
                     int participantId = 0;
                     if (resolveId != null && rows[i] != null)
                     {
                         try { participantId = resolveId(rows[i].ActorNumber); }
-                        catch { participantId = 0; }
+                        catch (Exception e)
+                        {
+                            WLog.Line("result_row_id_error", secret: false,
+                                ("actor", rows[i].ActorNumber), ("err", e.Message));
+                            participantId = 0;
+                        }
                     }
                     _slots[i].SetTop(y);
                     _slots[i].Show(rows[i], avatar, participantId);
@@ -227,6 +237,42 @@ namespace Werewolf.UI
             if (!_root.activeSelf) _root.SetActive(true);
             WLog.Line("result_screen_show", secret: false,
                 ("team", winningTeam), ("rows", count), ("digest", digestCount));
+        }
+
+        public void ShowPreplayAbort(string title, string reason, string note, string footerText)
+        {
+            if (_root == null) return;
+
+            _bannerText.text = title ?? string.Empty;
+            _bannerText.color = VoidMatchColor;
+            _bannerImage.color = new Color(0.2f, 0.2f, 0.22f, 0.94f);
+            ShowEpigraph(null);
+            _footerText.text = footerText ?? string.Empty;
+
+            foreach (Slot slot in _slots) slot.Hide();
+            ClearDigestObjects();
+
+            var reasonText = UiKit.CreateText(_content, "PreplayAbortReason",
+                Vector2.zero, new Vector2(ContentWidth - 120f, 150f),
+                reason ?? string.Empty, 34f,
+                new Color(0.95f, 0.95f, 0.98f, 1f), TextAlignmentOptions.Center);
+            reasonText.enableWordWrapping = true;
+            PlaceTop(reasonText.rectTransform, 170f, 150f);
+            _digestObjects.Add(reasonText.gameObject);
+
+            var noteText = UiKit.CreateText(_content, "PreplayAbortNote",
+                Vector2.zero, new Vector2(ContentWidth - 160f, 100f),
+                note ?? string.Empty, 27f,
+                new Color(0.74f, 0.76f, 0.8f, 1f), TextAlignmentOptions.Center);
+            noteText.enableWordWrapping = true;
+            PlaceTop(noteText.rectTransform, 350f, 100f);
+            _digestObjects.Add(noteText.gameObject);
+
+            _contentHeight = ViewportHeight;
+            _content.sizeDelta = new Vector2(ContentWidth, ViewportHeight);
+            _scrollY = 0f;
+            _content.anchoredPosition = Vector2.zero;
+            if (!_root.activeSelf) _root.SetActive(true);
         }
 
         public void Tick(bool wheelBlocked = false)

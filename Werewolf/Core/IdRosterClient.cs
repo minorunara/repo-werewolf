@@ -34,7 +34,6 @@ namespace Werewolf.Core
             {
                 _idByActor.Add(pair.Key, pair.Value);
             }
-            WLog.Line("id_roster_applied", secret: false, ("count", _idByActor.Count));
         }
 
         public int IdOf(int actorNumber)

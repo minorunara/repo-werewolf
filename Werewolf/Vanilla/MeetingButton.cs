@@ -1,7 +1,6 @@
 using System;
 using UnityEngine;
 using Werewolf.Core;
-using Werewolf.UI;
 
 namespace Werewolf.Vanilla
 {
@@ -14,17 +13,14 @@ namespace Werewolf.Vanilla
         private bool _isLocalPlayerNear;
 
         private bool _useGrabInteract;
-        private Transform _pressVisual;
-        private MeshRenderer _pressRenderer;
-        private AnimationCurve _pressCurve;
-        private bool _pressAnimating;
-        private float _pressEval;
-        private static readonly Color PressColorStart = new Color(1f, 0.5f, 0f, 1f);
+        private readonly MeetingButtonPressVisual _press = new MeetingButtonPressVisual();
         private const float AimDotThreshold = 0.9f;
 
         public Action OnConvene;
 
         public Action OnIncompleteHold;
+
+        internal static Func<string, GameObject> PrefabResolver;
 
         private readonly ConveneHold _hold = new ConveneHold();
 
@@ -75,9 +71,6 @@ namespace Werewolf.Vanilla
                 return false;
             }
             _visual.transform.SetPositionAndRotation(pos, rot);
-
-            WLog.Line("meeting_button_created", secret: false,
-                ("pos", $"{pos.x:F2},{pos.y:F2},{pos.z:F2}"));
             return true;
         }
 
@@ -91,11 +84,7 @@ namespace Werewolf.Vanilla
             _isLocalPlayerNear = false;
             _hold.Reset();
             _useGrabInteract = false;
-            _pressVisual = null;
-            _pressRenderer = null;
-            _pressCurve = null;
-            _pressAnimating = false;
-            _pressEval = 0f;
+            _press.Clear();
         }
 
         private bool IsAimingAtButton(PlayerAvatar local)
@@ -115,39 +104,15 @@ namespace Werewolf.Vanilla
             return GameRefs.PlayerAvatar_isTumbling != null && GameRefs.PlayerAvatar_isTumbling(local);
         }
 
-        private void StartPressAnimation()
-        {
-            if (_pressVisual == null) return;
-            _pressVisual.localScale = new Vector3(1f, 0.1f, 1f);
-            _pressAnimating = true;
-            _pressEval = 0f;
-        }
-
-        private void TickPressAnimation()
-        {
-            if (!_pressAnimating || _pressVisual == null || _pressCurve == null) return;
-
-            _pressEval += Time.deltaTime * 2f;
-            _pressEval = Mathf.Clamp01(_pressEval);
-            float t = _pressCurve.Evaluate(_pressEval);
-            if (_pressRenderer != null && _pressRenderer.material != null)
-            {
-                _pressRenderer.material.SetColor("_EmissionColor",
-                    Color.Lerp(PressColorStart, Color.white, t));
-            }
-            float scaleY = Mathf.Clamp(t, 0.5f, 1f);
-            _pressVisual.localScale = new Vector3(1f, scaleY, 1f);
-            if (_pressEval >= 1f)
-            {
-                _pressAnimating = false;
-                _pressEval = 0f;
-            }
-        }
-
         public void Tick(bool localCanConvene, long readyAtUnixMs, long nowUnixMs, int rightsRemaining)
         {
-            TickPressAnimation();
+            _press.Tick(Time.deltaTime);
+            TickHold(localCanConvene, readyAtUnixMs, nowUnixMs, rightsRemaining);
+            _press.Sync(_hold.IsCharging);
+        }
 
+        private void TickHold(bool localCanConvene, long readyAtUnixMs, long nowUnixMs, int rightsRemaining)
+        {
             if (_visual == null) { _isLocalPlayerNear = false; _hold.Reset(); return; }
             PlayerAvatar local = PlayerAvatar.instance;
             if (local == null) { _isLocalPlayerNear = false; _hold.Reset(); return; }
@@ -202,7 +167,6 @@ namespace Werewolf.Vanilla
                     WLog.Line("meeting_button_pressed", secret: false,
                         ("localGate", localCanConvene),
                         ("mode", _useGrabInteract ? "grab" : "interact"));
-                    StartPressAnimation();
                     OnConvene?.Invoke();
                 }
                 else if (wasCharging && inputReleased && otherwiseEligible)
@@ -244,25 +208,16 @@ namespace Werewolf.Vanilla
                 MeshRenderer mr = instance.GetComponent<MeshRenderer>()
                     ?? instance.GetComponentInChildren<MeshRenderer>(true);
 
-                _pressVisual = instance.transform;
-                _pressRenderer = mr;
-                _pressCurve = MeetingButtonAssetResolver.PressCurve;
+                AnimationCurve curve = MeetingButtonAssetResolver.PressCurve;
+                _press.Bind(instance.transform, mr, curve);
                 _useGrabInteract = true;
-                _pressAnimating = false;
-                _pressEval = 0f;
-
-                WLog.Line("meeting_button_visual_shop", secret: false,
-                    ("hasRenderer", mr != null),
-                    ("hasCurve", _pressCurve != null));
                 return instance;
             }
             catch (System.Exception e)
             {
                 WLog.Line("meeting_button_shop_fallback", secret: false, ("err", e.Message));
                 _useGrabInteract = false;
-                _pressVisual = null;
-                _pressRenderer = null;
-                _pressCurve = null;
+                _press.Clear();
                 return null;
             }
         }
@@ -271,7 +226,7 @@ namespace Werewolf.Vanilla
         {
             try
             {
-                GameObject prefab = AssetCatalog.GetPrefab("MeetingButton");
+                GameObject prefab = PrefabResolver != null ? PrefabResolver("MeetingButton") : null;
                 if (prefab == null) return null;
 
                 GameObject instance = UnityEngine.Object.Instantiate(prefab);

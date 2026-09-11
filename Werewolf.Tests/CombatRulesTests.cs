@@ -11,6 +11,8 @@ namespace Werewolf.Tests
         [InlineData(GamePhase.Play, true)]
         [InlineData(GamePhase.Meeting, true)]
         [InlineData(GamePhase.GameOver, false)]
+        [InlineData(GamePhase.RoleReveal, false)]
+        [InlineData(GamePhase.PreplayAborted, false)]
         public void IsMatchLive_MatrixOfAllPhases(GamePhase phase, bool expected)
         {
             Assert.Equal(expected, CombatRules.IsMatchLive(phase));

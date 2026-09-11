@@ -6,133 +6,233 @@
 <title>Werewolf Replay Viewer</title>
 <style>
   :root {
-    --bg: #14161a;
-    --panel: #1d2026;
-    --panel2: #23262d;
-    --border: #33373f;
-    --text: #d8dbe0;
-    --dim: #8b909a;
-    --accent: #e8b23a;
+    color-scheme: dark;
+    --stage: #080c08;
+    --panel: #0d130e;
+    --raised: #142015;
+    --line: #1c2a1e;
+    --line-strong: #2c4230;
+    --ink: #d9e6d6;
+    --dim: #7f9a80;
+    --faint: #4a5f4c;
+    --accent: #5ad96a;
+    --accent-hover: #74e884;
+    --accent-ink: #06140a;
     --meeting: #caa3ff;
     --danger: #e5534b;
+    --good: #4fc06b;
+    --cyan: #4dccf2;
+    --loss: #d9a626;
+    --gameover: #e8b23a;
+    --font-ui: "Bahnschrift", "Segoe UI", "Yu Gothic UI", "Meiryo", sans-serif;
+    --font-mono: "Cascadia Mono", "Consolas", "SF Mono", "Menlo", ui-monospace, monospace;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
   html, body { height: 100%; }
   body {
-    background: var(--bg); color: var(--text);
-    font: 13px/1.5 "Segoe UI", "Yu Gothic UI", sans-serif;
+    background: var(--stage); color: var(--ink);
+    font: 13px/1.45 var(--font-ui);
     display: flex; flex-direction: column; overflow: hidden;
   }
+  button, select { font: inherit; color: var(--ink); }
+  button, select, label.toggle { cursor: pointer; user-select: none; }
+  button, select {
+    background: var(--raised); border: 1px solid var(--line-strong); border-radius: 3px;
+    padding: 4px 12px; font-size: 12px; line-height: 1.3;
+  }
+  button:hover, select:hover { border-color: var(--dim); }
+  button:focus-visible, select:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+  select {
+    appearance: none; padding-right: 24px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%237f9a80' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 9px center;
+  }
+
+  /* ---- ヘッダー: 左＝銘板と入力、中＝表示レイヤー、右＝状態と設定 ---- */
   header {
-    display: flex; align-items: center; gap: 10px;
-    padding: 6px 12px; background: var(--panel); border-bottom: 1px solid var(--border);
-    flex-wrap: wrap;
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--line);
   }
-  header h1 { font-size: 14px; font-weight: 600; margin-right: 8px; white-space: nowrap; }
-  header .meta { color: var(--dim); font-size: 12px; }
-  button, select, label.toggle {
-    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
-    border-radius: 4px; padding: 3px 10px; font-size: 12px; cursor: pointer; user-select: none;
+  header .brand { display: flex; align-items: center; gap: 10px; flex: none; }
+  header h1 {
+    font-size: 13px; font-weight: 600; letter-spacing: .08em; white-space: nowrap;
+    padding-right: 12px; border-right: 1px solid var(--line-strong);
   }
-  button:hover, label.toggle:hover { border-color: var(--dim); }
-  label.toggle { display: inline-flex; align-items: center; gap: 4px; }
-  label.toggle input { accent-color: var(--accent); }
+  #segSel { font-family: var(--font-mono); font-size: 11.5px; min-width: 60px; }
+  header .layers { display: flex; flex-wrap: wrap; gap: 10px; flex: 1; min-width: 0; }
+  header .group {
+    display: inline-flex; border: 1px solid var(--line-strong); border-radius: 3px; overflow: hidden;
+  }
+  header .status { display: flex; align-items: center; gap: 10px; flex: none; margin-left: auto; }
+  header .meta { color: var(--dim); font: 11.5px var(--font-mono); }
+  #warn { color: var(--danger); font-size: 12px; }
+
+  /* 表示トグル: チェックボックスの代わりに点灯インジケーター。input は不可視のまま焦点は受ける */
+  label.toggle {
+    position: relative; display: inline-flex; align-items: center; gap: 7px;
+    padding: 5px 10px 5px 9px; font-size: 12px; line-height: 1.2;
+    color: var(--dim); background: var(--panel); white-space: nowrap;
+  }
+  .group label.toggle + label.toggle { border-left: 1px solid var(--line); }
+  label.toggle:hover { color: var(--ink); }
+  label.toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+  label.toggle::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%; flex: none;
+    background: var(--faint); transition: background .12s, box-shadow .12s;
+  }
+  label.toggle:has(input:checked) { color: var(--ink); background: var(--raised); }
+  label.toggle:has(input:checked)::before { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  label.toggle:has(input:focus-visible) { outline: 1px solid var(--accent); outline-offset: -1px; }
+  header .status label.toggle { border: 1px solid var(--line-strong); border-radius: 3px; }
+
+  /* ---- 舞台（マップ）と右パネル ---- */
   #main { flex: 1; display: flex; min-height: 0; }
-  #mapWrap { flex: 1; position: relative; min-width: 0; }
+  #mapWrap { flex: 1; position: relative; min-width: 0; background: var(--stage); }
   #map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
   #map.panning { cursor: grabbing; }
   #tooltip {
-    position: absolute; pointer-events: none; display: none;
-    background: rgba(20,22,26,.92); border: 1px solid var(--border); border-radius: 4px;
-    padding: 4px 8px; font-size: 12px; white-space: pre; z-index: 5;
+    position: absolute; pointer-events: none; display: none; z-index: 5;
+    background: rgba(8,12,8,.94); border: 1px solid var(--line-strong); border-radius: 2px;
+    padding: 5px 9px; font: 11.5px/1.5 var(--font-mono); white-space: pre;
   }
   #side {
-    width: 320px; border-left: 1px solid var(--border); background: var(--panel);
+    width: 340px; border-left: 1px solid var(--line); background: var(--panel);
     display: flex; flex-direction: column; min-height: 0;
   }
-  #gauges { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  .sec-head {
+    display: flex; align-items: center; gap: 10px; flex: none;
+    padding: 10px 14px 4px; font-size: 10.5px; font-weight: 600; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--dim);
+  }
+  .sec-head::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  #gauges { padding: 4px 14px 10px; }
   #gauges table { width: 100%; border-collapse: collapse; }
-  #gauges td { padding: 1px 0; font-size: 12px; }
-  #gauges td:first-child { color: var(--dim); width: 45%; }
-  #gauges td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  #gauges td { padding: 2px 0; font-size: 12px; vertical-align: baseline; }
+  #gauges td:first-child { color: var(--dim); width: 48%; }
+  #gauges td:last-child { text-align: right; font-family: var(--font-mono); font-size: 12.5px; }
   /* 減額バーは左から、納品バーは右から伸びる */
-  #gaugeBars { display: flex; flex-direction: column; gap: 3px; margin-bottom: 6px; }
-  #gaugeBars .grow { display: flex; align-items: center; gap: 6px; }
+  #gaugeBars { display: flex; flex-direction: column; gap: 4px; margin: 2px 0 8px; }
+  #gaugeBars .grow { display: flex; align-items: center; gap: 8px; }
   #gaugeBars .grow img { width: 20px; height: 20px; object-fit: contain; flex: none; }
   #gaugeBars .gspace { width: 20px; flex: none; }
   #gaugeBars .gtrack {
-    flex: 1; position: relative; height: 8px; overflow: hidden;
-    background: #15171c; border: 1px solid var(--border); border-radius: 4px;
+    flex: 1; position: relative; height: 6px; overflow: hidden;
+    background: var(--stage); border-radius: 1px; box-shadow: inset 0 0 0 1px var(--line);
   }
-  #gaugeBars .gfill { position: absolute; top: 0; bottom: 0; left: 0; width: 0%; background: #d9a626; }
-  #gaugeBars #gDeliverFill { left: auto; right: 0; background: #4dccf2; }
+  #gaugeBars .gfill { position: absolute; top: 0; bottom: 0; left: 0; width: 0%; background: var(--loss); }
+  #gaugeBars #gDeliverFill { left: auto; right: 0; background: var(--cyan); }
   #gaugeBars .glabels {
     display: flex; justify-content: space-between; gap: 8px;
-    font-size: 11px; font-variant-numeric: tabular-nums;
+    font: 11px var(--font-mono); color: var(--dim);
   }
-  #gaugeBars #gDeliverBarText { color: #4dccf2; }
-  #roster { padding: 6px 12px; border-bottom: 1px solid var(--border); font-size: 12px; max-height: 40%; overflow-y: auto; }
-  #roster .row { display: flex; gap: 6px; align-items: center; padding: 1px 4px; cursor: pointer; border-radius: 3px; }
-  #roster .row:hover { background: var(--panel2); }
-  #roster .row.sel { background: var(--panel2); box-shadow: inset 2px 0 0 var(--accent); }
-  #roster .swatch { width: 9px; height: 9px; border-radius: 1px; transform: rotate(45deg); flex: none; }
-  #roster .dead { text-decoration: line-through; color: var(--dim); }
-  #roster .role { margin-left: auto; color: var(--dim); }
+  #gaugeBars #gDeliverBarText { color: var(--cyan); }
+  #roster { padding: 2px 8px 8px; font-size: 12px; max-height: 40%; overflow-y: auto; }
+  #roster .row {
+    display: flex; gap: 8px; align-items: center; padding: 3px 6px; cursor: pointer; border-radius: 2px;
+  }
+  #roster .row:hover { background: var(--raised); }
+  #roster .row.sel { background: var(--raised); box-shadow: inset 3px 0 0 var(--accent); }
+  #roster .swatch { width: 8px; height: 8px; transform: rotate(45deg); flex: none; margin: 0 2px; }
+  #roster .dead { text-decoration: line-through; color: var(--faint); }
+  #roster .role { margin-left: auto; color: var(--dim); font-size: 11.5px; }
   #roster .role.wolf { color: var(--danger); }
-  #events { flex: 1; overflow-y: auto; min-height: 0; }
+  #events { flex: 1; overflow-y: auto; min-height: 0; padding-bottom: 8px; }
   #events .ev {
-    display: flex; gap: 8px; padding: 2px 12px; cursor: pointer; font-size: 12px;
+    display: flex; gap: 10px; padding: 3px 14px 3px 11px; cursor: pointer; font-size: 12px;
     border-left: 3px solid transparent;
   }
-  #events .ev:hover { background: var(--panel2); }
-  #events .ev.current { background: var(--panel2); border-left-color: var(--accent); }
-  #events .ev .t { color: var(--dim); font-variant-numeric: tabular-nums; flex: none; width: 52px; }
+  #events .ev:hover { background: var(--raised); }
+  #events .ev.current { background: var(--raised); border-left-color: var(--accent); }
+  #events .ev .t { color: var(--dim); font: 11px/1.6 var(--font-mono); flex: none; width: 50px; }
   #events .ev.death { color: var(--danger); }
   #events .ev.meet { color: var(--meeting); }
-  #events .ev.gameover { color: var(--accent); }
+  #events .ev.gameover { color: var(--gameover); }
   #events .ev.warn { color: var(--dim); }
-  footer { background: var(--panel); border-top: 1px solid var(--border); padding: 6px 12px 10px; }
-  #controls { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
-  #playBtn { width: 64px; }
-  #timeLabel { font-variant-numeric: tabular-nums; min-width: 130px; }
-  #seek { position: relative; height: 26px; cursor: pointer; touch-action: none; }
+
+  /* ---- フッター: 再生操作とシーク ---- */
+  footer { background: var(--panel); border-top: 1px solid var(--line); padding: 8px 14px 10px; }
+  #controls { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  #playBtn {
+    min-width: 96px; padding: 6px 14px; font-weight: 700; letter-spacing: .04em;
+    background: var(--accent); color: var(--accent-ink); border-color: transparent;
+  }
+  #playBtn:hover { background: var(--accent-hover); border-color: transparent; }
+  #paceLabel {
+    color: var(--dim); font-size: 11.5px; padding: 3px 9px;
+    border: 1px dashed var(--line-strong); border-radius: 3px; cursor: help;
+  }
+  #timeLabel { font: 15px var(--font-mono); letter-spacing: .02em; min-width: 150px; }
+  #controls .keys {
+    margin-left: auto; min-width: 0; color: var(--dim); font-size: 11px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right;
+  }
+  #seek {
+    position: relative; height: 26px; cursor: pointer; touch-action: none;
+    background: var(--stage); box-shadow: inset 0 0 0 1px var(--line); border-radius: 2px;
+  }
   #seekCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* ---- 空状態（ドロップ受け）: 四隅の括弧枠。ドラッグ中は枠と見出しが点灯する ---- */
   #drop {
     position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
-    background: rgba(20,22,26,.94); flex-direction: column; gap: 12px; text-align: center;
+    background: var(--stage);
   }
   #drop.hidden { display: none; }
   #drop .box {
-    border: 2px dashed var(--border); border-radius: 10px; padding: 40px 60px; color: var(--dim);
+    --c: var(--line-strong);
+    max-width: 640px; padding: 52px 64px; text-align: center; color: var(--dim);
+    background:
+      linear-gradient(var(--c), var(--c)) top left / 22px 2px no-repeat,
+      linear-gradient(var(--c), var(--c)) top left / 2px 22px no-repeat,
+      linear-gradient(var(--c), var(--c)) top right / 22px 2px no-repeat,
+      linear-gradient(var(--c), var(--c)) top right / 2px 22px no-repeat,
+      linear-gradient(var(--c), var(--c)) bottom left / 22px 2px no-repeat,
+      linear-gradient(var(--c), var(--c)) bottom left / 2px 22px no-repeat,
+      linear-gradient(var(--c), var(--c)) bottom right / 22px 2px no-repeat,
+      linear-gradient(var(--c), var(--c)) bottom right / 2px 22px no-repeat;
   }
-  #drop .box b { color: var(--text); font-size: 15px; }
-  #drop.armed .box { border-color: var(--accent); color: var(--text); }
-  #warn { color: var(--danger); font-size: 12px; }
-  #langSel { margin-left: auto; }
+  #drop .box b { display: block; color: var(--ink); font-size: 18px; font-weight: 600; letter-spacing: .04em; margin-bottom: 10px; }
+  #drop .box span { display: block; font-size: 12.5px; line-height: 1.8; }
+  #drop.armed .box { --c: var(--accent); }
+  #drop.armed .box b { color: var(--accent); }
 </style>
 </head>
 <body>
 <header>
-  <h1 data-i18n="appTitle">Werewolf Replay Viewer</h1>
-  <button id="openBtn" data-i18n="open">Open file</button>
-  <select id="segSel" data-i18n-title="segTitle" title="Segment (level)"></select>
-  <label class="toggle"><input type="checkbox" id="tEnemies" checked><span data-i18n="tgEnemies">Enemies</span></label>
-  <label class="toggle"><input type="checkbox" id="tVals" checked><span data-i18n="tgVals">Valuables</span></label>
-  <label class="toggle"><input type="checkbox" id="tItems" checked><span data-i18n="tgItems">Items</span></label>
-  <label class="toggle"><input type="checkbox" id="tNames" checked><span data-i18n="tgNames">Names</span></label>
-  <label class="toggle"><input type="checkbox" id="tTrail" checked><span data-i18n="tgTrail">Trails</span></label>
-  <label class="toggle"><input type="checkbox" id="tBg"><span data-i18n="tgBg">All trails as background</span></label>
-  <label class="toggle" data-i18n-title="tgMeshTitle" title="Overlay the walkable floor mesh on the map image. Recordings without a map image always show the mesh as the background"><input type="checkbox" id="tMesh" checked><span data-i18n="tgMesh">Floor mesh</span></label>
-  <label class="toggle"><input type="checkbox" id="tYFade" checked><span data-i18n="tgYFade">Fade by height</span></label>
-  <label class="toggle"><input type="checkbox" id="tRoles" checked><span data-i18n="tgRoles">Roles</span></label>
-  <label class="toggle" data-i18n-title="tgChatTitle" title="Show meeting comments. When off, the meeting plays as if nobody had chatted"><input type="checkbox" id="tChat" checked><span data-i18n="tgChat">Comments</span></label>
-  <label class="toggle" data-i18n-title="tgAnonTitle" title="Show players by identifier only (names hidden everywhere). Remembered next time"><input type="checkbox" id="tAnon"><span data-i18n="tgAnon">Anonymize</span></label>
-  <span class="meta" id="fileMeta"></span>
-  <span id="warn"></span>
-  <select id="langSel" title="Language / 言語">
-    <option value="en">English</option>
-    <option value="ja">日本語</option>
-  </select>
+  <div class="brand">
+    <h1 data-i18n="appTitle">Werewolf Replay Viewer</h1>
+    <button id="openBtn" data-i18n="open">Open file</button>
+    <select id="segSel" data-i18n-title="segTitle" title="Segment (level)"></select>
+  </div>
+  <div class="layers">
+    <div class="group" data-i18n-title="grpMap" title="Map layers">
+      <label class="toggle" data-i18n-title="tgMeshTitle" title="Overlay the walkable floor mesh on the map image. Recordings without a map image always show the mesh as the background"><input type="checkbox" id="tMesh" checked><span data-i18n="tgMesh">Floor mesh</span></label>
+      <label class="toggle"><input type="checkbox" id="tYFade" checked><span data-i18n="tgYFade">Fade by height</span></label>
+      <label class="toggle"><input type="checkbox" id="tBg"><span data-i18n="tgBg">All trails as background</span></label>
+    </div>
+    <div class="group" data-i18n-title="grpEntities" title="Entities">
+      <label class="toggle"><input type="checkbox" id="tEnemies" checked><span data-i18n="tgEnemies">Enemies</span></label>
+      <label class="toggle"><input type="checkbox" id="tVals" checked><span data-i18n="tgVals">Valuables</span></label>
+      <label class="toggle"><input type="checkbox" id="tItems" checked><span data-i18n="tgItems">Items</span></label>
+    </div>
+    <div class="group" data-i18n-title="grpPlayers" title="Players">
+      <label class="toggle"><input type="checkbox" id="tNames" checked><span data-i18n="tgNames">Names</span></label>
+      <label class="toggle"><input type="checkbox" id="tTrail" checked><span data-i18n="tgTrail">Trails</span></label>
+      <label class="toggle"><input type="checkbox" id="tRoles" checked><span data-i18n="tgRoles">Roles</span></label>
+    </div>
+    <div class="group">
+      <label class="toggle" data-i18n-title="tgChatTitle" title="Show meeting comments. When off, the meeting plays as if nobody had chatted"><input type="checkbox" id="tChat" checked><span data-i18n="tgChat">Comments</span></label>
+    </div>
+  </div>
+  <div class="status">
+    <span class="meta" id="fileMeta"></span>
+    <span id="warn"></span>
+    <label class="toggle" data-i18n-title="tgAnonTitle" title="Show players by identifier only (names hidden everywhere). Remembered next time"><input type="checkbox" id="tAnon"><span data-i18n="tgAnon">Anonymize</span></label>
+    <select id="langSel" title="Language / 言語">
+      <option value="en">English</option>
+      <option value="ja">日本語</option>
+    </select>
+  </div>
 </header>
 <div id="main">
   <div id="mapWrap">
@@ -140,12 +240,13 @@
     <div id="tooltip"></div>
     <div id="drop">
       <div class="box">
-        <b data-i18n="dropTitle">Drop a replay .jsonl file here</b><br>
+        <b data-i18n="dropTitle">Drop a replay .jsonl file here</b>
         <span data-i18n="dropHint">Or use “Open file” at the top left. Load a file saved from the in-game replay viewer, or dumped with /ww replay dump.</span>
       </div>
     </div>
   </div>
   <div id="side">
+    <div class="sec-head" data-i18n="secStatus">Status</div>
     <div id="gauges">
       <div id="gaugeBars" style="display:none">
         <div class="grow">
@@ -169,7 +270,9 @@
         <tr><td data-i18n="gDeaths">Deaths</td><td id="gDeaths">-</td></tr>
       </table>
     </div>
+    <div class="sec-head" data-i18n="secRoster">Roster</div>
     <div id="roster"></div>
+    <div class="sec-head" data-i18n="secLog">Log</div>
     <div id="events"></div>
   </div>
 </div>
@@ -185,10 +288,10 @@
       <option value="16">16×</option>
       <option value="32">32×</option>
     </select>
-    <span class="meta" id="paceLabel" data-i18n="paceLabel" data-i18n-title="paceTitle"
+    <span id="paceLabel" data-i18n="paceLabel" data-i18n-title="paceTitle"
       title="Meetings play at an absolute speed (4× around chat, 32× while silent; 16× around chat when 16× or faster is selected)">Auto pace in meetings</span>
     <span id="timeLabel">0:00.0 / 0:00.0</span>
-    <span class="meta" data-i18n="keyHint">Space = play/pause · ←→ = ±5s (Shift ±30s) · Wheel = zoom · Drag = pan · Click/roster = track player (Esc clears)</span>
+    <span class="keys" data-i18n="keyHint">Space = play/pause · ←→ = ±5s (Shift ±30s) · Wheel = zoom · Drag = pan · Click/roster = track player (Esc clears)</span>
   </div>
   <div id="seek"><canvas id="seekCanvas"></canvas></div>
 </footer>
@@ -216,6 +319,8 @@ const TEXTS = {
     tgChatTitle: "Show meeting comments. When off, the meeting plays as if nobody had chatted",
     tgAnon: "Anonymize",
     tgAnonTitle: "Show players by identifier only (names hidden everywhere). Remembered next time",
+    grpMap: "Map layers", grpEntities: "Entities", grpPlayers: "Players",
+    secStatus: "Status", secRoster: "Roster", secLog: "Log",
     dropTitle: "Drop a replay .jsonl file here",
     dropHint: "Or use “Open file” at the top left. Load a file saved from the in-game replay viewer, or dumped with /ww replay dump.",
     gPhase: "Phase", gValCount: "Valuables left", gRemain: "Value left",
@@ -303,6 +408,8 @@ const TEXTS = {
     tgChatTitle: "会議の発言を表示する。オフにすると発言が無かったものとして会議を再生する",
     tgAnon: "匿名化",
     tgAnonTitle: "プレイヤーを識別IDだけで表示する（名前はどこにも出さない）。次回開いたときも引き継ぐ",
+    grpMap: "マップの表示", grpEntities: "対象物の表示", grpPlayers: "プレイヤーの表示",
+    secStatus: "状況", secRoster: "名簿", secLog: "ログ",
     dropTitle: "リプレイ .jsonl をここへドロップ",
     dropHint: "または左上の「ファイルを開く」。ゲーム内リプレイビューアの「保存」、または /ww replay dump で書き出したファイルを読み込めます。",
     gPhase: "フェーズ", gValCount: "現存貴重品", gRemain: "現存総額",
@@ -1140,6 +1247,21 @@ function danmakuAccentWidthScale(c, elapsed) {
 function danmakuAccentCenterOffsetFactor(c, elapsed) {
   return danmakuEntrySign(c) * (1 - danmakuAccentWidthScale(c, elapsed)) * 0.5;
 }
+/* プレイヤー色: 録画の頭部色（players[].c＝#rrggbb）が正。無い旧録画は識別ID起点のゴールデンアングル色相 */
+function idHueColor(n) {
+  const hue = ((n * 137.508) % 360 + 360) % 360;
+  return `hsl(${hue.toFixed(1)}, 62%, 60%)`;
+}
+function playerColorOf(p) {
+  return p && /^#[0-9a-fA-F]{6}$/.test(p.c || "") ? p.c.toLowerCase() : idHueColor(p ? p.id : 0);
+}
+/* 塗りの上に置く数字の色。暗い塗り（#rrggbb の相対輝度 < 0.45）だけ白 */
+function inkOn(color) {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(color);
+  if (!m) return "#0c0d10";
+  const [r, g, b] = m.slice(1).map(h => parseInt(h, 16) / 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.45 ? "#f5f6f8" : "#0c0d10";
+}
 /*__CORE_END__*/
 
 /* ---------------- UI（DOM・Canvas） ---------------- */
@@ -1148,11 +1270,6 @@ const isOn = id => $(id).checked;
 /* コメント非表示中は速度プロファイルにも発言を渡さない＝会議は発言が無かったものとして進む */
 const NO_CHATS = [];
 function paceChatTimes() { return isOn("tChat") ? state.chatTimes : NO_CHATS; }
-/* プレイヤー色は識別ID起点のゴールデンアングル色相 */
-function playerColor(n) {
-  const hue = ((n * 137.508) % 360 + 360) % 360;
-  return `hsl(${hue.toFixed(1)}, 62%, 60%)`;
-}
 /* プレイヤーマーカーの輪郭＝菱形 */
 function tracePlayerMarker(ctx, cx, cy, r) {
   ctx.beginPath();
@@ -1186,7 +1303,7 @@ const state = {
   bounds: null, eventRows: [],
   bgPaths: [], mapLayers: null, mapBitmap: null, fixedRefY: null,
   popups: [], gaugeIndex: null, deathMarks: [], cartItemHides: new Set(),
-  selected: new Set(), hoverables: [], playerHits: [], actorToId: new Map(),
+  selected: new Set(), hoverables: [], playerHits: [], actorPlayers: new Map(),
   chatTimes: [], danmaku: emptyDanmaku(),
 };
 
@@ -1241,12 +1358,12 @@ function danmakuMetaText(actor, role) {
 }
 /* マーカーに入れる識別ID（名簿に居ない actor は「?」。色は actor 値から作る） */
 function actorIdText(a) {
-  const pid = state.actorToId.get(a);
-  return pid !== undefined ? String(pid) : "?";
+  const p = state.actorPlayers.get(a);
+  return p ? String(p.id) : "?";
 }
 function actorColor(a) {
-  const pid = state.actorToId.get(a);
-  return playerColor(pid !== undefined ? pid : a);
+  const p = state.actorPlayers.get(a);
+  return p ? playerColorOf(p) : idHueColor(a);
 }
 /* 録画に載っている表示名（kind は P/E/C/V/I/D） */
 function entityName(kind, id, fallback) {
@@ -1296,7 +1413,7 @@ function buildSegOptions() {
 function selectSegment(i) {
   state.segIdx = i;
   const s = seg();
-  state.actorToId = new Map((s.header.players || []).map(p => [p.a, p.id]));
+  state.actorPlayers = new Map((s.header.players || []).map(p => [p.a, p]));
   state.tracks = buildTracks(s);
   state.derived = buildDerived(s);
   pruneCorpseSpawnGlitch(state.tracks, state.derived);
@@ -1641,15 +1758,14 @@ function goneBy(ledger, id) {
 /* 死亡発表の済んだ死体は盤面から退場させる（名簿には残る） */
 const hasDeparted = actor => goneBy(state.derived.announcedAt, actor);
 
-/* 直近15秒の移動跡。追跡選択中は選択者だけを描く */
+/* 直近15秒の移動跡（暗い下敷き線の上に頭部色）。追跡選択中は選択者だけを描く */
 function drawPlayerTrails(ctx) {
   if (!isOn("tTrail")) return;
   const t = state.t, tracking = state.selected.size > 0;
   for (const [actor, track] of state.tracks.P) {
     if (tracking && !state.selected.has(actor)) continue;
     if (hasDeparted(actor)) continue;
-    ctx.strokeStyle = actorColor(actor);
-    ctx.lineWidth = tracking ? 2.2 : 1.5;
+    const width = tracking ? 2.2 : 1.5;
     ctx.globalAlpha = tracking ? 0.8 : 0.5;
     ctx.beginPath();
     const addPath = samples => {
@@ -1664,6 +1780,11 @@ function drawPlayerTrails(ctx) {
     addPath(track);
     const corpse = state.tracks.D.get(actor);
     if (corpse) addPath(corpse); // 死亡後に運ばれた経路（アバターは死亡地点で静止する）
+    ctx.strokeStyle = "#060806";
+    ctx.lineWidth = width + 2;
+    ctx.stroke();
+    ctx.strokeStyle = actorColor(actor);
+    ctx.lineWidth = width;
     ctx.stroke();
     ctx.globalAlpha = 1;
     ctx.lineWidth = 1;
@@ -1699,7 +1820,7 @@ function drawPlayers(ctx, hits) {
       ctx.lineWidth = 1;
     }
     const idText = actorIdText(actor);
-    ctx.fillStyle = "#0c0d10";
+    ctx.fillStyle = inkOn(color);
     ctx.font = `bold ${idText.length >= 3 ? 7.5 : 9.5}px sans-serif`;
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText(idText, sx, sy + 0.5);
@@ -1738,7 +1859,7 @@ function drawGrid(ctx, w, h) {
   const [wx0, wz1] = toWorld(0, 0);
   const [wx1, wz0] = toWorld(w, h);
   const step = state.view.scale > 18 ? 5 : 10;
-  ctx.strokeStyle = "#22252b";
+  ctx.strokeStyle = "#121b13";
   ctx.beginPath();
   for (let x = Math.ceil(wx0 / step) * step; x <= wx1; x += step) {
     const [sx] = toScreen(x, 0);
@@ -1792,7 +1913,7 @@ function buildRosterStatic() {
     row.title = tx("rosterRowTitle");
     const sw = document.createElement("span");
     sw.className = "swatch";
-    sw.style.background = playerColor(p.id);
+    sw.style.background = playerColorOf(p);
     const name = document.createElement("span");
     name.className = "name";
     name.textContent = playerLabel(p) + (p.a === s.header.me ? tx("selfSuffix") : "");
@@ -2015,7 +2136,7 @@ function spawnComment(chat, elapsed) {
   const text = chat.text || "";
   const { line1, line2 } = chatWrap(text);
   const n = chatDisplayLength(text);
-  const prefix = (state.actorToId.get(chat.a) ?? "?") + ": ";
+  const prefix = actorIdText(chat.a) + ": ";
   const c = {
     a: chat.a, text, line1, line2, prefix,
     displayChars: n, spawnT: chat.t || 0,

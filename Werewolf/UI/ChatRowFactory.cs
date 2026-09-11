@@ -40,6 +40,11 @@ namespace Werewolf.UI
         private const float BodyFontSize = 20f;
         private const float NameFontSize = 19f;
 
+        private const float MessageIconSize = 80f;
+        private const float MessageIconGap = 8f;
+
+        private const float MessageIconSlot = MessageIconSize + MessageIconGap;
+
         private const int AvatarFreezeWaitFrames = 120;
 
         private static readonly Color AliveBubbleColor = new Color(0.94f, 0.94f, 0.96f, 0.96f);
@@ -66,6 +71,9 @@ namespace Werewolf.UI
         private Func<int, PlayerHandle> _resolveAvatar;
         private Func<int, int> _resolveId;
         private Func<int, Role?> _markedRole;
+
+        private bool _idErrorLogged;
+        private bool _roleErrorLogged;
 
         private readonly List<PendingAvatar> _pendingAvatars = new List<PendingAvatar>();
 
@@ -127,22 +135,43 @@ namespace Werewolf.UI
         public ChatBlockSize MeasureBubble(ChatLogEntry entry)
         {
             bool system = entry.Kind == ChatEntryKind.System;
-            string body = system ? ComposeSystemText(entry) : entry.Text;
+            if (!system && FeatureFlags.ChatStamps
+                && EmojiSprites.TryTakeLeadingSprite(entry.Text, out _, out string stampRest))
+            {
+                if (string.IsNullOrEmpty(stampRest))
+                {
+                    return new ChatBlockSize(MessageIconSize + BubblePadding * 2f,
+                                             MessageIconSize + BubblePadding * 2f);
+                }
+                MeasureText(EmojiSprites.Substitute(stampRest), MaxTextWidth - MessageIconSlot,
+                    shrink: true, out float restWidth, out float restHeight);
+                return new ChatBlockSize(
+                    MessageIconSlot + restWidth + BubblePadding * 2f,
+                    Mathf.Max(MessageIconSize, restHeight) + BubblePadding * 2f);
+            }
 
-            float textWidth = MaxTextWidth;
-            float textHeight = BodyFontSize;
+            string body = system ? ComposeSystemText(entry) : EmojiSprites.Substitute(entry.Text);
+            MeasureText(body, MaxTextWidth, shrink: !system, out float textWidth, out float textHeight);
+            return new ChatBlockSize(textWidth + BubblePadding * 2f, textHeight + BubblePadding * 2f);
+        }
+
+        private void MeasureText(string body, float maxWidth, bool shrink,
+                                 out float width, out float height)
+        {
+            width = maxWidth;
+            height = BodyFontSize;
             try
             {
                 if (_measure != null)
                 {
-                    if (!system)
+                    if (shrink)
                     {
-                        Vector2 unconstrained = _measure.GetPreferredValues(body, MaxTextWidth, 0f);
-                        textWidth = Mathf.Clamp(unconstrained.x, BodyFontSize, MaxTextWidth);
+                        Vector2 unconstrained = _measure.GetPreferredValues(body, maxWidth, 0f);
+                        width = Mathf.Clamp(unconstrained.x, BodyFontSize, maxWidth);
                     }
-                    textHeight = Mathf.Max(BodyFontSize,
-                        Mathf.Max(_measure.GetPreferredValues(body, textWidth, 0f).y,
-                            MeasureWrappedHeight(body, textWidth)));
+                    height = Mathf.Max(BodyFontSize,
+                        Mathf.Max(_measure.GetPreferredValues(body, width, 0f).y,
+                            MeasureWrappedHeight(body, width)));
                 }
             }
             catch (Exception e)
@@ -153,7 +182,6 @@ namespace Werewolf.UI
                     WLog.Line("chat_measure_error", secret: false, ("err", e.Message));
                 }
             }
-            return new ChatBlockSize(textWidth + BubblePadding * 2f, textHeight + BubblePadding * 2f);
         }
 
         private float MeasureWrappedHeight(string body, float width)
@@ -347,12 +375,37 @@ namespace Werewolf.UI
             bubble.raycastTarget = false;
             if (groupHead) CreateTail(rect, bubbleColor, isSelf);
 
+            if (FeatureFlags.ChatStamps
+                && EmojiSprites.TryTakeLeadingSprite(entry.Text, out Sprite stampIcon, out string stampRest))
+            {
+                Image icon = UiKit.CreateImage(rect, "Icon",
+                    new Vector2(-block.Width * 0.5f + BubblePadding + MessageIconSize * 0.5f, 0f),
+                    new Vector2(MessageIconSize, MessageIconSize), Color.white);
+                icon.sprite = stampIcon;
+                icon.preserveAspect = true;
+                icon.raycastTarget = false;
+                if (stampRest.Length > 0)
+                {
+                    float restWidth = block.Width - BubblePadding * 2f - MessageIconSlot;
+                    TextMeshProUGUI restLabel = UiKit.CreateText(rect, "Text",
+                        new Vector2(MessageIconSlot * 0.5f, 0f),
+                        new Vector2(restWidth, block.Height - BubblePadding * 2f),
+                        EmojiSprites.Substitute(stampRest), BodyFontSize, bodyColor,
+                        TextAlignmentOptions.MidlineLeft);
+                    restLabel.enableWordWrapping = true;
+                    restLabel.spriteAsset = EmojiSprites.Asset;
+                }
+                return rect.gameObject;
+            }
+
             float textWidth = block.Width - BubblePadding * 2f;
             float textHeight = block.Height - BubblePadding * 2f;
             TextMeshProUGUI label = UiKit.CreateText(rect, "Text", Vector2.zero,
-                new Vector2(textWidth, textHeight), entry.Text, BodyFontSize,
+                new Vector2(textWidth, textHeight),
+                EmojiSprites.Substitute(entry.Text), BodyFontSize,
                 bodyColor, TextAlignmentOptions.TopLeft);
             label.enableWordWrapping = true;
+            label.spriteAsset = EmojiSprites.Asset;
 
             RectTransform labelRect = label.rectTransform;
             labelRect.anchorMin = new Vector2(0f, 1f);
@@ -433,12 +486,28 @@ namespace Werewolf.UI
         {
             int id = 0;
             try { id = _resolveId != null ? _resolveId(actor) : 0; }
-            catch { id = 0; }
+            catch (Exception e)
+            {
+                if (!_idErrorLogged)
+                {
+                    _idErrorLogged = true;
+                    WLog.Line("chat_row_id_error", secret: false, ("err", e.Message));
+                }
+                id = 0;
+            }
             if (id <= 0) return rawName;
 
             Role? marked = null;
             try { marked = _markedRole != null ? _markedRole(actor) : null; }
-            catch { marked = null; }
+            catch (Exception e)
+            {
+                if (!_roleErrorLogged)
+                {
+                    _roleErrorLogged = true;
+                    WLog.Line("chat_row_role_error", secret: false, ("err", e.Message));
+                }
+                marked = null;
+            }
 
             string number = id.ToString();
             string hex = MarkerColors.HexFor(marked);

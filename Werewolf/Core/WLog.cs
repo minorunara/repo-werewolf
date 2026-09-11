@@ -5,6 +5,13 @@ using System.Text;
 
 namespace Werewolf.Core
 {
+    public enum WLogLevel
+    {
+        Debug = 0,
+        Warning = 1,
+        Error = 2,
+    }
+
     public static class WLog
     {
         public const string Prefix = "[WW]";
@@ -65,6 +72,37 @@ namespace Werewolf.Core
             }
 
             Emit(sb, secret);
+        }
+
+        internal static WLogLevel LevelOf(string line)
+        {
+            string kind = KindOf(line);
+
+            if (kind == "warn" || kind.EndsWith("_warning", StringComparison.Ordinal))
+                return WLogLevel.Warning;
+
+            if (kind.EndsWith("_error", StringComparison.Ordinal)
+                || kind.EndsWith("_failed", StringComparison.Ordinal)
+                || kind.EndsWith("_fail", StringComparison.Ordinal)
+                || kind.EndsWith("_invalid", StringComparison.Ordinal)
+                || kind == "game_refs_disabled"
+                || kind == "harmony_disabled")
+                return WLogLevel.Error;
+
+            return WLogLevel.Debug;
+        }
+
+        internal static string KindOf(string line)
+        {
+            if (string.IsNullOrEmpty(line) || !line.StartsWith(Prefix, StringComparison.Ordinal))
+                return "unknown";
+
+            int start = Prefix.Length;
+            while (start < line.Length && line[start] == ' ') start++;
+            if (start >= line.Length) return "unknown";
+
+            int end = line.IndexOf(' ', start);
+            return end < 0 ? line.Substring(start) : line.Substring(start, end - start);
         }
 
         private static void Emit(StringBuilder sb, bool secret)

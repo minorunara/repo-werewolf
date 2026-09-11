@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using Werewolf.Core;
-using Werewolf.UI;
 
 namespace Werewolf.Vanilla
 {
@@ -17,7 +16,9 @@ namespace Werewolf.Vanilla
 
         public float FontScale { get; set; } = 1f;
 
-        public TutorialBubblePanel Bubble { get; set; }
+        public ITutorialBubble Bubble { get; set; }
+
+        public int ElevatedSortingOrder { get; set; }
 
         private readonly List<(TutorialId Id, string Message)> _queue = new List<(TutorialId, string)>();
         private float _remaining;
@@ -45,7 +46,7 @@ namespace Werewolf.Vanilla
         public TutorialId? Tick(bool meetingUiVisible)
         {
             TutorialUI ui = TutorialUI.instance;
-            TutorialBubblePanel bubble = Bubble;
+            ITutorialBubble bubble = Bubble;
             bool bubbleReady = bubble != null && bubble.Exists;
             bool bubbleSkip = bubbleReady && bubble.Tick();
 
@@ -153,7 +154,7 @@ namespace Werewolf.Vanilla
             Canvas nested = go.GetComponent<Canvas>();
             if (nested == null) nested = go.AddComponent<Canvas>();
             nested.overrideSorting = true;
-            nested.sortingOrder = WerewolfUIManager.TutorialSortingOrder;
+            nested.sortingOrder = ElevatedSortingOrder;
             _elevatedUi = ui;
         }
     }

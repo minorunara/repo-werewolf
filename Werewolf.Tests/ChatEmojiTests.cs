@@ -110,6 +110,31 @@ namespace Werewolf.Tests
                 "。PNG を Werewolf/Assets へ置く（csproj の Assets\\**\\*.png で自動埋め込み）。");
         }
 
+        [Theory]
+        [InlineData("👻 死んでいました", 0, "emoji_ghost", 2)]
+        [InlineData("❌", 0, "emoji_cross_mark", 1)]
+        [InlineData("❌️ x", 0, "emoji_cross_mark", 2)]
+        [InlineData("a👻", 1, "emoji_ghost", 3)]
+        public void TryReadSpriteAt_ReadsMappedEmoji(string text, int index, string expectedKey, int expectedNext)
+        {
+            Assert.True(ChatEmoji.TryReadSpriteAt(text, index, out string key, out int next));
+            Assert.Equal(expectedKey, key);
+            Assert.Equal(expectedNext, next);
+        }
+
+        [Theory]
+        [InlineData("abc", 0)]
+        [InlineData("🙂", 0)]
+        [InlineData("👻", 2)]
+        [InlineData("", 0)]
+        [InlineData(null, 0)]
+        public void TryReadSpriteAt_RejectsUnmappedOrOutOfRange(string text, int index)
+        {
+            Assert.False(ChatEmoji.TryReadSpriteAt(text, index, out string key, out int next));
+            Assert.Null(key);
+            Assert.Equal(index, next);
+        }
+
         [Fact]
         public void Templates_MatchLanguagePlaceholders()
         {

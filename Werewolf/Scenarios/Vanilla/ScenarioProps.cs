@@ -2,10 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Werewolf.Core;
-using Werewolf.Game;
 using Werewolf.Scenarios.Core;
-using Werewolf.Scenarios.UI;
-using Werewolf.UI;
 using Werewolf.Vanilla;
 
 namespace Werewolf.Scenarios.Vanilla

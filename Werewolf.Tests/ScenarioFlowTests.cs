@@ -544,5 +544,35 @@ namespace Werewolf.Tests
             Assert.Equal(25000L, timing.StartDelayMs(ScenarioCue.ActionNag));
             Assert.Equal(0L, timing.StartDelayMs(ScenarioCue.None));
         }
+
+        [Fact]
+        public void ChatLogExplanationPending_HoldsFromTheStartUntilTheLastPageInsideTheLog()
+        {
+            ScenarioFlow flow = Flow(
+                ScenarioPage.Say(ScenarioSignal.Advance, A).PointsAt(ScenarioHighlight.MeetingGauge),
+                ScenarioPage.Say(ScenarioSignal.Advance, B).PointsAt(ScenarioHighlight.RecapTitle),
+                ScenarioPage.Say(ScenarioSignal.Advance, C).PointsAt(ScenarioHighlight.ChatLogPanel),
+                ScenarioPage.Say(ScenarioSignal.Advance, D).PointsAt(ScenarioHighlight.MapOverlay));
+
+            Assert.True(flow.ChatLogExplanationPending);
+            flow.Feed(ScenarioSignal.Advance);
+            Assert.True(flow.ChatLogExplanationPending);
+            flow.Feed(ScenarioSignal.Advance);
+            Assert.True(flow.ChatLogExplanationPending);
+            flow.Feed(ScenarioSignal.Advance);
+            Assert.False(flow.ChatLogExplanationPending);
+            flow.Feed(ScenarioSignal.Advance);
+            Assert.True(flow.Finished);
+            Assert.False(flow.ChatLogExplanationPending);
+        }
+
+        [Fact]
+        public void ChatLogExplanationPending_IsFalseForScriptsThatNeverPointIntoTheLog()
+        {
+            ScenarioFlow flow = Flow(
+                ScenarioPage.Say(ScenarioSignal.Advance, A).PointsAt(ScenarioHighlight.ChatLogButton),
+                ScenarioPage.Say(ScenarioSignal.Advance, B));
+            Assert.False(flow.ChatLogExplanationPending);
+        }
     }
 }

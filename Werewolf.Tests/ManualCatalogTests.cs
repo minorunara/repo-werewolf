@@ -137,16 +137,35 @@ namespace Werewolf.Tests
             }
         }
 
-        [Theory]
-        [InlineData(0, 0, 5)]
-        [InlineData(7, 0, 9)]
-        [InlineData(17, 15, 18)]
-        [InlineData(20, 16, 22)]
-        [InlineData(28, 25, 28)]
-        public void SectionNavigation_JumpsToAdjacentSectionStarts(int page, int previous, int next)
+        [Fact]
+        public void SectionNavigation_JumpsToAdjacentSectionStarts()
         {
-            Assert.Equal(previous, ManualCatalog.PreviousSectionStart(page));
-            Assert.Equal(next, ManualCatalog.NextSectionStart(page));
+            var starts = ManualCatalog.Sections.Select(x => x.StartIndex).ToArray();
+
+            for (int i = 0; i < starts.Length; i++)
+            {
+                int page = starts[i];
+                Assert.Equal(starts[i > 0 ? i - 1 : 0], ManualCatalog.PreviousSectionStart(page));
+                Assert.Equal(starts[i + 1 < starts.Length ? i + 1 : i], ManualCatalog.NextSectionStart(page));
+            }
         }
+
+        [Fact]
+        public void SectionNavigation_FromInsideASection_UsesThatSectionsNeighbours()
+        {
+            var starts = ManualCatalog.Sections.Select(x => x.StartIndex).ToArray();
+
+            for (int page = 0; page < ManualCatalog.Pages.Length; page++)
+            {
+                int section = starts.Select((start, idx) => new { start, idx })
+                    .Last(x => page >= x.start).idx;
+
+                Assert.Equal(starts[section > 0 ? section - 1 : 0],
+                    ManualCatalog.PreviousSectionStart(page));
+                Assert.Equal(starts[section + 1 < starts.Length ? section + 1 : section],
+                    ManualCatalog.NextSectionStart(page));
+            }
+        }
+
     }
 }

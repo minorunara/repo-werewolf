@@ -4,6 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
+using Werewolf.Core.Replay;
 using Werewolf.Vanilla;
 
 namespace Werewolf.UI
@@ -66,7 +67,6 @@ namespace Werewolf.UI
                 scaler.referenceResolution = new Vector2(1920f, 1080f);
                 scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
 
-                WLog.Line("ui_overlay_created", secret: false, ("sortingOrder", PanelSortingOrder));
                 return true;
             }
             catch (Exception e)
@@ -132,7 +132,6 @@ namespace Werewolf.UI
     {
         private static TMP_FontAsset _cachedTmpFont;
         private static bool _tmpFontResolved;
-        private static bool _tmpFallbackLogged;
         private static Sprite _whiteSprite;
 
         private const float CursorKeepAliveSeconds = 0.2f;
@@ -233,6 +232,46 @@ namespace Werewolf.UI
         internal static void PinToCorner(RectTransform rect, Vector2 corner, float margin)
             => PinToCorner(rect, corner, new Vector2(margin, margin));
 
+        internal static ScrollRect CreateScrollArea(RectTransform parent, string name,
+            float scrollSensitivity, out RectTransform area, out RectTransform viewport,
+            out RectTransform content)
+        {
+            var areaGo = new GameObject(name, typeof(RectTransform));
+            area = (RectTransform)areaGo.transform;
+            area.SetParent(parent, false);
+            Stretch(area);
+            var scroll = areaGo.AddComponent<ScrollRect>();
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.inertia = false;
+            scroll.scrollSensitivity = scrollSensitivity;
+            var areaBg = areaGo.AddComponent<Image>();
+            areaBg.color = new Color(0f, 0f, 0f, 0.001f);
+            areaBg.raycastTarget = true;
+
+            var viewportGo = new GameObject("Viewport", typeof(RectTransform));
+            viewport = (RectTransform)viewportGo.transform;
+            viewport.SetParent(area, false);
+            Stretch(viewport);
+            var viewportBg = viewportGo.AddComponent<Image>();
+            viewportBg.color = new Color(0f, 0f, 0f, 0.001f);
+            viewportBg.raycastTarget = true;
+            viewportGo.AddComponent<RectMask2D>();
+            scroll.viewport = viewport;
+
+            var contentGo = new GameObject("Content", typeof(RectTransform));
+            content = (RectTransform)contentGo.transform;
+            content.SetParent(viewport, false);
+            content.anchorMin = new Vector2(0f, 1f);
+            content.anchorMax = new Vector2(1f, 1f);
+            content.pivot = new Vector2(0.5f, 1f);
+            content.anchoredPosition = Vector2.zero;
+            content.sizeDelta = Vector2.zero;
+            scroll.content = content;
+            return scroll;
+        }
+
         internal static void SetAnchorsBottomLeft(RectTransform rect, Vector2 centerPos, Vector2 size)
         {
             rect.anchorMin = rect.anchorMax = new Vector2(0f, 0f);
@@ -248,6 +287,34 @@ namespace Werewolf.UI
             image.color = color;
             image.raycastTarget = false;
             return image;
+        }
+
+        internal struct DiamondMarker
+        {
+            public RectTransform Rect;
+            public Image Frame;
+            public Image Fill;
+            public TextMeshProUGUI Id;
+        }
+
+        internal static readonly Color MarkerIdInkOnLight = new Color(0f, 0f, 0f, 0.9f);
+        internal static readonly Color MarkerIdInkOnDark = new Color(1f, 1f, 1f, 0.95f);
+
+        internal static Color MarkerIdInk(float r, float g, float b)
+            => ReplayMarkerPalette.IsDark(r, g, b) ? MarkerIdInkOnDark : MarkerIdInkOnLight;
+
+        internal static DiamondMarker CreateDiamondMarker(Transform parent, string name,
+            float frameSize, float fillSize, float idFontSize, Color frameColor)
+        {
+            var marker = new DiamondMarker();
+            marker.Rect = CreateRect(parent, name, Vector2.zero, new Vector2(frameSize, frameSize));
+            marker.Frame = CreateImage(marker.Rect, "Frame", Vector2.zero, new Vector2(frameSize, frameSize), frameColor);
+            marker.Frame.rectTransform.localEulerAngles = new Vector3(0f, 0f, 45f);
+            marker.Fill = CreateImage(marker.Rect, "Fill", Vector2.zero, new Vector2(fillSize, fillSize), Color.white);
+            marker.Fill.rectTransform.localEulerAngles = new Vector3(0f, 0f, 45f);
+            marker.Id = CreateText(marker.Rect, "Id", Vector2.zero, new Vector2(frameSize * 2f, frameSize),
+                "", idFontSize, MarkerIdInkOnLight, TextAlignmentOptions.Center);
+            return marker;
         }
 
         internal static Image CreateFilledImage(Transform parent, string name, Vector2 anchoredPos, Vector2 size, Color color)
@@ -447,9 +514,6 @@ namespace Werewolf.UI
                 {
                     _cachedTmpFont = chatFont;
                     _tmpFontResolved = true;
-                    WLog.Line("ui_font", secret: false,
-                        ("mode", "chatui"),
-                        ("font", _cachedTmpFont != null ? _cachedTmpFont.name : "null"));
                     return _cachedTmpFont;
                 }
             }
@@ -458,13 +522,6 @@ namespace Werewolf.UI
                 WLog.Line("ui_font_error", secret: false, ("src", "chatui"), ("err", e.Message));
             }
             TMP_FontAsset fallback = TMP_Settings.defaultFontAsset;
-            if (!_tmpFallbackLogged)
-            {
-                _tmpFallbackLogged = true;
-                WLog.Line("ui_font", secret: false,
-                    ("mode", "tmp_fallback"),
-                    ("font", fallback != null ? fallback.name : "null"));
-            }
             return fallback;
         }
     }

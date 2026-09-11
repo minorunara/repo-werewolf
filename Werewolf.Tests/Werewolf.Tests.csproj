@@ -34,12 +34,17 @@
 
     <Compile Include="..\Werewolf\Debug\CommandGate.cs" Link="Debug\CommandGate.cs" />
     <Compile Include="..\Werewolf\Debug\DebugChatAuto.cs" Link="Debug\DebugChatAuto.cs" />
+    <Compile Include="..\Werewolf\Debug\RepeatedLogLimiter.cs" Link="Debug\RepeatedLogLimiter.cs" />
     <Compile Include="..\Werewolf\Debug\SecretLogBuffer.cs" Link="Debug\SecretLogBuffer.cs" />
+    <Compile Include="..\Werewolf\Debug\StructuredLogPolicy.cs" Link="Debug\StructuredLogPolicy.cs" />
     <Compile Include="..\Werewolf\Debug\SelfTest.cs" Link="Debug\SelfTest.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="!Exists('..\Werewolf\Assets\emoji_people.png')">
     <Compile Remove="ChatEmojiTests.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="!Exists('..\Werewolf\Assets\role_card_back.png')">
+    <Compile Remove="PreplayAssetTests.cs" />
   </ItemGroup>
   <ItemGroup Condition="!Exists('..\Werewolf\Assets\sfx_bell_five_minutes.wav')">
     <Compile Remove="SfxFeatureWireTests.cs" />
@@ -49,5 +54,11 @@
   </ItemGroup>
   <ItemGroup Condition="!Exists('..\Werewolf\Vanilla\DEPENDENCIES.md')">
     <Compile Remove="VanillaDependencyLedgerTests.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="!Exists('..\Werewolf\Vanilla\SMOKE_CHECKLIST.md')">
+    <Compile Remove="SmokeChecklistCoverageTests.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="!Exists('$(RepoPath)..\globalgamemanagers')">
+    <Compile Remove="MeetingButtonAssetTests.cs" />
   </ItemGroup>
 </Project>

@@ -7,7 +7,7 @@ namespace Werewolf.Game.Patches
 {
     internal static class MapHidePatch
     {
-        private static readonly AccessTools.FieldRef<PlayerAvatar, PlayerDeathHead> DeathHeadRef =
+        private static AccessTools.FieldRef<PlayerAvatar, PlayerDeathHead> DeathHeadRef =>
             GameRefs.PlayerAvatar_playerDeathHead;
 
         internal static bool GateOpen()

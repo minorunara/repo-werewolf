@@ -10,6 +10,9 @@ namespace Werewolf.Vanilla
 
         private readonly string _srcTag;
 
+        private static bool _mapToolProbeErrorLogged;
+        private static bool _orthoErrorLogged;
+
         private Camera _cachedCamera;
 
         private Vector3 _origCamLocalPosition;
@@ -142,8 +145,13 @@ namespace Werewolf.Vanilla
                 if (tool == null) return false;
                 return GameRefs.MapToolController_Active(tool);
             }
-            catch
+            catch (Exception e)
             {
+                if (!_mapToolProbeErrorLogged)
+                {
+                    _mapToolProbeErrorLogged = true;
+                    WLog.Line("maptool_probe_error", secret: false, ("err", e.Message));
+                }
                 return false;
             }
         }
@@ -269,8 +277,13 @@ namespace Werewolf.Vanilla
                 float required = Mathf.Max(miniH * 0.5f, miniW / (2f * aspect));
                 return required * 1.05f;
             }
-            catch
+            catch (Exception e)
             {
+                if (!_orthoErrorLogged)
+                {
+                    _orthoErrorLogged = true;
+                    WLog.Line("maprt_ortho_error", secret: false, ("err", e.Message));
+                }
                 return fallback;
             }
         }

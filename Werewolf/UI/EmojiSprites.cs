@@ -70,23 +70,13 @@ namespace Werewolf.UI
                 }
 
                 if (own == null) continue;
-
-                int size = 1;
-                int codePoint = text[i];
-                if (char.IsHighSurrogate(text[i]) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
-                {
-                    codePoint = char.ConvertToUtf32(text[i], text[i + 1]);
-                    size = 2;
-                }
-                if (!ChatEmoji.SpriteKeys.TryGetValue(codePoint, out string key)) continue;
+                if (!ChatEmoji.TryReadSpriteAt(text, i, out string key, out int after)) continue;
 
                 if (sb == null) sb = new StringBuilder(text.Length + 32);
                 sb.Append(text, copied, i - copied);
                 sb.Append(TagPrefix).Append(key).Append(TagSuffix);
-
-                i += size - 1;
-                if (i + 1 < text.Length && text[i + 1] == ChatEmoji.VariationSelector16) i++;
-                copied = i + 1;
+                copied = after;
+                i = after - 1;
             }
 
             if (sb == null) return text;
@@ -105,6 +95,18 @@ namespace Werewolf.UI
             Sprite cut = CutVanillaSprite(name);
             _vanillaSprites[name] = cut;
             return cut;
+        }
+
+        public static bool TryTakeLeadingSprite(string text, out Sprite sprite, out string rest)
+        {
+            sprite = null;
+            rest = null;
+            if (!ChatEmoji.TryReadSpriteAt(text, 0, out string key, out int next)) return false;
+            sprite = AssetCatalog.GetSprite(key);
+            if (sprite == null) return false;
+
+            rest = text.Substring(next).TrimStart(' ');
+            return true;
         }
 
         internal static void ResetForTests()
@@ -173,7 +175,6 @@ namespace Werewolf.UI
                 if (own.fallbackSpriteAssets == null) own.fallbackSpriteAssets = new List<TMP_SpriteAsset>();
                 if (!own.fallbackSpriteAssets.Contains(found)) own.fallbackSpriteAssets.Add(found);
             }
-            WLog.Line("emoji_vanilla_ready", secret: false, ("count", characters.Count));
             return _vanilla;
         }
 
@@ -265,8 +266,6 @@ namespace Werewolf.UI
             asset.material = material;
             asset.materialHashCode = TMP_TextUtilities.GetSimpleHashCode(material.name);
 
-            WLog.Line("emoji_sprite_ready", secret: false,
-                ("count", keys.Count), ("atlas", atlas.width + "x" + atlas.height));
             return asset;
         }
     }

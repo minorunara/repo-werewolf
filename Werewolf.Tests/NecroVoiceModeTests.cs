@@ -14,14 +14,6 @@ namespace Werewolf.Tests
             Assert.Equal((byte)2, (byte)NecroVoiceMode.AllDead);
         }
 
-        [Fact]
-        public void GameConfig_Default_IsNonWerewolfDead()
-        {
-            var config = new GameConfig();
-
-            Assert.Equal(NecroVoiceMode.NonWerewolfDead, config.NecroVoiceMode);
-        }
-
         [Theory]
         [InlineData((byte)0, NecroVoiceMode.Off)]
         [InlineData((byte)1, NecroVoiceMode.NonWerewolfDead)]

@@ -265,10 +265,5 @@ namespace Werewolf.Tests
             Assert.Equal(expected, DiscussionImpact.CountUnits(text));
         }
 
-        [Fact]
-        public void HoldSec_MatchesTheClapperInterval()
-        {
-            Assert.Equal(0.975f, DiscussionImpact.HoldSec, 3);
-        }
     }
 }

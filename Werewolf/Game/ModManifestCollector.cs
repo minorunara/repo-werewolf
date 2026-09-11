@@ -35,6 +35,7 @@ namespace Werewolf.Game
         {
             public ModManifest Manifest;
             public string Error;
+            public List<(string Guid, string Error)> ContentIdErrors = new List<(string Guid, string Error)>();
         }
 
         private Task<CollectionResult> _task;
@@ -90,6 +91,8 @@ namespace Werewolf.Game
             try
             {
                 CollectionResult result = _task.GetAwaiter().GetResult();
+                foreach (var (guid, err) in result.ContentIdErrors)
+                    WLog.Line("mod_integrity_contentid_error", secret: false, ("guid", guid), ("err", err));
                 if (result.Manifest == null)
                 {
                     Fail(result.Error ?? "manifest");
@@ -119,6 +122,7 @@ namespace Werewolf.Game
         private static CollectionResult Collect(IReadOnlyList<PluginSnapshot> snapshots)
         {
             var entries = new List<ModManifestEntry>(snapshots.Count);
+            var contentIdErrors = new List<(string Guid, string Error)>();
             for (int i = 0; i < snapshots.Count; i++)
             {
                 PluginSnapshot plugin = snapshots[i];
@@ -126,15 +130,15 @@ namespace Werewolf.Game
                     Bound(plugin.Guid, ModIntegrityWire.MaxGuidLength),
                     Bound(plugin.Name, ModIntegrityWire.MaxNameLength),
                     Bound(plugin.Version, ModIntegrityWire.MaxVersionLength),
-                    BuildContentId(plugin)));
+                    BuildContentId(plugin, contentIdErrors)));
             }
 
             if (!ModManifestComparer.TryCreateManifest(entries, out ModManifest manifest, out string error))
-                return new CollectionResult { Error = error };
-            return new CollectionResult { Manifest = manifest };
+                return new CollectionResult { Error = error, ContentIdErrors = contentIdErrors };
+            return new CollectionResult { Manifest = manifest, ContentIdErrors = contentIdErrors };
         }
 
-        private static string BuildContentId(PluginSnapshot plugin)
+        private static string BuildContentId(PluginSnapshot plugin, List<(string Guid, string Error)> errors)
         {
             if (!string.IsNullOrEmpty(plugin.Location))
             {
@@ -150,8 +154,9 @@ namespace Werewolf.Game
                         return hex.ToString();
                     }
                 }
-                catch
+                catch (Exception e)
                 {
+                    errors.Add((plugin.Guid, e.Message));
                 }
             }
 

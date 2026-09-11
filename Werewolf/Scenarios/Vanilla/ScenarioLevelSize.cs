@@ -2,7 +2,6 @@ using System;
 using Werewolf.Core;
 using Werewolf.Scenarios.Core;
 using Werewolf.Vanilla;
-using Werewolf.Scenarios.Game;
 
 namespace Werewolf.Scenarios.Vanilla
 {
@@ -65,7 +64,7 @@ namespace Werewolf.Scenarios.Vanilla
         private static bool TryGetSpec(out ScenarioEnvironmentSpec spec)
         {
             spec = default;
-            ScenarioDefinition definition = ScenarioRun.Definition;
+            ScenarioDefinition definition = ScenarioRunState.Definition;
             if (definition == null) return false;
             spec = definition.Environment;
             return spec.LevelSizeOverridden;

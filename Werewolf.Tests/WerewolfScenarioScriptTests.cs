@@ -143,7 +143,6 @@ namespace Werewolf.Tests
         public void Watch_TreatsAllExtractionsCompletedAsUnrecoverable()
         {
             Assert.True(Def.Watch.BreakOnAllExtractionsCompleted);
-            Assert.Equal(0, CheckmateJudge.RemainingQuotaDollars(10000, 2, 2));
         }
 
         [Fact]

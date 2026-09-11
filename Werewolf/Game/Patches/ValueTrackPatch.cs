@@ -8,16 +8,16 @@ namespace Werewolf.Game.Patches
 {
     internal static class ValueTrackPatch
     {
-        private static readonly AccessTools.FieldRef<ValuableObject, float> DollarValueCurrent =
+        private static AccessTools.FieldRef<ValuableObject, float> DollarValueCurrent =>
             GameRefs.ValuableObject_dollarValueCurrent;
 
-        private static readonly AccessTools.FieldRef<ValuableObject, float> DollarValueOriginal =
+        private static AccessTools.FieldRef<ValuableObject, float> DollarValueOriginal =>
             GameRefs.ValuableObject_dollarValueOriginal;
 
-        private static readonly AccessTools.FieldRef<PhysGrabObjectImpactDetector, ValuableObject> ValuableRef =
+        private static AccessTools.FieldRef<PhysGrabObjectImpactDetector, ValuableObject> ValuableRef =>
             GameRefs.PhysGrabObjectImpactDetector_valuableObject;
 
-        private static readonly AccessTools.FieldRef<PhysGrabObjectImpactDetector, PhysGrabObject> PhysGrabObjectRef =
+        private static AccessTools.FieldRef<PhysGrabObjectImpactDetector, PhysGrabObject> PhysGrabObjectRef =>
             GameRefs.PhysGrabObjectImpactDetector_physGrabObject;
 
         private static readonly HashSet<int> _breakAccountedIds = new HashSet<int>();
@@ -45,7 +45,7 @@ namespace Werewolf.Game.Patches
             CloseHaulFreeze();
 
             WerewolfDirector dir = WerewolfDirector.Instance;
-            if (dir == null || !dir.IsHostSessionActive) return;
+            if (dir == null || !dir.IsHostMatchLive) return;
             if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
             if (!SemiFunc.RunIsLevel()) return;
 
@@ -115,9 +115,14 @@ namespace Werewolf.Game.Patches
         {
             try
             {
+                WerewolfDirector dir = WerewolfDirector.Instance;
+                if (dir == null || !dir.IsRoundActiveClient) return;
                 ValueTrackPatch.CloseHaulFreeze();
-                WerewolfDirector.Instance?.HostRecordExtractionDone();
-                WerewolfDirector.Instance?.HostRequestCheckmateScan();
+                if (dir.IsHostMatchLive)
+                {
+                    dir.HostRecordExtractionDone();
+                    dir.HostRequestCheckmateScan();
+                }
                 ReplaySampler.NoteExtractionCompleted();
             }
             catch (Exception e)
@@ -152,7 +157,7 @@ namespace Werewolf.Game.Patches
             try
             {
                 WerewolfDirector dir = WerewolfDirector.Instance;
-                if (dir == null || !dir.IsHostSessionActive) return;
+                if (dir == null || !dir.IsHostMatchLive) return;
                 if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
                 if (!SemiFunc.RunIsLevel()) return;
                 if (!_loseValue) return;
@@ -186,7 +191,7 @@ namespace Werewolf.Game.Patches
             try
             {
                 WerewolfDirector dir = WerewolfDirector.Instance;
-                if (dir == null || !dir.IsHostSessionActive) return;
+                if (dir == null || !dir.IsHostMatchLive) return;
                 if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
                 if (!SemiFunc.RunIsLevel()) return;
                 if (__instance.destroyDisable) return;
@@ -237,7 +242,7 @@ namespace Werewolf.Game.Patches
             try
             {
                 WerewolfDirector dir = WerewolfDirector.Instance;
-                if (dir == null || !dir.IsHostSessionActive) return;
+                if (dir == null || !dir.IsHostMatchLive) return;
                 if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
                 if (!SemiFunc.RunIsLevel()) return;
 

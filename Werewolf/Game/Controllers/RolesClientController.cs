@@ -63,8 +63,12 @@ namespace Werewolf.Game
 
         public void Tick(long now)
         {
-            Role? effectiveRole = _d.IsLocalAlive() ? _d.LocalRoleClient : null;
-            _perkEffects.Tick(_d.RolesClient, effectiveRole, SendRoleAction, OnWolfModeChangedLocal);
+            bool matchLive = CombatRules.IsMatchLive(_d.ClientPhaseMirror);
+            Role? effectiveRole = matchLive && _d.IsLocalAlive() ? _d.LocalRoleClient : null;
+            if (matchLive)
+                _perkEffects.Tick(_d.RolesClient, effectiveRole, SendRoleAction, OnWolfModeChangedLocal);
+            else
+                _perkEffects.ResetEffects();
 
             bool healEligible = effectiveRole == Role.Werewolf && _d.RolesClient.HealActive
                 && _d.ClientPhaseMirror == GamePhase.Play && !_d.MeetingClientView.MeetingActive;
@@ -98,7 +102,7 @@ namespace Werewolf.Game
                     _d.RoomStateView.TryReadRights(_d.LocalActor, out rights);
                 }
                 var hudInput = new HudInput(
-                    phase: _d.ClientPhase,
+                    phase: _d.RoleRevealVisible ? GamePhase.RoleReveal : _d.ClientPhase,
                     localRole: _d.LocalRoleClient,
                     roundEndUnixMs: _d.ClientRoundEndUnixMs,
                     rolesClient: _d.RolesClient,

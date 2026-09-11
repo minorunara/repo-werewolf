@@ -284,13 +284,22 @@ namespace Werewolf.Game
             }
         }
 
+        private static bool _escSuppressErrorLogged;
+        private static bool _menuKeyErrorLogged;
+        private static bool _textInputErrorLogged;
+
         private static void SuppressEscMenu()
         {
             try
             {
                 Session.DisableEscMenu(1f);
             }
-            catch { }
+            catch (Exception e)
+            {
+                if (_escSuppressErrorLogged) return;
+                _escSuppressErrorLogged = true;
+                WLog.Line("result_esc_suppress_error", secret: false, ("err", e.Message));
+            }
         }
 
         private static bool MenuKeyDownSafe()
@@ -299,8 +308,13 @@ namespace Werewolf.Game
             {
                 return Inputs.Down(GameKey.Menu);
             }
-            catch
+            catch (Exception e)
             {
+                if (!_menuKeyErrorLogged)
+                {
+                    _menuKeyErrorLogged = true;
+                    WLog.Line("result_menu_key_error", secret: false, ("err", e.Message));
+                }
                 return false;
             }
         }
@@ -311,8 +325,13 @@ namespace Werewolf.Game
             {
                 return Inputs.NoTextInputsActive;
             }
-            catch
+            catch (Exception e)
             {
+                if (!_textInputErrorLogged)
+                {
+                    _textInputErrorLogged = true;
+                    WLog.Line("result_text_input_error", secret: false, ("err", e.Message));
+                }
                 return true;
             }
         }

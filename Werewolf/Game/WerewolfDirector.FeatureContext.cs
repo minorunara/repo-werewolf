@@ -53,6 +53,9 @@ namespace Werewolf.Game
 
         internal long ClientRoundEndUnixMs => _roundMirror.RoundEndUnixMs;
 
+        internal long ClientRoleRevealStartUnixMs => _roundMirror.RoleRevealStartUnixMs;
+        internal long ClientRoleRevealEndUnixMs => _roundMirror.RoleRevealEndUnixMs;
+
         internal bool RoleRevealVisible => _roleRevealFeature.CinematicVisible;
 
         internal int[] KnownWerewolves => _roundMirror.KnownWerewolves;
@@ -99,6 +102,16 @@ namespace Werewolf.Game
                 if (!ClientScenarioSession) return false;
                 ScenarioFlow flow = _scenarioFeature?.Flow;
                 return flow != null && !flow.Finished;
+            }
+        }
+
+        internal bool ScenarioChatLogExplanationPending
+        {
+            get
+            {
+                if (!ClientScenarioSession) return false;
+                ScenarioFlow flow = _scenarioFeature?.Flow;
+                return flow != null && flow.ChatLogExplanationPending;
             }
         }
 

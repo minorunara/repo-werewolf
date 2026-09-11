@@ -3,6 +3,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
+using Werewolf.Vanilla;
 
 namespace Werewolf.UI
 {
@@ -14,7 +15,7 @@ namespace Werewolf.UI
         private const float TopMargin = HudGeometry.RoleBadge.TopMargin;
         private const float RootWidth = 400f;
         private const float RootHeight = 220f;
-        private const float BadgeIconSize = 128f;
+        private const float BadgeIconSize = HudGeometry.RoleBadge.IconSize;
         private const float BadgeRowHeight = HudGeometry.RoleBadge.RowHeight;
         private const float BadgeGap = 10f;
         private const float BadgeFontSize = 48f;

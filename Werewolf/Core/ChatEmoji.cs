@@ -35,6 +35,7 @@ namespace Werewolf.Core
             [0x1F5F3] = "emoji_ballot_box",
             [0x270B]  = "emoji_raised_hand",
             [0x1F4A6] = "emoji_sweat_droplets",
+            [0x1F62D] = "emoji_loudly_crying_face",
         };
 
         private static readonly Dictionary<TextId, string> _templates = new Dictionary<TextId, string>
@@ -52,6 +53,26 @@ namespace Werewolf.Core
         public static IReadOnlyDictionary<int, string> SpriteKeys => _spriteKeys;
 
         public static IReadOnlyDictionary<TextId, string> Templates => _templates;
+
+        public static bool TryReadSpriteAt(string text, int index, out string key, out int next)
+        {
+            key = null;
+            next = index;
+            if (text == null || index < 0 || index >= text.Length) return false;
+
+            int size = 1;
+            int codePoint = text[index];
+            if (char.IsHighSurrogate(text[index]) && index + 1 < text.Length && char.IsLowSurrogate(text[index + 1]))
+            {
+                codePoint = char.ConvertToUtf32(text[index], text[index + 1]);
+                size = 2;
+            }
+            if (!_spriteKeys.TryGetValue(codePoint, out key)) return false;
+
+            next = index + size;
+            if (next < text.Length && text[next] == VariationSelector16) next++;
+            return true;
+        }
 
         public static string Template(TextId id)
             => _templates.TryGetValue(id, out string template) ? template : null;
@@ -71,8 +92,9 @@ namespace Werewolf.Core
                 {
                     return string.Format(CultureInfo.InvariantCulture, template, args);
                 }
-                catch (FormatException)
+                catch (FormatException e)
                 {
+                    WLog.Line("chat_emoji_format_error", secret: false, ("id", id), ("err", e.Message));
                 }
             }
             return Texts.Format(id, args);

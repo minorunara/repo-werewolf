@@ -2,19 +2,19 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Werewolf.Core;
-using Werewolf.UI;
-using Werewolf.Game;
 using HarmonyLib;
 
 namespace Werewolf.Vanilla
 {
     internal static class EnemyMapIcons
     {
-        private static readonly AccessTools.FieldRef<EnemyParent, Enemy> EnemyRef = GameRefs.EnemyParent_Enemy;
-        private static readonly AccessTools.FieldRef<EnemyParent, bool> SpawnedRef = GameRefs.EnemyParent_Spawned;
-        private static readonly AccessTools.FieldRef<Enemy, EnemyRigidbody> RigidbodyRef = GameRefs.Enemy_Rigidbody;
-        private static readonly AccessTools.FieldRef<Enemy, bool> HasRigidbodyRef = GameRefs.Enemy_HasRigidbody;
-        private static readonly AccessTools.FieldRef<MapCustom, MapCustomEntity> MapEntityRef = GameRefs.MapCustom_mapCustomEntity;
+        private static AccessTools.FieldRef<EnemyParent, Enemy> EnemyRef => GameRefs.EnemyParent_Enemy;
+        private static AccessTools.FieldRef<EnemyParent, bool> SpawnedRef => GameRefs.EnemyParent_Spawned;
+        private static AccessTools.FieldRef<Enemy, EnemyRigidbody> RigidbodyRef => GameRefs.Enemy_Rigidbody;
+        private static AccessTools.FieldRef<Enemy, bool> HasRigidbodyRef => GameRefs.Enemy_HasRigidbody;
+        private static AccessTools.FieldRef<MapCustom, MapCustomEntity> MapEntityRef => GameRefs.MapCustom_mapCustomEntity;
+
+        internal static Func<string, Texture2D> TextureResolver;
 
         private static Sprite _spriteLevel1;
         private static Sprite _spriteLevel2;
@@ -26,19 +26,19 @@ namespace Werewolf.Vanilla
         private const float VeilLiftY = 0.2f;
         private const int VeilSortingOrder = 100;
 
-        private static bool GateOpen()
+        internal static void Tick(bool gate)
         {
-            WerewolfDirector dir = WerewolfDirector.Instance;
-            return dir != null && dir.IsRoundActiveClient && dir.LocalRoleClient == Role.Werewolf;
-        }
-
-        internal static void Tick()
-        {
-            bool gate = GateOpen();
             if (gate == _active) return;
-            _active = gate;
-            if (gate) AttachAll();
-            else ClearAll();
+            if (gate)
+            {
+                AttachAll();
+                _active = true;
+            }
+            else
+            {
+                ClearAll();
+                _active = false;
+            }
         }
 
         internal static void LateTick()
@@ -65,7 +65,7 @@ namespace Werewolf.Vanilla
 
         internal static void OnSpawn(EnemyParent parent)
         {
-            if (!GateOpen()) return;
+            if (!_active) return;
             Attach(parent);
         }
 
@@ -168,7 +168,7 @@ namespace Werewolf.Vanilla
 
         private static Sprite CreateMonsterSprite(string assetKey)
         {
-            Texture2D texture = AssetCatalog.GetTexture(assetKey);
+            Texture2D texture = TextureResolver != null ? TextureResolver(assetKey) : null;
             if (texture == null) return null;
             return Sprite.Create(texture,
                 new Rect(0f, 0f, texture.width, texture.height),

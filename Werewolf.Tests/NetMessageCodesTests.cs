@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using System.Reflection;
 using Werewolf.Core;
 using Werewolf.Net;
 using Xunit;
@@ -7,19 +9,6 @@ namespace Werewolf.Tests
 {
     public class NetEventCodesTests
     {
-
-        [Fact]
-        public void ImplementedCodes_AliasWWEventCodes_SingleSource()
-        {
-            Assert.Equal(WWEventCodes.AssignRole, MessageCodes.AssignRole);
-            Assert.Equal(WWEventCodes.RevealSelfRole, MessageCodes.RevealSelfRole);
-            Assert.Equal(WWEventCodes.RevealTeammates, MessageCodes.RevealTeammates);
-            Assert.Equal(WWEventCodes.PlayerDied, MessageCodes.PlayerDied);
-            Assert.Equal(WWEventCodes.GameOver, MessageCodes.GameOver);
-            Assert.Equal(WWEventCodes.GameStart, MessageCodes.GameStart);
-            Assert.Equal(WWEventCodes.PhaseChanged, MessageCodes.PhaseChanged);
-        }
-
         [Fact]
         public void ImplementedCodes_HaveExactValues()
         {
@@ -33,26 +22,8 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void ReservedCodes_AreDefinedWithinRange()
+        public void RolesCodes_HaveExactValues()
         {
-            foreach (byte code in new byte[]
-                     {
-                         MessageCodes.StartMeeting, MessageCodes.CastVote, MessageCodes.VoteProgress,
-                         MessageCodes.MeetingResult, MessageCodes.RequestMeeting, MessageCodes.BeaconAudit,
-                         MessageCodes.SyncPerkGauge, MessageCodes.RoleAction, MessageCodes.RoleState,
-                     })
-            {
-                Assert.InRange(code, MessageCodes.MinCode, MessageCodes.MaxCode);
-            }
-        }
-
-        [Fact]
-        public void RolesCodes_AliasWWRolesCodes_SingleSource()
-        {
-            Assert.Equal(WWRolesCodes.BeaconAudit, MessageCodes.BeaconAudit);
-            Assert.Equal(WWRolesCodes.SyncPerkGauge, MessageCodes.SyncPerkGauge);
-            Assert.Equal(WWRolesCodes.RoleAction, MessageCodes.RoleAction);
-            Assert.Equal(WWRolesCodes.RoleState, MessageCodes.RoleState);
             Assert.Equal(167, MessageCodes.BeaconAudit);
             Assert.Equal(171, MessageCodes.SyncPerkGauge);
             Assert.Equal(174, MessageCodes.RoleAction);
@@ -69,52 +40,34 @@ namespace Werewolf.Tests
             Assert.Equal(173, MessageCodes.RequestMeeting);
         }
 
-        [Theory]
-        [InlineData(160, true)]
-        [InlineData(175, true)]
-        [InlineData(168, true)]
-        [InlineData(176, true)]
-        [InlineData(180, true)]
-        [InlineData(189, true)]
-        [InlineData(190, true)]
-        [InlineData(191, true)]
-        [InlineData(192, true)]
-        [InlineData(159, false)]
-        [InlineData(193, false)]
-        [InlineData(0, false)]
-        [InlineData(200, false)]
-        public void IsInRange_MatchesReservedBand(int code, bool expected)
+        [Fact]
+        public void IsInRange_AcceptsEveryDefinedCode_AndRejectsOutsideTheBand()
         {
-            Assert.Equal(expected, MessageCodes.IsInRange((byte)code));
+            var codes = typeof(MessageCodes)
+                .GetFields(BindingFlags.Public | BindingFlags.Static)
+                .Where(f => f.IsLiteral && f.FieldType == typeof(byte))
+                .Select(f => new { f.Name, Value = (byte)f.GetRawConstantValue() })
+                .ToArray();
+
+            Assert.NotEmpty(codes);
+            foreach (var c in codes)
+            {
+                Assert.True(MessageCodes.IsInRange(c.Value), c.Name + " が帯域外");
+            }
+
+            Assert.False(MessageCodes.IsInRange((byte)(MessageCodes.MinCode - 1)));
+            Assert.False(MessageCodes.IsInRange((byte)(MessageCodes.MaxCode + 1)));
+            Assert.False(MessageCodes.IsInRange(0));
+            Assert.False(MessageCodes.IsInRange(255));
         }
 
         [Fact]
-        public void ConveneDenied_HasExactValue()
+        public void ConveneDenied_Is176_PublicTargetDelivery()
         {
             Assert.Equal(176, MessageCodes.ConveneDenied);
-        }
-
-        [Fact]
-        public void ConveneDenied_IsInReservedRange()
-        {
-            Assert.InRange(MessageCodes.ConveneDenied, MessageCodes.MinCode, MessageCodes.MaxCode);
-        }
-
-        [Fact]
-        public void ConveneDenied_NotClassifiedAsTargetOnlySecret()
-        {
+            Assert.True(MessageCodes.IsInRange(MessageCodes.ConveneDenied));
             Assert.False(MessageCodes.IsTargetOnly(MessageCodes.ConveneDenied));
-        }
-
-        [Fact]
-        public void ConveneDenied_NotClassifiedAsMasterInbound()
-        {
             Assert.False(MessageCodes.IsMasterInbound(MessageCodes.ConveneDenied));
-        }
-
-        [Fact]
-        public void ConveneDenied_IsNotSecret()
-        {
             Assert.False(MessageCodes.IsSecret(MessageCodes.ConveneDenied));
         }
 
@@ -125,38 +78,39 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void MaxCode_ExtendedTo192()
+        public void ChatStampRequest_Is193_MasterInbound()
         {
-            Assert.Equal(192, MessageCodes.MaxCode);
+            Assert.Equal(193, MessageCodes.ChatStampRequest);
+            Assert.True(MessageCodes.IsInRange(MessageCodes.ChatStampRequest));
+            Assert.True(MessageCodes.IsMasterInbound(MessageCodes.ChatStampRequest));
+            Assert.False(MessageCodes.IsTargetOnly(MessageCodes.ChatStampRequest));
+            Assert.False(MessageCodes.IsSecret(MessageCodes.ChatStampRequest));
         }
 
         [Fact]
-        public void CosmeticGrant_HasExactValue()
+        public void ChatStamp_Is194_PublicBroadcast()
+        {
+            Assert.Equal(194, MessageCodes.ChatStamp);
+            Assert.True(MessageCodes.IsInRange(MessageCodes.ChatStamp));
+            Assert.False(MessageCodes.IsMasterInbound(MessageCodes.ChatStamp));
+            Assert.False(MessageCodes.IsTargetOnly(MessageCodes.ChatStamp));
+            Assert.False(MessageCodes.IsSecret(MessageCodes.ChatStamp));
+        }
+
+        [Fact]
+        public void ChatStampCodes_Schemas_CarryIdOnly()
+        {
+            Assert.Equal(new[] { typeof(byte) }, MessageCodes.Schema(MessageCodes.ChatStampRequest));
+            Assert.Equal(new[] { typeof(int), typeof(byte) }, MessageCodes.Schema(MessageCodes.ChatStamp));
+        }
+
+        [Fact]
+        public void CosmeticGrant_Is177_PublicBroadcast()
         {
             Assert.Equal(177, MessageCodes.CosmeticGrant);
-        }
-
-        [Fact]
-        public void CosmeticGrant_IsInReservedRange()
-        {
             Assert.True(MessageCodes.IsInRange(MessageCodes.CosmeticGrant));
-        }
-
-        [Fact]
-        public void CosmeticGrant_NotClassifiedAsTargetOnly()
-        {
             Assert.False(MessageCodes.IsTargetOnly(MessageCodes.CosmeticGrant));
-        }
-
-        [Fact]
-        public void CosmeticGrant_NotClassifiedAsMasterInbound()
-        {
             Assert.False(MessageCodes.IsMasterInbound(MessageCodes.CosmeticGrant));
-        }
-
-        [Fact]
-        public void CosmeticGrant_IsNotSecret()
-        {
             Assert.False(MessageCodes.IsSecret(MessageCodes.CosmeticGrant));
         }
 
@@ -290,63 +244,23 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void BombDetonation_HasExactValue()
+        public void BombDetonation_Is180_BroadcastButRedactedInLogs()
         {
             Assert.Equal(180, MessageCodes.BombDetonation);
-        }
-
-        [Fact]
-        public void BomberState_HasExactValue()
-        {
-            Assert.Equal(181, MessageCodes.BomberState);
-        }
-
-        [Fact]
-        public void BombDetonation_IsInReservedRange()
-        {
             Assert.True(MessageCodes.IsInRange(MessageCodes.BombDetonation));
-        }
-
-        [Fact]
-        public void BomberState_IsInReservedRange()
-        {
-            Assert.True(MessageCodes.IsInRange(MessageCodes.BomberState));
-        }
-
-        [Fact]
-        public void BombDetonation_IsNotTargetOnly_BroadcastToAll()
-        {
             Assert.False(MessageCodes.IsTargetOnly(MessageCodes.BombDetonation));
-        }
-
-        [Fact]
-        public void BomberState_IsTargetOnly()
-        {
-            Assert.True(MessageCodes.IsTargetOnly(MessageCodes.BomberState));
-        }
-
-        [Fact]
-        public void BombDetonation_IsSecret_ForLogRedaction()
-        {
+            Assert.False(MessageCodes.IsMasterInbound(MessageCodes.BombDetonation));
             Assert.True(MessageCodes.IsSecret(MessageCodes.BombDetonation));
         }
 
         [Fact]
-        public void BomberState_IsSecret()
+        public void BomberState_Is181_TargetOnlySecret()
         {
-            Assert.True(MessageCodes.IsSecret(MessageCodes.BomberState));
-        }
-
-        [Fact]
-        public void BombDetonation_IsNotMasterInbound()
-        {
-            Assert.False(MessageCodes.IsMasterInbound(MessageCodes.BombDetonation));
-        }
-
-        [Fact]
-        public void BomberState_IsNotMasterInbound()
-        {
+            Assert.Equal(181, MessageCodes.BomberState);
+            Assert.True(MessageCodes.IsInRange(MessageCodes.BomberState));
+            Assert.True(MessageCodes.IsTargetOnly(MessageCodes.BomberState));
             Assert.False(MessageCodes.IsMasterInbound(MessageCodes.BomberState));
+            Assert.True(MessageCodes.IsSecret(MessageCodes.BomberState));
         }
 
         [Fact]

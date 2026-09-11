@@ -32,12 +32,19 @@ namespace Werewolf.Tests
         [Theory]
         [InlineData(-1f, ConveneChargeTone.StartVolume)]
         [InlineData(0f, ConveneChargeTone.StartVolume)]
-        [InlineData(0.5f, 0.50f)]
         [InlineData(1f, ConveneChargeTone.EndVolume)]
         [InlineData(2f, ConveneChargeTone.EndVolume)]
         public void Volume_ClampsAndRises(float ratio, float expected)
         {
             Assert.Equal(expected, ConveneChargeTone.VolumeFor(ratio), 4);
+        }
+
+        [Fact]
+        public void Volume_Midpoint_LiesBetweenStartAndEnd()
+        {
+            float mid = ConveneChargeTone.VolumeFor(0.5f);
+            Assert.True(ConveneChargeTone.StartVolume < mid);
+            Assert.True(mid < ConveneChargeTone.EndVolume);
         }
     }
 }

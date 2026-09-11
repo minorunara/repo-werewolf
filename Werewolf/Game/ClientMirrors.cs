@@ -56,25 +56,39 @@ namespace Werewolf.Game
 
         internal long RoundEndUnixMs;
 
+        internal long RoleRevealStartUnixMs;
+
+        internal long RoleRevealEndUnixMs;
+
         internal int WerewolfCount;
 
         internal int RevealDelaySec;
 
         internal long GameStartUnixMs;
 
+        internal bool StartBoundaryPrepared;
+
         internal long LastMeetingEndUnixMs;
 
-        internal void Reset()
+        internal void ClearAssignedRoles()
         {
             LocalRole = null;
             KnownWerewolves = null;
             KnownTeammateRoles = null;
+        }
+
+        internal void Reset()
+        {
+            ClearAssignedRoles();
             DeathMirror.Clear();
             DisplayNameCache = null;
             RoundEndUnixMs = 0;
+            RoleRevealStartUnixMs = 0;
+            RoleRevealEndUnixMs = 0;
             WerewolfCount = 0;
             RevealDelaySec = 0;
             GameStartUnixMs = 0;
+            StartBoundaryPrepared = false;
             LastMeetingEndUnixMs = 0;
         }
     }

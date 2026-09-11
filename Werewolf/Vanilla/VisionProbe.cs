@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Werewolf.Game
+namespace Werewolf.Vanilla
 {
     internal static class VisionProbe
     {

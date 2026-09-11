@@ -150,6 +150,45 @@ namespace Werewolf.Tests
             Assert.Equal("[WW] selftest-start", _captured[0].Line);
         }
 
+        [Theory]
+        [InlineData("[WW] phase Lobby->Play reason=start")]
+        [InlineData("[WW] dir=send code=163 target=all payload=[]")]
+        [InlineData("[WW] scenario_started scenario=MeetingVote")]
+        [InlineData("[WW] win reason=ExtractionFailed trigger=extraction_failed")]
+        public void LevelOf_NormalTrace_IsDebug(string line)
+        {
+            Assert.Equal(WLogLevel.Debug, WLog.LevelOf(line));
+        }
+
+        [Theory]
+        [InlineData("[WW] lobby_start_warning reason=players")]
+        [InlineData("[WW] warn reason=corrected")]
+        public void LevelOf_WarningKind_IsWarning(string line)
+        {
+            Assert.Equal(WLogLevel.Warning, WLog.LevelOf(line));
+        }
+
+        [Theory]
+        [InlineData("[WW] tick_error err=boom")]
+        [InlineData("[WW] registry_init_failed err=boom")]
+        [InlineData("[WW] send_fail err=boom")]
+        [InlineData("[WW] recv_payload_invalid code=999")]
+        [InlineData("[WW] game_refs_disabled failedFields=2")]
+        [InlineData("[WW] harmony_disabled failedClasses=1")]
+        public void LevelOf_FailureKind_IsError(string line)
+        {
+            Assert.Equal(WLogLevel.Error, WLog.LevelOf(line));
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("not a WLog line")]
+        public void LevelOf_UnknownLine_DefaultsToDebug(string line)
+        {
+            Assert.Equal(WLogLevel.Debug, WLog.LevelOf(line));
+        }
+
         [Fact]
         public void Sink_Unset_DoesNotThrow()
         {

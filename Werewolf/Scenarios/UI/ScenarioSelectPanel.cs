@@ -8,6 +8,7 @@ using Werewolf.Scenarios.Core;
 using Werewolf.Scenarios.Game;
 using Werewolf.UI;
 using Werewolf.Scenarios.Vanilla;
+using Werewolf.Vanilla;
 
 namespace Werewolf.Scenarios.UI
 {
@@ -114,8 +115,6 @@ namespace Werewolf.Scenarios.UI
             _backLabel.richText = false;
 
             _root.SetActive(false);
-
-            WLog.Line("scenario_select_built", secret: false, ("tiles", _tiles.Count));
         }
 
         private void BuildTiles(Transform parent)

@@ -31,13 +31,11 @@ namespace Werewolf.Scenarios.Game
 
             if (!ScenarioRun.Available)
             {
-                WLog.Line("scenario_entry_skipped", secret: false, ("reason", "patch_failed"));
                 return;
             }
 
             if (!Chainloader.PluginInfos.ContainsKey(MenuLibGuid))
             {
-                WLog.Line("scenario_entry_skipped", secret: false, ("reason", "menulib_missing"));
                 return;
             }
 
@@ -45,7 +43,6 @@ namespace Werewolf.Scenarios.Game
             {
                 Install();
                 _installed = true;
-                WLog.Line("scenario_entry_installed", secret: false);
             }
             catch (Exception e)
             {
@@ -73,11 +70,6 @@ namespace Werewolf.Scenarios.Game
                 Vector2 pivot = button.rectTransform.pivot;
                 Vector2 position = ResolveBottomRight(parent, size, pivot);
                 button.rectTransform.localPosition = new Vector3(position.x, position.y, 0f);
-
-                WLog.Line("scenario_entry_button", secret: false,
-                    ("x", (int)position.x), ("y", (int)position.y),
-                    ("w", (int)size.x), ("h", (int)size.y),
-                    ("pivot", pivot.x.ToString("0.##") + "," + pivot.y.ToString("0.##")));
             }
             catch (Exception e)
             {
@@ -110,7 +102,6 @@ namespace Werewolf.Scenarios.Game
                 TMP_FontAsset replacement = UiKit.ResolveTmpFont();
                 if (replacement == null || replacement == current) return;
                 label.font = replacement;
-                WLog.Line("scenario_entry_font", secret: false, ("font", replacement.name));
             }
             catch (Exception e)
             {

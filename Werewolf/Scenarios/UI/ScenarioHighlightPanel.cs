@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using Werewolf.Core;
 using Werewolf.Scenarios.Core;
 using Werewolf.UI;
+using Werewolf.Vanilla;
 
 namespace Werewolf.Scenarios.UI
 {

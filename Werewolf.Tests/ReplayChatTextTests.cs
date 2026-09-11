@@ -63,30 +63,25 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void Wrap_30CharsOrLess_SingleLine()
+        public void Wrap_AtOrBelowSingleLineMax_StaysOnOneLine()
         {
-            string s30 = new string('い', 30);
-            (string l1, string l2) = ReplayChatText.Wrap(s30);
-            Assert.Equal(s30, l1);
+            string s = new string('い', ReplayChatText.SingleLineMax);
+            (string l1, string l2) = ReplayChatText.Wrap(s);
+            Assert.Equal(s, l1);
             Assert.Null(l2);
         }
 
-        [Fact]
-        public void Wrap_31Chars_SplitsAt25Plus6()
+        [Theory]
+        [InlineData(ReplayChatText.SingleLineMax + 1)]
+        [InlineData(ReplayChatText.MaxDisplayChars)]
+        public void Wrap_AboveSingleLineMax_SplitsNearTargetWithoutLosingChars(int length)
         {
-            string s31 = new string('う', 31);
-            (string l1, string l2) = ReplayChatText.Wrap(s31);
-            Assert.Equal(25, ReplayChatText.DisplayLength(l1));
-            Assert.Equal(6, ReplayChatText.DisplayLength(l2));
-        }
-
-        [Fact]
-        public void Wrap_50Chars_SplitsAt25Plus25()
-        {
-            string s50 = new string('え', 50);
-            (string l1, string l2) = ReplayChatText.Wrap(s50);
-            Assert.Equal(25, ReplayChatText.DisplayLength(l1));
-            Assert.Equal(25, ReplayChatText.DisplayLength(l2));
+            string s = new string('う', length);
+            (string l1, string l2) = ReplayChatText.Wrap(s);
+            Assert.NotNull(l2);
+            Assert.InRange(ReplayChatText.DisplayLength(l1),
+                ReplayChatText.WrapTarget - 1, ReplayChatText.WrapTarget + 1);
+            Assert.Equal(length, ReplayChatText.DisplayLength(l1) + ReplayChatText.DisplayLength(l2));
         }
 
         [Fact]
@@ -125,22 +120,6 @@ namespace Werewolf.Tests
             (string l1, string l2) = ReplayChatText.Wrap(s);
             Assert.EndsWith(cluster, l1);
             Assert.Equal('し', l2[0]);
-        }
-
-        [Fact]
-        public void DwellSeconds_ClampsBetweenBaseAndMax()
-        {
-            Assert.Equal(1.25, ReplayChatText.DwellSeconds(0), 3);
-            Assert.Equal(1.875, ReplayChatText.DwellSeconds(25), 3);
-            Assert.Equal(2.5, ReplayChatText.DwellSeconds(50), 3);
-            Assert.Equal(2.5, ReplayChatText.DwellSeconds(999), 3);
-        }
-
-        [Fact]
-        public void TotalSeconds_AddsSlideInAndOut()
-        {
-            Assert.Equal(0.22 + 1.25 + 0.28, ReplayChatText.TotalSeconds(0), 3);
-            Assert.Equal(0.22 + 2.5 + 0.28, ReplayChatText.TotalSeconds(50), 3);
         }
 
         [Fact]

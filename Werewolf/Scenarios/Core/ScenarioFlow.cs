@@ -27,6 +27,18 @@ namespace Werewolf.Scenarios.Core
 
         public ScenarioPage Current => _pages[Finished ? _pages.Count - 1 : _index];
 
+        public bool ChatLogExplanationPending
+        {
+            get
+            {
+                for (int i = _index; i < _pages.Count; i++)
+                {
+                    if (ScenarioHighlightLayout.OccupiesChatLog(_pages[i].Highlight)) return true;
+                }
+                return false;
+            }
+        }
+
         public bool IsLatched(ScenarioSignal signal) => _latched[(int)signal];
 
         public bool HasReached(ScenarioMilestone milestone)

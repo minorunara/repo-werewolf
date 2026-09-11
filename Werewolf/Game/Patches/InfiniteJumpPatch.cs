@@ -7,10 +7,10 @@ namespace Werewolf.Game.Patches
     [HarmonyPatch(typeof(PlayerController), "Update")]
     internal static class InfiniteJumpPatch
     {
-        private static readonly AccessTools.FieldRef<PlayerController, bool> JumpFirst =
+        private static AccessTools.FieldRef<PlayerController, bool> JumpFirst =>
             GameRefs.PlayerController_JumpFirst;
 
-        private static readonly AccessTools.FieldRef<PlayerController, int> JumpExtraCurrent =
+        private static AccessTools.FieldRef<PlayerController, int> JumpExtraCurrent =>
             GameRefs.PlayerController_JumpExtraCurrent;
 
         private static int _refillsThisAirTime;

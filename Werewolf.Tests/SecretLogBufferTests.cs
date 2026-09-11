@@ -1,4 +1,5 @@
 using System;
+using Werewolf.Core;
 using Werewolf.Debugging;
 using Xunit;
 
@@ -9,86 +10,92 @@ namespace Werewolf.Tests
         private static readonly DateTime T0 = new DateTime(2026, 7, 17, 21, 3, 45, 123);
 
         [Fact]
-        public void Add_AppendsCaptureTimestampSuffix()
+        public void Add_PreservesLevelAndAppendsCaptureTimestamp()
         {
             var buffer = new SecretLogBuffer();
-            buffer.Add("[WW] assign actor=3 role=BlackCat secret=1", T0);
+            buffer.Add("[WW] assign actor=3 role=BlackCat secret=1", WLogLevel.Debug, T0);
 
-            var lines = buffer.Flush(out _);
+            var entry = Assert.Single(buffer.Flush(out _));
 
-            Assert.Equal("[WW] assign actor=3 role=BlackCat secret=1 t=21:03:45.123", Assert.Single(lines));
+            Assert.Equal(WLogLevel.Debug, entry.Level);
+            Assert.Equal("[WW] assign actor=3 role=BlackCat secret=1 t=21:03:45.123", entry.Line);
         }
 
         [Fact]
-        public void Flush_ReturnsLinesInCaptureOrder()
+        public void Flush_ReturnsEntriesInCaptureOrderWithOriginalLevels()
         {
             var buffer = new SecretLogBuffer();
-            buffer.Add("first", T0);
-            buffer.Add("second", T0.AddSeconds(1));
-            buffer.Add("third", T0.AddSeconds(2));
+            buffer.Add("first", WLogLevel.Debug, T0);
+            buffer.Add("second", WLogLevel.Warning, T0.AddSeconds(1));
+            buffer.Add("third", WLogLevel.Error, T0.AddSeconds(2));
 
-            var lines = buffer.Flush(out int dropped);
+            var entries = buffer.Flush(out int dropped);
 
-            Assert.Equal(3, lines.Count);
-            Assert.StartsWith("first", lines[0]);
-            Assert.StartsWith("second", lines[1]);
-            Assert.StartsWith("third", lines[2]);
+            Assert.Equal(3, entries.Count);
+            Assert.StartsWith("first", entries[0].Line);
+            Assert.Equal(WLogLevel.Debug, entries[0].Level);
+            Assert.StartsWith("second", entries[1].Line);
+            Assert.Equal(WLogLevel.Warning, entries[1].Level);
+            Assert.StartsWith("third", entries[2].Line);
+            Assert.Equal(WLogLevel.Error, entries[2].Level);
             Assert.Equal(0, dropped);
         }
 
         [Fact]
-        public void Flush_EmptiesBuffer_SecondFlushReturnsNothing()
+        public void Flush_EmptiesBufferAndResetsDroppedCounter()
         {
-            var buffer = new SecretLogBuffer();
-            buffer.Add("line", T0);
-            buffer.Flush(out _);
+            var buffer = new SecretLogBuffer(capacity: 1);
+            buffer.Add("a", WLogLevel.Debug, T0);
+            buffer.Add("b", WLogLevel.Debug, T0);
 
-            var second = buffer.Flush(out int dropped);
+            var first = buffer.Flush(out int firstDropped);
+            var second = buffer.Flush(out int secondDropped);
 
+            Assert.Single(first);
+            Assert.StartsWith("b", first[0].Line);
+            Assert.Equal(1, firstDropped);
             Assert.Empty(second);
-            Assert.Equal(0, dropped);
+            Assert.Equal(0, secondDropped);
             Assert.Equal(0, buffer.Count);
         }
 
         [Fact]
-        public void Add_OverCapacity_DropsOldestAndCountsDropped()
+        public void Add_OverCapacity_DropsOldest()
         {
             var buffer = new SecretLogBuffer(capacity: 2);
-            buffer.Add("oldest", T0);
-            buffer.Add("middle", T0);
-            buffer.Add("newest", T0);
+            buffer.Add("oldest", WLogLevel.Debug, T0);
+            buffer.Add("middle", WLogLevel.Warning, T0);
+            buffer.Add("newest", WLogLevel.Error, T0);
 
-            var lines = buffer.Flush(out int dropped);
+            var entries = buffer.Flush(out int dropped);
 
-            Assert.Equal(2, lines.Count);
-            Assert.StartsWith("middle", lines[0]);
-            Assert.StartsWith("newest", lines[1]);
+            Assert.Equal(2, entries.Count);
+            Assert.StartsWith("middle", entries[0].Line);
+            Assert.StartsWith("newest", entries[1].Line);
             Assert.Equal(1, dropped);
         }
 
         [Fact]
-        public void Flush_ResetsDroppedCounter()
+        public void CapacityBelowOne_IsClampedToOne()
         {
-            var buffer = new SecretLogBuffer(capacity: 1);
-            buffer.Add("a", T0);
-            buffer.Add("b", T0);
+            var buffer = new SecretLogBuffer(capacity: 0);
+            buffer.Add("first", WLogLevel.Debug, T0);
+            buffer.Add("second", WLogLevel.Debug, T0);
 
-            buffer.Flush(out int firstDropped);
-            Assert.Equal(1, firstDropped);
+            var entries = buffer.Flush(out int dropped);
 
-            buffer.Add("c", T0);
-            buffer.Flush(out int secondDropped);
-            Assert.Equal(0, secondDropped);
+            Assert.Single(entries);
+            Assert.StartsWith("second", entries[0].Line);
+            Assert.Equal(1, dropped);
         }
 
         [Fact]
-        public void Count_TracksHeldLines()
+        public void Count_TracksHeldEntries()
         {
             var buffer = new SecretLogBuffer();
-            Assert.Equal(0, buffer.Count);
 
-            buffer.Add("a", T0);
-            buffer.Add("b", T0);
+            buffer.Add("first", WLogLevel.Debug, T0);
+            buffer.Add("second", WLogLevel.Error, T0);
 
             Assert.Equal(2, buffer.Count);
         }

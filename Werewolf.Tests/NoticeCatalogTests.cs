@@ -1,3 +1,4 @@
+using System.Linq;
 using Werewolf.Core;
 using Xunit;
 
@@ -6,60 +7,43 @@ namespace Werewolf.Tests
     public class NoticeCatalogTests
     {
         [Fact]
-        public void ConveneStarted_IncludesCallerName()
+        public void NamedNotices_EmbedTheActorName()
         {
-            var notice = SessionNotice.ForConveneStarted("Alice");
-            Assert.Equal("Aliceが緊急会議を招集しました", NoticeCatalog.Format(notice));
+            var texts = new[]
+            {
+                NoticeCatalog.Format(SessionNotice.ForConveneStarted("Alice")),
+                NoticeCatalog.Format(SessionNotice.ForExecuted("Alice")),
+                NoticeCatalog.Format(SessionNotice.ForBlackCatRevealed("Alice")),
+                NoticeCatalog.Format(SessionNotice.ForCurseVictim("Alice")),
+                NoticeCatalog.Format(SessionNotice.ForPlayerDisconnected("Alice")),
+            };
+
+            foreach (var text in texts)
+            {
+                Assert.False(string.IsNullOrEmpty(text));
+                Assert.Contains("Alice", text);
+            }
+
+            Assert.Equal(texts.Length, texts.Distinct().Count());
         }
 
         [Fact]
-        public void NoExecution_ShowsFixedText()
+        public void FixedNotices_AreNonEmptyAndCarryNoNameSlot()
         {
-            var notice = SessionNotice.ForNoExecution();
-            Assert.Equal("誰も処刑されませんでした", NoticeCatalog.Format(notice));
-        }
+            var texts = new[]
+            {
+                NoticeCatalog.Format(SessionNotice.ForNoExecution()),
+                NoticeCatalog.Format(SessionNotice.ForCatAwakened()),
+                NoticeCatalog.Format(SessionNotice.ForConveneHoldHint()),
+            };
 
-        [Fact]
-        public void Executed_IncludesActorName()
-        {
-            var notice = SessionNotice.ForExecuted("Bob");
-            Assert.Equal("Bobが処刑されました", NoticeCatalog.Format(notice));
-        }
+            foreach (var text in texts)
+            {
+                Assert.False(string.IsNullOrEmpty(text));
+                Assert.DoesNotContain("{0}", text);
+            }
 
-        [Fact]
-        public void BlackCatRevealed_IncludesActorName()
-        {
-            var notice = SessionNotice.ForBlackCatRevealed("Carol");
-            Assert.Equal("Carolは黒猫でした", NoticeCatalog.Format(notice));
-        }
-
-        [Fact]
-        public void CurseVictim_IncludesActorName()
-        {
-            var notice = SessionNotice.ForCurseVictim("Dave");
-            Assert.Equal("Daveは道連れにされました", NoticeCatalog.Format(notice));
-        }
-
-        [Fact]
-        public void CatAwakened_IsAnonymousFixedTemplate()
-        {
-            var notice = SessionNotice.ForCatAwakened();
-            Assert.Equal("もし黒猫がいるなら、目覚めている頃です…", NoticeCatalog.Format(notice));
-        }
-
-        [Fact]
-        public void PlayerDisconnected_IncludesActorName()
-        {
-            var notice = SessionNotice.ForPlayerDisconnected("Eve");
-            Assert.Equal("Eveがゲームから切断されました", NoticeCatalog.Format(notice));
-        }
-
-        [Fact]
-        public void ConveneHoldHint_ExplainsHoldOperation()
-        {
-            var notice = SessionNotice.ForConveneHoldHint();
-            Assert.Equal("会議を招集するには、ボタンを長押ししてください",
-                NoticeCatalog.Format(notice));
+            Assert.Equal(texts.Length, texts.Distinct().Count());
         }
 
         [Theory]

@@ -5,7 +5,7 @@ namespace Werewolf.Net
         public static bool IsAcceptable(byte code, int senderActor, int masterActor)
         {
             if (MessageCodes.IsMasterInbound(code)) return true;
-            if (masterActor <= 0) return true;
+            if (masterActor <= 0) return false;
             return senderActor == masterActor;
         }
     }

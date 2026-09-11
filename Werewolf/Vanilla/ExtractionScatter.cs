@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 using Werewolf.Core;
-using Werewolf.Game;
 
 namespace Werewolf.Vanilla
 {
@@ -37,7 +36,10 @@ namespace Werewolf.Vanilla
 
             List<LevelPoint> levelPoints = null;
             try { levelPoints = SemiFunc.LevelPointsGetAll(); }
-            catch {  }
+            catch (Exception e)
+            {
+                WLog.Line("scatter_diag_points_error", secret: false, ("err", e.Message));
+            }
 
             SpawnPoint[] truckSpawns = TruckWarper.ResolveTruckSpawnPoints();
 
