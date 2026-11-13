@@ -1,5 +1,7 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Werewolf.Core
 {
@@ -110,7 +112,7 @@ namespace Werewolf.Core
 
         public byte[] Rarities { get; }
 
-        public bool TryGetCounts(int actor, out int[] countsByRarity)
+        public bool TryGetCounts(int actor, [NotNullWhen(true)] out int[]? countsByRarity)
         {
             for (int i = 0; i < Actors.Length; i++)
             {

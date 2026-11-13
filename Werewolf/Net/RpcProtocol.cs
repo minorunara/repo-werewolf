@@ -1,3 +1,5 @@
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
 using Werewolf.Core;
 
 namespace Werewolf.Net
@@ -10,8 +12,8 @@ namespace Werewolf.Net
 
         public const string MethodName = "WerewolfRpc";
 
-        public static bool TryOpen(byte protocolVersion, byte messageType, object[] payload,
-            int senderActor, out InboundMessage message, out string dropReason)
+        public static bool TryOpen(byte protocolVersion, byte messageType, object?[]? payload,
+            int senderActor, [NotNullWhen(true)] out InboundMessage? message, out string? dropReason)
         {
             message = null;
 
@@ -23,7 +25,7 @@ namespace Werewolf.Net
                 return false;
             }
 
-            if (!NetPayload.TryDeserialize(messageType, payload, out object[] valid, out dropReason))
+            if (!NetPayload.TryDeserialize(messageType, payload, out object[]? valid, out dropReason))
                 return false;
 
             message = new InboundMessage(messageType, valid, senderActor);

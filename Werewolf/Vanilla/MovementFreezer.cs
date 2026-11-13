@@ -1,6 +1,6 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
-using HarmonyLib;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Werewolf.Core;
@@ -9,14 +9,6 @@ namespace Werewolf.Vanilla
 {
     public sealed class MovementFreezer
     {
-        private static AccessTools.FieldRef<RunManager, List<PlayerVoiceChat>> VoiceChatsRef =>
-            GameRefs.RunManager_voiceChats;
-
-        private static AccessTools.FieldRef<InputManager, Dictionary<InputKey, InputAction>> InputActionsRef =>
-            GameRefs.InputManager_inputActions;
-        private static AccessTools.FieldRef<DataDirector, bool> ToggleMuteRef =>
-            GameRefs.DataDirector_toggleMute;
-
         private const float KeepAliveSeconds = 0.1f;
 
         private bool _active;
@@ -69,7 +61,7 @@ namespace Werewolf.Vanilla
         {
             RunManager rm = RunManager.instance;
             if (rm == null) return;
-            List<PlayerVoiceChat> chats = VoiceChatsRef(rm);
+            List<PlayerVoiceChat> chats = rm.voiceChats;
             if (chats == null) return;
             foreach (PlayerVoiceChat vc in chats)
             {
@@ -79,17 +71,16 @@ namespace Werewolf.Vanilla
 
         private static void PollToggleMute()
         {
-            if (InputActionsRef == null || ToggleMuteRef == null) return;
             if (!SemiFunc.IsMultiplayer()) return;
             if (!InputGate.KeysFree) return;
             InputManager im = InputManager.instance;
             DataDirector dd = DataDirector.instance;
             if (im == null || dd == null) return;
-            Dictionary<InputKey, InputAction> actions = InputActionsRef(im);
+            Dictionary<InputKey, InputAction> actions = im.inputActions;
             if (actions == null) return;
             if (!actions.TryGetValue(InputKey.ToggleMute, out InputAction action) || action == null) return;
             if (!action.WasPressedThisFrame()) return;
-            ref bool mute = ref ToggleMuteRef(dd);
+            ref bool mute = ref dd.toggleMute;
             mute = !mute;
         }
     }

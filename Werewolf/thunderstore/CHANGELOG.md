@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.6.0
+
+### 日本語
+
+- 処刑済みステータスの絞首台を木槌へ置き換えられるローカル表示設定を追加しました
+- v0.5.1アップデートに対応しました
+- 人狼の試合中はマップにお宝が不足したときにゲームがお宝を補充する救済措置を無効化しました
+- チュートリアルのスキップや説明書・シナリオ選択を閉じる操作をゲーム本体の「戻る」操作に揃えました
+- 表示言語がゲーム本体の言語設定に自動で追従するようになりました
+- 日本語の文言を、ゲーム本体の公式日本語訳の用語（貴重品→お宝・抽出ポイント→回収地点・Taxman→税務官など）に揃えました
+
+### English
+
+- Added a local visual setting that replaces the gallows used for the Executed status with a gavel
+- Updated for game version 0.5.1
+- The game's new safeguard that respawns valuables when the haul falls short no longer triggers during werewolf rounds
+- Skipping tutorials and closing the manual or the scenario picker now use the game's own Back input
+- The display language now follows the game's language setting
+- Aligned the Japanese text with the terms used by the game's official Japanese localization (valuables, extraction points, the Taxman, and more)
+
 ## 1.5.0
 
 ### 日本語

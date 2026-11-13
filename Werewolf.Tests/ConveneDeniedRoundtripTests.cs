@@ -31,11 +31,12 @@ namespace Werewolf.Tests
         {
             session.OnSend += msg =>
             {
-                switch (msg.Target)
+                switch (msg.Destination)
                 {
-                    case MessageTarget.All: bus.SendToAll(msg.Code, msg.Payload); break;
-                    case MessageTarget.Actors: bus.SendToActors(msg.Code, msg.Payload, msg.TargetActors); break;
-                    case MessageTarget.Master: bus.SendToMaster(msg.Code, msg.Payload); break;
+                    case MessageDestination.AllDestination: bus.SendToAll(msg.Code, msg.Payload); break;
+                    case MessageDestination.ActorsDestination actors:
+                        bus.SendToActors(msg.Code, msg.Payload, actors.Actors); break;
+                    case MessageDestination.MasterDestination: bus.SendToMaster(msg.Code, msg.Payload); break;
                 }
             };
         }
@@ -49,8 +50,8 @@ namespace Werewolf.Tests
 
             Assert.Equal(ConveneRejectReason.NoRight, reason);
             var denied = Assert.Single(h.ByCode(MessageCodes.ConveneDenied).ToArray());
-            Assert.Equal(MessageTarget.Actors, denied.Target);
-            Assert.Equal(new[] { 3 }, denied.TargetActors);
+            Assert.Equal(new[] { 3 },
+                Assert.IsType<MessageDestination.ActorsDestination>(denied.Destination).Actors);
             Assert.Single(denied.Payload);
             Assert.Equal((byte)1, denied.Payload[0]);
         }
@@ -85,8 +86,8 @@ namespace Werewolf.Tests
             Assert.Equal(ConveneRejectReason.WrongPhase, session.TryConvene(1, 100_000));
 
             var denied = Assert.Single(sent.FindAll(m => m.Code == MessageCodes.ConveneDenied));
-            Assert.Equal(MessageTarget.Actors, denied.Target);
-            Assert.Equal(new[] { 1 }, denied.TargetActors);
+            Assert.Equal(new[] { 1 },
+                Assert.IsType<MessageDestination.ActorsDestination>(denied.Destination).Actors);
             Assert.Equal((byte)3, denied.Payload[0]);
         }
 

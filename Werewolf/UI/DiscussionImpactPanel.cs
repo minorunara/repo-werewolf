@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using TMPro;
@@ -22,182 +23,289 @@ namespace Werewolf.UI
         private static readonly Color RightHaloColor = new Color(1f, 0.510f, 0.118f, 1f);
         private static readonly Color RightStrokeColor = new Color(0.478f, 0.227f, 0.020f, 1f);
 
-        private GameObject _root;
-        private Word _left;
-        private Word _right;
-        private ImpactJitterUnit _unit;
-        private float _elapsedSec;
-        private bool _playing;
-        private bool _impactFired;
-        private Action _onImpact;
+        private ViewRefs? _view;
+
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root)
+            {
+                Root = root;
+            }
+
+            public GameObject Root { get; }
+            public WordPair? Pair { get; set; }
+            public ImpactJitterUnit Unit { get; set; }
+            public float ElapsedSec { get; set; }
+            public bool Playing { get; set; }
+            public bool ImpactFired { get; set; }
+            public Action? OnImpact { get; set; }
+        }
+
+        private sealed class WordPair
+        {
+            public WordPair(Word left, Word right)
+            {
+                Left = left;
+                Right = right;
+            }
+
+            public Word Left { get; }
+            public Word Right { get; }
+        }
 
         private sealed class Word
         {
-            public RectTransform Root;
+            public Word(RectTransform root, List<Unit> units, float widthPx, float dir)
+            {
+                Root = root;
+                Units = units;
+                WidthPx = widthPx;
+                Dir = dir;
+            }
 
-            public readonly List<Unit> Units = new List<Unit>();
+            public RectTransform Root { get; }
 
-            public float WidthPx;
+            public List<Unit> Units { get; }
 
-            public float Dir;
+            public float WidthPx { get; }
+
+            public float Dir { get; }
         }
 
         private sealed class Unit
         {
-            public TextMeshProUGUI Main;
-            public TextMeshProUGUI HaloInner;
-            public TextMeshProUGUI HaloOuter;
-            public float RestX;
+            public Unit(TextMeshProUGUI main, TextMeshProUGUI haloInner, TextMeshProUGUI haloOuter)
+            {
+                Main = main;
+                HaloInner = haloInner;
+                HaloOuter = haloOuter;
+            }
+
+            public TextMeshProUGUI Main { get; }
+            public TextMeshProUGUI HaloInner { get; }
+            public TextMeshProUGUI HaloOuter { get; }
+            public float RestX { get; set; }
         }
 
-        public bool Exists => _root != null;
+        public bool Exists => GetLiveViewOrNull() != null;
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
-            if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
 
-            var go = new GameObject("WW_DiscussionImpact", typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(layerRoot, false);
-            UiKit.Stretch(rect);
-            _root = go;
-            _root.SetActive(false);
-        }
-
-        public void Show(string left, string right, Action onImpact)
-        {
-            if (_root == null) return;
+            GameObject? root = null;
             try
             {
-                _root.transform.parent.SetAsLastSibling();
+                if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-                if (!_root.activeSelf) _root.SetActive(true);
+                root = new GameObject("WW_DiscussionImpact", typeof(RectTransform));
+                var rect = (RectTransform)root.transform;
+                rect.SetParent(layerRoot, false);
+                UiKit.Stretch(rect);
+                root.SetActive(false);
+                _view = new ViewRefs(root);
+            }
+            catch
+            {
+                _view = null;
+                if (root != null)
+                {
+                    root.SetActive(false);
+                    UnityEngine.Object.Destroy(root);
+                }
+                throw;
+            }
+        }
+
+        public void Show(string? left, string? right, Action? onImpact)
+        {
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
+
+            Word? newLeft = null;
+            Word? newRight = null;
+            try
+            {
+                DestroyWords(view);
+                ResetPlayback(view, hideRoot: false);
+
+                view.Root.transform.parent.SetAsLastSibling();
+
+                if (!view.Root.activeSelf) view.Root.SetActive(true);
 
                 left ??= string.Empty;
                 right ??= string.Empty;
-                _unit = DiscussionImpact.ResolveUnit(left, right);
+                ImpactJitterUnit unit = DiscussionImpact.ResolveUnit(left, right);
 
-                DestroyWords();
-                _left = BuildWord("Left", left, -1f, LeftFaceColor, LeftHaloColor, LeftStrokeColor);
-                _right = BuildWord("Right", right, +1f, RightFaceColor, RightHaloColor, RightStrokeColor);
+                newLeft = BuildWord(view.Root.transform, "Left", left, -1f,
+                    LeftFaceColor, LeftHaloColor, LeftStrokeColor, unit);
+                newRight = BuildWord(view.Root.transform, "Right", right, +1f,
+                    RightFaceColor, RightHaloColor, RightStrokeColor, unit);
+                var pair = new WordPair(newLeft, newRight);
+                view.Pair = pair;
+                newLeft = null;
+                newRight = null;
 
-                _onImpact = onImpact;
-                _impactFired = false;
-                _elapsedSec = 0f;
-                _playing = true;
-                Apply();
+                view.Unit = unit;
+                view.OnImpact = onImpact;
+                view.ImpactFired = false;
+                view.ElapsedSec = 0f;
+                view.Playing = true;
+                Apply(view);
 
                 WLog.Line("discussion_impact_shown", secret: false,
-                    ("unit", _unit.ToString()), ("units", _left.Units.Count + _right.Units.Count));
+                    ("unit", unit.ToString()), ("units", pair.Left.Units.Count + pair.Right.Units.Count));
             }
             catch (Exception e)
             {
+                DestroyWord(newLeft);
+                DestroyWord(newRight);
+                DestroyWords(view);
+                ResetPlayback(view, hideRoot: true);
                 WLog.Line("discussion_impact_show_error", secret: false, ("err", e.Message));
-                Hide();
             }
         }
 
         public void Tick()
         {
-            if (!_playing || _root == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null || !view.Playing) return;
             try
             {
-                float prev = _elapsedSec;
-                _elapsedSec += Time.unscaledDeltaTime;
+                float prev = view.ElapsedSec;
+                view.ElapsedSec += Time.unscaledDeltaTime;
 
-                if (!_impactFired && prev < DiscussionImpact.ImpactSec
-                    && _elapsedSec >= DiscussionImpact.ImpactSec)
+                if (!view.ImpactFired && prev < DiscussionImpact.ImpactSec
+                    && view.ElapsedSec >= DiscussionImpact.ImpactSec)
                 {
-                    _impactFired = true;
-                    _onImpact?.Invoke();
+                    view.ImpactFired = true;
+                    Action? onImpact = view.OnImpact;
+                    onImpact?.Invoke();
+                    if (!IsCurrent(view) || !view.Playing) return;
                 }
 
-                if (_elapsedSec >= DiscussionImpact.TotalSec)
+                if (view.ElapsedSec >= DiscussionImpact.TotalSec)
                 {
-                    Hide();
+                    ResetPlayback(view, hideRoot: true);
                     return;
                 }
-                Apply();
+                Apply(view);
             }
             catch (Exception e)
             {
                 WLog.Line("discussion_impact_tick_error", secret: false, ("err", e.Message));
-                Hide();
+                ResetPlayback(view, hideRoot: true);
             }
         }
 
         public void Hide()
         {
-            _playing = false;
-            _impactFired = false;
-            _elapsedSec = 0f;
-            _onImpact = null;
-            if (_root != null && _root.activeSelf) _root.SetActive(false);
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view != null) ResetPlayback(view, hideRoot: true);
         }
 
         public void Destroy()
         {
-            _playing = false;
-            _onImpact = null;
-            if (_root != null)
+            ViewRefs? view = _view;
+            _view = null;
+            if (view == null) return;
+
+            Invalidate(view);
+            if (view.Root != null)
             {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
+                view.Root.SetActive(false);
+                UnityEngine.Object.Destroy(view.Root);
             }
-            _left = null;
-            _right = null;
         }
 
-        private void DestroyWords()
+        private ViewRefs? GetLiveViewOrNull()
         {
-            DestroyWord(_left);
-            DestroyWord(_right);
-            _left = null;
-            _right = null;
+            ViewRefs? view = _view;
+            if (view == null || view.Root != null) return view;
+
+            _view = null;
+            Invalidate(view);
+            return null;
         }
 
-        private static void DestroyWord(Word word)
+        private bool IsCurrent(ViewRefs view)
         {
-            if (word?.Root != null) UnityEngine.Object.Destroy(word.Root.gameObject);
+            return ReferenceEquals(_view, view) && view.Root != null;
         }
 
-        private Word BuildWord(string name, string text, float dir,
-            Color faceColor, Color haloColor, Color strokeColor)
+        private static void ResetPlayback(ViewRefs view, bool hideRoot)
         {
-            var word = new Word { Dir = dir };
+            view.Playing = false;
+            view.ImpactFired = false;
+            view.ElapsedSec = 0f;
+            view.OnImpact = null;
+            if (hideRoot && view.Root != null && view.Root.activeSelf) view.Root.SetActive(false);
+        }
 
-            var go = new GameObject("WW_Impact" + name, typeof(RectTransform));
-            word.Root = (RectTransform)go.transform;
-            word.Root.SetParent(_root.transform, false);
-            word.Root.anchorMin = word.Root.anchorMax = new Vector2(0.5f, 0.5f);
-            word.Root.pivot = new Vector2(0.5f, 0.5f);
-            word.Root.sizeDelta = Vector2.zero;
+        private static void Invalidate(ViewRefs view)
+        {
+            ResetPlayback(view, hideRoot: false);
+            view.Pair = null;
+        }
 
-            string[] pieces = SplitUnits(text);
-            var widths = new float[pieces.Length];
-            float total = 0f;
-            for (int i = 0; i < pieces.Length; i++)
+        private static void DestroyWords(ViewRefs view)
+        {
+            WordPair? pair = view.Pair;
+            view.Pair = null;
+            if (pair == null) return;
+
+            DestroyWord(pair.Left);
+            DestroyWord(pair.Right);
+        }
+
+        private static void DestroyWord(Word? word)
+        {
+            if (word != null && word.Root != null) UnityEngine.Object.Destroy(word.Root.gameObject);
+        }
+
+        private static Word BuildWord(Transform parent, string name, string text, float dir,
+            Color faceColor, Color haloColor, Color strokeColor, ImpactJitterUnit jitterUnit)
+        {
+            GameObject? rootObject = null;
+            try
             {
-                Unit unit = CreateUnit(word.Root, name + i, pieces[i], faceColor, haloColor, strokeColor);
-                word.Units.Add(unit);
-                widths[i] = Mathf.Max(0f, unit.Main.GetPreferredValues(pieces[i]).x);
-                total += widths[i];
-            }
-            word.WidthPx = total;
+                rootObject = new GameObject("WW_Impact" + name, typeof(RectTransform));
+                var root = (RectTransform)rootObject.transform;
+                root.SetParent(parent, false);
+                root.anchorMin = root.anchorMax = new Vector2(0.5f, 0.5f);
+                root.pivot = new Vector2(0.5f, 0.5f);
+                root.sizeDelta = Vector2.zero;
 
-            float cursor = -total * 0.5f;
-            for (int i = 0; i < word.Units.Count; i++)
-            {
-                word.Units[i].RestX = cursor + widths[i] * 0.5f;
-                cursor += widths[i];
+                string[] pieces = SplitUnits(text, jitterUnit);
+                var units = new List<Unit>(pieces.Length);
+                var widths = new float[pieces.Length];
+                float total = 0f;
+                for (int i = 0; i < pieces.Length; i++)
+                {
+                    Unit unit = CreateUnit(root, name + i, pieces[i], faceColor, haloColor, strokeColor);
+                    units.Add(unit);
+                    widths[i] = Mathf.Max(0f, unit.Main.GetPreferredValues(pieces[i]).x);
+                    total += widths[i];
+                }
+
+                float cursor = -total * 0.5f;
+                for (int i = 0; i < units.Count; i++)
+                {
+                    units[i].RestX = cursor + widths[i] * 0.5f;
+                    cursor += widths[i];
+                }
+                return new Word(root, units, total, dir);
             }
-            return word;
+            catch
+            {
+                if (rootObject != null) UnityEngine.Object.Destroy(rootObject);
+                throw;
+            }
         }
 
-        private string[] SplitUnits(string text)
+        private static string[] SplitUnits(string text, ImpactJitterUnit jitterUnit)
         {
-            if (_unit == ImpactJitterUnit.Word) return new[] { text };
+            if (jitterUnit == ImpactJitterUnit.Word) return new[] { text };
 
             var pieces = new List<string>(text.Length);
             foreach (char c in text)
@@ -210,15 +318,13 @@ namespace Werewolf.UI
         private static Unit CreateUnit(Transform parent, string name, string text,
             Color faceColor, Color haloColor, Color strokeColor)
         {
-            return new Unit
-            {
-                HaloOuter = CreateLayer(parent, name + "_HaloOuter", text, haloColor,
-                    haloColor, DiscussionImpact.HaloOuterWidthPx),
-                HaloInner = CreateLayer(parent, name + "_HaloInner", text, haloColor,
-                    haloColor, DiscussionImpact.HaloInnerWidthPx),
-                Main = CreateLayer(parent, name + "_Main", text, faceColor,
-                    strokeColor, DiscussionImpact.StrokeWidthPx),
-            };
+            TextMeshProUGUI haloOuter = CreateLayer(parent, name + "_HaloOuter", text, haloColor,
+                haloColor, DiscussionImpact.HaloOuterWidthPx);
+            TextMeshProUGUI haloInner = CreateLayer(parent, name + "_HaloInner", text, haloColor,
+                haloColor, DiscussionImpact.HaloInnerWidthPx);
+            TextMeshProUGUI main = CreateLayer(parent, name + "_Main", text, faceColor,
+                strokeColor, DiscussionImpact.StrokeWidthPx);
+            return new Unit(main, haloInner, haloOuter);
         }
 
         private static TextMeshProUGUI CreateLayer(Transform parent, string name, string text,
@@ -235,16 +341,19 @@ namespace Werewolf.UI
             return label;
         }
 
-        private void Apply()
+        private static void Apply(ViewRefs view)
         {
-            ImpactState state = DiscussionImpact.Compute(_elapsedSec);
-            ApplyWord(_left, state);
-            ApplyWord(_right, state);
+            WordPair? pair = view.Pair;
+            if (pair == null) return;
+
+            ImpactState state = DiscussionImpact.Compute(view.ElapsedSec);
+            ApplyWord(pair.Left, state, view.Unit);
+            ApplyWord(pair.Right, state, view.Unit);
         }
 
-        private void ApplyWord(Word word, ImpactState state)
+        private static void ApplyWord(Word word, ImpactState state, ImpactJitterUnit jitterUnit)
         {
-            if (word?.Root == null) return;
+            if (word.Root == null) return;
             if (!state.Visible)
             {
                 if (word.Root.gameObject.activeSelf) word.Root.gameObject.SetActive(false);
@@ -252,7 +361,7 @@ namespace Werewolf.UI
             }
             if (!word.Root.gameObject.activeSelf) word.Root.gameObject.SetActive(true);
 
-            bool perWord = _unit == ImpactJitterUnit.Word;
+            bool perWord = jitterUnit == ImpactJitterUnit.Word;
 
             float x = word.Dir * (DiscussionImpact.GapPx * 0.5f + word.WidthPx * 0.5f
                 + state.SlideOffsetX + state.Recoil);

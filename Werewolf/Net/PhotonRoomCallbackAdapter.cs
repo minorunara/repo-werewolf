@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using ExitGames.Client.Photon;
@@ -9,17 +10,17 @@ namespace Werewolf.Net
 {
     public sealed class PhotonRoomCallbackAdapter : IInRoomCallbacks, IConnectionCallbacks
     {
-        public event Action<int> OnPlayerLeft;
+        public event Action<int>? OnPlayerLeft;
 
-        public event Action OnLocalDisconnected;
+        public event Action? OnLocalDisconnected;
 
-        public event Action<Hashtable> OnRoomPropertiesChanged;
+        public event Action<Hashtable>? OnRoomPropertiesChanged;
 
         public void Register() => PhotonNetwork.AddCallbackTarget(this);
 
         public void Unregister() => PhotonNetwork.RemoveCallbackTarget(this);
 
-        public void OnPlayerLeftRoom(Player otherPlayer)
+        public void OnPlayerLeftRoom(Player? otherPlayer)
         {
             try
             {
@@ -28,20 +29,22 @@ namespace Werewolf.Net
                 WLog.Line("player_left", secret: false, ("actor", actor), ("src", "photon"));
                 OnPlayerLeft?.Invoke(actor);
             }
-            catch
+            catch (Exception e)
             {
+                WLog.Exception("photon_player_left_error", e);
             }
         }
 
-        public void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
+        public void OnRoomPropertiesUpdate(Hashtable? propertiesThatChanged)
         {
             try
             {
                 if (propertiesThatChanged == null) return;
                 OnRoomPropertiesChanged?.Invoke(propertiesThatChanged);
             }
-            catch
+            catch (Exception e)
             {
+                WLog.Exception("photon_room_props_error", e);
             }
         }
 
@@ -56,8 +59,9 @@ namespace Werewolf.Net
                 WLog.Line("local_disconnected", secret: false, ("cause", cause.ToString()));
                 OnLocalDisconnected?.Invoke();
             }
-            catch
+            catch (Exception e)
             {
+                WLog.Exception("photon_disconnect_error", e, secret: false, ("cause", cause));
             }
         }
 

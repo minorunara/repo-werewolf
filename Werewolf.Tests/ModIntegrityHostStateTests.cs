@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Werewolf.Core;
 using Xunit;
 
@@ -5,6 +7,42 @@ namespace Werewolf.Tests
 {
     public class ModIntegrityHostStateTests
     {
+        [Fact]
+        public void BeginEpoch_NullRoster_ThrowsForRosterActors()
+        {
+            var state = new ModIntegrityHostState();
+            ModManifest baseline = Manifest(new ModManifestEntry("base", "Base", "1", "content"));
+
+            var error = Assert.Throws<ArgumentNullException>(() =>
+                state.BeginEpoch(1, 10, (IReadOnlyList<int>)null, baseline, 0));
+
+            Assert.Equal("rosterActors", error.ParamName);
+        }
+
+        [Fact]
+        public void SyncRoster_NullRoster_ThrowsForRosterActorsAfterInitialization()
+        {
+            ModIntegrityHostState state = Begin();
+
+            var error = Assert.Throws<ArgumentNullException>(() =>
+                state.SyncRoster((IReadOnlyList<int>)null, 100));
+
+            Assert.Equal("rosterActors", error.ParamName);
+        }
+
+        [Fact]
+        public void ApplyManifest_NullManifest_ThrowsForManifest()
+        {
+            var state = Begin();
+
+            #nullable enable
+            var error = Assert.Throws<ArgumentNullException>(() =>
+                state.ApplyManifest(20, null!, 100));
+            #nullable restore
+
+            Assert.Equal("manifest", error.ParamName);
+        }
+
         [Fact]
         public void BeginEpoch_CreatesBaselineAndPendingRoster()
         {

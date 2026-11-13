@@ -1,4 +1,6 @@
+#nullable enable
 using UnityEngine;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Werewolf.Scenarios.Vanilla
 {
@@ -7,10 +9,7 @@ namespace Werewolf.Scenarios.Vanilla
         public static bool TryReadState(out int haulGoal, out int points, out int currentHaul, out int surplus)
         {
             RoundDirector director = RoundDirector.instance;
-            if (director == null || GameRefs.RoundDirector_haulGoal == null
-                || GameRefs.RoundDirector_extractionPoints == null
-                || GameRefs.RoundDirector_currentHaul == null
-                || GameRefs.RoundDirector_extractionPointSurplus == null)
+            if (director == null)
             {
                 haulGoal = 0;
                 points = 0;
@@ -18,36 +17,36 @@ namespace Werewolf.Scenarios.Vanilla
                 surplus = 0;
                 return false;
             }
-            haulGoal = GameRefs.RoundDirector_haulGoal(director);
-            points = GameRefs.RoundDirector_extractionPoints(director);
-            currentHaul = GameRefs.RoundDirector_currentHaul(director);
-            surplus = GameRefs.RoundDirector_extractionPointSurplus(director);
+            haulGoal = director.haulGoal;
+            points = director.extractionPoints;
+            currentHaul = director.currentHaul;
+            surplus = director.extractionPointSurplus;
             return true;
         }
 
-        public static bool TryReadExtraction(out int points, out int completed, out string failReason)
+        public static bool TryReadExtraction(out int points, out int completed,
+            [NotNullWhen(false)] out string? failReason)
         {
             RoundDirector director = RoundDirector.instance;
-            if (director == null || GameRefs.RoundDirector_extractionPoints == null
-                || GameRefs.RoundDirector_extractionPointsCompleted == null)
+            if (director == null)
             {
                 points = 0;
                 completed = 0;
-                failReason = director == null ? "no_round_director" : "fieldref_null";
+                failReason = "no_round_director";
                 return false;
             }
-            points = GameRefs.RoundDirector_extractionPoints(director);
-            completed = GameRefs.RoundDirector_extractionPointsCompleted(director);
+            points = director.extractionPoints;
+            completed = director.extractionPointsCompleted;
             failReason = null;
             return true;
         }
 
-        public static bool TryReadBagDollars(GameObject bag, out int dollars)
+        public static bool TryReadBagDollars(GameObject? bag, out int dollars)
         {
             dollars = 0;
-            ValuableObject valuable = bag != null ? bag.GetComponent<ValuableObject>() : null;
-            if (valuable == null || GameRefs.ValuableObject_dollarValueCurrent == null) return false;
-            float current = GameRefs.ValuableObject_dollarValueCurrent(valuable);
+            ValuableObject? valuable = bag != null ? bag.GetComponent<ValuableObject>() : null;
+            if (valuable == null) return false;
+            float current = valuable.dollarValueCurrent;
             dollars = current > 0f ? (int)current : 0;
             return true;
         }

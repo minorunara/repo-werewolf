@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -14,11 +15,11 @@ namespace Werewolf.Game
         private readonly RoleRevealCinematic _revealCinematic = new RoleRevealCinematic();
 
         private readonly BlackCatAwakeningToast _catAwakenToast = new BlackCatAwakeningToast();
-        private Coroutine _catAwakenToastCoroutine;
+        private Coroutine? _catAwakenToastCoroutine;
 
         private bool _revealStarted;
         private bool _awakeningRevealStarted;
-        private Coroutine _revealCoroutine;
+        private Coroutine? _revealCoroutine;
 
         private readonly CatAwakenToastGate _catAwakenGate = new CatAwakenToastGate();
 
@@ -47,9 +48,9 @@ namespace Werewolf.Game
                     return;
                 }
 
-                Role role = _d.LocalRoleClient.Value;
-                int[] knownWerewolves = _d.KnownWerewolves;
-                byte[] knownTeammateRoles = _d.KnownTeammateRoles;
+                Role role = _d.LocalRoleClient!.Value;
+                int[]? knownWerewolves = _d.KnownWerewolves;
+                byte[]? knownTeammateRoles = _d.KnownTeammateRoles;
                 bool isWolfTeam = role == Role.Werewolf || role == Role.Bomber;
 
                 string[] teammateNames;
@@ -128,7 +129,7 @@ namespace Werewolf.Game
         {
             float offsetX = 0f;
             float offsetY = 0f;
-            ConfigBindings bindings = Plugin.Bindings;
+            ConfigBindings? bindings = Plugin.Bindings;
             if (bindings != null)
             {
                 offsetX = bindings.HudOffsetX.Value;

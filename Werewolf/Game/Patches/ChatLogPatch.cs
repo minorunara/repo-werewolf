@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
@@ -14,7 +15,7 @@ namespace Werewolf.Game.Patches
             {
                 if (__instance == null || string.IsNullOrEmpty(_message)) return;
 
-                WerewolfDirector dir = WerewolfDirector.Instance;
+                WerewolfDirector? dir = WerewolfDirector.Instance;
                 if (dir == null || !dir.IsChatLogWindowOpenClient) return;
 
                 int actor = Players.ActorOf(__instance);

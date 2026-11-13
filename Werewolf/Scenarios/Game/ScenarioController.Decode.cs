@@ -17,20 +17,27 @@ namespace Werewolf.Scenarios.Game
         private bool _decodeStarted;
         private bool _decodeDone;
         private float _decodeElapsed;
-        private IReadOnlyList<string> _decodeUnits;
+        private IReadOnlyList<string>? _decodeUnits;
         private int _decodeEmojiShown;
-        private string _decodeBubbleText;
+        private string? _decodeBubbleText;
         private float _decodeGlitchRollAt;
         private int _decodeTypeSfxCount;
         private bool _decodeGlitchSfxPlayed;
-        private System.Random _decodeRng;
+        private System.Random? _decodeRng;
 
         private bool TickDecodeIntro(bool keysFree)
         {
             if (_decodeDone) return false;
 
-            string emojiLine = _definition != null ? _definition.IntroDecodeEmoji : null;
-            if (string.IsNullOrEmpty(emojiLine) || _flow == null || _flow.Finished)
+            if (!TryGetRunningScript(out ScenarioScriptRun? script))
+            {
+                _decodeDone = true;
+                return false;
+            }
+            ScenarioFlow flow = script.Flow;
+            ScenarioDefinition definition = script.Definition;
+            string? emojiLine = definition.IntroDecodeEmoji;
+            if (string.IsNullOrEmpty(emojiLine))
             {
                 _decodeDone = true;
                 return false;
@@ -66,14 +73,22 @@ namespace Werewolf.Scenarios.Game
                 _decodeElapsed += Time.deltaTime;
             }
 
-            if (keysFree && InputDown(GameKey.Menu))
+            if (keysFree && InputDown(GameKey.Back))
             {
                 FinishDecode("skipped");
                 return false;
             }
 
+            IReadOnlyList<string>? decodeUnits = _decodeUnits;
+            System.Random? decodeRng = _decodeRng;
+            if (decodeUnits == null || decodeRng == null)
+            {
+                _decodeDone = true;
+                return false;
+            }
+
             ScenarioDecodeIntro.State state =
-                ScenarioDecodeIntro.At(_decodeElapsed, _decodeUnits.Count);
+                ScenarioDecodeIntro.At(_decodeElapsed, decodeUnits.Count);
             if (state.Finished)
             {
                 FinishDecode("finished");
@@ -94,7 +109,7 @@ namespace Werewolf.Scenarios.Game
 
             if (state.Returning) _decodePanel.Hide();
             else _decodePanel.Show(BuildDecodeCenterText(state));
-            ShowDecodeBubble(state);
+            ShowDecodeBubble(state, flow.Current, decodeUnits, decodeRng);
 
             _guide.Tick();
             _highlight.Hide();
@@ -102,7 +117,7 @@ namespace Werewolf.Scenarios.Game
             return true;
         }
 
-        private static string BuildDecodeCenterText(ScenarioDecodeIntro.State state)
+        private static string? BuildDecodeCenterText(ScenarioDecodeIntro.State state)
         {
             if (!state.Line1Visible) return null;
 
@@ -117,15 +132,14 @@ namespace Werewolf.Scenarios.Game
             return sb.ToString();
         }
 
-        private void ShowDecodeBubble(ScenarioDecodeIntro.State state)
+        private void ShowDecodeBubble(ScenarioDecodeIntro.State state, ScenarioPage page,
+                                      IReadOnlyList<string> decodeUnits, System.Random decodeRng)
         {
-            ScenarioPage page = _flow.Current;
-
             if (state.Glitching)
             {
                 if (_decodeBubbleText == null || _decodeElapsed >= _decodeGlitchRollAt)
                 {
-                    _decodeBubbleText = ScenarioDecodeIntro.Garble(JoinLines(page.Lines), _decodeRng);
+                    _decodeBubbleText = ScenarioDecodeIntro.Garble(JoinLines(page.Lines), decodeRng);
                     _decodeGlitchRollAt = _decodeElapsed + ScenarioDecodeIntro.GlitchRollSec;
                 }
                 _guide.ShowPage(_decodeBubbleText, ScenarioAnchor.DecodeFocus,
@@ -157,7 +171,7 @@ namespace Werewolf.Scenarios.Game
             {
                 _decodeEmojiShown = state.EmojiShown;
                 var sb = new StringBuilder();
-                for (int i = 0; i < state.EmojiShown; i++) sb.Append(_decodeUnits[i]);
+                for (int i = 0; i < state.EmojiShown; i++) sb.Append(decodeUnits[i]);
                 _decodeBubbleText = EmojiSprites.Substitute(sb.ToString());
             }
             _guide.ShowPage(_decodeBubbleText, ScenarioAnchor.DecodeFocus,

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using TMPro;
@@ -63,14 +64,14 @@ namespace Werewolf.UI
         private readonly float _contentWidth;
         private readonly float _sidePadding;
 
-        private RectTransform _content;
-        private TextMeshProUGUI _measure;
+        private RectTransform? _content;
+        private TextMeshProUGUI? _measure;
         private bool _measureErrorLogged;
 
         private int _localActor;
-        private Func<int, PlayerHandle> _resolveAvatar;
-        private Func<int, int> _resolveId;
-        private Func<int, Role?> _markedRole;
+        private Func<int, PlayerHandle>? _resolveAvatar;
+        private Func<int, int>? _resolveId;
+        private Func<int, Role?>? _markedRole;
 
         private bool _idErrorLogged;
         private bool _roleErrorLogged;
@@ -98,7 +99,7 @@ namespace Werewolf.UI
         {
             _measure = UiKit.CreateText(measureParent, "Measure", Vector2.zero, Vector2.zero,
                 string.Empty, BodyFontSize, new Color(0f, 0f, 0f, 0f), TextAlignmentOptions.TopLeft);
-            _measure.enableWordWrapping = true;
+            _measure.textWrappingMode = TextWrappingModes.Normal;
         }
 
         public void Attach(RectTransform content)
@@ -136,7 +137,7 @@ namespace Werewolf.UI
         {
             bool system = entry.Kind == ChatEntryKind.System;
             if (!system && FeatureFlags.ChatStamps
-                && EmojiSprites.TryTakeLeadingSprite(entry.Text, out _, out string stampRest))
+                && EmojiSprites.TryTakeLeadingSprite(entry.Text, out _, out string? stampRest))
             {
                 if (string.IsNullOrEmpty(stampRest))
                 {
@@ -186,7 +187,7 @@ namespace Werewolf.UI
 
         private float MeasureWrappedHeight(string body, float width)
         {
-            _measure.rectTransform.sizeDelta = new Vector2(width, 0f);
+            _measure!.rectTransform.sizeDelta = new Vector2(width, 0f);
             _measure.text = body;
             _measure.ForceMeshUpdate(ignoreActiveState: true);
 
@@ -257,7 +258,7 @@ namespace Werewolf.UI
                 topY, isSelf ? 1f : 0f);
 
             string displayName = DecorateName(entry.Actor, entry.Name);
-            ListedRow listed = TryCreateAvatar(row, entry, displayName,
+            ListedRow? listed = TryCreateAvatar(row, entry, displayName,
                 new Vector2(AvatarHolderX(block.Width, isSelf), 0f),
                 new Vector2(block.Width, block.Height), AvatarPrefabScale);
 
@@ -281,7 +282,7 @@ namespace Werewolf.UI
             var labelSize = new Vector2(VoteTextWidth, block.Height);
 
             string displayName = DecorateName(entry.Actor, entry.Name);
-            ListedRow listed = TryCreateAvatar(row, entry, displayName, new Vector2(avatarX, 0f),
+            ListedRow? listed = TryCreateAvatar(row, entry, displayName, new Vector2(avatarX, 0f),
                 new Vector2(VoteAvatarWidth, block.Height), VoteAvatarScale);
 
             if (listed == null)
@@ -293,7 +294,7 @@ namespace Werewolf.UI
 
             TextMeshProUGUI text = UiKit.CreateText(row, "VoteText", labelPos, labelSize,
                 entry.Text, VoteTextFontSize, VoteTextColor, TextAlignmentOptions.MidlineRight);
-            text.enableWordWrapping = false;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
 
             return row.gameObject;
         }
@@ -302,7 +303,7 @@ namespace Werewolf.UI
         {
             RectTransform row = CreateBlock("SystemSpeaker", new Vector2(block.Width, block.Height), topY, 0f);
 
-            Sprite face = EmojiSprites.VanillaSprite(entry.Icon)
+            Sprite? face = EmojiSprites.VanillaSprite(entry.Icon)
                 ?? AssetCatalog.GetSprite(entry.Icon)
                 ?? AssetCatalog.GetSprite(SystemFallbackFace);
             float nameX = 0f;
@@ -339,7 +340,7 @@ namespace Werewolf.UI
             TextMeshProUGUI label = UiKit.CreateText(rect, "Text", Vector2.zero,
                 new Vector2(textWidth, textHeight), ComposeSystemText(entry), BodyFontSize,
                 SystemBodyColor, TextAlignmentOptions.TopLeft);
-            label.enableWordWrapping = true;
+            label.textWrappingMode = TextWrappingModes.Normal;
 
             RectTransform labelRect = label.rectTransform;
             labelRect.anchorMin = new Vector2(0f, 1f);
@@ -376,7 +377,7 @@ namespace Werewolf.UI
             if (groupHead) CreateTail(rect, bubbleColor, isSelf);
 
             if (FeatureFlags.ChatStamps
-                && EmojiSprites.TryTakeLeadingSprite(entry.Text, out Sprite stampIcon, out string stampRest))
+                && EmojiSprites.TryTakeLeadingSprite(entry.Text, out Sprite? stampIcon, out string? stampRest))
             {
                 Image icon = UiKit.CreateImage(rect, "Icon",
                     new Vector2(-block.Width * 0.5f + BubblePadding + MessageIconSize * 0.5f, 0f),
@@ -392,7 +393,7 @@ namespace Werewolf.UI
                         new Vector2(restWidth, block.Height - BubblePadding * 2f),
                         EmojiSprites.Substitute(stampRest), BodyFontSize, bodyColor,
                         TextAlignmentOptions.MidlineLeft);
-                    restLabel.enableWordWrapping = true;
+                    restLabel.textWrappingMode = TextWrappingModes.Normal;
                     restLabel.spriteAsset = EmojiSprites.Asset;
                 }
                 return rect.gameObject;
@@ -404,7 +405,7 @@ namespace Werewolf.UI
                 new Vector2(textWidth, textHeight),
                 EmojiSprites.Substitute(entry.Text), BodyFontSize,
                 bodyColor, TextAlignmentOptions.TopLeft);
-            label.enableWordWrapping = true;
+            label.textWrappingMode = TextWrappingModes.Normal;
             label.spriteAsset = EmojiSprites.Asset;
 
             RectTransform labelRect = label.rectTransform;
@@ -435,7 +436,7 @@ namespace Werewolf.UI
             return isSelf ? 0f : -blockWidth * 0.5f - ListedAvatar.OriginOffsetX * AvatarPrefabScale;
         }
 
-        private ListedRow TryCreateAvatar(RectTransform row, ChatLogEntry entry, string displayName,
+        private ListedRow? TryCreateAvatar(RectTransform row, ChatLogEntry entry, string displayName,
                                                  Vector2 holderPos, Vector2 holderSize, float scale)
         {
             bool isBot = entry.Actor < 0;
@@ -445,7 +446,7 @@ namespace Werewolf.UI
             holderPos.y -= (ListedAvatar.RowHeight * 0.5f + AvatarOriginTrim) * scale;
             RectTransform holder = UiKit.CreateRect(row, "AvatarHolder", holderPos, holderSize);
             holder.localScale = new Vector3(scale, scale, 1f);
-            ListedRow listed = isBot
+            ListedRow? listed = isBot
                 ? ListedAvatar.TryCreateStatic(holder, displayName, BotColors.IndexFor(entry.Actor))
                 : ListedAvatar.TryCreate(holder, avatar, displayName);
             if (listed == null)
@@ -469,7 +470,7 @@ namespace Werewolf.UI
         {
             TextMeshProUGUI name = UiKit.CreateText(row, "Name", pos, size,
                 playerName, NameFontSize, NameTextColor, align);
-            name.enableWordWrapping = false;
+            name.textWrappingMode = TextWrappingModes.NoWrap;
         }
 
         private void QueueAvatarFreeze(ListedRow listed, string displayName)
@@ -510,7 +511,7 @@ namespace Werewolf.UI
             }
 
             string number = id.ToString();
-            string hex = MarkerColors.HexFor(marked);
+            string? hex = MarkerColors.HexFor(marked);
             if (hex != null) number = "<color=" + hex + ">" + number + "</color>";
             return Texts.Format(TextId.IdNameFormat, number, rawName ?? string.Empty);
         }

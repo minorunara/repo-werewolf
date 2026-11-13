@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -314,7 +315,6 @@ namespace Werewolf.Core
         ModIntegrityReasonCollectionFailed,
         ModIntegrityDetailLoading,
         ModIntegrityDetailFailed,
-        ModIntegrityDisclaimer,
         ModIntegrityDetailMissingFormat,
         ModIntegrityDetailExtraFormat,
         ModIntegrityDetailVersionFormat,
@@ -961,25 +961,23 @@ namespace Werewolf.Core
 
     public static class Texts
     {
-        public static Language Current { get; set; } = Language.Japanese;
+        public static Language Current { get; private set; } = Language.Japanese;
 
-        private static IReadOnlyDictionary<TextId, string> _override;
+        public static event Action? Changed;
 
-        public static Action<string> FormatErrorLogger;
+        public static void Apply(Language language, IReadOnlyDictionary<TextId, string>? overrideTable)
+        {
+            Current = language;
+            _override = overrideTable;
+            _formatErrorLogged.Clear();
+            Changed?.Invoke();
+        }
+
+        private static IReadOnlyDictionary<TextId, string>? _override;
+
+        public static Action<string>? FormatErrorLogger;
 
         private static readonly HashSet<TextId> _formatErrorLogged = new HashSet<TextId>();
-
-        public static void SetOverride(IReadOnlyDictionary<TextId, string> table)
-        {
-            _override = table;
-            _formatErrorLogged.Clear();
-        }
-
-        public static void ClearOverride()
-        {
-            _override = null;
-            _formatErrorLogged.Clear();
-        }
 
         public static string Get(TextId id)
         {
@@ -995,7 +993,7 @@ namespace Werewolf.Core
             return JapaneseTable.TryGetValue(id, out var ja) ? ja : string.Empty;
         }
 
-        public static string Format(TextId id, params object[] args)
+        public static string Format(TextId id, params object?[]? args)
         {
             string template = Get(id);
             if (args == null || args.Length == 0) return template;
@@ -1068,8 +1066,8 @@ namespace Werewolf.Core
             [TextId.NoticeConveneDeniedWrongPhase] = "会議を開催できません（今は開催できません）",
             [TextId.NoticeConveneDeniedOther] = "会議を開催できません",
             [TextId.NoticeCorpseReportStartedFormat] = "{0}が死体の頭を発見しました",
-            [TextId.NoticeMeetingCancelledExtraction] = "最終抽出直前のため死体の通報は中止されました",
-            [TextId.NoticeConveneDeniedLastRun] = "会議を開催できません（最終抽出直前からは通報できません）",
+            [TextId.NoticeMeetingCancelledExtraction] = "最終回収直前のため死体の通報は中止されました",
+            [TextId.NoticeConveneDeniedLastRun] = "会議を開催できません（最終回収直前からは通報できません）",
             [TextId.NoticeConveneDeniedNoCorpse] = "会議を開催できません（通報できる死体が無い）",
             [TextId.NoticePlayerDisconnectedFormat] = "{0}がゲームから切断されました",
             [TextId.NoticeConveneHoldHint] = "会議を招集するには、ボタンを長押ししてください",
@@ -1090,13 +1088,13 @@ namespace Werewolf.Core
             [TextId.RevealHeadingAbility] = "◆ あなたの能力",
             [TextId.RevealVillagerTitleMaybeCat] = "あなたは村人…かもしれません。",
             [TextId.RevealVillagerTitle] = "あなたは村人です",
-            [TextId.RevealVillagerWinCondition1] = "全ての抽出ポイントを完了し、トラックを発車させる",
+            [TextId.RevealVillagerWinCondition1] = "全ての回収地点を完了し、トラックを発車させる",
             [TextId.RevealVillagerWinCondition2] = "人狼陣営を全滅させる",
-            [TextId.RevealVillagerFlavor] = "特別な能力はない。貴重品の回収と会議で人狼に立ち向かえ。",
-            [TextId.RevealWolfTeamWinCondition1] = "その時点で存在する貴重品を全て集めても、最後の抽出を完了できない状態にする",
+            [TextId.RevealVillagerFlavor] = "特別な能力はない。お宝の回収と会議で人狼に立ち向かえ。",
+            [TextId.RevealWolfTeamWinCondition1] = "その時点で存在するお宝を全て集めても、最後の回収を完了できない状態にする",
             [TextId.RevealWolfTeamWinCondition2] = "時間切れまでトラックを発車させない",
             [TextId.RevealWolfTeamWinCondition3] = "村人陣営を全滅させる",
-            [TextId.RevealWolfAbility1] = "貴重品を壊すほどバフがかかる",
+            [TextId.RevealWolfAbility1] = "お宝を壊すほどバフがかかる",
             [TextId.RevealWolfAbility2] = "マップで敵の位置が分かる",
             [TextId.RevealWolfAbility3] = "ビーコンで敵を今いる場所におびき寄せる",
             [TextId.RevealBomberAbility1] = "十分な時間近くで過ごした他のプレイヤーを爆弾に変えられる",
@@ -1114,9 +1112,9 @@ namespace Werewolf.Core
             [TextId.RevealHeadingTips] = "◆ ヒント",
             [TextId.RevealVillagerTipConvene] = "トラック最奥の赤いボタン長押しで会議を開ける",
             [TextId.RevealVillagerTipReport] = "死体の近くで通報キーを押すと会議を開ける",
-            [TextId.RevealVillagerTipValuableMap] = "会議のたびにマップの貴重品情報が更新される",
+            [TextId.RevealVillagerTipValuableMap] = "会議のたびにマップのお宝情報が更新される",
             [TextId.RevealVillagerTipAliveCheck] = "会議では全プレイヤーの生死を確認できる",
-            [TextId.TutorialSkipHint] = "[menu] でスキップ",
+            [TextId.TutorialSkipHint] = "[back] でスキップ",
             [TextId.RevealSelfIdFormat] = "あなたの識別番号はNo.{0}",
 
             [TextId.RoleNameWerewolf] = "人狼",
@@ -1209,12 +1207,12 @@ namespace Werewolf.Core
             [TextId.DigestReasonVillagersEradicated] = "村人陣営全滅",
             [TextId.DigestReasonExtractionCompleted] = "トラック発車",
             [TextId.DigestReasonTimerExpired] = "時間切れ",
-            [TextId.DigestReasonExtractionFailed] = "抽出失敗",
+            [TextId.DigestReasonExtractionFailed] = "回収失敗",
             [TextId.DigestReasonValueCheckmate] = "資産詰み",
-            [TextId.DigestExtractionDoneFormat] = "抽出完了（{0}/{1}）",
+            [TextId.DigestExtractionDoneFormat] = "回収完了（{0}/{1}）",
             [TextId.DigestPerkUnlockedFormat] = "人狼特典「{0}」解禁",
             [TextId.DigestInformant] = "内通が成立（黒猫へ人狼陣営を開示）",
-            [TextId.DigestFinalBalanceFormat] = "最終収支: 抽出 ${0} ／ 残ノルマ ${1} ／ 回収可能 ${2}",
+            [TextId.DigestFinalBalanceFormat] = "最終収支: 回収済み ${0} ／ 残ノルマ ${1} ／ 回収可能 ${2}",
 
             [TextId.EpigraphWerewolvesEradicated] = "人狼は全滅した",
             [TextId.EpigraphVillagersEradicated] = "村人は全滅した",
@@ -1241,7 +1239,7 @@ namespace Werewolf.Core
             [TextId.ChatLogDeadHint] = "灰色の発言は冥界にだけ見えています",
             [TextId.ChatLogToggleLabelFormat] = "会議チャットログ [{0}]",
             [TextId.ChatLogVoted] = "が投票しました。",
-            [TextId.ChatLogSystemName] = "Taxman",
+            [TextId.ChatLogSystemName] = "税務官",
             [TextId.ChatLogScatterTitle] = "前回の組分け",
             [TextId.ChatLogScatterLineFormat] = "【{0}】{1}",
             [TextId.ChatLogMeetingNumberFormat] = "第{0}回の会議",
@@ -1304,7 +1302,7 @@ namespace Werewolf.Core
             [TextId.ReplayPositionCapped] = "録画上限に達したため、ここから先は位置の記録がありません",
             [TextId.ReplaySavedCapped] = "（位置は途中まで）",
             [TextId.ReplayGaugeLossFormat] = "減額 ${0} / 総額 ${1}",
-            [TextId.ReplayGaugeDeliveredFormat] = "抽出 ${0}",
+            [TextId.ReplayGaugeDeliveredFormat] = "回収 ${0}",
             [TextId.ReplayEpStateNone] = "未起動",
             [TextId.ReplayEpStateIdle] = "待機",
             [TextId.ReplayEpStateActive] = "受付中",
@@ -1321,8 +1319,8 @@ namespace Werewolf.Core
             [TextId.RecapNameSeparator] = "、",
             [TextId.RecapDeathsFormat] = "死亡: {0}",
             [TextId.RecapDeathsNone] = "死亡: なし",
-            [TextId.RecapLostFormat] = "破壊された貴重品: -${0}",
-            [TextId.RecapHaulFormat] = "抽出: ${0} ／ ノルマ ${1}",
+            [TextId.RecapLostFormat] = "破壊されたお宝: -${0}",
+            [TextId.RecapHaulFormat] = "回収: ${0} ／ ノルマ ${1}",
             [TextId.RecapBeaconFormat] = "ビーコン使用: {0}回",
             [TextId.RecapBeaconNone] = "ビーコン使用: なし",
 
@@ -1364,7 +1362,6 @@ namespace Werewolf.Core
             [TextId.ModIntegrityReasonCollectionFailed] = "MOD情報の収集失敗",
             [TextId.ModIntegrityDetailLoading] = "詳細を取得中…",
             [TextId.ModIntegrityDetailFailed] = "詳細を取得できませんでした  再取得",
-            [TextId.ModIntegrityDisclaimer] = "この表示はクライアント申告のルーム基準比較であり、チート不在を保証しません。",
             [TextId.ModIntegrityDetailMissingFormat] = "不足: {0} ({1})",
             [TextId.ModIntegrityDetailExtraFormat] = "追加: {0} ({1})",
             [TextId.ModIntegrityDetailVersionFormat] = "Version: {0}  基準 {1} → 参加者 {2}",
@@ -1474,7 +1471,7 @@ namespace Werewolf.Core
             [TextId.SettingsLabelWerewolfModeEnabled] = "人狼モード",
             [TextId.SettingsLabelMinimapHideEnabled] = "死体のミニマップ非表示",
             [TextId.SettingsLabelOutfitChangeAllowed] = "試合中の着替え",
-            [TextId.SettingsLabelValuableMapMode] = "貴重品マップ表示モード",
+            [TextId.SettingsLabelValuableMapMode] = "お宝マップ表示モード",
             [TextId.SettingsLabelGameOverAutoReturnSec] = "結果画面の自動帰還秒数（0=自動で戻らない）",
             [TextId.SettingsLabelNecroVoiceMode] = "冥界の声（死者→生存人狼の傍聴）",
             [TextId.SettingsLabelStartLevelNumber] = "レベル",
@@ -1519,46 +1516,46 @@ namespace Werewolf.Core
             [TextId.BomberProximityWarning] = "爆弾を仕掛けられたかもしれない…",
 
             [TextId.TutorialCorpseDiscovery] =
-                "未発見の死体を発見した。Good Job!😂\n" +
-                "死者は蘇らないから抽出ポイントに運ぶ必要はない。\n" +
+                "未発見の死体を発見した。やったね！😂\n" +
+                "死者は蘇らないから回収地点に運ぶ必要はない。\n" +
                 "未発見の死体の近くでは、開催権に関係なく通報ができる（右下HUDのアイコンが色付きで脈動する）。\n" +
                 "どんな状況で死んでいたか、会議で皆に共有すること。",
 
             [TextId.TutorialMeetingCountdownStarted] =
                 "会議が招集された。トラックへワープするまでのカウントダウンだ。\n" +
-                "手に持っている貴重品・武器・ドローンは、その場に残される。インベントリへ仕舞えば持ち帰れる。\n" +
-                "貴重品を落として傷つけたり、通路をふさいでモンスターに壊されないよう急いで片付けること。",
+                "手に持っているお宝・武器・ドローンは、その場に残される。インベントリへ仕舞えば持ち帰れる。\n" +
+                "お宝を落として傷つけたり、通路をふさいでモンスターに壊されないよう急いで片付けること。",
 
             [TextId.TutorialFirstMeetingAsVillager] =
-                "会議中は、貴重品の位置と現存状況が更新された全体マップを見られる。\n" +
+                "会議中は、お宝の位置と現存状況が更新された全体マップを見られる。\n" +
                 "状況を確認し、情報を交換し、誰が怪しいか、誰が怪しくないか報告し合うこと。\n" +
                 "怪しい奴には投票しろ。処刑できる。",
 
             [TextId.TutorialWerewolfRoleDrawn] =
                 "お前は人狼だ。おめでとう😂\n" +
-                "貴重品を壊すほど、強力な能力が解禁される。\n" +
-                "村人にバレないように貴重品を壊し、特典を受け取ること。\n" +
+                "お宝を壊すほど、強力な能力が解禁される。\n" +
+                "村人にバレないようにお宝を壊し、特典を受け取ること。\n" +
                 "人狼にだけは、マップにモンスターの位置が表示される。うまく使え。",
 
             [TextId.TutorialFirstValuableSeen] =
-                "貴重品を発見した。\n" +
+                "お宝を発見した。\n" +
                 "マップに位置が登録されるが、その後に移動・破壊されてもマップは更新されない。\n" +
-                "更新されるのは、会議の開始時と抽出の完了時だけだ。\n" +
-                "マップにあるはずの貴重品がそこに無いなら、誰かが運び去ったか、壊したということだ。",
+                "更新されるのは、会議の開始時と回収の完了時だけだ。\n" +
+                "マップにあるはずのお宝がそこに無いなら、誰かが運び去ったか、壊したということだ。",
 
             [TextId.TutorialWolfModeFirstUnlock] =
-                "十分な額の貴重品が破壊された。狼化が解禁だ。\n" +
+                "十分な額のお宝が破壊された。狼化が解禁だ。\n" +
                 "狼化中は強力な能力が使える。\n" +
                 "村人の前でうっかり能力を使うな。狼化はオフにもできる。",
 
             [TextId.TutorialBeaconFirstCharged] =
-                "十分な額の貴重品が破壊された。ビーコンが解禁だ。\n" +
+                "十分な額のお宝が破壊された。ビーコンが解禁だ。\n" +
                 "ビーコンは、マップの広い範囲からモンスターを現在位置へ誘導する。倒されて消えたモンスターも呼び戻す。\n" +
                 "モンスターが殺到している場所にいた奴は発信源だと怪しまれる。使う場所を選ぶこと。\n" +
                 "マップでモンスターの位置を確認しろ。自分が巻き込まれても知らないぞ。",
 
             [TextId.TutorialFirstMeetingAsWerewolf] =
-                "会議中はマップの貴重品情報が更新され、様々な情報が全員に共有される。\n" +
+                "会議中はマップのお宝情報が更新され、様々な情報が全員に共有される。\n" +
                 "人狼が処刑されると、人狼陣営は不利になる。\n" +
                 "言い訳をしろ。潔白を装え。無意味な情報を話し、大事な情報は隠せ。嘘で怪しい奴を増やせ。\n" +
                 "健闘を祈る😂",
@@ -1588,13 +1585,13 @@ namespace Werewolf.Core
                 "黒猫は人狼の生存数には数えない。人狼が全滅すれば、黒猫が生きていても村人陣営の勝ちだ。",
 
             [TextId.TutorialLastRunApproaching] =
-                "最終抽出指令が出た。これ以降、死体通報は受理されない。\n" +
+                "最終回収指令が出た。これ以降、死体通報は受理されない。\n" +
                 "会議はトラックの会議ボタンからのみ開ける。\n" +
-                "誰をトラックに残し、誰に最後の抽出ポイントを任せるか慎重に決めろ。",
+                "誰をトラックに残し、誰に最後の回収地点を任せるか慎重に決めろ。",
 
             [TextId.TutorialRoundTimeWarningVillager] =
                 "間もなく納期だ。\n" +
-                "納期までに全ての抽出ポイントを終え、トラックを発車させろ。できなければ村人の負けだ。\n" +
+                "納期までに全ての回収地点を終え、トラックを発車させろ。できなければ村人の負けだ。\n" +
                 "間に合わないなら、人狼を全滅させるしかない。",
 
             [TextId.TutorialRoundTimeWarningWerewolf] =
@@ -1603,12 +1600,12 @@ namespace Werewolf.Core
                 "最後まで気を抜くな。",
 
             [TextId.TutorialFinalExtractionVillager] =
-                "最終抽出を完了した。\n" +
+                "最終回収を完了した。\n" +
                 "トラックの発車時に村人が1人でも生きていれば勝利だ。\n" +
                 "最後まで気を抜くな。",
 
             [TextId.TutorialFinalExtractionWerewolf] =
-                "最終抽出が完了してしまった。\n" +
+                "最終回収が完了してしまった。\n" +
                 "トラックの発車時に村人が生きていれば人狼の負けだ。\n" +
                 "こうなったら、村人を全滅させるしかない。",
 
@@ -1618,18 +1615,18 @@ namespace Werewolf.Core
                 "それか、会議で向こうから仕掛けてくるかもしれない。うまく話を合わせろ。",
 
             [TextId.TutorialInformantUnlockedAsBlackCat] =
-                "十分な額の貴重品が破壊された。人狼が誰か分かるようになった。\n" +
+                "十分な額のお宝が破壊された。人狼が誰か分かるようになった。\n" +
                 "名前が赤く見えたり、会議の時に狼のマークがついているのが人狼だ。\n" +
                 "村人にバレないようにこっそり人狼に自分が黒猫だとアピールしろ。",
 
             [TextId.TutorialEnemyIgnoreUnlockedAsWerewolf] =
-                "十分な額の貴重品が破壊された。モンスターはお前を仲間だとみなすようになった。\n" +
+                "十分な額のお宝が破壊された。モンスターはお前を仲間だとみなすようになった。\n" +
                 "狼化が有効な間は、ほとんどのモンスターはお前を見ても反応しなくなるぞ。\n" +
                 "音には反応するし攻撃の巻き添えは食らうがな。\n" +
                 "ちなみに、大きな音を出すと消えたモンスターが早く復活することはもう知っているか？",
 
             [TextId.TutorialNaturalHealUnlockedAsWerewolf] =
-                "十分な額の貴重品が破壊された。お前の肉体は人間離れしつつある。\n" +
+                "十分な額のお宝が破壊された。お前の肉体は人間離れしつつある。\n" +
                 "狼化が有効な間、体力が少しずつ自然に回復するようになった。\n" +
                 "光ったり音が出たりはしないが、背中の体力ゲージは他のプレイヤーからも見える。\n" +
                 "さっきまで瀕死だったのにいつの間にか回復していたら、言い逃れは難しいだろう。",
@@ -1645,7 +1642,7 @@ namespace Werewolf.Core
                 "ビーコンが何回使われたかは会議で明かされるから、村人に推理材料を与えないように気をつけろ。",
 
             [TextId.TutorialBlackCatSelectedForExecution] =
-                "処刑対象に選ばれたな。Good Job!😂\n" +
+                "処刑対象に選ばれたな。やったね！😂\n" +
                 "誰を道連れにするか選べ。\n" +
                 "選ばないとランダムで選ばれる。",
 
@@ -1665,12 +1662,12 @@ namespace Werewolf.Core
                 "自分が巻き込まれたら即死する。距離を取ってから起爆しろ。",
 
             [TextId.TutorialBombPlantedAsBomber] =
-                "上手く爆弾を取り付けたな。Good Job!😂\n" +
+                "上手く爆弾を取り付けたな。やったね！😂\n" +
                 "あとは自分が巻き込まれないように気をつけながら起爆するだけだ。\n" +
                 "取り付けた相手がトラック周辺にいたら起爆させないぞ。トラックが傷つくからな。",
 
             [TextId.TutorialBomberProximityWarnedAsVillager] =
-                "貴重品を効率よく差し押さえるためには他の誰かとの協力が必要なこともあるだろう。\n" +
+                "お宝を効率よく差し押さえるためには他の誰かとの協力が必要なこともあるだろう。\n" +
                 "しかし、爆弾魔はしばらく近くで過ごした他人に爆弾を仕掛けることができる。\n" +
                 "後で自分が爆弾にされていたと分かったときのために、誰と一緒に仕事していたか覚えておくんだな。",
 
@@ -1704,18 +1701,18 @@ namespace Werewolf.Core
                 "奪いたいなら、近接武器で殴るなりして落とさせてから拾え。",
 
             [TextId.TutorialValuableRecordSuppressed] =
-                "貴重品を見つけたが、地図には記録しなかった。\n" +
-                "記録をOFFにしている間は貴重品を発見しない。誰にも知られていない貴重品なら、\n" +
+                "お宝を見つけたが、地図には記録しなかった。\n" +
+                "記録をOFFにしている間はお宝を発見しない。誰にも知られていないお宝なら、\n" +
                 "壊しても「あったはずの物が無い」と気づかれずに済む。\n" +
                 "記録を再開したくなったら、通報キーの長押しで切り替えろ。",
 
             [TextId.ManualToggleLabelFormat] = "説明書 [{0}]",
             [TextId.ManualPageFooterFormat] = "{0}　　{1} / {2}",
-            [TextId.ManualNavHint] = "← → ページ送り　　Shift＋← → 章送り　　{0} または [menu] で閉じる",
+            [TextId.ManualNavHint] = "← → ページ送り　　Shift＋← → 章送り　　{0} または [back] で閉じる",
             [TextId.ManualSectionBasics] = "基本ルール",
             [TextId.ManualSectionExploration] = "探索と戦闘",
             [TextId.ManualSectionMeeting] = "会議と投票",
-            [TextId.ManualSectionGauge] = "貴重品減額ゲージ",
+            [TextId.ManualSectionGauge] = "お宝減額ゲージ",
             [TextId.ManualSectionVillager] = "村人",
             [TextId.ManualSectionShaman] = "祈祷師",
             [TextId.ManualSectionWerewolf] = "人狼",
@@ -1726,7 +1723,7 @@ namespace Werewolf.Core
             [TextId.ManualWelcomeTitle] = "REPO人狼へようこそ",
             [TextId.ManualWelcomeBody] =
                 "REPO人狼では、プレイヤーは村人陣営と人狼陣営に分かれ、それぞれの勝利を目指して水面下で争います。\n" +
-                "村人陣営の目標は、通常のREPOと同じです。マップから貴重品を集めて全ての抽出ポイントを完了させ、トラックを出発させることです。\n" +
+                "村人陣営の目標は、通常のREPOと同じです。マップからお宝を集めて全ての回収地点を完了させ、トラックを出発させることです。\n" +
                 "人狼陣営の目標は、正体を隠したままそれを妨害することです。\n" +
                 "誰が誰を疑い、誰が誰と手を組んでいるのか？\n" +
                 "疑心暗鬼の中から真実を見つけ出せるでしょうか。それとも、偽りを真実だと信じ込ませられるでしょうか？\n" +
@@ -1744,7 +1741,7 @@ namespace Werewolf.Core
             [TextId.ManualVillagerWinTitle] = "村人陣営の勝利条件",
             [TextId.ManualVillagerWinBody] =
                 "村人陣営の勝利条件は次の2つです。どちらかを満たせば勝利します。\n" +
-                "・全ての抽出ポイントを完了させ、村人陣営が1人以上生存した状態でトラックを出発させる\n" +
+                "・全ての回収地点を完了させ、村人陣営が1人以上生存した状態でトラックを出発させる\n" +
                 "・人狼陣営が全滅する（黒猫が生き残っていても勝利できます）\n" +
                 "トラックを発車させた人物の陣営は勝敗に影響しません。発車時の村人陣営の生存状況によって決まります。\n" +
                 "つまり、通常のREPOと同じようにゲームクリアを目指せば勝利に近づきます。\n" +
@@ -1753,37 +1750,37 @@ namespace Werewolf.Core
             [TextId.ManualWerewolfWinTitle] = "人狼陣営の勝利条件",
             [TextId.ManualWerewolfWinBody] =
                 "人狼陣営の勝利条件は次の3つです。いずれかを満たせば勝利します。\n" +
-                "・場に出ている全ての貴重品を集めてもノルマを達成できない状態（詰み）にする\n" +
+                "・場に出ている全てのお宝を集めてもノルマを達成できない状態（詰み）にする\n" +
                 "・制限時間切れまでトラックの発車を阻止する\n" +
                 "・村人陣営が全滅する\n" +
                 "「詰み」が成立すると、その瞬間に人狼陣営の勝利が確定します。\n" +
-                "最終抽出が完了していても、トラックの発車までに村人陣営を全滅させれば人狼陣営の勝利です。\n" +
+                "最終回収が完了していても、トラックの発車までに村人陣営を全滅させれば人狼陣営の勝利です。\n" +
                 "人狼がトラックを発車させ、置き去りによって村人陣営が全滅した場合もこれに含まれます。",
 
             [TextId.ManualPeacefulVillageTitle] = "平和村",
             [TextId.ManualPeacefulVillageBody] =
                 "ルーム設定によっては、人狼陣営が一人も配役されない「平和村」になることがあります。\n" +
-                "平和村では倒すべき人狼陣営が初めから存在しないため、勝利条件は通常のREPOと同様に全ての抽出ポイントを完了させてトラックを出発させることだけです。\n" +
+                "平和村では倒すべき人狼陣営が初めから存在しないため、勝利条件は通常のREPOと同様に全ての回収地点を完了させてトラックを出発させることだけです。\n" +
                 "ただし、試合中に平和村であることを確かめる手段はありません。役職の公開、会議の議事録、黒猫の自覚通知、接近警告など、見える情報は通常村と同じです。\n" +
                 "一方で、人狼陣営の活動によってビーコンが使われる、人狼でしかあり得ない行動をしている、爆弾魔による爆発が起きるなどした場合は、平和村ではないことが確定します。\n" +
                 "疑いを捨てて互いに協力すべき平和村なのか、人狼が息を潜めて油断を誘っている通常村なのかはその時が来るまで分かりません。\n" +
                 "平和村には、通常村における村人陣営の敗北条件に加えて特殊敗北条件があり、生存者が1人以下になるとその時点で平和村は崩壊して全員が敗北します。",
 
-            [TextId.ManualValuablesMapTitle] = "貴重品とマップ",
+            [TextId.ManualValuablesMapTitle] = "お宝とマップ",
             [TextId.ManualValuablesMapBody] =
-                "誰かが貴重品を発見したり、敵がオーブを落としたりすると、マップに黄色いマーカーが登録されます。\n" +
+                "誰かがお宝を発見したり、敵がオーブを落としたりすると、マップに黄色いマーカーが登録されます。\n" +
                 "通常のREPOと違い、標準設定ではこのマーカーはリアルタイムに更新されません。\n" +
-                "更新されるのは、抽出ポイントを完了したときと会議を開いたときだけです。\n" +
+                "更新されるのは、回収地点を完了したときと会議を開いたときだけです。\n" +
                 "マーカーの場所に現物が無い場合、誰かが運んだか、壊されたかのどちらかです。\n" +
                 "マップからは区別できません。\n" +
-                "注意深い村人は、会議のたびに「あの貴重品はどこへ行ったのか」を棚卸しして推理します。",
+                "注意深い村人は、会議のたびに「あのお宝はどこへ行ったのか」を棚卸しして推理します。",
 
-            [TextId.ManualValuableRecordTitle] = "貴重品の記録切り替え（人狼陣営）",
+            [TextId.ManualValuableRecordTitle] = "お宝の記録切り替え（人狼陣営）",
             [TextId.ManualValuableRecordBody] =
-                "貴重品マーカーがマップに登録されるのは「誰かがその貴重品を視界に捉えた」瞬間です。\n" +
-                "人狼陣営（人狼・爆弾魔・自覚した黒猫）は、記録をOFFにしている間、見つけた貴重品をマップへ登録しません。\n" +
-                "そのため、まだ誰にも見つかっていない貴重品を人狼陣営が先回りして壊した場合、マップには最初から何も残りません。\n" +
-                "逆に、村人が先に見つけて記録済みの貴重品を壊せば、マーカーだけが残り「あったはずの物が無い」と気づかれます。",
+                "お宝マーカーがマップに登録されるのは「誰かがそのお宝を視界に捉えた」瞬間です。\n" +
+                "人狼陣営（人狼・爆弾魔・自覚した黒猫）は、記録をOFFにしている間、見つけたお宝をマップへ登録しません。\n" +
+                "そのため、まだ誰にも見つかっていないお宝を人狼陣営が先回りして壊した場合、マップには最初から何も残りません。\n" +
+                "逆に、村人が先に見つけて記録済みのお宝を壊せば、マーカーだけが残り「あったはずの物が無い」と気づかれます。",
             [TextId.ManualValuableRecordToggle] =
                 "記録するかどうかは、通報キーの長押しでいつでも切り替えられます（右下のアイコンが現在の状態です）。\n" +
                 "ステルス破壊を狙うときだけ記録をOFFにし、探索へ戻る前に必要に応じてONへ戻しましょう。",
@@ -1802,7 +1799,7 @@ namespace Werewolf.Core
                 "試合終盤、会議による決着が難しくなると、人狼陣営と村人陣営が直接対決する最終局面に移ることがあります。\n" +
                 "最終局面での戦いやすさは、それまでに各陣営が築いた状況によって変化します。\n" +
                 "村人陣営は、危険な武器を確保・没収して人狼の手に渡るのを防ぐほか、信頼できる仲間を守り、回復手段を残しておくことで有利に戦えます。\n" +
-                "人狼陣営は、貴重品を破壊して特典を解禁するほか、信頼を得ている村人を殺害し、村人同士の連携を崩すことで優位を築けます。\n" +
+                "人狼陣営は、お宝を破壊して特典を解禁するほか、信頼を得ている村人を殺害し、村人同士の連携を崩すことで優位を築けます。\n" +
                 "最後にぶつかるのは、両陣営が試合を通して築いてきた優位性です。\n" +
                 "終盤の展開も見据え、序盤から準備を進めましょう。",
 
@@ -1819,15 +1816,15 @@ namespace Werewolf.Core
                 "・未周知の死体の近くで通報キーを押す\n" +
                 "ボタンで会議を開ける回数は1人1回までです（ルーム設定で変更できます）。\n" +
                 "ゲーム開始直後と会議終了直後のしばらくは、ボタンで会議を開けません。\n" +
-                "また、未完了の抽出ポイントが最後の1箇所になると、死体通報による会議の開催はできなくなります（例: 抽出ポイントが4箇所なら、3箇所目の完了以降は通報不可）。\n" +
+                "また、未完了の回収地点が最後の1箇所になると、死体通報による会議の開催はできなくなります（例: 回収地点が4箇所なら、3箇所目の完了以降は通報不可）。\n" +
                 "ボタンでの会議開催は最後まで可能です。",
 
             [TextId.ManualMeetingFlowTitle] = "会議の流れ",
             [TextId.ManualMeetingFlowBody] =
                 "会議が始まると、全員がトラックへワープして身動きが取れなくなります。\n" +
                 "会議中は敵が消え、新たに現れることもないので安全です。\n" +
-                "まず前回の会議以降の死亡者が発表され、続いて貴重品減額ゲージの変化が開示されます。\n" +
-                "その後、投票が始まります。会議中は全体マップを開いて、更新された貴重品の情報を確認できます。\n" +
+                "まず前回の会議以降の死亡者が発表され、続いてお宝減額ゲージの変化が開示されます。\n" +
+                "その後、投票が始まります。会議中は全体マップを開いて、更新されたお宝の情報を確認できます。\n" +
                 "試合の制限時間は会議中は停止するので、議論で持ち時間は減りません。\n" +
                 "ただし、会議中にも敵のリスポーンタイマーは減っていくので、会議で時間を浪費しすぎると敵が復活してしまいます（ルーム設定で係数を設定可能）。\n" +
                 "会議終了時点でリスポーンの準備が整っている敵は即座にスポーンします。",
@@ -1842,36 +1839,36 @@ namespace Werewolf.Core
             [TextId.ManualScatterTitle] = "会議後の散開",
             [TextId.ManualScatterBody] =
                 "ルーム設定によっては、会議が終わった時に生存者が6人以上いると、ランダムに3人以上の組へ分けられ、組ごとに別々の場所へワープして再出発します。\n" +
-                "行き先はトラックか、2箇所目以降の完了済みの抽出ポイントのいずれかです（最初の抽出ポイントは行き先になりません）。\n" +
+                "行き先はトラックか、2箇所目以降の完了済みの回収地点のいずれかです（最初の回収地点は行き先になりません）。\n" +
                 "組分けは全員に発表されますが、どの組がどこへ行くのかは分かりません。前回の組分けは、次の会議の冒頭に会議チャットログで再掲されます。\n" +
-                "2箇所目の抽出が完了するまでの間、最終抽出を完了させた後、生存者が6人に満たないときは、散開せず全員がトラックから再出発します。\n" +
+                "2箇所目の回収が完了するまでの間、最終回収を完了させた後、生存者が6人に満たないときは、散開せず全員がトラックから再出発します。\n" +
                 "散開の直後、画面上部に「引き継ぎ期間中…」と表示されている間に誰かが死亡すると、「引き継ぎトラブル発生」として自動で緊急会議が開かれます。\n" +
                 "この会議は予告なしで即座に始まり、誰の会議開催回数も消費しません。",
 
-            [TextId.ManualGaugeBasicsTitle] = "貴重品減額ゲージの見方",
+            [TextId.ManualGaugeBasicsTitle] = "お宝減額ゲージの見方",
             [TextId.ManualGaugeIntro] =
-                "貴重品減額ゲージは、村人陣営と人狼陣営の貴重品の奪い合いを視覚化したものです。試合開始時点でマップにある貴重品の総額が基準になります。",
+                "お宝減額ゲージは、村人陣営と人狼陣営のお宝の奪い合いを視覚化したものです。試合開始時点でマップにあるお宝の総額が基準になります。",
             [TextId.ManualGaugeLoss] =
                 "黄色のゲージ（左から伸びる）…傷つき、失われた金額",
             [TextId.ManualGaugeDelivery] =
-                "水色のゲージ（右から伸びる）…抽出済みの金額",
+                "水色のゲージ（右から伸びる）…回収済みの金額",
             [TextId.ManualGaugeLines] =
                 "・青い縦線…ノルマ達成に必要な金額。水色のゲージがここに届けば、トラックの発車が可能になります\n" +
-                "・赤い縦線…場に出ている貴重品を全て集めてもノルマを達成できなくなる「詰み」のライン。黄色のゲージがここに達すると、その瞬間に人狼陣営が勝利します\n" +
-                "敵がオーブを落としたり、新たな貴重品が場に増えたりすると、赤い縦線は右へ移動します（村人側の余裕が増えます）。人狼陣営の詰み勝利が確定した後に移動しても覆りません。",
+                "・赤い縦線…場に出ているお宝を全て集めてもノルマを達成できなくなる「詰み」のライン。黄色のゲージがここに達すると、その瞬間に人狼陣営が勝利します\n" +
+                "敵がオーブを落としたり、新たなお宝が場に増えたりすると、赤い縦線は右へ移動します（村人側の余裕が増えます）。人狼陣営の詰み勝利が確定した後に移動しても覆りません。",
 
             [TextId.ManualRoleVillagerTitle] = "役職: 村人",
             [TextId.ManualRoleVillagerBody] =
                 "所属陣営：村人陣営\n" +
-                "村人に特殊な能力はありません。通常のREPOプレイヤーとして貴重品を集め、抽出完了と帰還を目指します。\n" +
-                "最大の武器は観察と議論です。貴重品マップの棚卸し・死体の発見・他プレイヤーの行動の記憶を持ち寄り、会議で人狼をあぶり出しましょう。",
+                "村人に特殊な能力はありません。通常のREPOプレイヤーとしてお宝を集め、回収完了と帰還を目指します。\n" +
+                "最大の武器は観察と議論です。お宝マップの棚卸し・死体の発見・他プレイヤーの行動の記憶を持ち寄り、会議で人狼をあぶり出しましょう。",
 
             [TextId.ManualRoleWerewolfTitle] = "役職: 人狼",
             [TextId.ManualRoleWerewolfIntro] =
                 "所属陣営：人狼陣営\n" +
                 "人狼（役職）は人狼陣営の中心となる役職で、最低1人は必ず配役されます。\n" +
-                "貴重品が傷つくほど強くなります。\n" +
-                "誰が傷つけたかに関係なく、貴重品の減額が一定額に達するたびに特典が順番に解禁されます。",
+                "お宝が傷つくほど強くなります。\n" +
+                "誰が傷つけたかに関係なく、お宝の減額が一定額に達するたびに特典が順番に解禁されます。",
             [TextId.ManualRoleWerewolfEnemyMap] =
                 "人狼（役職）だけは、マップで敵の位置が分かります。",
             [TextId.ManualRoleWerewolfPerksTitle] = "役職: 人狼 — 特典（1/2）",
@@ -1889,7 +1886,7 @@ namespace Werewolf.Core
 
             [TextId.ManualRoleWerewolfBeaconTitle] = "役職: 人狼 — ビーコン",
             [TextId.ManualRoleWerewolfBeaconBody] =
-                "ビーコンは人狼（役職）の特殊能力です。貴重品を一定額傷つけるたびに使用回数がチャージされます。\n" +
+                "ビーコンは人狼（役職）の特殊能力です。お宝を一定額傷つけるたびに使用回数がチャージされます。\n" +
                 "使用すると、プレイヤーには聞こえない音を発してマップ中の敵をその場所へ呼び寄せます。倒されて消えているモンスターも呼び戻します（呼び戻しには人狼陣営で共有のクールダウンがあります）。\n" +
                 "はぐれたプレイヤーを\"事故死\"させたり、村人の集団に敵をけしかけてパニックにさせたりできます。\n" +
                 "ただし、オーブの供給を増やしてノルマ達成に近づけてしまったり、自分自身が戦闘に巻き込まれるリスクもあります。\n" +
@@ -1905,9 +1902,9 @@ namespace Werewolf.Core
                 "人狼からは誰が黒猫か分からず、黒猫からも最初は誰が人狼か分かりません。",
             [TextId.ManualBlackCatInformantTitle] = "役職: 黒猫 — 内通",
             [TextId.ManualRoleBlackCatInformant] =
-                "特典「内通」…貴重品が一定額傷つくと、黒猫にだけ人狼陣営のメンバーが表示されるようになります。",
+                "特典「内通」…お宝が一定額傷つくと、黒猫にだけ人狼陣営のメンバーが表示されるようになります。",
             [TextId.ManualRoleBlackCatGaugeNote] =
-                "黒猫にも貴重品減額ゲージが表示されますが、更新はリアルタイムではなく一定間隔です。",
+                "黒猫にもお宝減額ゲージが表示されますが、更新はリアルタイムではなく一定間隔です。",
 
             [TextId.ManualBlackCatCounterTitle] = "黒猫への対処法",
             [TextId.ManualBlackCatCounterBody] =
@@ -1935,11 +1932,11 @@ namespace Werewolf.Core
             [TextId.ManualRoleBomberDetonateTitle] = "役職: 爆弾魔 — 起爆",
             [TextId.ManualRoleBomberDetonateBody] =
                 "「起爆」のクールダウンが明けてからキーを押すと、爆弾にしたプレイヤーを中心に爆発が起きます。\n" +
-                "周囲のプレイヤー・貴重品・敵が巻き込まれます。爆弾にされた本人も少しダメージを受けますが、体力が1を下回ることはなく、吹き飛ばされません。\n" +
+                "周囲のプレイヤー・お宝・敵が巻き込まれます。爆弾にされた本人も少しダメージを受けますが、体力が1を下回ることはなく、吹き飛ばされません。\n" +
                 "爆風に爆弾魔自身が巻き込まれると即死します。\n" +
                 "対象がトラックの近くにいる間は起爆できません。\n" +
                 "対象が死亡した状態で起爆すると不発になり、爆弾は失われます。\n" +
-                "爆弾の残数は、貴重品が一定額傷つくたびに補充されます。",
+                "爆弾の残数は、お宝が一定額傷つくたびに補充されます。",
 
             [TextId.ManualRoleShamanTitle] = "役職: 祈祷師",
             [TextId.ManualRoleShamanIntro] =
@@ -1964,7 +1961,7 @@ namespace Werewolf.Core
             [TextId.ManualShamanStorm] =
                 "霊障は近くの死体の距離を察知できる能力です。\n" +
                 "未周知の死体の近くにいると霊障が発生し、その強さは距離に応じて弱・中・強の3段階に変化します。\n" +
-                "未完了の抽出ポイントが最後の1箇所になると、霊障による視界の歪みは消え、音だけになります。\n" +
+                "未完了の回収地点が最後の1箇所になると、霊障による視界の歪みは消え、音だけになります。\n" +
                 "会議で発表済みの死体には反応しません。",
 
             [TextId.ManualAfterDeathTitle] = "死んでしまったら",
@@ -1978,7 +1975,7 @@ namespace Werewolf.Core
             [TextId.ScenarioNameMeeting] = "会議・投票",
             [TextId.ScenarioDescMeeting] = "会議を開き、証言を読み、投票で人狼を処刑する",
             [TextId.ScenarioNameWolf] = "人狼の能力",
-            [TextId.ScenarioDescWolf] = "貴重品を壊して回り、能力を解禁して詰み勝利を狙う",
+            [TextId.ScenarioDescWolf] = "お宝を壊して回り、能力を解禁して詰み勝利を狙う",
 
             [TextId.ScenarioNameShaman] = "霊視・死体通報",
             [TextId.ScenarioDescShaman] = "霊視で死体を探し、通報で会議を開き、終盤戦の通報不可を体験する",
@@ -1992,7 +1989,7 @@ namespace Werewolf.Core
             [TextId.ScenarioAbortConfirm] = "チュートリアルを中止してタイトルへ戻りたいか？",
             [TextId.ScenarioHudBadge] = "チュートリアル（時間制限なし）",
             [TextId.ScenarioAdvanceHint] = "[interact] で次へ",
-            [TextId.ScenarioAbortHint] = "[menu] でタイトルへ",
+            [TextId.ScenarioAbortHint] = "[back] でタイトルへ",
             [TextId.ScenarioAbortCancelHint] = "[interact] でキャンセル",
             [TextId.ScenarioBrokenNotice] = "何か問題が起きたようだ。もう一度出直してくれ。",
             [TextId.ScenarioNeedOpenChatLogNag] = "会議チャットログを開け。議事録も発言もそこに記録される。",
@@ -2018,14 +2015,14 @@ namespace Werewolf.Core
 
             [TextId.ScenarioMeetingLeashNag] = "勝手に持ち場を離れるな[[:/]]トラックへ戻すぞ。",
 
-            [TextId.ScenarioDecodeReceiving] = "Taxmanから通信を受信中...",
+            [TextId.ScenarioDecodeReceiving] = "税務官から通信を受信中...",
             [TextId.ScenarioDecodeInitializing] = "意味解釈モジュールを初期化中...",
             [TextId.ScenarioDecodeDone] = "完了",
 
             [TextId.ScenarioMeetingIntro1] = "ここでは趣向を変えて人狼ゲームを演じてもらう。",
             [TextId.ScenarioMeetingIntro2] = "何食わぬ顔で一緒に仕事をしているが、裏では任務失敗を企てている…",
             [TextId.ScenarioMeetingIntro3] = "お前の役職、「村人」はそんな人狼を処刑することも仕事だ。",
-            [TextId.ScenarioMeetingIntro4] = "勿論、いつもの貴重品回収という仕事も忘れるなよ[[;)]]",
+            [TextId.ScenarioMeetingIntro4] = "勿論、いつものお宝回収という仕事も忘れるなよ[[;)]]",
             [TextId.ScenarioMeetingIntro5] = "今回のチュートリアルでは会議と投票だけ教える。",
             [TextId.ScenarioMeetingIntro6] = "練習用に、ここにはモンスターを出していないし、時間制限も外してある。実戦ではどちらもある。",
 
@@ -2039,11 +2036,11 @@ namespace Werewolf.Core
             [TextId.ScenarioMeetingConveneEarly2] = "なら話は早い。ボタンの説明は省くぞ。",
 
             [TextId.ScenarioMeetingOpened1] = "会議が始まった。ここで確認できるのは3つ。",
-            [TextId.ScenarioMeetingOpened2] = "死亡者[[deathhead]]、貴重品の損失と納品状況[[extraction]]、そして全体マップだ。",
+            [TextId.ScenarioMeetingOpened2] = "死亡者[[deathhead]]、お宝の損失と納品状況[[extraction]]、そして全体マップだ。",
             [TextId.ScenarioMeetingOpened3] = "会議チャットログにはテキストチャットが記録されるほか、会議毎の議事録もまとめられる。",
             [TextId.ScenarioMeetingOpened4] = "議事録の一番上の行は何回目の会議かを示す。",
             [TextId.ScenarioMeetingOpened5] = "その次に、死亡者[[deathhead]]は誰か。",
-            [TextId.ScenarioMeetingOpened6] = "前回の会議から今回までに破壊された貴重品の額。",
+            [TextId.ScenarioMeetingOpened6] = "前回の会議から今回までに破壊されたお宝の額。",
             [TextId.ScenarioMeetingOpened7] = "納品に成功した金額[[$$$]]と、トラックを発車[[truck]][[arrowright]][[road]]させるのに必要なノルマ総額[[extraction]]",
             [TextId.ScenarioMeetingOpened8] = "前回の会議から今回までに使用されたビーコンの回数。",
             [TextId.ScenarioMeetingOpened9] = "今回は出ていないが、直前の会議で組分けがあれば、その組み合わせ[[semibots]]も別の行として続く。",
@@ -2053,15 +2050,15 @@ namespace Werewolf.Core
             [TextId.ScenarioMeetingClock3] = "だが、モンスター[[headman]][[clown]]の復活待ちと、時間経過による復活間隔の短縮は完全には止まらない。ルーム設定で決めた割合だけ進む。",
             [TextId.ScenarioMeetingClock4] = "会議が終わった時点で復活の準備ができているモンスター[[headman]][[clown]]は、すぐ現れる。",
 
-            [TextId.ScenarioMeetingGauge1] = "画面の一番上の帯は、貴重品の状況だ。",
-            [TextId.ScenarioMeetingGauge2] = "上の黄色いバーが、これまでに壊された貴重品の総額。会議のたびに、増えた分を見せている。",
+            [TextId.ScenarioMeetingGauge1] = "画面の一番上の帯は、お宝の状況だ。",
+            [TextId.ScenarioMeetingGauge2] = "上の黄色いバーが、これまでに壊されたお宝の総額。会議のたびに、増えた分を見せている。",
             [TextId.ScenarioMeetingGauge3] = "下の段は納品した金額[[extraction]]で、右から水色で埋まっていく。今回はまだ何も納品していないから空だ。",
             [TextId.ScenarioMeetingGauge4] = "青い縦線がノルマだ。水色がここまで届けば、トラックを発車させられる。",
             [TextId.ScenarioMeetingGauge5] = "黄色が赤い縦線まで伸びたら、残り全部を納品してもノルマに届かない。その時点で人狼の勝ちだ。",
 
             [TextId.ScenarioMeetingMap1] = "これが全体マップだ。会議中だけ開ける。",
-            [TextId.ScenarioMeetingMap2] = "誰かが一度見つけた貴重品が記録される。貴重品の現在地が更新されるのは会議の開始時と抽出完了時[[extraction]]だけだ。",
-            [TextId.ScenarioMeetingMap3] = "マップにあるはずの貴重品がそこに無いなら、誰かが運び去ったか、壊したということだ。",
+            [TextId.ScenarioMeetingMap2] = "誰かが一度見つけたお宝が記録される。お宝の現在地が更新されるのは会議の開始時と回収完了時[[extraction]]だけだ。",
+            [TextId.ScenarioMeetingMap3] = "マップにあるはずのお宝がそこに無いなら、誰かが運び去ったか、壊したということだ。",
             [TextId.ScenarioMeetingMap4] = "格子にはA1のような座標が振ってある。「C5の部屋で死体を見た」と言えば、全員に同じ場所が伝わる。",
             [TextId.ScenarioMeetingMap5] = "見終わったら、同じボタンで閉じろ。",
 
@@ -2073,7 +2070,7 @@ namespace Werewolf.Core
             [TextId.ScenarioMeetingVote3] = "同じ相手をもう一度押せば確定だ。確定前なら選び直せる。",
 
             [TextId.ScenarioMeetingTally] = "というわけで、単独最多得票数のNo.3の処刑が決定した[[scared]]",
-            [TextId.ScenarioMeetingResult1] = "処刑されたNo.3は人狼だった。Good Job![[creepycrying]]",
+            [TextId.ScenarioMeetingResult1] = "処刑されたNo.3は人狼だった。やったね！[[creepycrying]]",
             [TextId.ScenarioMeetingResult2] = "人狼が全滅したから、村人陣営の勝ちだ。",
 
             [TextId.ScenarioMeetingPostgame1] = "結果画面だ。",
@@ -2082,7 +2079,7 @@ namespace Werewolf.Core
             [TextId.ScenarioMeetingReplay2] = "これを開けば、さっきの議論がそのまま流れる。",
             [TextId.ScenarioMeetingPostgame3] = "会議のチュートリアルはここまでだ[[wave]]",
 
-            [TextId.ScenarioMeetingLine1] = "No.3が何かの貴重品を壊していました。",
+            [TextId.ScenarioMeetingLine1] = "No.3が何かのお宝を壊していました。",
             [TextId.ScenarioMeetingLine2] = "誤解です。わざとじゃなくて本当に落としたんです。",
             [TextId.ScenarioMeetingLine3] = "ちなみに何を運んでたんですか？",
             [TextId.ScenarioMeetingLine4] = "チェンソーです。",
@@ -2098,41 +2095,41 @@ namespace Werewolf.Core
             [TextId.ScenarioMeetingLine14] = "No.3に投票しましょう。",
 
             [TextId.ScenarioWolfIntro1] = "今回はお前に人狼をやってもらう[[;)]]",
-            [TextId.ScenarioWolfIntro2] = "人狼の目標は、村人にバレないように[[hush]]貴重品を壊して任務を失敗させることだ。",
+            [TextId.ScenarioWolfIntro2] = "人狼の目標は、村人にバレないように[[hush]]お宝を壊して任務を失敗させることだ。",
             [TextId.ScenarioWolfIntro3] = "ここにはモンスター[[headman]][[clown]]がいる。襲われれば痛いだろうが、練習だからお前は死なないし、時間制限も外してある。実戦では人狼も死ぬし、時間も切れる。",
 
-            [TextId.ScenarioWolfGauge1] = "右下のゲージが、試合開始時にこのマップにあった貴重品の総額と、これまでに壊された貴重品の総額だ。人狼にしか見えない。",
+            [TextId.ScenarioWolfGauge1] = "右下のゲージが、試合開始時にこのマップにあったお宝の総額と、これまでに壊されたお宝の総額だ。人狼にしか見えない。",
             [TextId.ScenarioWolfGauge2] = "赤い縦線まで伸ばせば、残り全部を回収してもノルマに届かなくなる。その瞬間、人狼の勝ちだ。",
             [TextId.ScenarioWolfGauge3] = "このレベル帯なら本番の赤線はもっと遠い。ここはノルマを高くしてあるから、半分ほど壊せば届く。",
 
-            [TextId.ScenarioWolfDestroy1] = "まずは貴重品を1つ壊してこい。",
+            [TextId.ScenarioWolfDestroy1] = "まずはお宝を1つ壊してこい。",
             [TextId.ScenarioWolfDestroy2] = "掴んで壁に叩きつけるか、高い所から落とすか、踏みつければ壊れる。",
-            [TextId.ScenarioWolfDestroyNag1] = "貴重品は見つけたか？[[eyesleft]]",
-            [TextId.ScenarioWolfDestroyNag2] = "貴重品を掴んで、壁か床へ思い切り叩きつけるか、踏みつけるんだ。",
+            [TextId.ScenarioWolfDestroyNag1] = "お宝は見つけたか？[[eyesleft]]",
+            [TextId.ScenarioWolfDestroyNag2] = "お宝を掴んで、壁か床へ思い切り叩きつけるか、踏みつけるんだ。",
             [TextId.ScenarioWolfEarly1] = "気が早いな。壊し方は知っているようだ[[shades]]",
             [TextId.ScenarioWolfEarly2] = "なら説明は省くぞ。",
 
-            [TextId.ScenarioWolfMarker1] = "今壊した貴重品のマーカーが、まだ残っているだろう。",
-            [TextId.ScenarioWolfMarker2] = "お前がその貴重品を目にした時点で、全員のマップに貴重品の位置が記録されている。",
+            [TextId.ScenarioWolfMarker1] = "今壊したお宝のマーカーが、まだ残っているだろう。",
+            [TextId.ScenarioWolfMarker2] = "お前がそのお宝を目にした時点で、全員のマップにお宝の位置が記録されている。",
             [TextId.ScenarioWolfMarker3] = "マーカーは壊しても消えない。運び去られたのか壊されたのかは、マップからは分からない。",
             [TextId.ScenarioWolfMarker4] = "だがマーカーの場所へ行けば、現物が無いことは分かる。お前が近くにいた事が分かれば、疑われる。",
             [TextId.ScenarioWolfMarker5] = "そもそもマーカーを付けずに済む方法もある。",
 
             [TextId.ScenarioWolfRecord1] = "右下の記録アイコンを見ろ。",
-            [TextId.ScenarioWolfRecord2] = "通報キー [reportkey] を長押しすれば、貴重品の記録を切れる。",
-            [TextId.ScenarioWolfRecord3] = "切っている間は、見つけた貴重品が誰のマップにも載らない。",
+            [TextId.ScenarioWolfRecord2] = "通報キー [reportkey] を長押しすれば、お宝の記録を切れる。",
+            [TextId.ScenarioWolfRecord3] = "切っている間は、見つけたお宝が誰のマップにも載らない。",
             [TextId.ScenarioWolfRecordNag1] = "まだ記録が切れていないぞ。通報キー [reportkey] を押しっぱなしにするんだ。",
 
-            [TextId.ScenarioWolfStealth1] = "その状態で、まだ誰も見つけていない貴重品を壊してこい。",
+            [TextId.ScenarioWolfStealth1] = "その状態で、まだ誰も見つけていないお宝を壊してこい。",
             [TextId.ScenarioWolfStealth2] = "村人が先に見つけた物を壊してもマーカーは残る。狙うのは手付かずの物だ。",
-            [TextId.ScenarioWolfStealthNag1] = "記録は切ったな。あとはまだ記録されていない貴重品を壊すだけだ。",
+            [TextId.ScenarioWolfStealthNag1] = "記録は切ったな。あとはまだ記録されていないお宝を壊すだけだ。",
             [TextId.ScenarioWolfStealth3] = "今度はマーカーが残っていない。",
             [TextId.ScenarioWolfStealth4] = "壊れた総額そのものは次の会議で開示される。隠せるのは場所だけだ。",
 
             [TextId.ScenarioWolfKeep1] = "その調子で壊し続けろ。",
-            [TextId.ScenarioWolfKeep2] = "一定割合の貴重品が壊されるたびに、人狼は強くなっていく。",
-            [TextId.ScenarioWolfPush1] = "引き続き貴重品を壊せ。ゲージが伸びれば次が解禁される。",
-            [TextId.ScenarioWolfPush2] = "特典はまだ残っている。貴重品を探して壊し続けろ。",
+            [TextId.ScenarioWolfKeep2] = "一定割合のお宝が壊されるたびに、人狼は強くなっていく。",
+            [TextId.ScenarioWolfPush1] = "引き続きお宝を壊せ。ゲージが伸びれば次が解禁される。",
+            [TextId.ScenarioWolfPush2] = "特典はまだ残っている。お宝を探して壊し続けろ。",
 
             [TextId.ScenarioWolfForm1] = "左下を見ろ。特典が1つ解禁された。",
             [TextId.ScenarioWolfForm2] = "アイコンは4つ。無限スタミナ、追加ジャンプ、モンスターからの無視、自然治癒だ。",
@@ -2148,7 +2145,7 @@ namespace Werewolf.Core
             [TextId.ScenarioWolfEnemyMap2] = "これは人狼にしか見えない。未探索の部屋にいるモンスター[[headman]][[clown]]も分かる。",
             [TextId.ScenarioWolfEnemyMap3] = "モンスター[[headman]][[clown]]の場所が分かっているかのような動きをすれば疑われる。自然にやれ[[hush]]",
 
-            [TextId.ScenarioWolfBeacon1] = "左下のビーコンスロットを見ろ。貴重品を一定割合壊すたびに残数が増える。",
+            [TextId.ScenarioWolfBeacon1] = "左下のビーコンスロットを見ろ。お宝を一定割合壊すたびに残数が増える。",
             [TextId.ScenarioWolfBeacon2] = "ビーコンキー [beaconkey] を押せば、その場にモンスター[[headman]][[clown]]を呼び寄せる。倒されたモンスターも呼び戻す。",
             [TextId.ScenarioWolfBeacon3] = "1発ぶん都合しておいた。試しに撃ってみろ。",
             [TextId.ScenarioWolfBeaconNag1] = "残数はあるはずだ。ビーコンキー [beaconkey] を押すだけだぞ。",
@@ -2162,15 +2159,15 @@ namespace Werewolf.Core
             [TextId.ScenarioWolfHeal1] = "自然治癒が解禁された。狼化がONの間、体力が少しずつ回復する。",
             [TextId.ScenarioWolfHeal2] = "体力バーは他人からも見える。減った体力が勝手に戻っていれば怪しまれる。",
 
-            [TextId.ScenarioWolfOrb1] = "モンスターを倒すと落ちるオーブも貴重品だ。落ちた分だけ村人が回収できる総額が増え、赤線が遠のく。",
+            [TextId.ScenarioWolfOrb1] = "モンスターを倒すと落ちるオーブもお宝だ。落ちた分だけ村人が回収できる総額が増え、赤線が遠のく。",
             [TextId.ScenarioWolfOrb2] = "だがそのオーブを壊せば実損に乗り、特典の解禁は進む。倒したなら壊しておけ。",
 
             [TextId.ScenarioWolfFinish1] = "あとは赤線まで壊し切れ。",
             [TextId.ScenarioWolfFinish2] = "狼化は有効にしたか？探索が楽になるぞ。",
-            [TextId.ScenarioWolfFinish3] = "マップ中の貴重品を探して壊して回るんだ。",
+            [TextId.ScenarioWolfFinish3] = "マップ中のお宝を探して壊して回るんだ。",
 
             [TextId.ScenarioWolfResult1] = "回収可能な総額がノルマを下回った。もう村人は任務を達成できない[[dry]]",
-            [TextId.ScenarioWolfResult2] = "貴重品の詰みによる、人狼陣営の勝ちだ。",
+            [TextId.ScenarioWolfResult2] = "お宝の詰みによる、人狼陣営の勝ちだ。",
             [TextId.ScenarioWolfPostgame1] = "結果画面だ。誰がどの役職だったかが開示される。",
             [TextId.ScenarioWolfPostgame2] = "マルチプレイなら、ここで一緒に感想戦ができる。",
             [TextId.ScenarioWolfReplay1] = "今のチュートリアルも丸ごと録画されている。",
@@ -2180,7 +2177,7 @@ namespace Werewolf.Core
             [TextId.ScenarioWolfPostgame3] = "人狼のチュートリアルはここまでだ[[wave]]",
 
             [TextId.ScenarioWolfExtractionNag1] = "おい、お前は人狼だぞ。",
-            [TextId.ScenarioWolfExtractionNag2] = "抽出を進めてどうする[[disappointed]]貴重品は壊すんだ。",
+            [TextId.ScenarioWolfExtractionNag2] = "回収を進めてどうする[[disappointed]]お宝は壊すんだ。",
             [TextId.ScenarioWolfExtractionBreak1] = "捻くれたやつだな[[:/]]",
             [TextId.ScenarioWolfExtractionBreak2] = "ノルマが達成されたから、もう詰み勝利は不可能だ[[disappointed2]]",
             [TextId.ScenarioWolfExtractionBreak3] = "始めから出直してこい。",
@@ -2236,11 +2233,11 @@ namespace Werewolf.Core
             [TextId.ScenarioShamanTally1] = "スキップ票が最多で処刑なしだ。No.3は監視つきの約束で生き残った。",
             [TextId.ScenarioShamanTally2] = "会議は終わる。ここからは終盤戦を体験してもらう。",
 
-            [TextId.ScenarioShamanDeliver1] = "目の前にお金袋[[$$$]]を置いた。トラック付近の抽出ポイント[[extraction]]へ運んで、抽出を完了させろ。",
+            [TextId.ScenarioShamanDeliver1] = "目の前にお金袋[[$$$]]を置いた。トラック付近の回収地点[[extraction]]へ運んで、回収を完了させろ。",
 
-            [TextId.ScenarioShamanDeliverNag1] = "袋[[$$$]]はどうした？ トラック付近の抽出ポイント[[extraction]]へ運べ。見失ったなら、目の前にもう1つ出しておく。",
+            [TextId.ScenarioShamanDeliverNag1] = "袋[[$$$]]はどうした？ トラック付近の回収地点[[extraction]]へ運べ。見失ったなら、目の前にもう1つ出しておく。",
 
-            [TextId.ScenarioShamanLastRun1] = "抽出が完了した。残る抽出ポイント[[extraction]]はあと1箇所。ここからは終盤戦だ。",
+            [TextId.ScenarioShamanLastRun1] = "回収が完了した。残る回収地点[[extraction]]はあと1箇所。ここからは終盤戦だ。",
             [TextId.ScenarioShamanLastRun2] = "終盤戦では死体通報ができない。霊障で視界も乱れなくなる。音は残る。",
             [TextId.ScenarioShamanLastRun3] = "トラックの中に死体[[deathhead]]がある。音はするのに視界は乱れない、これが終盤戦の霊障だ。",
 
@@ -2292,7 +2289,7 @@ namespace Werewolf.Core
             [TextId.ScenarioShamanExtractionBreak3] = "始めから出直してこい。",
 
             [TextId.ScenarioShamanEarlyExtractionBreak1] = "順番が違う。会議を開く前に納品したな[[angry]]",
-            [TextId.ScenarioShamanEarlyExtractionBreak2] = "残る抽出ポイントが最後の1箇所になった。ここからは死体通報ができない。あの死体[[deathhead]]の会議はもう開けない。",
+            [TextId.ScenarioShamanEarlyExtractionBreak2] = "残る回収地点が最後の1箇所になった。ここからは死体通報ができない。あの死体[[deathhead]]の会議はもう開けない。",
             [TextId.ScenarioShamanEarlyExtractionBreak3] = "始めから出直してこい。",
 
             [TextId.ScenarioShamanQuotaBagBreak1] = "わざとやっているのか？[[angry]]",
@@ -2343,7 +2340,7 @@ namespace Werewolf.Core
             [TextId.ScenarioBomberFire1] = "うまく爆弾に変えたな。今度は逆に、自分から爆風を浴びてもらう。",
             [TextId.ScenarioBomberFire2] = "No.4に密着して [bombkey] を押せ。今回はチュートリアルだから離れた位置では起爆させない。押すと心臓の音が鳴るが、爆風の中にいる合図だ。その場から動くな。",
             [TextId.ScenarioBomberFireNag1] = "まだ起爆していないな。No.4のすぐ隣まで詰めて密着しろ。今回はチュートリアルだから離れた位置では起爆させない。密着したら [bombkey] を押す。心臓の音は爆風の中にいる合図だから、鳴っても逃げずにその場で待て。",
-            [TextId.ScenarioBomberResult1] = "Good Job![[creepycrying]]この敗北は台本どおりだ。",
+            [TextId.ScenarioBomberResult1] = "やったね！[[creepycrying]]この敗北は台本どおりだ。",
             [TextId.ScenarioBomberResult2] = "お前と、爆心で削れていた仲間のNo.3が死亡し、人狼陣営が全滅したため村人陣営の勝利になった。",
             [TextId.ScenarioBomberPostgame1] = "結果画面だ。誰がどの役職だったかが開示される。",
             [TextId.ScenarioBomberPostgame2] = "負けで終わったが、これで爆弾魔のチュートリアルは成功裏に終わった。",
@@ -2359,7 +2356,7 @@ namespace Werewolf.Core
             [TextId.ScenarioBomberEarly1] = "なんだ、もう爆弾に変えたのか[[:O]]",
             [TextId.ScenarioBomberEarly2] = "話が早い[[:)]]",
             [TextId.ScenarioBomberExtractionBreak1] = "お前……仕事中毒でおかしくなったのか？[[pleading]]",
-            [TextId.ScenarioBomberExtractionBreak2] = "今は抽出はしなくて良い。出直してこい。",
+            [TextId.ScenarioBomberExtractionBreak2] = "今は回収はしなくて良い。出直してこい。",
             [TextId.ScenarioBomberSurvivedBreak1] = "なんで爆発に巻き込まれていないんだ？[[weary]]",
             [TextId.ScenarioBomberSurvivedBreak2] = "爆弾が無駄になったじゃないか。出直してこい[[angry]]",
             [TextId.ScenarioBomberWrongTarget1] = "爆弾が付いた相手が違う。その爆弾はNo.{0}に付けるものだ。",
@@ -2375,7 +2372,7 @@ namespace Werewolf.Core
             [TextId.ScenarioBomberLineA5] = "No.4とNo.5は爆風を食らっても生きています。爆弾魔なら巻き込まれた時点で死ぬので、この二人は爆弾魔ではないことは確かです。",
             [TextId.ScenarioBomberLineA6] = "爆心のNo.3も違います。爆弾魔は自分自身を爆弾にはできません。残るのはNo.1・No.2・No.6の三人の中の誰かです。",
             [TextId.ScenarioBomberLineA7] = "No.1、No.3と一緒に行動してませんでしたか？妙にべったりくっついているなと思いましたが。",
-            [TextId.ScenarioBomberLineA8] = "……そんなに長かったですか？私も貴重品を運ぶのに忙しかったので分からないです。",
+            [TextId.ScenarioBomberLineA8] = "……そんなに長かったですか？私もお宝を運ぶのに忙しかったので分からないです。",
             [TextId.ScenarioBomberLineA9] = "爆心の本人が覚えていないなら、決め手にはなりません。",
             [TextId.ScenarioBomberLineA10] = "容疑者が多すぎます。今回はスキップにして、No.1・No.2・No.6とは距離を取りましょう。",
             [TextId.ScenarioBomberLineA11] = "単独行動は怖いです。人狼に襲われやすくなります。",
@@ -2392,7 +2389,7 @@ namespace Werewolf.Core
             [TextId.ScenarioShamanLineA7] = "いや、さっぱり分かりません。多分、モンスターに襲われたか、足が滑って穴に落ちたかした事故じゃないですか？",
             [TextId.ScenarioShamanLineA8] = "それは疑わしいですね。",
             [TextId.ScenarioShamanLineA9] = "No.3は今何の武器を持っていますか？",
-            [TextId.ScenarioShamanLineA10] = "今はSledgeHammerとGunを持っています。",
+            [TextId.ScenarioShamanLineA10] = "今は大型ハンマーと銃を持っています。",
             [TextId.ScenarioShamanLineA11] = "殺人に最適な武器を持っているというわけです。",
             [TextId.ScenarioShamanLineA12] = "単なる護身用です。モンスターを倒すために持っています。",
             [TextId.ScenarioShamanLineA13] = "もしNo.3が人狼なら、これだけ強い武器を持たせたまま会議を終えるのは危険です。私たちを襲うかもしれません。",
@@ -2483,7 +2480,7 @@ namespace Werewolf.Core
             [TextId.RevealVillagerTipReport] = "Press the report key near a body to call a meeting",
             [TextId.RevealVillagerTipValuableMap] = "The map's data on valuables is updated at every meeting",
             [TextId.RevealVillagerTipAliveCheck] = "Meetings show whether each player is alive or dead",
-            [TextId.TutorialSkipHint] = "[menu] to skip",
+            [TextId.TutorialSkipHint] = "[back] to skip",
             [TextId.RevealSelfIdFormat] = "Your ID number is No.{0}",
 
             [TextId.RoleNameWerewolf] = "Werewolf",
@@ -2731,7 +2728,6 @@ namespace Werewolf.Core
             [TextId.ModIntegrityReasonCollectionFailed] = "Failed to collect mod info",
             [TextId.ModIntegrityDetailLoading] = "Loading details…",
             [TextId.ModIntegrityDetailFailed] = "Failed to load details  Retry",
-            [TextId.ModIntegrityDisclaimer] = "This view compares client self-reports against the room baseline and does not guarantee the absence of cheats.",
             [TextId.ModIntegrityDetailMissingFormat] = "Missing: {0} ({1})",
             [TextId.ModIntegrityDetailExtraFormat] = "Extra: {0} ({1})",
             [TextId.ModIntegrityDetailVersionFormat] = "Version: {0}  baseline {1} → player {2}",
@@ -3078,7 +3074,7 @@ namespace Werewolf.Core
 
             [TextId.ManualToggleLabelFormat] = "Manual [{0}]",
             [TextId.ManualPageFooterFormat] = "{0}　　{1} / {2}",
-            [TextId.ManualNavHint] = "← →: Pages　　Shift + ← →: Sections　　{0} or [menu]: Close",
+            [TextId.ManualNavHint] = "← →: Pages　　Shift + ← →: Sections　　{0} or [back]: Close",
             [TextId.ManualSectionBasics] = "Basics",
             [TextId.ManualSectionExploration] = "Exploration and Combat",
             [TextId.ManualSectionMeeting] = "Meetings and Voting",
@@ -3359,7 +3355,7 @@ namespace Werewolf.Core
             [TextId.ScenarioAbortConfirm] = "Quit the tutorial and return to the title screen?",
             [TextId.ScenarioHudBadge] = "TUTORIAL (no time limit)",
             [TextId.ScenarioAdvanceHint] = "[interact] to continue",
-            [TextId.ScenarioAbortHint] = "[menu] to quit",
+            [TextId.ScenarioAbortHint] = "[back] to quit",
             [TextId.ScenarioAbortCancelHint] = "[interact] to go back",
             [TextId.ScenarioBrokenNotice] = "Something went wrong. Come back and start over.",
             [TextId.ScenarioNeedOpenChatLogNag] = "Open the meeting log. The meeting minutes and all chat messages are recorded there.",

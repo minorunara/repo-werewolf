@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using Werewolf.Core;
 
@@ -22,13 +23,12 @@ namespace Werewolf.Vanilla
 
         public static bool TryReplaceDisplayTags(string text, string prefix, string suffix, out string replaced)
         {
-            InputManager input = InputManager.instance;
-            if (input == null)
+            if (InputManager.instance == null)
             {
                 replaced = text;
                 return false;
             }
-            replaced = input.InputDisplayReplaceTags(text, prefix, suffix);
+            replaced = SemiFunc.InputDisplayReplaceTags(text, prefix, suffix);
             return true;
         }
 
@@ -36,10 +36,10 @@ namespace Werewolf.Vanilla
         {
             switch (key)
             {
-                case GameKey.Menu: return InputKey.Menu;
+                case GameKey.Back: return InputKey.Back;
                 case GameKey.Interact: return InputKey.Interact;
                 case GameKey.Grab: return InputKey.Grab;
-                case GameKey.Confirm: return InputKey.Confirm;
+                case GameKey.Confirm: return InputKey.ChatConfirm;
                 case GameKey.ToggleMute: return InputKey.ToggleMute;
                 default: throw new ArgumentOutOfRangeException(nameof(key), key, null);
             }

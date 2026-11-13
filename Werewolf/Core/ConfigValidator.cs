@@ -1,3 +1,5 @@
+#nullable enable
+using System;
 using System.Collections.Generic;
 
 namespace Werewolf.Core
@@ -18,8 +20,8 @@ namespace Werewolf.Core
 
         public static IReadOnlyList<ConfigIssue> Validate(GameConfig config, int playerCount)
         {
+            if (config == null) throw new ArgumentNullException(nameof(config));
             var issues = new List<ConfigIssue>();
-            if (config == null) return issues;
 
             if (WerewolfCountExceedsPlayers(config.WerewolfCount, playerCount))
             {

@@ -16,7 +16,7 @@ namespace Werewolf.Game
             if (window && !_replayViewer.Exists)
             {
                 EnsurePanelBuilt(_replayViewer);
-                _chatFeature.EnsureResultPanelTopSibling();
+                Runtime.ChatFeature.EnsureResultPanelTopSibling();
             }
             if (!_replayViewer.Exists) return;
 
@@ -27,14 +27,14 @@ namespace Werewolf.Game
                 Plugin.Bindings != null ? Plugin.Bindings.MeetingMapResolution.Value : 1,
                 Plugin.ReplayViewerKey != null ? Plugin.ReplayViewerKey.Value : KeyCode.R,
                 InputGate.KeysFree,
-                p => IsResultChatActiveClient && _chatFeature.IsPointerOverResultPanel(p),
+                p => IsResultChatActiveClient && Runtime.ChatFeature.IsPointerOverResultPanel(p),
                 ReplaySampler.ExportForUser);
         }
 
         internal void DebugReplayDemo(int count)
         {
             EnsurePanelBuilt(_replayViewer);
-            _chatFeature.EnsureResultPanelTopSibling();
+            Runtime.ChatFeature.EnsureResultPanelTopSibling();
             if (_replayViewer.Exists) _replayViewer.SetDemo(count);
         }
     }

@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Werewolf.Core;
 using Xunit;
@@ -6,6 +7,18 @@ namespace Werewolf.Tests
 {
     public class RevealScriptTests
     {
+        [Fact]
+        public void Build_NullTeammateRoster_ThrowsForTeammateNames()
+        {
+            #nullable enable
+            var error = Assert.Throws<ArgumentNullException>(() =>
+                RevealScript.Build(Role.Villager, null!, blackCatPossible: false,
+                    ValuableMapMode.Realtime));
+            #nullable restore
+
+            Assert.Equal("teammateNames", error.ParamName);
+        }
+
         private static string[] AllLines(RevealContent content) =>
             content.Pages.SelectMany(p => p.BodyLines).ToArray();
 

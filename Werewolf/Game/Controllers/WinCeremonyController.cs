@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using UnityEngine;
 using Werewolf.Core;
@@ -13,12 +14,12 @@ namespace Werewolf.Game
     {
         private readonly WerewolfDirector _d;
 
-        private CheckmateSequence _checkmate;
+        private CheckmateSequence? _checkmate;
         private bool _checkmateScanPending;
         private long _checkmateNextScanUnixMs;
 
         private readonly CheckmateRevealPanel _checkmateReveal = new CheckmateRevealPanel();
-        private Coroutine _checkmateRevealCoroutine;
+        private Coroutine? _checkmateRevealCoroutine;
 
         private bool _winCeremonyActive;
 
@@ -31,7 +32,7 @@ namespace Werewolf.Game
         private long _eradicationConfirmAtUnixMs;
 
         private readonly EradicationRevealPanel _eradicationReveal = new EradicationRevealPanel();
-        private Coroutine _eradicationRevealCoroutine;
+        private Coroutine? _eradicationRevealCoroutine;
 
         internal WinCeremonyController(WerewolfDirector director)
         {
@@ -72,16 +73,16 @@ namespace Werewolf.Game
 
         private void TickCheckmateHost(long now)
         {
-            GameSession session = _d.HostSession;
-            if (_checkmate == null || session == null || session.Winner != null) return;
+            HostPlayState? play = _d.HostGameplay;
+            if (_checkmate == null || play == null || play.Session.Winner != null) return;
             if (!Session.IsHost) return;
 
-            if (session.WinLocked && !_checkmate.CeremonyStarted) return;
+            if (play.Session.WinLocked && !_checkmate.CeremonyStarted) return;
 
             bool haulSuck = ValueTrackPatch.InHaulSuckWindow(now);
 
-            RolesSession roles = _d.HostRolesSession;
-            if (roles != null && !haulSuck && now >= _checkmateLineNextSyncUnixMs && Session.InRunLevel)
+            RolesSession roles = play.Roles;
+            if (!haulSuck && now >= _checkmateLineNextSyncUnixMs && Session.InRunLevel)
             {
                 _checkmateLineNextSyncUnixMs = now + CheckmateLineSyncIntervalMs;
                 roles.UpdateCheckmateLine(ComputeCheckmateLineDollars());
@@ -96,19 +97,17 @@ namespace Werewolf.Game
                 TryDetectCheckmate();
             }
 
-            bool curseActive = roles != null
-                && roles.ActiveCurse != null && !roles.ActiveCurse.Resolved;
-            bool meetingCountdown = _d.HostMeetingSession != null
-                && _d.HostMeetingSession.Stage == MeetingStage.Countdown;
-            switch (_checkmate.Tick(now, session.Phase, curseActive, meetingCountdown))
+            bool curseActive = roles.ActiveCurse != null && !roles.ActiveCurse.Resolved;
+            bool meetingCountdown = play.Meeting.Stage == MeetingStage.Countdown;
+            switch (_checkmate.Tick(now, play.Session.Phase, curseActive, meetingCountdown))
             {
                 case CheckmateAction.StartCeremony:
-                    session.LockValueCheckmate();
+                    play.Session.LockValueCheckmate();
                     SendCheckmateReveal(now);
                     break;
 
                 case CheckmateAction.ConfirmWin:
-                    session.NotifyValueCheckmate(now);
+                    play.Session.NotifyValueCheckmate(now);
                     break;
             }
         }
@@ -117,6 +116,8 @@ namespace Werewolf.Game
         {
             try
             {
+                CheckmateSequence? checkmate = _checkmate;
+                if (checkmate == null) return;
                 if (!Extraction.TryReadQuota(out int haulGoal, out int points, out int completed)) return;
                 int remainingQuota = CheckmateJudge.RemainingQuotaDollars(haulGoal, points, completed);
                 if (remainingQuota <= 0) return;
@@ -124,10 +125,10 @@ namespace Werewolf.Game
                 float obtainable = ValueTrackPatch.ComputeObtainableDollars();
                 if (!CheckmateJudge.IsCheckmate(obtainable, remainingQuota)) return;
 
-                _checkmate.NotifyDetected();
+                checkmate.NotifyDetected();
                 WLog.Line("checkmate_detected", secret: false,
                     ("obtainable", (int)obtainable), ("remainingQuota", remainingQuota),
-                    ("phase", _d.HostSession.Phase));
+                    ("phase", _d.HostGameplay?.Session.Phase ?? GamePhase.Lobby));
             }
             catch (Exception e)
             {
@@ -137,7 +138,7 @@ namespace Werewolf.Game
 
         private void SendCheckmateReveal(long now)
         {
-            RolesSession roles = _d.HostRolesSession;
+            RolesSession? roles = _d.HostGameplay?.Roles;
             if (roles == null)
             {
                 WLog.Line("checkmate_send_skip", secret: false, ("reason", "no_roles_session"));
@@ -146,14 +147,13 @@ namespace Werewolf.Game
 
             Extraction.ReadExtractedAndGoal(out int extracted, out int haulGoal);
 
-            _d.SendViaBus(new OutboundMessage(
+            _d.SendViaBus(OutboundMessage.ToAll(
                 WWCheckmateCodes.CheckmateReveal,
                 new object[]
                 {
                     roles.BuildMeetingGaugeData(extracted, haulGoal, ComputeCheckmateLineDollars()),
                     now,
-                },
-                MessageTarget.All, null));
+                }));
             WLog.Line("checkmate_ceremony_start", secret: false);
         }
 
@@ -161,7 +161,7 @@ namespace Werewolf.Game
         {
             try
             {
-                RolesSession roles = _d.HostRolesSession;
+                RolesSession? roles = _d.HostGameplay?.Roles;
                 if (roles == null || !Session.InRunLevel) return -1;
                 if (!Extraction.TryReadQuota(out int haulGoal, out int points, out int completed)) return -1;
                 int remaining = CheckmateJudge.RemainingQuotaDollars(haulGoal, points, completed);
@@ -198,12 +198,12 @@ namespace Werewolf.Game
         {
             if (_eradicationConfirmAtUnixMs == 0 || now < _eradicationConfirmAtUnixMs) return;
             _eradicationConfirmAtUnixMs = 0;
-            _d.HostSession?.ConfirmPendingWin(now);
+            _d.HostGameplay?.Session.ConfirmPendingWin(now);
         }
 
         internal void HandleCheckmateReveal(object[] p)
         {
-            MeetingGaugeSnapshot snapshot = MeetingGaugeSnapshot.FromData((int[])p[0]);
+            MeetingGaugeSnapshot? snapshot = MeetingGaugeSnapshot.FromData((int[])p[0]);
             if (snapshot == null)
             {
                 WLog.Line("checkmate_reveal_drop", secret: false, ("reason", "invalid_payload"));
@@ -228,7 +228,7 @@ namespace Werewolf.Game
 
         internal void HandleEradicationReveal(object[] p)
         {
-            EradicationRevealData data = EradicationRevealWire.FromWire(p);
+            EradicationRevealData? data = EradicationRevealWire.FromWire(p);
             if (data == null)
             {
                 WLog.Line("eradication_reveal_drop", secret: false, ("reason", "invalid_payload"));

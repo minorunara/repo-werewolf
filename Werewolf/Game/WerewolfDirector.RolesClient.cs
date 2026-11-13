@@ -28,7 +28,7 @@ namespace Werewolf.Game
                     return;
                 }
 
-                List<int> disconnected = null;
+                List<int>? disconnected = null;
                 foreach (var pair in _meetingClient.Rows)
                 {
                     if (pair.Value != RowStatus.Disconnected) continue;
@@ -47,13 +47,14 @@ namespace Werewolf.Game
                     return;
                 }
 
-                List<string> digestLines = _resultFlowFeature.ClientDigestEntries != null
-                    ? ResultDigestText.FormatLines(_resultFlowFeature.ClientDigestEntries, ResolveDisplayName)
+                IReadOnlyList<DigestEntry>? digestEntries = Runtime.ResultFlowFeature.ClientDigestEntries;
+                List<string>? digestLines = digestEntries != null
+                    ? ResultDigestText.FormatLines(digestEntries, ResolveDisplayName)
                     : null;
                 _resultScreen.Show(winningTeam, rows, Players.Resolve,
                     digestLines, ResultFlowController.BuildResultFooterText(), ParticipantIdFor,
-                    _resultFlowFeature.MatchWinReason());
-                _resultFlowFeature.CaptureResultChatContext(actors, roles);
+                    Runtime.ResultFlowFeature.MatchWinReason());
+                Runtime.ResultFlowFeature.CaptureResultChatContext(actors, roles);
                 PlayResultSfx(winningTeam);
                 FeedScenarioSignal(ScenarioSignal.ResultScreenShown);
             }
@@ -93,9 +94,10 @@ namespace Werewolf.Game
 
         internal string ResolveDisplayName(int actorNumber)
         {
-            if (_session != null)
+            GameSession? session = _hostRound?.Session;
+            if (session != null)
             {
-                foreach (WPlayer p in _session.Players)
+                foreach (WPlayer p in session.Players)
                 {
                     if (p != null && p.ActorNumber == actorNumber && !string.IsNullOrEmpty(p.Name))
                     {

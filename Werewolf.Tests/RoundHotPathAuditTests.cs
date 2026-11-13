@@ -46,10 +46,10 @@ namespace Werewolf.Tests
         public void DirectorUpdate_WarmsMeetingButtonTemplate()
         {
             using var module = OpenModModule();
-            var calls = Calls(Method(module, DirectorType, "Update")).ToList();
+            var calls = Calls(Method(module, DirectorType, "TickWarmupPreplayStage")).ToList();
 
             Assert.True(calls.Contains(ResolverType + "::TryWarmup"),
-                $"{DirectorType}.Update から {ResolverType}.TryWarmup の先読みが消えている。"
+                $"{DirectorType}.TickWarmupPreplayStage から {ResolverType}.TryWarmup の先読みが消えている。"
                 + "会議ボタンのテンプレートは未キャッシュだと Resources.Load の同期ロードで秒単位止まるため、"
                 + "ラウンド開始のフレームではなくタイトル画面のうちに解決すること。");
         }

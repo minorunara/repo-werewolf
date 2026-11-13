@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using TMPro;
 using UnityEngine;
@@ -50,82 +51,135 @@ namespace Werewolf.UI
         private static readonly Color HauntingRippleMediumColor = new Color(1f, 0.82f, 0.10f);
         private static readonly Color HauntingRippleStrongColor = new Color(1f, 0.16f, 0.10f);
 
-        private GameObject _root;
-        private RectTransform _iconRect;
-        private RectTransform _slotRect;
-        private Image _icon;
-        private Sprite _iconSpriteColor;
-        private Sprite _iconSpriteGray;
-        private TextMeshProUGUI _iconFallback;
-        private TextMeshProUGUI _keyLabel;
-        private GameObject _blockedRoot;
-        private RawImage[] _hauntingRippleImages;
-        private float[] _hauntingRippleRemainingSec;
-        private Color[] _hauntingRippleColors;
-        private Texture2D _hauntingRippleTexture;
+        private sealed class RippleView
+        {
+            public RippleView(RawImage[] images, float[] remainingSeconds, Color[] colors, Texture2D texture)
+            {
+                Images = images; RemainingSeconds = remainingSeconds; Colors = colors; Texture = texture;
+            }
+            public RawImage[] Images { get; }
+            public float[] RemainingSeconds { get; }
+            public Color[] Colors { get; }
+            public Texture2D Texture { get; }
+        }
+
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, RectTransform iconRect, RectTransform slotRect, Image icon,
+                Sprite? iconSpriteColor, Sprite? iconSpriteGray, TextMeshProUGUI? iconFallback,
+                TextMeshProUGUI keyLabel, GameObject blockedRoot, RippleView ripple)
+            {
+                Root = root; IconRect = iconRect; SlotRect = slotRect; Icon = icon;
+                IconSpriteColor = iconSpriteColor; IconSpriteGray = iconSpriteGray;
+                IconFallback = iconFallback; KeyLabel = keyLabel; BlockedRoot = blockedRoot; Ripple = ripple;
+            }
+            public GameObject Root { get; }
+            public RectTransform IconRect { get; }
+            public RectTransform SlotRect { get; }
+            public Image Icon { get; }
+            public Sprite? IconSpriteColor { get; }
+            public Sprite? IconSpriteGray { get; }
+            public TextMeshProUGUI? IconFallback { get; }
+            public TextMeshProUGUI KeyLabel { get; }
+            public GameObject BlockedRoot { get; }
+            public RippleView Ripple { get; }
+        }
+
+        private ViewRefs? _view;
+        private GameObject? _root => _view?.Root;
+        private RectTransform? _iconRect => _view?.IconRect;
+        private RectTransform? _slotRect => _view?.SlotRect;
+        private Image? _icon => _view?.Icon;
+        private Sprite? _iconSpriteColor => _view?.IconSpriteColor;
+        private Sprite? _iconSpriteGray => _view?.IconSpriteGray;
+        private TextMeshProUGUI? _iconFallback => _view?.IconFallback;
+        private TextMeshProUGUI? _keyLabel => _view?.KeyLabel;
+        private GameObject? _blockedRoot => _view?.BlockedRoot;
+        private RawImage[]? _hauntingRippleImages => _view?.Ripple.Images;
+        private float[]? _hauntingRippleRemainingSec => _view?.Ripple.RemainingSeconds;
+        private Color[]? _hauntingRippleColors => _view?.Ripple.Colors;
         private int _nextHauntingRipple;
 
         private Layout _lastLayout = (Layout)(-1);
         private bool _lastNear;
         private bool _lastBlocked;
-        private string _lastKeyName;
+        private string? _lastKeyName;
+        private readonly TextRefresh _textRefresh = new TextRefresh(nameof(CorpseReportHudPanel));
 
-        public bool Exists => _root != null;
+        public bool Exists => GetLiveViewOrNull() != null;
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
             float plate = IconSize + PlatePadding;
             float rootWidth = plate;
             float rootHeight = plate + LabelGap + LabelHeight;
 
+            GameObject? root = null;
+            RippleView? ripple = null;
+            try
+            {
             RectTransform rect = UiKit.CreateAnchoredRect(layerRoot, "WW_CorpseReportHudPanel",
                 UiKit.BottomRight, new Vector2(1f, 0f),
                 new Vector2(-RightMargin, GaugeBottomY), new Vector2(rootWidth, rootHeight));
-            _root = rect.gameObject;
+            root = rect.gameObject;
 
             float iconCenterX = rootWidth / 2f;
             float iconCenterY = LabelHeight + LabelGap + plate / 2f;
 
-            _slotRect = UiKit.CreateRect(rect, "Slot", Vector2.zero, new Vector2(plate, plate));
-            UiKit.SetAnchorsBottomLeft(_slotRect, new Vector2(iconCenterX, iconCenterY),
+            RectTransform slotRect = UiKit.CreateRect(rect, "Slot", Vector2.zero, new Vector2(plate, plate));
+            UiKit.SetAnchorsBottomLeft(slotRect, new Vector2(iconCenterX, iconCenterY),
                 new Vector2(plate, plate));
 
-            BuildHauntingRipples();
+            ripple = BuildHauntingRipples(slotRect);
 
-            _icon = UiKit.CreateImage(_slotRect, "Icon", Vector2.zero,
+            Image icon = UiKit.CreateImage(slotRect, "Icon", Vector2.zero,
                 new Vector2(IconSize, IconSize), IdleIconTint);
-            _iconRect = _icon.rectTransform;
+            RectTransform iconRect = icon.rectTransform;
 
-            Sprite sprite = AssetCatalog.GetSprite("icon_host_megaphone");
+            Sprite? sprite = AssetCatalog.GetSprite("icon_host_megaphone");
+            Sprite? iconSpriteColor = null;
+            Sprite? iconSpriteGray = null;
+            TextMeshProUGUI? iconFallback = null;
             if (sprite != null)
             {
-                _iconSpriteColor = sprite;
-                _iconSpriteGray = AssetCatalog.GetGraySprite("icon_host_megaphone");
-                _icon.sprite = _iconSpriteGray ?? sprite;
-                _icon.preserveAspect = true;
+                iconSpriteColor = sprite;
+                iconSpriteGray = AssetCatalog.GetGraySprite("icon_host_megaphone");
+                icon.sprite = iconSpriteGray ?? sprite;
+                icon.preserveAspect = true;
             }
             else
             {
-                _icon.enabled = false;
-                _iconFallback = UiKit.CreateText(_slotRect, "IconFallback",
+                icon.enabled = false;
+                iconFallback = UiKit.CreateText(slotRect, "IconFallback",
                     Vector2.zero, new Vector2(IconSize, IconSize),
                     "通報", 26f, IdleIconTint, TextAlignmentOptions.Center);
             }
 
-            BuildBlockedOverlay(plate);
+            GameObject blockedRoot = BuildBlockedOverlay(slotRect, plate);
 
-            _keyLabel = UiKit.CreateText(rect, "KeyLabel",
+            TextMeshProUGUI keyLabel = UiKit.CreateText(rect, "KeyLabel",
                 new Vector2(iconCenterX, LabelHeight / 2f),
                 new Vector2(rootWidth + 120f, LabelHeight),
                 string.Empty, LabelFontSize, IdleLabelColor, TextAlignmentOptions.Center);
-            UiKit.SetAnchorsBottomLeft(_keyLabel.rectTransform,
+            UiKit.SetAnchorsBottomLeft(keyLabel.rectTransform,
                 new Vector2(iconCenterX, LabelHeight / 2f),
                 new Vector2(rootWidth + 120f, LabelHeight));
 
-            _root.SetActive(false);
+            root.SetActive(false);
+            _view = new ViewRefs(root, iconRect, slotRect, icon, iconSpriteColor, iconSpriteGray,
+                iconFallback, keyLabel, blockedRoot, ripple);
+            _textRefresh.Subscribe(() => Exists, ApplyTexts);
+            }
+            catch
+            {
+                _view = null;
+                if (ripple != null && ripple.Texture != null) UnityEngine.Object.Destroy(ripple.Texture);
+                if (root != null) UnityEngine.Object.Destroy(root);
+                throw;
+            }
         }
 
         public void Tick(CorpseReportHudMode mode, bool nearCorpse, string keyName, Layout layout)
@@ -184,7 +238,7 @@ namespace Werewolf.UI
                 if (_icon != null && _icon.enabled)
                 {
                     _icon.color = iconTint;
-                    Sprite want = near
+                    Sprite? want = near
                         ? (_iconSpriteColor ?? _iconSpriteGray)
                         : (_iconSpriteGray ?? _iconSpriteColor);
                     if (want != null && _icon.sprite != want) _icon.sprite = want;
@@ -212,8 +266,8 @@ namespace Werewolf.UI
             if (image == null) return;
 
             Color color = HauntingRippleColorOf(tier);
-            _hauntingRippleColors[index] = color;
-            _hauntingRippleRemainingSec[index] = HauntingRippleDurationSec;
+            _hauntingRippleColors![index] = color;
+            _hauntingRippleRemainingSec![index] = HauntingRippleDurationSec;
             image.rectTransform.sizeDelta = new Vector2(
                 HauntingRippleStartSize, HauntingRippleStartSize);
             image.color = WithAlpha(color, 0f);
@@ -225,10 +279,10 @@ namespace Werewolf.UI
             if (_hauntingRippleImages == null) return;
             for (int i = 0; i < _hauntingRippleImages.Length; i++)
             {
-                _hauntingRippleRemainingSec[i] = 0f;
+                _hauntingRippleRemainingSec![i] = 0f;
                 RawImage image = _hauntingRippleImages[i];
                 if (image == null) continue;
-                image.color = WithAlpha(_hauntingRippleColors[i], 0f);
+                image.color = WithAlpha(_hauntingRippleColors![i], 0f);
                 image.enabled = false;
             }
             _nextHauntingRipple = 0;
@@ -247,18 +301,20 @@ namespace Werewolf.UI
             }
         }
 
-        private void BuildHauntingRipples()
+        private static RippleView BuildHauntingRipples(RectTransform slotRect)
         {
-            _hauntingRippleImages = new RawImage[HauntingRippleCount];
-            _hauntingRippleRemainingSec = new float[HauntingRippleCount];
-            _hauntingRippleColors = new Color[HauntingRippleCount];
-            Texture2D texture = EnsureHauntingRippleTexture();
+            var images = new RawImage[HauntingRippleCount];
+            var remainingSeconds = new float[HauntingRippleCount];
+            var colors = new Color[HauntingRippleCount];
+            Texture2D texture = CreateHauntingRippleTexture();
 
+            try
+            {
             for (int i = 0; i < HauntingRippleCount; i++)
             {
                 var rippleGo = new GameObject("HauntingRipple" + i, typeof(RectTransform));
                 var rippleRect = (RectTransform)rippleGo.transform;
-                rippleRect.SetParent(_slotRect, false);
+                rippleRect.SetParent(slotRect, false);
                 rippleRect.anchorMin = rippleRect.anchorMax = new Vector2(0.5f, 0.5f);
                 rippleRect.pivot = new Vector2(0.5f, 0.5f);
                 rippleRect.anchoredPosition = Vector2.zero;
@@ -270,8 +326,15 @@ namespace Werewolf.UI
                 image.texture = texture;
                 image.color = WithAlpha(HauntingRippleStrongColor, 0f);
                 image.enabled = false;
-                _hauntingRippleColors[i] = HauntingRippleStrongColor;
-                _hauntingRippleImages[i] = image;
+                colors[i] = HauntingRippleStrongColor;
+                images[i] = image;
+            }
+            return new RippleView(images, remainingSeconds, colors, texture);
+            }
+            catch
+            {
+                UnityEngine.Object.Destroy(texture);
+                throw;
             }
         }
 
@@ -283,7 +346,7 @@ namespace Werewolf.UI
             for (int i = 0; i < _hauntingRippleImages.Length; i++)
             {
                 RawImage image = _hauntingRippleImages[i];
-                if (image == null || _hauntingRippleRemainingSec[i] <= 0f) continue;
+                if (image == null || _hauntingRippleRemainingSec![i] <= 0f) continue;
 
                 float remaining = Mathf.Max(0f,
                     _hauntingRippleRemainingSec[i] - deltaSeconds);
@@ -297,19 +360,19 @@ namespace Werewolf.UI
                 float fadeIn = Mathf.Clamp01(t / 0.08f);
                 float fadeOut = 1f - Mathf.SmoothStep(0f, 1f, t);
                 float alpha = HauntingRippleMaxAlpha * fadeIn * fadeOut;
-                image.color = WithAlpha(_hauntingRippleColors[i], alpha);
+                image.color = WithAlpha(_hauntingRippleColors![i], alpha);
 
                 if (remaining <= 0f) image.enabled = false;
             }
         }
 
-        private Texture2D EnsureHauntingRippleTexture()
+        private static Texture2D CreateHauntingRippleTexture()
         {
-            if (_hauntingRippleTexture != null) return _hauntingRippleTexture;
-
             var texture = new Texture2D(
                 HauntingRippleTextureSize, HauntingRippleTextureSize,
                 TextureFormat.RGBA32, false);
+            try
+            {
             texture.wrapMode = TextureWrapMode.Clamp;
             texture.filterMode = FilterMode.Bilinear;
             var pixels = new Color32[HauntingRippleTextureSize * HauntingRippleTextureSize];
@@ -334,16 +397,21 @@ namespace Werewolf.UI
             texture.SetPixels32(pixels);
             texture.Apply(false, false);
             texture.name = "WW_ShamanHauntingRipple";
-            _hauntingRippleTexture = texture;
             return texture;
+            }
+            catch
+            {
+                UnityEngine.Object.Destroy(texture);
+                throw;
+            }
         }
 
-        private void BuildBlockedOverlay(float plate)
+        private static GameObject BuildBlockedOverlay(RectTransform slotRect, float plate)
         {
-            var blocked = UiKit.CreateRect(_slotRect, "Blocked", Vector2.zero, new Vector2(plate, plate));
-            _blockedRoot = blocked.gameObject;
+            var blocked = UiKit.CreateRect(slotRect, "Blocked", Vector2.zero, new Vector2(plate, plate));
+            GameObject blockedRoot = blocked.gameObject;
 
-            Sprite cross = AssetCatalog.GetSprite("emoji_cross_mark");
+            Sprite? cross = AssetCatalog.GetSprite("emoji_cross_mark");
             if (cross != null)
             {
                 Image x = UiKit.CreateImage(blocked, "Cross", Vector2.zero,
@@ -361,7 +429,7 @@ namespace Werewolf.UI
                 }
             }
 
-            Sprite face = AssetCatalog.GetSprite("img_taxman_death");
+            Sprite? face = AssetCatalog.GetSprite("img_taxman_death");
             if (face != null)
             {
                 Image f = UiKit.CreateImage(blocked, "TaxmanFace", BlockedFaceOffset,
@@ -370,7 +438,8 @@ namespace Werewolf.UI
                 f.preserveAspect = true;
             }
 
-            _blockedRoot.SetActive(false);
+            blockedRoot.SetActive(false);
+            return blockedRoot;
         }
 
         public void Hide()
@@ -380,28 +449,39 @@ namespace Werewolf.UI
             _lastKeyName = null;
         }
 
+        private void ApplyTexts()
+        {
+            _lastKeyName = null;
+        }
+
         public void Destroy()
         {
-            if (_root != null)
-            {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
-            }
-            _slotRect = null; _icon = null; _iconRect = null; _iconFallback = null;
-            _keyLabel = null; _blockedRoot = null;
-            _hauntingRippleImages = null;
-            _hauntingRippleRemainingSec = null;
-            _hauntingRippleColors = null;
-            if (_hauntingRippleTexture != null)
-            {
-                UnityEngine.Object.Destroy(_hauntingRippleTexture);
-                _hauntingRippleTexture = null;
-            }
+            _textRefresh.Unsubscribe();
+            ViewRefs? view = _view;
+            _view = null;
+            if (view != null && view.Root != null) UnityEngine.Object.Destroy(view.Root);
+            if (view != null && view.Ripple.Texture != null) UnityEngine.Object.Destroy(view.Ripple.Texture);
             _nextHauntingRipple = 0;
             _lastLayout = (Layout)(-1);
             _lastNear = false;
             _lastBlocked = false;
             _lastKeyName = null;
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null && view.Ripple.Texture != null) return view;
+            _view = null;
+            if (view.Root != null) UnityEngine.Object.Destroy(view.Root);
+            if (view.Ripple.Texture != null) UnityEngine.Object.Destroy(view.Ripple.Texture);
+            _nextHauntingRipple = 0;
+            _lastLayout = (Layout)(-1);
+            _lastNear = false;
+            _lastBlocked = false;
+            _lastKeyName = null;
+            return null;
         }
 
     }

@@ -150,6 +150,31 @@ namespace Werewolf.Tests
             Assert.Equal("[WW] selftest-start", _captured[0].Line);
         }
 
+        [Fact]
+        public void Exception_IncludesContextTypeMessageAndSingleLineStack()
+        {
+            Exception error;
+            try
+            {
+                throw new InvalidOperationException("first line\nsecond\\line");
+            }
+            catch (Exception e)
+            {
+                error = e;
+            }
+
+            WLog.Exception("tick_error", error, secret: false, ("stage", "voice"));
+
+            string line = Assert.Single(_captured).Line;
+            Assert.Contains("stage=voice", line);
+            Assert.Contains("type=System.InvalidOperationException", line);
+            Assert.Contains("err=\"first line\\nsecond\\\\line\"", line);
+            Assert.Contains("stack=", line);
+            Assert.Contains(nameof(Exception_IncludesContextTypeMessageAndSingleLineStack), line);
+            Assert.DoesNotContain('\r', line);
+            Assert.DoesNotContain('\n', line);
+        }
+
         [Theory]
         [InlineData("[WW] phase Lobby->Play reason=start")]
         [InlineData("[WW] dir=send code=163 target=all payload=[]")]
@@ -173,7 +198,6 @@ namespace Werewolf.Tests
         [InlineData("[WW] registry_init_failed err=boom")]
         [InlineData("[WW] send_fail err=boom")]
         [InlineData("[WW] recv_payload_invalid code=999")]
-        [InlineData("[WW] game_refs_disabled failedFields=2")]
         [InlineData("[WW] harmony_disabled failedClasses=1")]
         public void LevelOf_FailureKind_IsError(string line)
         {
@@ -197,10 +221,13 @@ namespace Werewolf.Tests
             var ex1 = Record.Exception(() => WLog.Event("send", 163, "all", new object[] { 1 }));
             var ex2 = Record.Exception(() => WLog.Phase(GamePhase.Play, GamePhase.Meeting, "vote"));
             var ex3 = Record.Exception(() => WLog.Line("drop", false, ("reason", "x")));
+            var ex4 = Record.Exception(() => WLog.Exception(
+                "tick_error", new InvalidOperationException("boom")));
 
             Assert.Null(ex1);
             Assert.Null(ex2);
             Assert.Null(ex3);
+            Assert.Null(ex4);
         }
 
         [Fact]

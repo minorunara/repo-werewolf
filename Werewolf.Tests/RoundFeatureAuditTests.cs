@@ -14,7 +14,7 @@ namespace Werewolf.Tests
         private const string DirectorTypeName = "Werewolf.Game.WerewolfDirector";
         private const string FeatureInterfaceName = "Werewolf.Game.IRoundFeature";
 
-        private const int DirectorMutableFieldCeiling = 19;
+        private const int DirectorMutableFieldCeiling = 7;
 
         private static readonly (string TypeFullName, string ResetMethod)[] ScopedControllers =
         {
@@ -159,6 +159,15 @@ namespace Werewolf.Tests
                 queue.Enqueue(m);
                 visited.Add(m.FullName);
             }
+
+            if (entryMethodName == "Update")
+            {
+                foreach (var m in director.Methods.Where(
+                             m => m.Name == "CreateUpdatePipeline" && m.HasBody))
+                {
+                    if (visited.Add(m.FullName)) queue.Enqueue(m);
+                }
+            }
             Assert.True(queue.Count > 0, $"{DirectorTypeName}.{entryMethodName} が見つからない（IL Body 付き）。");
 
             while (queue.Count > 0)
@@ -166,6 +175,17 @@ namespace Werewolf.Tests
                 MethodDefinition method = queue.Dequeue();
                 foreach (Instruction ins in method.Body.Instructions)
                 {
+                    if (ins.OpCode == OpCodes.Ldftn && ins.Operand is MethodReference delegateTarget
+                        && delegateTarget.DeclaringType.FullName == DirectorTypeName)
+                    {
+                        if (visited.Add(delegateTarget.FullName))
+                        {
+                            MethodDefinition delegateMethod = delegateTarget.Resolve();
+                            if (delegateMethod != null && delegateMethod.HasBody) queue.Enqueue(delegateMethod);
+                        }
+                        continue;
+                    }
+
                     if ((ins.OpCode != OpCodes.Call && ins.OpCode != OpCodes.Callvirt) ||
                         !(ins.Operand is MethodReference mr))
                         continue;
@@ -187,6 +207,96 @@ namespace Werewolf.Tests
             }
 
             return calls;
+        }
+
+        [Fact]
+        public void UpdatePipeline_IsOwnedByRuntimeAndDrivenFromUpdate()
+        {
+            using var module = LoadModModule();
+            TypeDefinition director = module.GetType(DirectorTypeName);
+            Assert.NotNull(director);
+
+            TypeDefinition runtime = director.NestedTypes.Single(t => t.Name == "DirectorRuntime");
+            MethodDefinition constructor = runtime.Methods.Single(
+                m => m.Name == ".ctor" && m.HasBody && m.Parameters.Count == 1);
+            MethodDefinition update = director.Methods.Single(m => m.Name == "Update" && m.HasBody);
+
+            Assert.Contains(constructor.Body.Instructions, ins =>
+                (ins.OpCode == OpCodes.Call || ins.OpCode == OpCodes.Callvirt)
+                && ins.Operand is MethodReference mr
+                && mr.DeclaringType.FullName == DirectorTypeName
+                && mr.Name == "CreateUpdatePipeline");
+            Assert.Contains(update.Body.Instructions, ins =>
+                ins.OpCode == OpCodes.Callvirt && ins.Operand is MethodReference mr
+                && mr.DeclaringType.FullName == "Werewolf.Core.FaultIsolatedTickPipeline"
+                && mr.Name == "Tick");
+        }
+
+        [Fact]
+        public void Awake_PublishesOnlyCompletedImmutableRuntime()
+        {
+            using var module = LoadModModule();
+            TypeDefinition director = module.GetType(DirectorTypeName);
+            Assert.NotNull(director);
+
+            TypeDefinition runtime = director.NestedTypes.Single(t => t.Name == "DirectorRuntime");
+            var mutableRuntimeFields = runtime.Fields
+                .Where(f => !f.IsStatic && !f.IsInitOnly)
+                .Select(f => f.Name)
+                .ToList();
+            Assert.True(mutableRuntimeFields.Count == 0,
+                "DirectorRuntime は構築後に部分配線へ戻せない immutable aggregate とする:\n  "
+                + string.Join("\n  ", mutableRuntimeFields));
+
+            MethodDefinition awake = director.Methods.Single(m => m.Name == "Awake" && m.HasBody);
+            List<Instruction> instructions = awake.Body.Instructions.ToList();
+            int create = instructions.FindIndex(ins =>
+                ins.OpCode == OpCodes.Call && ins.Operand is MethodReference mr
+                && mr.DeclaringType.FullName == runtime.FullName && mr.Name == "Create");
+            int storeRuntime = instructions.FindIndex(ins =>
+                ins.OpCode == OpCodes.Stfld && ins.Operand is FieldReference field
+                && field.DeclaringType.FullName == DirectorTypeName && field.Name == "_runtime");
+            int publishInstance = instructions.FindIndex(ins =>
+                ins.OpCode == OpCodes.Call && ins.Operand is MethodReference method
+                && method.DeclaringType.FullName == DirectorTypeName && method.Name == "set_Instance");
+            int disableOnFailure = instructions.FindIndex(ins =>
+                ins.OpCode == OpCodes.Call && ins.Operand is MethodReference method
+                && method.DeclaringType.FullName == "UnityEngine.Behaviour" && method.Name == "set_enabled");
+
+            Assert.True(create >= 0 && create < storeRuntime && storeRuntime < publishInstance,
+                "Awake は DirectorRuntime の完全構築→_runtime の一括代入→Instance 公開の順に固定する。");
+            Assert.True(disableOnFailure > publishInstance,
+                "Awake の構築失敗経路は未初期化コンポーネントを無効化する。");
+        }
+
+        [Fact]
+        public void DirectorCreators_RequireReadyRuntimeAfterAddComponent()
+        {
+            using var module = LoadModModule();
+            var creators = new[]
+            {
+                module.GetType("Werewolf.Plugin").Methods.Single(m => m.Name == "Awake" && m.HasBody),
+                module.GetType("Werewolf.Game.Patches.DirectorRevivePatch").Methods
+                    .Single(m => m.Name == "Postfix" && m.HasBody),
+            };
+
+            foreach (MethodDefinition creator in creators)
+            {
+                List<Instruction> instructions = creator.Body.Instructions.ToList();
+                int addComponent = instructions.FindIndex(ins =>
+                    ins.Operand is GenericInstanceMethod method
+                    && method.Name == "AddComponent"
+                    && method.GenericArguments.Any(argument => argument.FullName == DirectorTypeName));
+                int readinessCheck = instructions.FindIndex(ins =>
+                    (ins.OpCode == OpCodes.Call || ins.OpCode == OpCodes.Callvirt)
+                    && ins.Operand is MethodReference method
+                    && method.DeclaringType.FullName == DirectorTypeName
+                    && method.Name == "get_IsReady");
+
+                Assert.True(addComponent >= 0 && readinessCheck > addComponent,
+                    $"{creator.DeclaringType.FullName}.{creator.Name} は AddComponent 後に" +
+                    "完全な DirectorRuntime の公開を成功条件として確認する。");
+            }
         }
 
         private static List<(TypeDefinition Type, string ResetMethod)> AuditedControllers(ModuleDefinition module)
@@ -311,6 +421,7 @@ namespace Werewolf.Tests
 
             List<string> fields = MutableInstanceFields(director)
                 .Where(f => !controllerTypes.Contains(f.FieldType.FullName))
+                .Where(f => f.FieldType.FullName != "Werewolf.Game.WerewolfDirector/DirectorRuntime")
                 .Select(f => f.Name)
                 .OrderBy(n => n, StringComparer.Ordinal)
                 .ToList();

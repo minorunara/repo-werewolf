@@ -1,8 +1,9 @@
+#nullable enable
 namespace Werewolf.Core
 {
     public static class NoticeCatalog
     {
-        public static string Format(SessionNotice notice)
+        public static string? Format(SessionNotice? notice)
         {
             if (notice == null) return null;
 
@@ -49,7 +50,7 @@ namespace Werewolf.Core
             }
         }
 
-        private static string FormatConveneDenied(ConveneRejectReason reason)
+        private static string? FormatConveneDenied(ConveneRejectReason reason)
         {
             switch (reason)
             {

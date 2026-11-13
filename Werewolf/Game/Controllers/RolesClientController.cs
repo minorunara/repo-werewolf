@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 using UnityEngine;
 using Werewolf.Core;
@@ -30,7 +31,7 @@ namespace Werewolf.Game
         private readonly DiscussionImpactPanel _discussionImpact = new DiscussionImpactPanel();
 
         private readonly ToastPanel _toastPanel = new ToastPanel();
-        private ToastQueue _toastQueue;
+        private ToastQueue? _toastQueue;
 
         private readonly WolfStatusPanel _wolfStatusPanel = new WolfStatusPanel();
         private readonly WolfStatusModel _wolfStatusModel = new WolfStatusModel();
@@ -40,7 +41,7 @@ namespace Werewolf.Game
         private readonly ValuableRecordHudPanel _valuableRecordHud = new ValuableRecordHudPanel();
         private readonly ValuableRecordHold _valuableRecordHold = new ValuableRecordHold();
 
-        private CurseTargetSource _curseSource;
+        private CurseTargetSource? _curseSource;
 
         internal RolesClientController(WerewolfDirector director)
         {
@@ -259,20 +260,20 @@ namespace Werewolf.Game
             => Plugin.GameConfig != null && Plugin.GameConfig.ToastDurationSec > 0
                 ? Plugin.GameConfig.ToastDurationSec : ToastDurationFallbackSec;
 
-        private void EnsureToastQueue()
+        private ToastQueue EnsureToastQueue()
         {
-            _toastQueue ??= new ToastQueue(ToastDurationSec());
+            return _toastQueue ??= new ToastQueue(ToastDurationSec());
         }
 
-        internal void PushToast(SessionNotice notice)
+        internal void PushToast(SessionNotice? notice)
         {
             if (notice == null) return;
-            string message = NoticeCatalog.Format(notice);
+            string? message = NoticeCatalog.Format(notice);
             if (string.IsNullOrEmpty(message)) return;
 
-            EnsureToastQueue();
+            ToastQueue queue = EnsureToastQueue();
             EnsureRolesUiBuilt();
-            _toastQueue.Push(message, SessionClock.NowMs());
+            queue.Push(message, SessionClock.NowMs());
             _d.PlaySfx(NoticeSfx.Resolve(notice));
             WLog.Line("toast_push", secret: false, ("kind", notice.Kind));
         }
@@ -281,9 +282,9 @@ namespace Werewolf.Game
             string logKind = "bomber", bool playSfx = true)
         {
             if (string.IsNullOrEmpty(message)) return;
-            EnsureToastQueue();
+            ToastQueue queue = EnsureToastQueue();
             EnsureRolesUiBuilt();
-            _toastQueue.Push(message, SessionClock.NowMs());
+            queue.Push(message, SessionClock.NowMs());
             if (playSfx)
             {
                 _d.PlaySfx(clipKey);
@@ -293,9 +294,9 @@ namespace Werewolf.Game
 
         internal void PushDebugToast(string message)
         {
-            EnsureToastQueue();
+            ToastQueue queue = EnsureToastQueue();
             EnsureRolesUiBuilt();
-            _toastQueue.Push(message, SessionClock.NowMs());
+            queue.Push(message, SessionClock.NowMs());
         }
 
         internal void HandleGaugeSync(object[] p)
@@ -400,7 +401,7 @@ namespace Werewolf.Game
 
         private void SendRoleAction(byte subtype, int arg, byte flag)
         {
-            INetBus bus = _d.ClientBus;
+            INetBus? bus = _d.ClientBus;
             if (bus == null)
             {
                 WLog.Line("roleaction_send_fail", secret: true,

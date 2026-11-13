@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using TMPro;
@@ -20,20 +21,20 @@ namespace Werewolf.UI
             public int Actor;
         }
 
-        private TextMeshProUGUI _title;
-        private RectTransform _titleRect;
-        private RectTransform _viewport;
-        private string _normalTitle;
+        private TextMeshProUGUI? _title;
+        private RectTransform? _titleRect;
+        private RectTransform? _viewport;
+        private string? _normalTitle;
         private Color _titleBaseColor;
 
         private readonly List<Target> _targets = new List<Target>();
         private readonly ClickGate _click = new ClickGate();
-        private Image _hoverPlate;
+        private Image? _hoverPlate;
 
         private int _actor;
         private bool _active;
 
-        public Func<ChatLogEntry, bool> Predicate { get; private set; }
+        public Func<ChatLogEntry, bool>? Predicate { get; private set; }
 
         public bool IsActive => _active;
 
@@ -63,7 +64,7 @@ namespace Werewolf.UI
 
             Vector2 mouse = Input.mousePosition;
 
-            RectTransform hoverRect = null;
+            RectTransform? hoverRect = null;
             int hoverActor = 0;
             bool inViewport = _viewport != null
                 && RectTransformUtility.RectangleContainsScreenPoint(_viewport, mouse, null);
@@ -132,6 +133,12 @@ namespace Werewolf.UI
             WLog.Line("chat_filter_on", secret: false, ("actor", actor));
         }
 
+        public void SetNormalTitle(string normalTitle)
+        {
+            _normalTitle = normalTitle;
+            ApplyTitle();
+        }
+
         private void ApplyTitle()
         {
             if (_title == null) return;
@@ -145,7 +152,7 @@ namespace Werewolf.UI
             _title.text = EmojiSprites.Ready ? EmojiSprites.Substitute(label + " ❌") : label;
         }
 
-        private void ApplyRowHover(RectTransform hoverRect)
+        private void ApplyRowHover(RectTransform? hoverRect)
         {
             if (hoverRect == null)
             {

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -56,17 +57,25 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void Compute_EmptyOrNullTargets_ReturnsEmpty()
+        public void Compute_EmptyTargets_ReturnsEmpty()
         {
             Assert.Empty(WorldgenUpgradeDeltas.Compute(Map(), _ => 3));
-            Assert.Empty(WorldgenUpgradeDeltas.Compute(null, _ => 3));
+        }
+
+        [Fact]
+        public void Compute_NullTargets_ThrowsForTargets()
+        {
+            var error = Assert.Throws<ArgumentNullException>(() =>
+                WorldgenUpgradeDeltas.Compute(null!, _ => 3));
+
+            Assert.Equal("targets", error.ParamName);
         }
 
         [Fact]
         public void Compute_NullCurrentLookup_Throws()
         {
             Assert.Throws<ArgumentNullException>(
-                () => WorldgenUpgradeDeltas.Compute(Map(("Speed", 1)), null));
+                () => WorldgenUpgradeDeltas.Compute(Map(("Speed", 1)), null!));
         }
 
         [Fact]

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
@@ -5,23 +6,18 @@ using Werewolf.Debugging;
 
 namespace Werewolf.Game.Patches
 {
-    [HarmonyPatch(typeof(ChatManager), "MessageSend")]
+    [HarmonyPatch(typeof(ChatManager), nameof(ChatManager.MessageSend))]
     internal static class ChatCommandPatch
     {
-        private static AccessTools.FieldRef<ChatManager, string> ChatMessageRef =>
-            GameRefs.ChatManager_chatMessage;
-
         private static bool Prefix(ChatManager __instance)
         {
             try
             {
-                if (ChatMessageRef == null) return true;
-
-                string message = ChatMessageRef(__instance);
+                string message = __instance.chatMessage;
                 if (!CommandGate.TryParse(message, out _, out _)) return true;
 
                 CheatCommands.Execute(message);
-                ChatMessageRef(__instance) = "";
+                __instance.chatMessage = "";
                 return false;
             }
             catch (Exception e)

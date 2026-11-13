@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -26,7 +27,7 @@ namespace Werewolf.Vanilla
 
         public static List<(float X, float Z)> ModuleCentersXZ()
         {
-            Module[] modules = Object.FindObjectsOfType<Module>();
+            Module[] modules = Object.FindObjectsByType<Module>(FindObjectsSortMode.None);
             var centers = new List<(float X, float Z)>(modules != null ? modules.Length : 0);
             if (modules == null) return centers;
             for (int i = 0; i < modules.Length; i++)

@@ -455,14 +455,19 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void Sync_NullArguments_AreIgnored()
+        public void Sync_NullRequiredArguments_AreRejected()
         {
             ChatLayout layout = NewLayout();
 
-            layout.Sync(null, FixedSize);
-            layout.Sync(new MeetingChatLog(), null);
+            #nullable enable
+            var logError = Assert.Throws<ArgumentNullException>(
+                () => layout.Sync(null!, FixedSize));
+            var measureError = Assert.Throws<ArgumentNullException>(
+                () => layout.Sync(new MeetingChatLog(), null!));
+            #nullable restore
 
-            Assert.Equal(0, layout.Count);
+            Assert.Equal("log", logError.ParamName);
+            Assert.Equal("measureBubble", measureError.ParamName);
         }
 
         [Fact]

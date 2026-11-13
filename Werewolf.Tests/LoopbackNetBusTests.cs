@@ -77,11 +77,13 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void SendToActors_NullTargets_DoesNotDeliver()
+        public void SendToActors_NullTargets_IsRejected()
         {
             var (bus, received) = NewBus();
 
-            bus.SendToActors(MessageCodes.RevealSelfRole, new object[] { (byte)Role.BlackCat }, null);
+            Assert.Throws<ArgumentNullException>(() =>
+                bus.SendToActors(MessageCodes.RevealSelfRole,
+                    new object[] { (byte)Role.BlackCat }, null!));
 
             Assert.Empty(received);
         }

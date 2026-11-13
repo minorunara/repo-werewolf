@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -15,20 +16,20 @@ namespace Werewolf.Core
 
     public sealed class RevealPage
     {
-        public string[] BodyLines;
+        public string[] BodyLines = Array.Empty<string>();
 
         public float HoldSec;
     }
 
     public sealed class RevealContent
     {
-        public string Title;
+        public string Title = "";
 
-        public string SelfIdLine;
+        public string? SelfIdLine;
 
         public RoleIcon Icon;
 
-        public RevealPage[] Pages;
+        public RevealPage[] Pages = Array.Empty<RevealPage>();
 
         public float FadeInSec;
         public float FadeOutSec;
@@ -52,9 +53,10 @@ namespace Werewolf.Core
 
         private const float SinglePageHoldSec = 5.0f;
 
-        public static RevealContent Build(Role selfRole, IReadOnlyList<string> teammateNames, bool blackCatPossible,
+        public static RevealContent Build(Role selfRole, IReadOnlyList<string?> teammateNames, bool blackCatPossible,
             ValuableMapMode valuableMapMode, bool blackCatCurseEnabled = true, int selfParticipantId = 0)
         {
+            if (teammateNames == null) throw new ArgumentNullException(nameof(teammateNames));
             RevealContent content;
             switch (selfRole)
             {
@@ -142,7 +144,7 @@ namespace Werewolf.Core
         }
 
         private static RevealContent BuildWolfTeam(
-            string title, RoleIcon icon, IReadOnlyList<string> teammateNames,
+            string title, RoleIcon icon, IReadOnlyList<string?> teammateNames,
             TextId ability1, TextId ability2, TextId ability3)
         {
             var teamLines = new List<string>();
@@ -257,31 +259,28 @@ namespace Werewolf.Core
             };
         }
 
-        private static List<string> WrapTeammateLines(IReadOnlyList<string> teammateNames)
+        private static List<string> WrapTeammateLines(IReadOnlyList<string?> teammateNames)
         {
             var lines = new List<string>();
             var current = new StringBuilder(TeammatePrefix);
             bool currentHasName = false;
 
-            if (teammateNames != null)
+            foreach (var name in teammateNames)
             {
-                foreach (var name in teammateNames)
+                if (string.IsNullOrEmpty(name)) continue;
+
+                string segment = currentHasName ? TeammateSeparator + name : name;
+
+                if (currentHasName && current.Length + segment.Length > MaxLineLength)
                 {
-                    if (string.IsNullOrEmpty(name)) continue;
-
-                    string segment = currentHasName ? TeammateSeparator + name : name;
-
-                    if (currentHasName && current.Length + segment.Length > MaxLineLength)
-                    {
-                        lines.Add(current.ToString());
-                        current = new StringBuilder(name);
-                        currentHasName = true;
-                    }
-                    else
-                    {
-                        current.Append(segment);
-                        currentHasName = true;
-                    }
+                    lines.Add(current.ToString());
+                    current = new StringBuilder(name);
+                    currentHasName = true;
+                }
+                else
+                {
+                    current.Append(segment);
+                    currentHasName = true;
                 }
             }
 

@@ -1,3 +1,5 @@
+#nullable enable
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Werewolf.Core;
@@ -135,10 +137,12 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void Build_NullSnapshotReturnsEmpty()
+        public void Build_NullSnapshotThrowsForSnapshot()
         {
-            List<GaugeMarker> markers = GaugeMarkerLayout.Build(null, permille: 0, minGapPct: 3);
-            Assert.Empty(markers);
+            var error = Assert.Throws<ArgumentNullException>(() =>
+                GaugeMarkerLayout.Build(null!, permille: 0, minGapPct: 3));
+
+            Assert.Equal("s", error.ParamName);
         }
 
         [Fact]
@@ -164,9 +168,12 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void UnlockedCount_NullSnapshotIsZero()
+        public void UnlockedCount_NullSnapshotThrowsForSnapshot()
         {
-            Assert.Equal(0, GaugeMarkerLayout.UnlockedCount(null, 1000));
+            var error = Assert.Throws<ArgumentNullException>(() =>
+                GaugeMarkerLayout.UnlockedCount(null!, 1000));
+
+            Assert.Equal("s", error.ParamName);
         }
     }
 }

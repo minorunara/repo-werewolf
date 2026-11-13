@@ -83,8 +83,7 @@ namespace Werewolf.Tests
             for (int i = 0; i < 5; i++)
             {
                 Assert.Equal(160, notices[i].Code);
-                Assert.Equal(MessageTarget.Actors, notices[i].Target);
-                Assert.Equal(new[] { i + 1 }, notices[i].TargetActors);
+                Assert.Equal(new[] { i + 1 }, notices[i].ActorTargetsOrNull());
                 var roleByte = Assert.IsType<byte>(Assert.Single(notices[i].Payload));
                 Assert.InRange(roleByte, (byte)0, (byte)3);
             }
@@ -99,11 +98,11 @@ namespace Werewolf.Tests
             session.Start(new GameConfig(), MakePlayers(5), Now, new Random(1));
 
             Assert.Equal(Role.BlackCat, session.Players.Single(p => p.ActorNumber == 2).Role);
-            var catNotice = _sent.Single(m => m.Code == 160 && m.TargetActors.Single() == 2);
+            var catNotice = _sent.Single(m => m.Code == 160 && m.ActorTargetsOrNull().Single() == 2);
             Assert.Equal((byte)Role.Villager, Assert.Single(catNotice.Payload));
             foreach (var player in session.Players.Where(p => p.Role != Role.BlackCat))
             {
-                var notice = _sent.Single(m => m.Code == 160 && m.TargetActors.Single() == player.ActorNumber);
+                var notice = _sent.Single(m => m.Code == 160 && m.ActorTargetsOrNull().Single() == player.ActorNumber);
                 Assert.Equal((byte)player.Role, Assert.Single(notice.Payload));
             }
         }
@@ -122,7 +121,7 @@ namespace Werewolf.Tests
             var wolves = session.Players.Where(p => p.Role == Role.Werewolf)
                 .Select(p => p.ActorNumber).OrderBy(a => a).ToArray();
             var reveals = _sent.Where(m => m.Code == 162).ToList();
-            Assert.Equal(wolves, reveals.Select(r => r.TargetActors.Single()).OrderBy(a => a).ToArray());
+            Assert.Equal(wolves, reveals.Select(r => r.ActorTargetsOrNull().Single()).OrderBy(a => a).ToArray());
             foreach (var reveal in reveals)
             {
                 Assert.Equal(2, reveal.Payload.Length);
@@ -168,7 +167,7 @@ namespace Werewolf.Tests
             session.Start(config, MakePlayers(5), Now, new Random(1));
 
             var start = _sent.Single(m => m.Code == 170);
-            Assert.Equal(MessageTarget.All, start.Target);
+            Assert.True(start.IsAllDestination());
             Assert.Equal(7, start.Payload.Length);
             Assert.Equal(Now + 600_000L, Assert.IsType<long>(start.Payload[0]));
             Assert.Equal(600, Assert.IsType<int>(start.Payload[1]));
@@ -301,7 +300,7 @@ namespace Werewolf.Tests
 
             Assert.Equal(GamePhase.Play, session.Phase);
             var phase = _sent.Single(m => m.Code == 172);
-            Assert.Equal(MessageTarget.All, phase.Target);
+            Assert.True(phase.IsAllDestination());
             Assert.Equal((byte)GamePhase.Play, Assert.IsType<byte>(phase.Payload[0]));
             Assert.Equal(Now, Assert.IsType<long>(phase.Payload[1]));
             Assert.Equal(Now + 600_000L, Assert.IsType<long>(phase.Payload[2]));
@@ -318,7 +317,7 @@ namespace Werewolf.Tests
 
             session.Start(config, MakePlayers(7), Now, new Random(1));
 
-            foreach (var message in _sent.Where(m => m.Target == MessageTarget.All))
+            foreach (var message in _sent.Where(m => m.IsAllDestination()))
             {
                 Assert.Contains((int)message.Code, new[] { 170, 172 });
                 Assert.DoesNotContain(message.Payload, p => p is byte[]);
@@ -330,8 +329,7 @@ namespace Werewolf.Tests
                 roster.OrderBy(a => a).ToArray());
             foreach (var message in _sent.Where(m => m.Code == 160 || m.Code == 162))
             {
-                Assert.Equal(MessageTarget.Actors, message.Target);
-                Assert.Single(message.TargetActors);
+                Assert.Single(Assert.IsType<MessageDestination.ActorsDestination>(message.Destination).Actors);
             }
         }
 

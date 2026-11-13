@@ -1,3 +1,4 @@
+#nullable enable
 namespace Werewolf.Core
 {
     public static class MeetingIntro

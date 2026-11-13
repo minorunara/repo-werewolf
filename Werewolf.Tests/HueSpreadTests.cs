@@ -1,3 +1,5 @@
+#nullable enable
+using System;
 using System.Linq;
 using Werewolf.Core;
 using Xunit;
@@ -33,7 +35,14 @@ namespace Werewolf.Tests
         public void Order_IsEmptyWithoutCandidates()
         {
             Assert.Empty(HueSpread.Order(new float[0]));
-            Assert.Empty(HueSpread.Order(null));
+        }
+
+        [Fact]
+        public void Order_NullCandidates_ThrowsForHues()
+        {
+            var error = Assert.Throws<ArgumentNullException>(() => HueSpread.Order(null!));
+
+            Assert.Equal("hues", error.ParamName);
         }
 
         [Fact]

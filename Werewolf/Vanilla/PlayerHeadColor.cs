@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using UnityEngine;
 using Werewolf.Core;
@@ -9,9 +10,9 @@ namespace Werewolf.Vanilla
     {
         private static bool _errorLogged;
 
-        internal static string HexOfLocal() => HexOf(PlayerAvatar.instance);
+        internal static string? HexOfLocal() => HexOf(PlayerAvatar.instance);
 
-        internal static string HexOf(PlayerAvatar avatar)
+        internal static string? HexOf(PlayerAvatar? avatar)
         {
             try
             {
@@ -29,7 +30,7 @@ namespace Werewolf.Vanilla
             }
         }
 
-        internal static string HexForBot(int actor)
+        internal static string? HexForBot(int actor)
         {
             if (actor >= 0) return null;
             return Hex(BotColors.ColorAt(BotColors.IndexFor(actor)));

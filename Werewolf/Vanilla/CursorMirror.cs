@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -22,97 +23,117 @@ namespace Werewolf.Vanilla
 
         public int SortingOrder { get; set; }
 
-        private GameObject _root;
-        private Image _image;
-        private RectTransform _imageRect;
-        private Canvas _canvas;
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, Image image, RectTransform imageRect, Canvas canvas)
+            {
+                Root = root;
+                Image = image;
+                ImageRect = imageRect;
+                Canvas = canvas;
+            }
 
-        private MenuCursor _capturedFrom;
-        private Sprite _capturedSprite;
+            public GameObject Root { get; }
+            public Image Image { get; }
+            public RectTransform ImageRect { get; }
+            public Canvas Canvas { get; }
+        }
+
+        private ViewRefs? _view;
+
+        private MenuCursor? _capturedFrom;
+        private Sprite? _capturedSprite;
         private Vector2 _capturedPivot;
         private Vector2 _capturedSize;
         private Color _capturedColor = Color.white;
 
-        public bool Exists => _root != null;
+        public bool Exists => GetLiveViewOrNull() != null;
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            var go = new GameObject("WW_CursorMirror", typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(layerRoot, false);
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-            var canvas = go.AddComponent<Canvas>();
-            canvas.overrideSorting = true;
-            canvas.sortingOrder = SortingOrder;
-            _canvas = canvas;
-            _root = go;
+            GameObject? partialRoot = null;
+            try
+            {
+                var go = new GameObject("WW_CursorMirror", typeof(RectTransform));
+                partialRoot = go;
+                var rect = (RectTransform)go.transform;
+                rect.SetParent(layerRoot, false);
+                rect.anchorMin = Vector2.zero;
+                rect.anchorMax = Vector2.one;
+                rect.offsetMin = Vector2.zero;
+                rect.offsetMax = Vector2.zero;
+                var canvas = go.AddComponent<Canvas>();
+                canvas.overrideSorting = true;
+                canvas.sortingOrder = SortingOrder;
 
-            var imgGo = new GameObject("Cursor", typeof(RectTransform));
-            _imageRect = (RectTransform)imgGo.transform;
-            _imageRect.SetParent(rect, false);
-            _imageRect.anchorMin = _imageRect.anchorMax = Vector2.zero;
-            _image = imgGo.AddComponent<Image>();
-            _image.raycastTarget = false;
-            _image.preserveAspect = true;
-            imgGo.SetActive(false);
+                var imgGo = new GameObject("Cursor", typeof(RectTransform));
+                var imageRect = (RectTransform)imgGo.transform;
+                imageRect.SetParent(rect, false);
+                imageRect.anchorMin = imageRect.anchorMax = Vector2.zero;
+                Image image = imgGo.AddComponent<Image>();
+                image.raycastTarget = false;
+                image.preserveAspect = true;
+                imgGo.SetActive(false);
+
+                _view = new ViewRefs(go, image, imageRect, canvas);
+                partialRoot = null;
+            }
+            catch
+            {
+                if (partialRoot != null) UnityEngine.Object.Destroy(partialRoot);
+                throw;
+            }
         }
 
         public void Tick(bool active)
         {
-            if (_root == null || !active)
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null || !active)
             {
-                SetVisible(false);
+                SetVisible(view, false);
                 SuppressVanillaCursor = false;
                 return;
             }
 
-            MenuCursor cursor = MenuCursor.instance;
-            if (!TryEnsureCapture(cursor))
+            MenuCursor? cursor = MenuCursor.instance;
+            if (!TryEnsureCapture(cursor, view) || _capturedSprite == null)
             {
-                SetVisible(false);
+                SetVisible(view, false);
                 SuppressVanillaCursor = false;
                 return;
             }
 
-            _image.sprite = _capturedSprite;
-            _image.color = _capturedColor;
-            _imageRect.pivot = _capturedPivot;
-            _imageRect.sizeDelta = _capturedSize * Mathf.Clamp(SizeScale, 0.25f, 4f);
-            float scale = _canvas != null ? _canvas.scaleFactor : 1f;
+            view.Image.sprite = _capturedSprite;
+            view.Image.color = _capturedColor;
+            view.ImageRect.pivot = _capturedPivot;
+            view.ImageRect.sizeDelta = _capturedSize * Mathf.Clamp(SizeScale, 0.25f, 4f);
+            float scale = view.Canvas.scaleFactor;
             if (scale <= 0f) scale = 1f;
-            _imageRect.anchoredPosition = (Vector2)Input.mousePosition / scale;
-            SetVisible(true);
+            view.ImageRect.anchoredPosition = (Vector2)Input.mousePosition / scale;
+            SetVisible(view, true);
             SuppressVanillaCursor = true;
         }
 
         public void Destroy()
         {
             SuppressVanillaCursor = false;
-            if (_root != null)
-            {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
-            }
-            _image = null;
-            _imageRect = null;
-            _canvas = null;
+            ViewRefs? view = _view;
+            _view = null;
+            if (view != null && view.Root != null) UnityEngine.Object.Destroy(view.Root);
         }
 
-        private void SetVisible(bool visible)
+        private static void SetVisible(ViewRefs? view, bool visible)
         {
-            if (_image != null && _image.gameObject.activeSelf != visible)
+            if (view != null && view.Image.gameObject.activeSelf != visible)
             {
-                _image.gameObject.SetActive(visible);
+                view.Image.gameObject.SetActive(visible);
             }
         }
 
-        private bool TryEnsureCapture(MenuCursor cursor)
+        private bool TryEnsureCapture(MenuCursor? cursor, ViewRefs view)
         {
             if (cursor == null) return false;
             if (_capturedSprite != null && _capturedFrom == cursor) return true;
@@ -127,13 +148,13 @@ namespace Werewolf.Vanilla
                 float settleScale = cursor.transform.localScale.x;
                 if (settleScale < 0.9f) return false;
 
-                Canvas vanillaCanvas = cursor.GetComponentInParent<Canvas>();
-                Canvas vanillaRoot = vanillaCanvas != null ? vanillaCanvas.rootCanvas : null;
+                Canvas? vanillaCanvas = cursor.GetComponentInParent<Canvas>();
+                Canvas? vanillaRoot = vanillaCanvas != null ? vanillaCanvas.rootCanvas : null;
                 if (vanillaRoot == null) return false;
 
                 if (!TryGetWorldBounds(visual, out Bounds bounds)) return false;
 
-                Sprite sprite = ResolveSprite(visual, vanillaRoot, bounds, out Color tint);
+                Sprite? sprite = ResolveSprite(visual, vanillaRoot, bounds, out Color tint);
                 if (sprite == null)
                 {
                     WLog.Line("cursor_mirror_capture_failed", secret: false, ("reason", "no_strategy"));
@@ -151,7 +172,7 @@ namespace Werewolf.Vanilla
 
                 RectTransform rootRect = (RectTransform)rootT;
                 float canvasWorldH = rootRect.rect.height * rootT.lossyScale.y;
-                float ourCanvasH = ((RectTransform)_root.transform).rect.height;
+                float ourCanvasH = ((RectTransform)view.Root.transform).rect.height;
                 float height = canvasWorldH > 0f
                     ? Mathf.Clamp(2f * halfH / settleScale / canvasWorldH * ourCanvasH, MinHeight, MaxHeight)
                     : 48f;
@@ -169,6 +190,16 @@ namespace Werewolf.Vanilla
                 WLog.Line("cursor_mirror_capture_failed", secret: false, ("reason", "exception"), ("err", e.Message));
                 return false;
             }
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+            _view = null;
+            SuppressVanillaCursor = false;
+            return null;
         }
 
         private static bool TryGetWorldBounds(GameObject visual, out Bounds bounds)
@@ -200,32 +231,32 @@ namespace Werewolf.Vanilla
             return Mathf.Abs(axis.x * e.x) + Mathf.Abs(axis.y * e.y) + Mathf.Abs(axis.z * e.z);
         }
 
-        private Sprite ResolveSprite(GameObject visual, Canvas vanillaRoot, Bounds bounds, out Color tint)
+        private Sprite? ResolveSprite(GameObject visual, Canvas vanillaRoot, Bounds bounds, out Color tint)
         {
             tint = Color.white;
-            Image img = visual.GetComponentInChildren<Image>(false);
+            Image? img = visual.GetComponentInChildren<Image>(false);
             if (img != null && img.sprite != null)
             {
                 tint = img.color;
                 return img.sprite;
             }
-            SpriteRenderer sr = visual.GetComponentInChildren<SpriteRenderer>(false);
+            SpriteRenderer? sr = visual.GetComponentInChildren<SpriteRenderer>(false);
             if (sr != null && sr.sprite != null)
             {
                 tint = sr.color;
                 return sr.sprite;
             }
-            RawImage raw = visual.GetComponentInChildren<RawImage>(false);
+            RawImage? raw = visual.GetComponentInChildren<RawImage>(false);
             if (raw != null && raw.texture is Texture2D rawTex)
             {
                 tint = raw.color;
                 return Sprite.Create(rawTex, new Rect(0f, 0f, rawTex.width, rawTex.height), new Vector2(0.5f, 0.5f));
             }
-            Sprite snap = SnapshotRenderers(visual, vanillaRoot, bounds);
+            Sprite? snap = SnapshotRenderers(visual, vanillaRoot, bounds);
             return snap;
         }
 
-        private static Sprite SnapshotRenderers(GameObject visual, Canvas vanillaRoot, Bounds bounds)
+        private static Sprite? SnapshotRenderers(GameObject visual, Canvas vanillaRoot, Bounds bounds)
         {
             Renderer[] renderers = visual.GetComponentsInChildren<Renderer>(false);
             if (renderers.Length == 0) return null;
@@ -290,7 +321,7 @@ namespace Werewolf.Vanilla
 
         private static Texture2D ReadRenderTexture(RenderTexture rt)
         {
-            RenderTexture prev = RenderTexture.active;
+            RenderTexture? prev = RenderTexture.active;
             RenderTexture.active = rt;
             var tex = new Texture2D(rt.width, rt.height, TextureFormat.ARGB32, false);
             tex.ReadPixels(new Rect(0f, 0f, rt.width, rt.height), 0, 0);

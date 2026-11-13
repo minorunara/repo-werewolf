@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using HarmonyLib;
@@ -10,25 +11,19 @@ namespace Werewolf.Game.Patches
     {
         private struct GhostRef
         {
-            public GameObject Holder;
-            public GameObject EntityGo;
+            public GameObject? Holder;
+            public GameObject? EntityGo;
         }
 
         private static readonly Dictionary<ValuableObject, GhostRef> _ghosts =
             new Dictionary<ValuableObject, GhostRef>();
-
-        private static AccessTools.FieldRef<ValuableObject, bool> DiscoveredRef =>
-            GameRefs.ValuableObject_discovered;
-
-        private static AccessTools.FieldRef<MapCustom, MapCustomEntity> MapCustomEntityRef =>
-            GameRefs.MapCustom_mapCustomEntity;
 
         private static ValuableMapMode _prevMode = ValuableMapMode.MeetingSync;
         private static bool _prevRoundActive;
 
         internal static void RefreshSnapshot(string reason)
         {
-            WerewolfDirector dir = WerewolfDirector.Instance;
+            WerewolfDirector? dir = WerewolfDirector.Instance;
             if (dir == null || Map.Instance == null) return;
             if (!ValuableMapGate.ShouldRefreshSnapshotAtInventoryPoint(
                     dir.ClientValuableMapMode, dir.IsRoundActiveClient)) return;
@@ -46,13 +41,13 @@ namespace Werewolf.Game.Patches
 
             int removed = 0;
             int moved = 0;
-            List<ValuableObject> deadKeys = null;
+            List<ValuableObject>? deadKeys = null;
             foreach (KeyValuePair<ValuableObject, GhostRef> kv in _ghosts)
             {
                 if (kv.Key == null)
                 {
                     DestroyGhost(kv.Value);
-                    (deadKeys ?? (deadKeys = new List<ValuableObject>())).Add(kv.Key);
+                    (deadKeys ?? (deadKeys = new List<ValuableObject>())).Add(kv.Key!);
                     removed++;
                 }
                 else if (kv.Value.Holder != null)
@@ -67,10 +62,10 @@ namespace Werewolf.Game.Patches
             }
 
             int added = 0;
-            foreach (ValuableObject valuable in UnityEngine.Object.FindObjectsOfType<ValuableObject>())
+            foreach (ValuableObject valuable in UnityEngine.Object.FindObjectsByType<ValuableObject>(FindObjectsSortMode.None))
             {
                 if (valuable == null || _ghosts.ContainsKey(valuable)) continue;
-                if (!DiscoveredRef(valuable)) continue;
+                if (!valuable.discovered) continue;
                 if (PlaceSnapshotGhost(valuable)) added++;
             }
 
@@ -80,7 +75,7 @@ namespace Werewolf.Game.Patches
 
         internal static void Tick()
         {
-            WerewolfDirector dir = WerewolfDirector.Instance;
+            WerewolfDirector? dir = WerewolfDirector.Instance;
             if (dir == null) return;
 
             ValuableMapMode mode = dir.ClientValuableMapMode;
@@ -119,10 +114,10 @@ namespace Werewolf.Game.Patches
             if (Map.Instance == null) return;
 
             int restored = 0;
-            foreach (ValuableObject valuable in UnityEngine.Object.FindObjectsOfType<ValuableObject>())
+            foreach (ValuableObject valuable in UnityEngine.Object.FindObjectsByType<ValuableObject>(FindObjectsSortMode.None))
             {
                 if (valuable == null) continue;
-                if (!DiscoveredRef(valuable)) continue;
+                if (!valuable.discovered) continue;
                 Map.Instance.AddValuable(valuable);
                 restored++;
             }
@@ -136,9 +131,9 @@ namespace Werewolf.Game.Patches
 
             try
             {
-                Sprite sprite = null;
+                Sprite? sprite = null;
                 Color color = Color.white;
-                MapValuable proto = Map.Instance.ValuableObject != null
+                MapValuable? proto = Map.Instance.ValuableObject != null
                     ? Map.Instance.ValuableObject.GetComponent<MapValuable>() : null;
                 if (proto != null)
                 {
@@ -154,8 +149,8 @@ namespace Werewolf.Game.Patches
                 mapCustom.color = color;
 
                 Map.Instance.AddCustom(mapCustom, sprite, color);
-                MapCustomEntity entity = MapCustomEntityRef(mapCustom);
-                GameObject entityGo = entity != null ? entity.gameObject : null;
+                MapCustomEntity? entity = mapCustom.mapCustomEntity;
+                GameObject? entityGo = entity != null ? entity.gameObject : null;
                 _ghosts[valuable] = new GhostRef { Holder = holder, EntityGo = entityGo };
 
                 WLog.Line("valuablemap_ghost_placed", secret: false,
@@ -189,14 +184,14 @@ namespace Werewolf.Game.Patches
         }
     }
 
-    [HarmonyPatch(typeof(Map), "AddValuable")]
+    [HarmonyPatch(typeof(Map), nameof(Map.AddValuable))]
     internal static class MapAddValuablePatch
     {
         private static bool Prefix(ValuableObject _valuable)
         {
             try
             {
-                WerewolfDirector dir = WerewolfDirector.Instance;
+                WerewolfDirector? dir = WerewolfDirector.Instance;
                 if (dir == null) return true;
                 bool roundActive = dir.IsRoundActiveClient;
                 if (roundActive) dir.MaybeShowTutorial(TutorialId.FirstValuableSeen);
@@ -216,7 +211,7 @@ namespace Werewolf.Game.Patches
         }
     }
 
-    [HarmonyPatch(typeof(RoundDirector), "ExtractionCompleted")]
+    [HarmonyPatch(typeof(RoundDirector), nameof(RoundDirector.ExtractionCompleted))]
     internal static class ExtractionCompletedPatch
     {
         private static void Postfix()

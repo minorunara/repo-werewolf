@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -12,26 +13,30 @@ namespace Werewolf.UI
         private const string EmbeddedNamespace = "Werewolf.Assets";
         private const string BundleFileName = "werewolf_assets";
 
-        private static readonly Dictionary<string, Sprite> _sprites = new Dictionary<string, Sprite>();
-        private static readonly Dictionary<string, Sprite> _graySprites = new Dictionary<string, Sprite>();
-        private static readonly Dictionary<string, Texture2D> _textures = new Dictionary<string, Texture2D>();
-        private static readonly Dictionary<string, GameObject> _prefabs = new Dictionary<string, GameObject>();
-        private static readonly Dictionary<string, AudioClip> _clips = new Dictionary<string, AudioClip>();
+        private static readonly Dictionary<string, Sprite?> _sprites = new Dictionary<string, Sprite?>();
+        private static readonly Dictionary<string, Sprite?> _graySprites = new Dictionary<string, Sprite?>();
+        private static readonly Dictionary<string, Texture2D?> _textures = new Dictionary<string, Texture2D?>();
+        private static readonly Dictionary<string, GameObject?> _prefabs = new Dictionary<string, GameObject?>();
+        private static readonly Dictionary<string, AudioClip?> _clips = new Dictionary<string, AudioClip?>();
 
-        private static AssetBundle _bundle;
+        private static AssetBundle? _bundle;
         private static bool _bundleAttempted;
+
+        private static bool _useAlternativeExecutionIcon;
 
         private static bool _streamerSafeMode;
 
+        public static void SetAlternativeExecutionIcon(bool enabled) => _useAlternativeExecutionIcon = enabled;
+
         public static void SetStreamerSafeMode(bool enabled) => _streamerSafeMode = enabled;
 
-        public static Sprite GetSprite(string key)
+        public static Sprite? GetSprite(string? key)
         {
             if (string.IsNullOrEmpty(key)) return null;
             if (_sprites.TryGetValue(key, out var cached)) return cached;
 
             var tex = GetTexture(key);
-            Sprite sp = null;
+            Sprite? sp = null;
             if (tex != null)
             {
                 try
@@ -50,12 +55,12 @@ namespace Werewolf.UI
             return sp;
         }
 
-        public static Sprite GetGraySprite(string key)
+        public static Sprite? GetGraySprite(string? key)
         {
             if (string.IsNullOrEmpty(key)) return null;
             if (_graySprites.TryGetValue(key, out var cached)) return cached;
 
-            Sprite gray = null;
+            Sprite? gray = null;
             var src = GetTexture(key);
             if (src != null)
             {
@@ -84,14 +89,14 @@ namespace Werewolf.UI
             return gray;
         }
 
-        public static Texture2D GetTexture(string key)
+        public static Texture2D? GetTexture(string? key)
         {
             if (string.IsNullOrEmpty(key)) return null;
             if (_textures.TryGetValue(key, out var cached)) return cached;
 
-            Texture2D tex = null;
-            string effectiveKey = key;
-            if (StreamerSafe.TryResolve(_streamerSafeMode, key, out string safeReplacement))
+            Texture2D? tex = null;
+            string effectiveKey = AlternativeExecutionIcon.Resolve(_useAlternativeExecutionIcon, key);
+            if (StreamerSafe.TryResolve(_streamerSafeMode, effectiveKey, out string? safeReplacement))
             {
                 if (safeReplacement == null)
                 {
@@ -128,12 +133,12 @@ namespace Werewolf.UI
             return tex;
         }
 
-        public static GameObject GetPrefab(string key)
+        public static GameObject? GetPrefab(string? key)
         {
             if (string.IsNullOrEmpty(key)) return null;
             if (_prefabs.TryGetValue(key, out var cached)) return cached;
 
-            GameObject prefab = null;
+            GameObject? prefab = null;
             var bundle = TryLoadBundle();
             if (bundle != null)
             {
@@ -159,14 +164,14 @@ namespace Werewolf.UI
             return prefab;
         }
 
-        public static AudioClip GetClip(string key)
+        public static AudioClip? GetClip(string? key)
         {
             if (string.IsNullOrEmpty(key)) return null;
             if (_clips.TryGetValue(key, out var cached)) return cached;
 
-            AudioClip clip = null;
+            AudioClip? clip = null;
             string effectiveKey = key;
-            if (StreamerSafe.TryResolve(_streamerSafeMode, key, out string safeReplacement))
+            if (StreamerSafe.TryResolve(_streamerSafeMode, key, out string? safeReplacement))
             {
                 if (safeReplacement == null)
                 {
@@ -197,28 +202,28 @@ namespace Werewolf.UI
             return clip;
         }
 
-        public static Sprite GetBombIcon()
+        public static Sprite? GetBombIcon()
         {
             var s = GetSprite("img_bomb");
             if (s != null) return s;
             return BombIconPlaceholder();
         }
 
-        public static AudioClip GetHeartbeatClip()
+        public static AudioClip? GetHeartbeatClip()
         {
             var c = GetClip("sfx_heartbeat");
             if (c != null) return c;
             return HeartbeatPlaceholder();
         }
 
-        public static AudioClip GetConveneChargeClip()
+        public static AudioClip? GetConveneChargeClip()
         {
             return ConveneChargeClip();
         }
 
-        private static Sprite _bombIconPlaceholder;
+        private static Sprite? _bombIconPlaceholder;
 
-        private static Sprite BombIconPlaceholder()
+        private static Sprite? BombIconPlaceholder()
         {
             if (_bombIconPlaceholder != null) return _bombIconPlaceholder;
 
@@ -261,15 +266,16 @@ namespace Werewolf.UI
             tex.Apply();
             _bombIconPlaceholder = Sprite.Create(tex,
                 new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+            if (_bombIconPlaceholder == null) return null;
             _bombIconPlaceholder.name = "WW_BombIconPlaceholder";
             return _bombIconPlaceholder;
         }
 
-        private static AudioClip _heartbeatPlaceholder;
+        private static AudioClip? _heartbeatPlaceholder;
 
-        private static AudioClip _conveneChargeClip;
+        private static AudioClip? _conveneChargeClip;
 
-        private static AudioClip ConveneChargeClip()
+        private static AudioClip? ConveneChargeClip()
         {
             if (_conveneChargeClip != null) return _conveneChargeClip;
 
@@ -296,7 +302,7 @@ namespace Werewolf.UI
             return clip;
         }
 
-        private static AudioClip HeartbeatPlaceholder()
+        private static AudioClip? HeartbeatPlaceholder()
         {
             if (_heartbeatPlaceholder != null) return _heartbeatPlaceholder;
 
@@ -335,13 +341,14 @@ namespace Werewolf.UI
             _clips.Clear();
             _bundle = null;
             _bundleAttempted = false;
+            _useAlternativeExecutionIcon = false;
             _streamerSafeMode = false;
             _bombIconPlaceholder = null;
             _heartbeatPlaceholder = null;
             _conveneChargeClip = null;
         }
 
-        private static byte[] LoadEmbeddedBytes(string fileName)
+        private static byte[]? LoadEmbeddedBytes(string fileName)
         {
             var asm = typeof(AssetCatalog).Assembly;
             var resourceName = EmbeddedNamespace + "." + fileName;
@@ -366,7 +373,7 @@ namespace Werewolf.UI
             }
         }
 
-        private static AssetBundle TryLoadBundle()
+        private static AssetBundle? TryLoadBundle()
         {
             if (_bundle != null) return _bundle;
             if (_bundleAttempted) return null;
@@ -389,7 +396,7 @@ namespace Werewolf.UI
             }
         }
 
-        private static AudioClip DecodePcm16Wav(string key, byte[] bytes)
+        private static AudioClip? DecodePcm16Wav(string key, byte[] bytes)
         {
             if (bytes.Length < 44) { LogFallback(key, "wav_too_short"); return null; }
 
@@ -405,7 +412,7 @@ namespace Werewolf.UI
             int sampleRate = 0;
             short bitsPerSample = 0;
             short audioFormat = 0;
-            byte[] pcm = null;
+            byte[]? pcm = null;
 
             while (pos + 8 <= bytes.Length)
             {
@@ -464,7 +471,7 @@ namespace Werewolf.UI
             return clip;
         }
 
-        private static void LogFallback(string key, string reason, string detail = null)
+        private static void LogFallback(string key, string reason, string? detail = null)
         {
             try
             {

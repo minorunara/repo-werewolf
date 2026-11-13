@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
@@ -21,7 +22,7 @@ namespace Werewolf.Game.Patches
         {
             try
             {
-                WerewolfDirector dir = WerewolfDirector.Instance;
+                WerewolfDirector? dir = WerewolfDirector.Instance;
                 if (dir == null || !dir.IsHostSessionActive)
                 {
                     ResetLogThrottle();

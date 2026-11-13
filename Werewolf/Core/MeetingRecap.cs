@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 using System.Text;
 
@@ -15,7 +16,7 @@ namespace Werewolf.Core
             BeaconUses = beaconUses;
         }
 
-        public IReadOnlyList<string> DeathLabels { get; }
+        public IReadOnlyList<string>? DeathLabels { get; }
 
         public int LostDollars { get; }
 

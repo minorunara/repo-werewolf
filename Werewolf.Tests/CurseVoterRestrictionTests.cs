@@ -225,8 +225,7 @@ namespace Werewolf.Tests
             Assert.True(idx179 < idx175, "179 must precede 175 (UI装着時に候補が揃う順序)");
 
             var msg = sent[idx179];
-            Assert.Equal(MessageTarget.Actors, msg.Target);
-            Assert.Equal(new[] { 2 }, msg.TargetActors);
+            Assert.Equal(new[] { 2 }, msg.ActorTargetsOrNull());
             Assert.Equal(voters, (int[])msg.Payload[0]);
         }
 

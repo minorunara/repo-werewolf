@@ -27,22 +27,24 @@ namespace Werewolf.Scenarios.Game
 
         private void TickBreakWatchdog(long now)
         {
-            if (!ScriptRunning) return;
+            if (!TryGetRunningScript(out ScenarioScriptRun? script)) return;
+            ScenarioFlow flow = script.Flow;
+            ScenarioDefinition definition = script.Definition;
 
-            ScenarioBreakWatch watch = _definition.Watch;
+            ScenarioBreakWatch watch = definition.Watch;
 
             if (watch.RequireTallyBeforeResult
-                && _flow.IsLatched(ScenarioSignal.ResultScreenShown)
-                && !_flow.IsLatched(ScenarioSignal.TallyRevealed))
+                && flow.IsLatched(ScenarioSignal.ResultScreenShown)
+                && !flow.IsLatched(ScenarioSignal.TallyRevealed))
             {
                 Break(ScenarioBreakKind.ResultBeforeTally, now);
                 return;
             }
 
             bool meetingRequired = watch.MeetingRequiredFrom.HasValue
-                                   && _flow.IsLatched(watch.MeetingRequiredFrom.Value)
+                                   && flow.IsLatched(watch.MeetingRequiredFrom.Value)
                                    && !(watch.MeetingRequiredUntil.HasValue
-                                        && _flow.IsLatched(watch.MeetingRequiredUntil.Value));
+                                         && flow.IsLatched(watch.MeetingRequiredUntil.Value));
             if (!meetingRequired || _d.MeetingActiveClient)
             {
                 _meetingMissingSinceMs = 0;
@@ -59,34 +61,38 @@ namespace Werewolf.Scenarios.Game
             Break(ScenarioBreakKind.MeetingLost, now);
         }
 
-        private static long BrokenNoticeMs(string text)
+        private static long BrokenNoticeMs(string? text)
         {
             long ms = BrokenNoticeMinMs + (text != null ? text.Length : 0) * BrokenNoticePerCharMs;
             return ms > BrokenNoticeMaxMs ? BrokenNoticeMaxMs : ms;
         }
 
-        private string BrokenNoticeText(IReadOnlyList<TextId> lines)
+        private string BrokenNoticeText(IReadOnlyList<TextId>? lines)
             => lines != null && lines.Count > 0 ? JoinLines(lines) : Texts.Get(TextId.ScenarioBrokenNotice);
 
-        private void Break(ScenarioBreakKind kind, long now, string detail = null)
+        private void Break(ScenarioBreakKind kind, long now, string? detail = null)
         {
-            IReadOnlyList<TextId> lines = _definition != null ? _definition.Notices.BreakLines(kind) : null;
+            ScenarioScriptRun? script = _script;
+            IReadOnlyList<TextId>? lines = script?.Definition.Notices.BreakLines(kind);
             if (!_interrupt.Break(kind, lines, now + BrokenNoticeMs(BrokenNoticeText(lines)))) return;
 
             ScenarioRun.MarkBroken();
             WLog.Line("scenario_broken", secret: false,
-                ("scenario", _scenario), ("reason", kind), ("detail", detail ?? ""),
-                ("page", _flow != null ? _flow.Index : 0));
+                ("scenario", script != null ? script.Scenario : ScenarioRun.Scenario),
+                ("reason", kind), ("detail", detail ?? ""),
+                ("page", script != null ? script.Flow.Index : 0));
         }
 
         private void TickTruckLeash(long now)
         {
-            if (!ScriptRunning) return;
+            if (!TryGetRunningScript(out ScenarioScriptRun? script)) return;
+            ScenarioFlow flow = script.Flow;
+            ScenarioDefinition definition = script.Definition;
 
-            ScenarioEnvironmentSpec spec = _definition.Environment;
+            ScenarioEnvironmentSpec spec = definition.Environment;
             if (!spec.TruckLeashEnabled) return;
             if (_d.MeetingActiveClient) return;
-            if (!LeashWindowOpen(spec)) return;
+            if (!LeashWindowOpen(flow, spec)) return;
             if (now < _leashNextCheckAtMs) return;
             _leashNextCheckAtMs = now + LeashCheckIntervalMs;
 
@@ -100,25 +106,25 @@ namespace Werewolf.Scenarios.Game
 
             Werewolf.Game.Patches.PlayerSpawnPatch.ArmWarpGrace(LeashWarpGraceMs);
             TruckWarper.WarpLocalAlive(spawnPos, spawnRot);
-            _interrupt.Raise(ScenarioInterrupt.LeashNag, now, _definition.Notices.LeashNag);
+            _interrupt.Raise(ScenarioInterrupt.LeashNag, now, definition.Notices.LeashNag);
             _leashNextCheckAtMs = now + ScenarioInterruptState.NoticeDurationMs(ScenarioInterrupt.LeashNag);
             WLog.Line("scenario_truck_leash", secret: false,
                 ("distanceM", Mathf.Sqrt(nearestSqr)), ("leashM", leash));
         }
 
-        private bool LeashWindowOpen(ScenarioEnvironmentSpec spec)
+        private static bool LeashWindowOpen(ScenarioFlow flow, ScenarioEnvironmentSpec spec)
         {
             if (spec.TruckLeashBefore != ScenarioMilestone.None
-                && !_flow.HasReached(spec.TruckLeashBefore))
+                && !flow.HasReached(spec.TruckLeashBefore))
             {
                 return true;
             }
             if (spec.TruckLeashAfter != ScenarioMilestone.None
-                && !_flow.HasReached(spec.TruckLeashAfter))
+                && !flow.HasReached(spec.TruckLeashAfter))
             {
                 return false;
             }
-            return !spec.TruckLeashUntil.HasValue || !_flow.IsLatched(spec.TruckLeashUntil.Value);
+            return !spec.TruckLeashUntil.HasValue || !flow.IsLatched(spec.TruckLeashUntil.Value);
         }
 
         private void ResetBreak()

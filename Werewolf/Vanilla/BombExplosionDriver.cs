@@ -1,6 +1,5 @@
+#nullable enable
 using System.Collections;
-using System.Reflection;
-using HarmonyLib;
 using UnityEngine;
 using Werewolf.Core;
 
@@ -12,9 +11,6 @@ namespace Werewolf.Vanilla
 
         private const float HurtColliderBaseRadiusMeters = 1.5f;
 
-        private static FieldInfo ExplosionPrefabField =>
-            GameRefs.ParticleScriptExplosion_explosionPrefab;
-
         private static readonly string[] PresetDonorPrefabPaths =
         {
             "Items/Item Grenade Explosive",
@@ -22,21 +18,34 @@ namespace Werewolf.Vanilla
             "Items/Item Grenade Duct Taped",
         };
 
-        private static ParticleScriptExplosion _source;
-        private static ExplosionPreset _fallback;
+        private sealed class ExplosionSourceState
+        {
+            public ExplosionSourceState(GameObject root, ParticleScriptExplosion source)
+            {
+                Root = root;
+                Source = source;
+            }
+
+            public GameObject Root { get; }
+            public ParticleScriptExplosion Source { get; }
+            public WarmupCoroutineHost? WarmupHost { get; set; }
+        }
+
+        private static ExplosionSourceState? _sourceState;
+        private static ExplosionPreset? _fallback;
 
         private static bool _warmedThisRound;
-        private static WarmupCoroutineHost _warmupHost;
 
         public static void Detonate(PlayerHandle epicenter, bool localIsBomber,
             int playerDamage, int enemyDamage, float blastRadiusMeters)
         {
-            if (!epicenter.IsValid)
+            PlayerAvatar? avatar = epicenter.Avatar;
+            if (avatar == null)
             {
                 WLog.Line("bomb_explode_fail", secret: false, ("reason", "epicenter_null"));
                 return;
             }
-            DetonateAt(epicenter.Avatar.transform.position + Vector3.up * 0.5f, epicenter.Avatar,
+            DetonateAt(avatar.transform.position + Vector3.up * 0.5f, avatar,
                 localIsBomber, playerDamage, enemyDamage, blastRadiusMeters);
         }
 
@@ -44,10 +53,10 @@ namespace Werewolf.Vanilla
             int playerDamage, int enemyDamage, float blastRadiusMeters)
             => DetonateAt(pos, null, localIsBomber, playerDamage, enemyDamage, blastRadiusMeters);
 
-        private static void DetonateAt(Vector3 pos, PlayerAvatar ignorePlayer, bool localIsBomber,
+        private static void DetonateAt(Vector3 pos, PlayerAvatar? ignorePlayer, bool localIsBomber,
             int playerDamage, int enemyDamage, float blastRadiusMeters)
         {
-            ParticleScriptExplosion source = EnsureSource();
+            ParticleScriptExplosion? source = EnsureSource();
             if (source == null) return;
 
             source.transform.position = pos;
@@ -73,7 +82,7 @@ namespace Werewolf.Vanilla
                 return;
             }
 
-            GameRefs.ParticlePrefabExplosion_HurtColliderSecondSetup?.SetValue(explosion, false);
+            explosion.HurtColliderSecondSetup = false;
 
             HurtCollider hurt = explosion.HurtCollider;
             float hurtBaseRadius = -1f;
@@ -99,7 +108,7 @@ namespace Werewolf.Vanilla
             int targetDamage = 0;
             if (ignorePlayer != null && ignorePlayer.playerHealth != null)
             {
-                int currentHealth = GameRefs.PlayerHealth_health(ignorePlayer.playerHealth);
+                int currentHealth = ignorePlayer.playerHealth.health;
                 targetDamage = BombDamageRules.TargetDamage(
                     playerDamage, currentHealth);
                 if (targetDamage > 0)
@@ -119,49 +128,67 @@ namespace Werewolf.Vanilla
                 ("blast_r_m", blastRadiusWorld));
         }
 
-        private static ParticleScriptExplosion EnsureSource()
+        private static ParticleScriptExplosion? EnsureSource()
         {
-            if (_source != null)
+            ExplosionSourceState? existing = GetLiveSourceStateOrNull();
+            if (existing != null)
             {
                 UpgradeFallbackPreset();
-                return _source;
+                return existing.Source;
             }
 
-            ExplosionPreset preset = ResolvePreset(out string presetSource);
+            ExplosionPreset? preset = ResolvePreset(out string presetSource);
             if (preset == null)
             {
                 WLog.Line("bomb_explode_fail", secret: false, ("reason", "preset_not_found"));
                 return null;
             }
-            GameObject prefab = Resources.Load<GameObject>("Effects/Part Prefab Explosion");
+            GameObject? prefab = Resources.Load<GameObject>("Effects/Part Prefab Explosion");
             if (prefab == null)
             {
                 WLog.Line("bomb_explode_fail", secret: false, ("reason", "prefab_not_found"));
                 return null;
             }
 
-            var go = new GameObject("WW_BombExplosionSource");
-            Object.DontDestroyOnLoad(go);
-            _source = go.AddComponent<ParticleScriptExplosion>();
-            _source.explosionPreset = preset;
-            ExplosionPrefabField?.SetValue(_source, prefab);
-            WLog.Line("bomb_explode_source_ready", secret: false,
-                ("preset", preset.name), ("src", presetSource));
-            return _source;
+            GameObject? partialRoot = null;
+            try
+            {
+                var go = new GameObject("WW_BombExplosionSource");
+                partialRoot = go;
+                Object.DontDestroyOnLoad(go);
+                ParticleScriptExplosion source = go.AddComponent<ParticleScriptExplosion>();
+                source.explosionPreset = preset;
+                source.explosionPrefab = prefab;
+                _sourceState = new ExplosionSourceState(go, source);
+                partialRoot = null;
+                WLog.Line("bomb_explode_source_ready", secret: false,
+                    ("preset", preset.name), ("src", presetSource));
+                return source;
+            }
+            catch (System.Exception e)
+            {
+                if (partialRoot != null) Object.Destroy(partialRoot);
+                _sourceState = null;
+                WLog.Line("bomb_explode_fail", secret: false,
+                    ("reason", "source_build_exception"), ("err", e.GetType().Name));
+                return null;
+            }
         }
 
         public static void WarmupOnce()
         {
             if (_warmedThisRound) return;
-            ParticleScriptExplosion source = EnsureSource();
+            ParticleScriptExplosion? source = EnsureSource();
             if (source == null) return;
-            _warmedThisRound = true;
 
-            if (_warmupHost == null)
+            ExplosionSourceState? state = GetLiveSourceStateOrNull();
+            if (state == null) return;
+            if (state.WarmupHost == null)
             {
-                _warmupHost = source.gameObject.AddComponent<WarmupCoroutineHost>();
+                state.WarmupHost = source.gameObject.AddComponent<WarmupCoroutineHost>();
             }
-            _warmupHost.Run(source);
+            state.WarmupHost.Run(source);
+            _warmedThisRound = true;
         }
 
         public static void ResetWarmup()
@@ -195,7 +222,7 @@ namespace Werewolf.Vanilla
 
         private static ExplosionPreset ResolvePreset(out string source)
         {
-            ExplosionPreset preset = FindPreset();
+            ExplosionPreset? preset = FindPreset();
             if (preset != null)
             {
                 source = "loaded";
@@ -215,14 +242,25 @@ namespace Werewolf.Vanilla
 
         private static void UpgradeFallbackPreset()
         {
-            if (_fallback == null || _source.explosionPreset != _fallback) return;
-            ExplosionPreset real = FindPreset() ?? LoadPreset();
+            ExplosionSourceState? state = GetLiveSourceStateOrNull();
+            if (_fallback == null || state == null || state.Source.explosionPreset != _fallback) return;
+            ExplosionPreset? real = FindPreset() ?? LoadPreset();
             if (real == null) return;
-            _source.explosionPreset = real;
+            state.Source.explosionPreset = real;
             WLog.Line("bomb_explode_source_upgraded", secret: false, ("preset", real.name));
         }
 
-        private static ExplosionPreset FindPreset()
+        private static ExplosionSourceState? GetLiveSourceStateOrNull()
+        {
+            ExplosionSourceState? state = _sourceState;
+            if (state == null) return null;
+            if (state.Root != null && state.Source != null) return state;
+            _sourceState = null;
+            if (state.Root != null) Object.Destroy(state.Root);
+            return null;
+        }
+
+        private static ExplosionPreset? FindPreset()
         {
             ExplosionPreset[] loaded = Resources.FindObjectsOfTypeAll<ExplosionPreset>();
             for (int i = 0; i < loaded.Length; i++)
@@ -232,13 +270,13 @@ namespace Werewolf.Vanilla
             return null;
         }
 
-        private static ExplosionPreset LoadPreset()
+        private static ExplosionPreset? LoadPreset()
         {
             for (int i = 0; i < PresetDonorPrefabPaths.Length; i++)
             {
-                GameObject donor = Resources.Load<GameObject>(PresetDonorPrefabPaths[i]);
+                GameObject? donor = Resources.Load<GameObject>(PresetDonorPrefabPaths[i]);
                 if (donor == null) continue;
-                ParticleScriptExplosion script = donor.GetComponentInChildren<ParticleScriptExplosion>(true);
+                ParticleScriptExplosion? script = donor.GetComponentInChildren<ParticleScriptExplosion>(true);
                 if (script != null && script.explosionPreset != null) return script.explosionPreset;
             }
             return null;

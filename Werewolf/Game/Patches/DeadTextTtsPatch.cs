@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
@@ -8,7 +9,7 @@ namespace Werewolf.Game.Patches
     {
         internal static bool ShouldShow(PlayerAvatar player)
         {
-            WerewolfDirector dir = WerewolfDirector.Instance;
+            WerewolfDirector? dir = WerewolfDirector.Instance;
             if (dir == null || !dir.IsRoundActiveClient) return true;
             int actor = dir.Registry.ResolveActor(player);
             return dir.ShouldShowDeadTextClient(actor);
@@ -36,7 +37,7 @@ namespace Werewolf.Game.Patches
         }
     }
 
-    [HarmonyPatch(typeof(PlayerAvatar), "ChatMessageSpeak")]
+    [HarmonyPatch(typeof(PlayerAvatar), nameof(PlayerAvatar.ChatMessageSpeak))]
     internal static class DeadTtsSpeakPatch
     {
         private static bool Prefix(PlayerAvatar __instance)

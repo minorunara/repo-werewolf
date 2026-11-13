@@ -18,7 +18,7 @@ namespace Werewolf.Tests
         private static readonly Dictionary<string, string> SeamTypes = new Dictionary<string, string>
         {
             ["Werewolf.Plugin"] =
-                "起動時のシナリオ用設定スナップショットと、パッチ層・参照層の帰結通知",
+                "起動時のシナリオ用設定スナップショットと、パッチ層の帰結通知",
             ["Werewolf.ConfigBindings"] =
                 "シナリオごとの完了フラグ（Cleared{Id}）の Bind",
             ["Werewolf.Game.WerewolfDirector"] =

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using HarmonyLib;
@@ -7,12 +8,9 @@ namespace Werewolf.Game.Patches
 {
     internal static class MapHidePatch
     {
-        private static AccessTools.FieldRef<PlayerAvatar, PlayerDeathHead> DeathHeadRef =>
-            GameRefs.PlayerAvatar_playerDeathHead;
-
         internal static bool GateOpen()
         {
-            WerewolfDirector dir = WerewolfDirector.Instance;
+            WerewolfDirector? dir = WerewolfDirector.Instance;
             if (dir == null) return false;
             return MapHideGate.ShouldSuppress(dir.IsRoundActiveClient, dir.ClientMinimapHideEnabled);
         }
@@ -32,7 +30,7 @@ namespace Werewolf.Game.Patches
                 {
                     PlayerAvatar avatar = players[i];
                     if (avatar == null) continue;
-                    PlayerDeathHead head = DeathHeadRef(avatar);
+                    PlayerDeathHead head = avatar.playerDeathHead;
                     if (head == null) continue;
                     MapCustom mc = head.mapCustom;
                     if (mc == null) continue;

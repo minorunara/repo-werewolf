@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 using Werewolf.Core;
 
@@ -16,7 +17,7 @@ namespace Werewolf.Scenarios.Core
 
     public readonly struct ScenarioVanillaName
     {
-        public ScenarioVanillaName(ScenarioVanillaNameKind kind, string name, string purpose, string parent = null)
+        public ScenarioVanillaName(ScenarioVanillaNameKind kind, string name, string purpose, string? parent = null)
         {
             Kind = kind;
             Name = name;
@@ -30,7 +31,7 @@ namespace Werewolf.Scenarios.Core
 
         public string Purpose { get; }
 
-        public string Parent { get; }
+        public string? Parent { get; }
     }
 
     public static class ScenarioVanillaNames

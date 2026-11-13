@@ -1,3 +1,4 @@
+#nullable enable
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
@@ -20,12 +21,12 @@ namespace Werewolf.UI
         private static readonly Color TimeBarZoneLineColor = new Color(0.92f, 0.94f, 0.98f, 0.25f);
 
         private readonly MeetingTimeBar _timeBar = new MeetingTimeBar();
-        private GameObject _timeBarRoot;
-        private Image _timeBarZoneMark;
-        private Image _timeBarLag;
-        private Image _timeBarGreen;
-        private Image _timeBarRed;
-        private RectTransform _timeBarZoneLine;
+        private GameObject? _timeBarRoot;
+        private Image? _timeBarZoneMark;
+        private Image? _timeBarLag;
+        private Image? _timeBarGreen;
+        private Image? _timeBarRed;
+        private RectTransform? _timeBarZoneLine;
         private bool _timeBarZoneLayoutDone;
 
         public void Build(RectTransform parent)
@@ -59,10 +60,10 @@ namespace Werewolf.UI
 
             float zoneFrac = (float)_timeBar.RedZoneFraction;
             float fillFrac = (float)_timeBar.FillFraction;
-            _timeBarLag.fillAmount = (float)_timeBar.LagFraction;
-            _timeBarRed.fillAmount = Mathf.Min(fillFrac, zoneFrac);
+            _timeBarLag!.fillAmount = (float)_timeBar.LagFraction;
+            _timeBarRed!.fillAmount = Mathf.Min(fillFrac, zoneFrac);
             float greenSpan = 1f - zoneFrac;
-            _timeBarGreen.fillAmount = greenSpan <= 0f ? 0f
+            _timeBarGreen!.fillAmount = greenSpan <= 0f ? 0f
                 : Mathf.Clamp01((fillFrac - zoneFrac) / greenSpan);
         }
 
@@ -97,11 +98,11 @@ namespace Werewolf.UI
             _timeBarZoneLayoutDone = true;
             float zoneW = TimeBarWidth * (float)_timeBar.RedZoneFraction;
             float left = TimeBarCenterX - TimeBarWidth / 2f;
-            _timeBarZoneMark.rectTransform.sizeDelta = new Vector2(zoneW, TimeBarHeight);
+            _timeBarZoneMark!.rectTransform.sizeDelta = new Vector2(zoneW, TimeBarHeight);
             _timeBarZoneMark.rectTransform.anchoredPosition = new Vector2(left + zoneW / 2f, 0f);
-            _timeBarZoneLine.anchoredPosition = new Vector2(left + zoneW, 0f);
+            _timeBarZoneLine!.anchoredPosition = new Vector2(left + zoneW, 0f);
             float greenW = TimeBarWidth - zoneW;
-            _timeBarGreen.rectTransform.sizeDelta = new Vector2(greenW, TimeBarHeight);
+            _timeBarGreen!.rectTransform.sizeDelta = new Vector2(greenW, TimeBarHeight);
             _timeBarGreen.rectTransform.anchoredPosition = new Vector2(left + zoneW + greenW / 2f, 0f);
         }
     }

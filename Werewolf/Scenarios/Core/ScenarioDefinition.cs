@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using Werewolf.Core;
@@ -67,7 +68,7 @@ namespace Werewolf.Scenarios.Core
         private readonly ScenarioChatLine[] _chat;
         private readonly ScenarioVote[] _votes;
 
-        public ScenarioMeetingScript(ScenarioChatLine[] chatScript, ScenarioVote[] botVotes)
+        public ScenarioMeetingScript(ScenarioChatLine[]? chatScript, ScenarioVote[]? botVotes)
         {
             _chat = chatScript ?? NoChat;
             _votes = botVotes ?? NoVotes;
@@ -143,7 +144,7 @@ namespace Werewolf.Scenarios.Core
         public ScenarioEnvironmentSpec(string forcedLevelName, int levelsCompleted, int seededLossPct,
                                        float truckLeashMeters, ScenarioSignal? truckLeashUntil,
                                        int haulGoalPctOfTotal = 0,
-                                       IReadOnlyDictionary<string, int> startUpgrades = null,
+                                       IReadOnlyDictionary<string, int>? startUpgrades = null,
                                        ScenarioMilestone truckLeashAfter = ScenarioMilestone.None,
                                        ScenarioMilestone truckLeashBefore = ScenarioMilestone.None,
                                        int moduleAmount = 0, int extractionPoints = 0,
@@ -364,13 +365,13 @@ namespace Werewolf.Scenarios.Core
         private readonly TextId[] _alreadyOnTarget;
         private readonly TextId[][] _breakLines;
 
-        public ScenarioNotices(TextId[] leashNag, ScenarioSignal? earlyStartSignal,
-                               ScenarioMilestone earlyStartAfter, TextId[] earlyStartLines,
-                               ScenarioKeyHint keyHint, TextId[] extractionNag = null,
-                               TextId[] mapAside = null,
-                               IReadOnlyDictionary<ScenarioBreakKind, TextId[]> breakLines = null,
-                               TextId[] wrongTargetLines = null,
-                               TextId[] alreadyOnTargetLines = null)
+        public ScenarioNotices(TextId[]? leashNag, ScenarioSignal? earlyStartSignal,
+                               ScenarioMilestone earlyStartAfter, TextId[]? earlyStartLines,
+                               ScenarioKeyHint keyHint, TextId[]? extractionNag = null,
+                               TextId[]? mapAside = null,
+                               IReadOnlyDictionary<ScenarioBreakKind, TextId[]>? breakLines = null,
+                               TextId[]? wrongTargetLines = null,
+                               TextId[]? alreadyOnTargetLines = null)
         {
             _leashNag = leashNag ?? NoLines;
             EarlyStartSignal = earlyStartSignal;
@@ -465,8 +466,8 @@ namespace Werewolf.Scenarios.Core
                                   ScenarioPage[] pages, ScenarioCueTiming timing,
                                   ScenarioNotices notices, ScenarioBreakWatch watch,
                                   ScenarioSafetySpec? safety = null, ScenarioRoomSpec room = default,
-                                  ScenarioMeetingScript[] meetings = null,
-                                  string introDecodeEmoji = null,
+                                  ScenarioMeetingScript[]? meetings = null,
+                                  string? introDecodeEmoji = null,
                                   ScenarioCorpseHint corpseHint = default)
         {
             if (pages == null) throw new ArgumentNullException(nameof(pages));
@@ -501,7 +502,7 @@ namespace Werewolf.Scenarios.Core
         public ScenarioMeetingScript MeetingScript(int meetingIndex)
             => meetingIndex >= 0 && meetingIndex < _meetings.Length ? _meetings[meetingIndex] : default;
 
-        public string IntroDecodeEmoji { get; }
+        public string? IntroDecodeEmoji { get; }
 
         public ScenarioCorpseHint CorpseHint { get; }
 

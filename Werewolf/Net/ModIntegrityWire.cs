@@ -1,5 +1,7 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Werewolf.Core;
 
 namespace Werewolf.Net
@@ -68,7 +70,7 @@ namespace Werewolf.Net
 
     public sealed class ModManifestChunkAssembler
     {
-        private readonly ModManifestReportChunk[] _chunks;
+        private readonly ModManifestReportChunk?[] _chunks;
         private int _received;
 
         public ModManifestChunkAssembler(ModManifestReportChunk first)
@@ -81,7 +83,13 @@ namespace Werewolf.Net
 
         public int Epoch { get; }
         public string ManifestFingerprint { get; }
-        public ModManifest Manifest { get; private set; }
+        public ModManifest? Manifest { get; private set; }
+
+        public bool TryGetCompletedManifest([NotNullWhen(true)] out ModManifest? manifest)
+        {
+            manifest = Manifest;
+            return manifest != null;
+        }
 
         public ModManifestChunkAddOutcome Add(ModManifestReportChunk chunk)
         {
@@ -90,7 +98,7 @@ namespace Werewolf.Net
                 !string.Equals(chunk.ManifestFingerprint, ManifestFingerprint, StringComparison.Ordinal))
                 return ModManifestChunkAddOutcome.Invalid;
 
-            ModManifestReportChunk existing = _chunks[chunk.ChunkIndex];
+            ModManifestReportChunk? existing = _chunks[chunk.ChunkIndex];
             if (existing != null)
             {
                 return SameEntries(existing.Entries, chunk.Entries)
@@ -105,7 +113,7 @@ namespace Werewolf.Net
             var entries = new List<ModManifestEntry>();
             for (int i = 0; i < _chunks.Length; i++)
             {
-                ModManifestReportChunk part = _chunks[i];
+                ModManifestReportChunk? part = _chunks[i];
                 if (part == null) return ModManifestChunkAddOutcome.Invalid;
                 for (int j = 0; j < part.Entries.Count; j++)
                 {
@@ -115,7 +123,7 @@ namespace Werewolf.Net
                 }
             }
 
-            if (!ModManifestComparer.TryCreateManifest(entries, out ModManifest manifest, out _) ||
+            if (!ModManifestComparer.TryCreateManifest(entries, out ModManifest? manifest, out _) ||
                 !string.Equals(manifest.Fingerprint, ManifestFingerprint, StringComparison.Ordinal))
                 return ModManifestChunkAddOutcome.Invalid;
 
@@ -166,16 +174,16 @@ namespace Werewolf.Net
         }
 
         public static bool TryReadManifestRequest(
-            object[] payload,
-            out ModManifestRequestMessage request,
-            out string error)
+            object?[]? payload,
+            [NotNullWhen(true)] out ModManifestRequestMessage? request,
+            out string? error)
         {
             request = null;
             error = null;
             if (payload == null || payload.Length != 3) return Fail("arity", out error);
-            int epoch = (int)payload[0];
-            byte protocol = (byte)payload[1];
-            string fingerprint = (string)payload[2];
+            if (payload[0] is not int epoch || payload[1] is not byte protocol ||
+                payload[2] is not string fingerprint)
+                return Fail("types", out error);
             if (epoch <= 0) return Fail("epoch", out error);
             if (protocol != ProtocolVersion) return Fail("protocol", out error);
             if (!ModManifestComparer.IsCanonicalFingerprint(fingerprint)) return Fail("fingerprint", out error);
@@ -234,22 +242,19 @@ namespace Werewolf.Net
         }
 
         public static bool TryReadManifestReport(
-            object[] payload,
-            out ModManifestReportChunk report,
-            out string error)
+            object?[]? payload,
+            [NotNullWhen(true)] out ModManifestReportChunk? report,
+            out string? error)
         {
             report = null;
             error = null;
             if (payload == null || payload.Length != 9) return Fail("arity", out error);
-            int epoch = (int)payload[0];
-            byte protocol = (byte)payload[1];
-            int chunkIndex = (int)payload[2];
-            int chunkCount = (int)payload[3];
-            string fingerprint = (string)payload[4];
-            string[] guids = (string[])payload[5];
-            string[] names = (string[])payload[6];
-            string[] versions = (string[])payload[7];
-            string[] contentIds = (string[])payload[8];
+            if (payload[0] is not int epoch || payload[1] is not byte protocol ||
+                payload[2] is not int chunkIndex || payload[3] is not int chunkCount ||
+                payload[4] is not string fingerprint || payload[5] is not string[] guids ||
+                payload[6] is not string[] names || payload[7] is not string[] versions ||
+                payload[8] is not string[] contentIds)
+                return Fail("types", out error);
 
             if (epoch <= 0) return Fail("epoch", out error);
             if (protocol != ProtocolVersion) return Fail("protocol", out error);
@@ -309,22 +314,19 @@ namespace Werewolf.Net
         }
 
         public static bool TryReadSnapshot(
-            object[] payload,
-            out ModIntegritySnapshot snapshot,
-            out string error)
+            object?[]? payload,
+            [NotNullWhen(true)] out ModIntegritySnapshot? snapshot,
+            out string? error)
         {
             snapshot = null;
             error = null;
             if (payload == null || payload.Length != 7) return Fail("arity", out error);
-            int epoch = (int)payload[0];
-            int revision = (int)payload[1];
-            int baselineActor = (int)payload[2];
-            int[] actors = (int[])payload[3];
-            byte[] statuses = (byte[])payload[4];
-            byte[] reasons = (byte[])payload[5];
-            int[] diffCounts = (int[])payload[6];
-            if (actors == null || statuses == null || reasons == null || diffCounts == null ||
-                actors.Length == 0 || actors.Length > MaxParticipants ||
+            if (payload[0] is not int epoch || payload[1] is not int revision ||
+                payload[2] is not int baselineActor || payload[3] is not int[] actors ||
+                payload[4] is not byte[] statuses || payload[5] is not byte[] reasons ||
+                payload[6] is not int[] diffCounts)
+                return Fail("types", out error);
+            if (actors.Length == 0 || actors.Length > MaxParticipants ||
                 statuses.Length != actors.Length || reasons.Length != actors.Length ||
                 diffCounts.Length != actors.Length * 4)
                 return Fail("arrays", out error);
@@ -358,15 +360,15 @@ namespace Werewolf.Net
         }
 
         public static bool TryReadDetailRequest(
-            object[] payload,
-            out ModIntegrityDetailRequestMessage request,
-            out string error)
+            object?[]? payload,
+            [NotNullWhen(true)] out ModIntegrityDetailRequestMessage? request,
+            out string? error)
         {
             request = null;
             error = null;
             if (payload == null || payload.Length != 2) return Fail("arity", out error);
-            int epoch = (int)payload[0];
-            int actor = (int)payload[1];
+            if (payload[0] is not int epoch || payload[1] is not int actor)
+                return Fail("types", out error);
             if (epoch <= 0 || actor <= 0) return Fail("value", out error);
             request = new ModIntegrityDetailRequestMessage(epoch, actor);
             return true;
@@ -376,10 +378,11 @@ namespace Werewolf.Net
             int epoch,
             int revision,
             int actor,
-            IReadOnlyList<ModDifference> differences)
+            IReadOnlyList<ModDifference>? differences)
         {
             if (epoch <= 0 || revision < 0 || actor <= 0) throw new ArgumentOutOfRangeException(nameof(epoch));
-            int total = differences?.Count ?? 0;
+            differences ??= Array.Empty<ModDifference>();
+            int total = differences.Count;
             if (total > MaxDifferences) throw new ArgumentOutOfRangeException(nameof(differences));
             int chunkCount = Math.Max(1, (total + DetailEntriesPerChunk - 1) / DetailEntriesPerChunk);
             if (chunkCount > MaxDetailChunks) throw new ArgumentOutOfRangeException(nameof(differences));
@@ -414,23 +417,20 @@ namespace Werewolf.Net
         }
 
         public static bool TryReadDetailResponse(
-            object[] payload,
-            out ModIntegrityDetailChunk chunk,
-            out string error)
+            object?[]? payload,
+            [NotNullWhen(true)] out ModIntegrityDetailChunk? chunk,
+            out string? error)
         {
             chunk = null;
             error = null;
             if (payload == null || payload.Length != 10) return Fail("arity", out error);
-            int epoch = (int)payload[0];
-            int revision = (int)payload[1];
-            int actor = (int)payload[2];
-            int chunkIndex = (int)payload[3];
-            int chunkCount = (int)payload[4];
-            byte[] kinds = (byte[])payload[5];
-            string[] guids = (string[])payload[6];
-            string[] names = (string[])payload[7];
-            string[] baselineValues = (string[])payload[8];
-            string[] participantValues = (string[])payload[9];
+            if (payload[0] is not int epoch || payload[1] is not int revision ||
+                payload[2] is not int actor || payload[3] is not int chunkIndex ||
+                payload[4] is not int chunkCount || payload[5] is not byte[] kinds ||
+                payload[6] is not string[] guids || payload[7] is not string[] names ||
+                payload[8] is not string[] baselineValues ||
+                payload[9] is not string[] participantValues)
+                return Fail("types", out error);
             if (epoch <= 0 || revision < 0 || actor <= 0 ||
                 chunkCount < 1 || chunkCount > MaxDetailChunks ||
                 chunkIndex < 0 || chunkIndex >= chunkCount)
@@ -451,15 +451,19 @@ namespace Werewolf.Net
         }
 
         private static bool ValidateManifestArrays(
-            string[] guids,
-            string[] names,
-            string[] versions,
-            string[] contentIds,
+            [NotNullWhen(true)] string[]? guids,
+            [NotNullWhen(true)] string[]? names,
+            [NotNullWhen(true)] string[]? versions,
+            [NotNullWhen(true)] string[]? contentIds,
             bool throwOnFailure)
         {
-            bool valid = guids != null && names != null && versions != null && contentIds != null &&
-                guids.Length == names.Length && guids.Length == versions.Length && guids.Length == contentIds.Length &&
-                guids.Length <= ManifestEntriesPerChunk;
+            if (guids == null || names == null || versions == null || contentIds == null)
+            {
+                if (throwOnFailure) throw new ArgumentException("manifest_entries");
+                return false;
+            }
+            bool valid = guids.Length == names.Length && guids.Length == versions.Length &&
+                guids.Length == contentIds.Length && guids.Length <= ManifestEntriesPerChunk;
             int chars = 0;
             if (valid)
             {
@@ -479,16 +483,20 @@ namespace Werewolf.Net
         }
 
         private static bool ValidateDetailArrays(
-            byte[] kinds,
-            string[] guids,
-            string[] names,
-            string[] baselineValues,
-            string[] participantValues,
+            [NotNullWhen(true)] byte[]? kinds,
+            [NotNullWhen(true)] string[]? guids,
+            [NotNullWhen(true)] string[]? names,
+            [NotNullWhen(true)] string[]? baselineValues,
+            [NotNullWhen(true)] string[]? participantValues,
             bool throwOnFailure)
         {
-            bool valid = kinds != null && guids != null && names != null &&
-                baselineValues != null && participantValues != null &&
-                kinds.Length == guids.Length && kinds.Length == names.Length &&
+            if (kinds == null || guids == null || names == null ||
+                baselineValues == null || participantValues == null)
+            {
+                if (throwOnFailure) throw new ArgumentException("detail_entries");
+                return false;
+            }
+            bool valid = kinds.Length == guids.Length && kinds.Length == names.Length &&
                 kinds.Length == baselineValues.Length && kinds.Length == participantValues.Length &&
                 kinds.Length <= DetailEntriesPerChunk;
             int chars = 0;
@@ -510,22 +518,23 @@ namespace Werewolf.Net
             return valid;
         }
 
-        private static bool AllEmpty(params Array[] arrays)
+        private static bool AllEmpty(params Array?[]? arrays)
         {
             if (arrays == null) return false;
             for (int i = 0; i < arrays.Length; i++)
             {
-                if (arrays[i] == null || arrays[i].Length != 0) return false;
+                Array? array = arrays[i];
+                if (array == null || array.Length != 0) return false;
             }
             return true;
         }
 
-        private static bool ValidText(string value, int min, int max)
+        private static bool ValidText(string? value, int min, int max)
         {
             return value != null && value.Length >= min && value.Length <= max;
         }
 
-        private static bool Fail(string value, out string error)
+        private static bool Fail(string value, [NotNullWhen(false)] out string? error)
         {
             error = value;
             return false;

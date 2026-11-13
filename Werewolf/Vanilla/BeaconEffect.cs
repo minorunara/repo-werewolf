@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 using UnityEngine;
 using Werewolf.Core;
@@ -10,8 +11,14 @@ namespace Werewolf.Vanilla
 
         private sealed class ActiveSequence
         {
-            public BeaconPulseSequence Sequence;
-            public Vector3 Position;
+            public ActiveSequence(BeaconPulseSequence sequence, Vector3 position)
+            {
+                Sequence = sequence;
+                Position = position;
+            }
+
+            public readonly BeaconPulseSequence Sequence;
+            public readonly Vector3 Position;
             public int Fired;
         }
 
@@ -20,7 +27,7 @@ namespace Werewolf.Vanilla
 
         public void Trigger(PlayerHandle requester, long nowUnixMs, int summonCooldownSec)
         {
-            PlayerAvatar requesterAvatar = requester.Avatar;
+            PlayerAvatar? requesterAvatar = requester.Avatar;
             if (requesterAvatar == null)
             {
                 WLog.Line("beacon_effect_skipped", secret: true, ("reason", "no_avatar"));
@@ -28,12 +35,7 @@ namespace Werewolf.Vanilla
             }
 
             Vector3 position = requesterAvatar.transform.position;
-            _active.Add(new ActiveSequence
-            {
-                Sequence = new BeaconPulseSequence(nowUnixMs),
-                Position = position,
-                Fired = 0,
-            });
+            _active.Add(new ActiveSequence(new BeaconPulseSequence(nowUnixMs), position));
             WLog.Line("beacon_effect", secret: true,
                 ("x", (int)position.x), ("y", (int)position.y), ("z", (int)position.z));
             TrySummon(nowUnixMs, summonCooldownSec);
@@ -51,7 +53,7 @@ namespace Werewolf.Vanilla
                 if (ep == null) continue;
                 try
                 {
-                    if (!GameRefs.EnemyParent_Spawned(ep)) targets.Add(ep);
+                    if (!ep.Spawned) targets.Add(ep);
                 }
                 catch (System.Exception e)
                 {

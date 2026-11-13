@@ -483,7 +483,7 @@ namespace Werewolf.Tests
         [Fact]
         public void Texts_PeacefulOutcomesReasonsAndEpigraphs_AreDistinctAndPresent()
         {
-            Texts.Current = Language.Japanese;
+            Texts.Apply(Language.Japanese, null);
             var survived = ResultDigestText.OutcomeText(TeamCodes.PeacefulSurvived);
             var collapsed = ResultDigestText.OutcomeText(TeamCodes.PeacefulCollapsed);
 
@@ -510,7 +510,7 @@ namespace Werewolf.Tests
         [Fact]
         public void Digest_MatchEnd_PeacefulCollapsed_FormatsHeadingOnly()
         {
-            Texts.Current = Language.Japanese;
+            Texts.Apply(Language.Japanese, null);
             var digest = new ResultDigest();
             digest.Observe(WWEventCodes.GameStart, new object[0], Now);
             digest.Observe(WWEventCodes.GameOver,

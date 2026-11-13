@@ -1,3 +1,4 @@
+#nullable enable
 namespace Werewolf.Core
 {
     public readonly struct SettingsPanelView

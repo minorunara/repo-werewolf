@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
@@ -7,19 +8,16 @@ namespace Werewolf.Game.Patches
     [HarmonyPatch(typeof(TruckScreenText), nameof(TruckScreenText.ChatMessageLevel))]
     internal static class MailSendWinPatch
     {
-        private static AccessTools.FieldRef<TruckScreenText, TruckScreenText.PlayerChatBoxState> StateRef =>
-            GameRefs.TruckScreenText_playerChatBoxState;
-
         private static void Postfix(TruckScreenText __instance)
         {
             try
             {
                 if (__instance == null) return;
-                TruckScreenText.PlayerChatBoxState state = StateRef(__instance);
+                TruckScreenText.PlayerChatBoxState state = __instance.playerChatBoxState;
                 if (state != TruckScreenText.PlayerChatBoxState.LockedStartingTruck &&
                     state != TruckScreenText.PlayerChatBoxState.LockedDestroySlackers) return;
 
-                WerewolfDirector dir = WerewolfDirector.Instance;
+                WerewolfDirector? dir = WerewolfDirector.Instance;
                 if (dir == null || !dir.IsHostSessionActive) return;
                 if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
                 if (dir.HostPhase != GamePhase.Play) return;

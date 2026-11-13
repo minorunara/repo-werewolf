@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Text;
 using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
@@ -25,46 +23,49 @@ namespace Werewolf
 
         internal const string MenuLibGuid = "nickklmao.menulib";
 
-        internal static new ManualLogSource Logger;
+        internal static new ManualLogSource? Logger;
 
-        internal static GameConfig GameConfig;
+        internal static GameConfig? GameConfig;
 
-        internal static ConfigBindings Bindings;
+        internal static ConfigBindings? Bindings;
 
-        internal static ConfigEntry<KeyCode> WolfModeKey;
+        internal static ConfigEntry<KeyCode>? WolfModeKey;
 
-        internal static ConfigEntry<KeyCode> BeaconKey;
+        internal static ConfigEntry<KeyCode>? BeaconKey;
 
-        internal static ConfigEntry<KeyCode> LobbySettingsPanelKey;
+        internal static ConfigEntry<KeyCode>? LobbySettingsPanelKey;
 
-        internal static ConfigEntry<KeyCode> MeetingMapKey;
+        internal static ConfigEntry<KeyCode>? MeetingMapKey;
 
-        internal static ConfigEntry<KeyCode> MeetingChatLogKey;
+        internal static ConfigEntry<KeyCode>? MeetingChatLogKey;
 
-        internal static ConfigEntry<KeyCode> ReplayViewerKey;
+        internal static ConfigEntry<KeyCode>? ReplayViewerKey;
 
-        internal static ConfigEntry<KeyCode> CorpseReportKey;
+        internal static ConfigEntry<KeyCode>? CorpseReportKey;
 
-        internal static ConfigEntry<KeyCode> ResultReturnKey;
+        internal static ConfigEntry<KeyCode>? ResultReturnKey;
 
-        internal static ConfigEntry<KeyCode> ManualKey;
+        internal static ConfigEntry<KeyCode>? ManualKey;
 
-        internal static ConfigEntry<KeyCode> VoidMatchKey;
+        internal static ConfigEntry<KeyCode>? VoidMatchKey;
 
         internal static void RefreshGameConfig()
         {
             if (Bindings == null) return;
             GameConfig = Bindings.Snapshot();
-            if (ScenarioRun.Active) GameConfig = ScenarioGameConfig.Build(GameConfig, ScenarioRun.Definition);
+            ScenarioDefinition? definition = ScenarioRun.Definition;
+            if (ScenarioRun.Active && definition != null)
+                GameConfig = ScenarioGameConfig.Build(GameConfig, definition);
         }
 
         private void Awake()
         {
-            Logger = base.Logger;
+            ManualLogSource logger = base.Logger;
+            Logger = logger;
 
             if (!CosmeticLottery.ValidateWeights())
             {
-                Logger.LogWarning(
+                logger.LogWarning(
                     "CosmeticLottery.ValidateWeights failed: weight constants (Common/Uncommon/Rare/UltraRare) " +
                     "do not sum to TotalWeight. Cosmetic coin drop rates will be inconsistent.");
             }
@@ -89,7 +90,11 @@ namespace Werewolf
 
             WorldgenMapBinding.Install(Config, Bindings);
 
-            LoadLanguageOverride();
+            UI.AssetCatalog.SetAlternativeExecutionIcon(Bindings.UseAlternativeExecutionIcon.Value);
+            if (Bindings.UseAlternativeExecutionIcon.Value)
+            {
+                WLog.Line("alternative_execution_icon", secret: false, ("enabled", true));
+            }
 
             UI.AssetCatalog.SetStreamerSafeMode(Bindings.StreamerSafeMode.Value);
             if (Bindings.StreamerSafeMode.Value)
@@ -97,46 +102,43 @@ namespace Werewolf
                 WLog.Line("streamer_safe_mode", secret: false, ("enabled", true));
             }
 
-            if (!GameRefs.ResolveAll())
-            {
-                Logger.LogError($"{PluginName} {PluginVersion}: 本体フィールド参照の解決に失敗したため" +
-                    "MODを無効化しました（本体アップデートでフィールドが変わった可能性。" +
-                    "修復手順: docs/steering/tech.md「本体アップデート対応プレイブック」）");
-                return;
-            }
-
-            int scenarioRefFailures = GameRefs.ResolveScenarioRefs();
-            if (scenarioRefFailures > 0)
-            {
-                ScenarioRun.DisableForFailedRefs(scenarioRefFailures);
-                Logger.LogWarning($"{PluginName} {PluginVersion}: チュートリアル用の本体フィールド参照" +
-                    $"{scenarioRefFailures}件が解決できないため、チュートリアルの入口だけを閉じました" +
-                    "（本編は通常どおり動作します）");
-            }
-
             Vanilla.EnemyMapIcons.TextureResolver = UI.AssetCatalog.GetTexture;
             Vanilla.MeetingButton.PrefabResolver = UI.AssetCatalog.GetPrefab;
 
             var harmony = new Harmony(PluginGuid);
-            if (!ApplyPatchesIsolated(harmony))
+            if (!ApplyPatchesIsolated(harmony, logger))
             {
-                Logger.LogError($"{PluginName} {PluginVersion}: Harmonyパッチ適用に失敗したため" +
+                logger.LogError($"{PluginName} {PluginVersion}: Harmonyパッチ適用に失敗したため" +
                     "MODを無効化しました（本体アップデートでパッチ対象が変わった可能性。" +
                     "修復手順: docs/steering/tech.md「本体アップデート対応プレイブック」）");
                 return;
             }
 
-            gameObject.AddComponent<WerewolfDirector>();
+            WerewolfDirector director;
+            try
+            {
+                director = gameObject.AddComponent<WerewolfDirector>();
+            }
+            catch (Exception e)
+            {
+                harmony.UnpatchSelf();
+                logger.LogError($"{PluginName} {PluginVersion}: Directorの生成に失敗したため" +
+                    $"MODを無効化しました\n{e}");
+                return;
+            }
+            if (!director.IsReady)
+            {
+                harmony.UnpatchSelf();
+                UnityEngine.Object.Destroy(director);
+                logger.LogError($"{PluginName} {PluginVersion}: Directorの初期化に失敗したため" +
+                    "MODを無効化しました");
+                return;
+            }
 
             ScenarioMenuEntry.TryInstall();
         }
 
-        private void OnDestroy()
-        {
-            StructuredLog.FlushDeferredSecrets("plugin_destroy");
-        }
-
-        private static bool ApplyPatchesIsolated(Harmony harmony)
+        private static bool ApplyPatchesIsolated(Harmony harmony, ManualLogSource logger)
         {
             var failures = new List<(string patchClass, Exception error)>();
             int scenarioFailures = 0;
@@ -148,8 +150,9 @@ namespace Werewolf
                 }
                 catch (Exception e)
                 {
-                    failures.Add((type.FullName, e));
-                    if (PatchTierPolicy.IsScenarioTier(type.FullName)) scenarioFailures++;
+                    string patchClass = type.FullName ?? type.Name;
+                    failures.Add((patchClass, e));
+                    if (PatchTierPolicy.IsScenarioTier(patchClass)) scenarioFailures++;
                 }
             }
 
@@ -158,7 +161,7 @@ namespace Werewolf
                 var cause = error.InnerException ?? error;
                 WLog.Line("harmony_patch_failed", secret: false,
                     ("patchClass", patchClass), ("err", cause.Message));
-                Logger.LogError($"Harmony patch failed: {patchClass}\n{error}");
+                logger.LogError($"Harmony patch failed: {patchClass}\n{error}");
             }
 
             PatchApplyOutcome outcome = PatchTierPolicy.Decide(
@@ -176,53 +179,6 @@ namespace Werewolf
             }
 
             return true;
-        }
-
-        private void LoadLanguageOverride()
-        {
-            try
-            {
-                string value = Bindings?.Language?.Value;
-                if (string.IsNullOrEmpty(value) || value == "日本語" || value == "ja") return;
-
-                bool english = value == "English" || value == "en";
-                if (english)
-                {
-                    Texts.Current = Language.English;
-                }
-
-                string code = english ? "en" : value;
-
-                var dllPath = typeof(Plugin).Assembly.Location;
-                var dir = string.IsNullOrEmpty(dllPath) ? null : Path.GetDirectoryName(dllPath);
-                if (string.IsNullOrEmpty(dir))
-                {
-                    if (!english)
-                    {
-                        WLog.Line("lang_load_failed", secret: false, ("code", code), ("reason", "no_dll_dir"));
-                    }
-                    return;
-                }
-
-                var path = Path.Combine(dir, "Lang", code + ".txt");
-                if (!File.Exists(path))
-                {
-                    if (!english)
-                    {
-                        WLog.Line("lang_load_failed", secret: false,
-                            ("code", code), ("reason", "file_missing"), ("path", path));
-                    }
-                    return;
-                }
-
-                string content = File.ReadAllText(path, Encoding.UTF8);
-                var table = LangFile.Parse(content);
-                Texts.SetOverride(table);
-            }
-            catch (Exception e)
-            {
-                WLog.Line("lang_load_failed", secret: false, ("reason", "exception"), ("detail", e.GetType().Name));
-            }
         }
     }
 }

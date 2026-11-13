@@ -9,6 +9,7 @@ namespace Werewolf
 {
     internal sealed class ConfigBindings
     {
+#pragma warning disable CS8618
         private const string SecGeneral = "01. General";
         private const string SecMeeting = "02. Meeting";
         private const string SecRoleAssignment = "03. Role Assignment";
@@ -54,8 +55,6 @@ namespace Werewolf
         internal ConfigEntry<int> BomberAmmoRefillPct;
         internal ConfigEntry<KeyCode> BomberPlantKey;
         internal ConfigEntry<KeyCode> BomberDetonateKey;
-
-        internal ConfigEntry<string> Language;
 
         internal ConfigEntry<int> MeetingRightsPerPlayer;
         internal ConfigEntry<int> ConveneSuppressStartSec;
@@ -113,6 +112,7 @@ namespace Werewolf
         internal ConfigEntry<int> MeetingMapResolution;
         internal ConfigEntry<bool> MeetingMapGrid;
         internal ConfigEntry<bool> MeetingChatLog;
+        internal ConfigEntry<bool> UseAlternativeExecutionIcon;
 
         internal ConfigEntry<int> NecroVoiceMode;
 
@@ -156,7 +156,7 @@ namespace Werewolf
 
         private Dictionary<string, ConfigEntry<int>> _startUpgrades;
 
-        internal Func<string> ItemsSpecProvider { get; set; }
+        internal Func<string>? ItemsSpecProvider { get; set; }
 
         private readonly Werewolf.Core.ValuableMapMode _valuableMapModeDefault;
 
@@ -184,6 +184,7 @@ namespace Werewolf
             BindVoice(config, defaults);
             BindDebug(config, defaults);
         }
+#pragma warning restore CS8618
 
         private void BindGeneral(ConfigFile config, GameConfig defaults)
         {
@@ -195,17 +196,6 @@ namespace Werewolf
                 "人狼モードのON/OFF。true の間はラウンドが人狼セッションとして進行する。" +
                 "ホスト権威（部屋に効くのはホストの値のみ。参加者側の値は自分がホストのときにだけ効く）");
 
-            Language = config.Bind(
-                SecGeneral, "Language (restart required)", "English",
-                new ConfigDescription(
-                    "Display language (restart required). 日本語 = built-in Japanese, English = built-in English, " +
-                    "custom = load Lang/custom.txt next to the DLL. A matching Lang file (Lang/en.txt for English, " +
-                    "Lang/custom.txt for custom), if present, overrides the built-in text per key " +
-                    "(missing keys fall back to the built-in table) / " +
-                    "表示言語（反映には再起動が必要）。日本語=埋め込み日本語, English=埋め込み英語, custom=DLL同階層の Lang/custom.txt。" +
-                    "対応する Lang ファイル（English は Lang/en.txt）があればキー単位で埋め込み文言を上書きする（欠落キーは埋め込みへフォールバック）",
-                    new AcceptableValueList<string>("日本語", "English", "custom")));
-
             RoundSeconds = config.Bind(
                 SecGeneral, "RoundSeconds", defaults.RoundSeconds,
                 new ConfigDescription(
@@ -214,7 +204,7 @@ namespace Werewolf
 
             MinimapHideEnabled = config.Bind(
                 SecGeneral, "MinimapHideEnabled", defaults.MinimapHideEnabled,
-                "Hide valuables and corpses from the minimap / 貴重品・死体のミニマップ非表示設定");
+                "Hide valuables and corpses from the minimap / お宝・死体のミニマップ非表示設定");
 
             OutfitChangeAllowed = config.Bind(
                 SecGeneral, "OutfitChangeAllowed", defaults.OutfitChangeAllowed,
@@ -225,7 +215,7 @@ namespace Werewolf
                 SecGeneral, "ValuableMapMode", (int)defaults.ValuableMapMode,
                 new ConfigDescription(
                     "Valuable map mode (0 = realtime, 1 = meeting sync (recommended; positions freeze at discovery and snapshot at meeting start / extraction complete), 2 = hidden) / " +
-                    "貴重品マップ表示モード（0=リアルタイム, 1=会議同期（推奨・発見時の位置で静止表示し会議開始/抽出完了時にスナップショット更新）, 2=非表示）",
+                    "お宝マップ表示モード（0=リアルタイム, 1=会議同期（推奨・発見時の位置で静止表示し会議開始/回収完了時にスナップショット更新）, 2=非表示）",
                     new AcceptableValueRange<int>(0, 2)));
 
             OrbGaugeEnabled = config.Bind(
@@ -287,7 +277,7 @@ namespace Werewolf
             MeetingScatterEnabled = config.Bind(
                 SecMeeting, "MeetingScatterEnabled", defaults.MeetingScatterEnabled,
                 "Reshuffle surviving players into random groups of 3+ and warp each group to its own destination (truck / completed extraction points) when a meeting ends. Groups are announced to everyone, destinations stay hidden. No scatter below 6 survivors or before the first completed extraction (prevents fixed patrol groups) / " +
-                "会議終了時に生存者を3人以上の組へ無作為に組み替え、組ごとにトラック＋納品済み抽出地点の別行き先へ分散ワープさせるか（固定グループ巡回の防止。組分けは全員へ発表・行き先は非公開。生存6人未満・最初の納品完了前は分散なし）");
+                "会議終了時に生存者を3人以上の組へ無作為に組み替え、組ごとにトラック＋納品済み回収地点の別行き先へ分散ワープさせるか（固定グループ巡回の防止。組分けは全員へ発表・行き先は非公開。生存6人未満・最初の納品完了前は分散なし）");
 
             ScatterGuardSec = config.Bind(
                 SecMeeting, "ScatterGuardSec", defaults.ScatterGuardSec,
@@ -409,7 +399,7 @@ namespace Werewolf
                 SecWerewolf, "StaminaUnlockPct", defaults.StaminaUnlockPct,
                 new ConfigDescription(
                     "Unlock threshold for infinite stamina (% of the map's total valuable value destroyed) / " +
-                    "無限スタミナの解禁閾値（マップ総貴重品額に対する減額%）",
+                    "無限スタミナの解禁閾値（マップのお宝総額に対する減額%）",
                     new AcceptableValueRange<int>(0, 100)));
 
             JumpUnlockPct = config.Bind(
@@ -580,13 +570,13 @@ namespace Werewolf
             OrbDropMax = config.Bind(
                 SecStage, "OrbDropMax", defaults.OrbDropMax,
                 new ConfigDescription(
-                    "Number of valuable orbs dropped when an enemy dies (vanilla = 3) / 敵撃破時にドロップする貴重品オーブの数（バニラ = 3）",
+                    "Number of valuable orbs dropped when an enemy dies (vanilla = 3) / 敵撃破時にドロップするお宝オーブの数（バニラ = 3）",
                     new AcceptableValueRange<int>(0, 20)));
 
             StartHaulGoalPct = config.Bind(
                 SecStage, "StartHaulGoalPct", defaults.StartHaulGoalPct,
                 new ConfigDescription(
-                    "Extraction quota as a percentage of the map's total valuable value (0 = vanilla). The Werewolves win by checkmate once (100 - this) percent of the map is destroyed / 抽出ノルマをマップ総貴重品額の割合で指定する（0 = バニラのまま）。マップの(100-指定値)%を壊すと人狼の詰み勝ちになる",
+                    "Extraction quota as a percentage of the map's total valuable value (0 = vanilla). The Werewolves win by checkmate once (100 - this) percent of the map is destroyed / 回収ノルマをマップのお宝総額の割合で指定する（0 = バニラのまま）。マップの(100-指定値)%を壊すと人狼の詰み勝ちになる",
                     new AcceptableValueRange<int>(0, 100)));
 
             EnemySetsDanger1 = BindEnemySets(config, "EnemySetsDanger1", defaults.EnemySetsDanger1, "tier 1 (weak)", "ティア1（弱）");
@@ -771,8 +761,16 @@ namespace Werewolf
                     "Show the chat log panel on the right side of the screen during meetings " +
                     "(speaker avatar and message bubbles, plus a recap of deaths, destroyed valuables, " +
                     "delivery progress and beacon uses). Messages from the dead are shown only to the dead / " +
-                    "会議中に画面右端へ会議チャットログを表示する（発言者アバターと吹き出し＋死亡者・破壊された貴重品・" +
+                    "会議中に画面右端へ会議チャットログを表示する（発言者アバターと吹き出し＋死亡者・破壊されたお宝・" +
                     "納品状況・ビーコン使用の要約）。死者の発言は死者にだけ表示される"));
+
+            UseAlternativeExecutionIcon = config.Bind(
+                SecClientUi, "UseAlternativeExecutionIcon", false,
+                new ConfigDescription(
+                    "Replace the gallows used for the Executed status with an alternative icon. " +
+                    "This is a local visual setting and affects only your screen; applies after a game restart / " +
+                    "処刑済みステータスの絞首台を代替アイコンに置き換える。" +
+                    "自分の画面にだけ反映されるローカル表示設定・反映はゲーム再起動"));
 
             CursorMirrorScale = config.Bind(
                 SecClientUi, "CursorMirrorScale", 1.0f,

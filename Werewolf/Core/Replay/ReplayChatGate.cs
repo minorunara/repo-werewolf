@@ -1,3 +1,4 @@
+#nullable enable
 namespace Werewolf.Core.Replay
 {
     public static class ReplayChatGate

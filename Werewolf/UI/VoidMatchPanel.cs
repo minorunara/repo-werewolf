@@ -1,3 +1,4 @@
+#nullable enable
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -22,123 +23,187 @@ namespace Werewolf.UI
 
         private static readonly Color ChargingLabelColor = new Color(1f, 1f, 1f, 0.9f);
 
-        private GameObject _root;
-        private GameObject _confirmRoot;
-        private Image _radial;
-        private TextMeshProUGUI _chargingLabel;
-        private TextMeshProUGUI _promptText;
-        private TextMeshProUGUI _hintText;
+        private sealed class ViewRefs
+        {
+            public ViewRefs(
+                GameObject root,
+                GameObject confirmRoot,
+                Image radial,
+                TextMeshProUGUI chargingLabel,
+                TextMeshProUGUI promptText,
+                TextMeshProUGUI hintText,
+                TextMeshProUGUI headerText,
+                TextMeshProUGUI bodyText)
+            {
+                Root = root;
+                ConfirmRoot = confirmRoot;
+                Radial = radial;
+                ChargingLabel = chargingLabel;
+                PromptText = promptText;
+                HintText = hintText;
+                HeaderText = headerText;
+                BodyText = bodyText;
+            }
 
-        private int _lastRemaining = -1;
-        private KeyCode _lastKey = KeyCode.None;
+            public GameObject Root { get; }
+            public GameObject ConfirmRoot { get; }
+            public Image Radial { get; }
+            public TextMeshProUGUI ChargingLabel { get; }
+            public TextMeshProUGUI PromptText { get; }
+            public TextMeshProUGUI HintText { get; }
+            public TextMeshProUGUI HeaderText { get; }
+            public TextMeshProUGUI BodyText { get; }
+            public int LastRemaining { get; set; } = -1;
+            public KeyCode LastKey { get; set; } = KeyCode.None;
+        }
 
-        public bool Exists => _root != null;
+        private ViewRefs? _view;
+        private readonly TextRefresh _textRefresh = new TextRefresh(nameof(VoidMatchPanel));
 
-        public bool Visible => _root != null && _root.activeSelf;
+        public bool Exists => GetLiveViewOrNull() != null;
+
+        public bool Visible
+        {
+            get
+            {
+                ViewRefs? view = GetLiveViewOrNull();
+                return view != null && view.Root.activeSelf;
+            }
+        }
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
 
-            if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
+            GameObject? root = null;
+            try
+            {
+                if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            RectTransform rect = UiKit.CreateStretched(layerRoot, "WW_VoidMatch");
-            var go = rect.gameObject;
-            _root = go;
+                RectTransform rect = UiKit.CreateStretched(layerRoot, "WW_VoidMatch");
+                root = rect.gameObject;
 
-            var canvas = go.AddComponent<Canvas>();
-            canvas.overrideSorting = true;
-            canvas.sortingOrder = WerewolfUIManager.VoidMatchSortingOrder;
+                var canvas = root.AddComponent<Canvas>();
+                canvas.overrideSorting = true;
+                canvas.sortingOrder = WerewolfUIManager.VoidMatchSortingOrder;
 
-            RectTransform confirmRect = UiKit.CreateStretched(rect, "Confirm");
-            _confirmRoot = confirmRect.gameObject;
+                RectTransform confirmRect = UiKit.CreateStretched(rect, "Confirm");
+                GameObject confirmRoot = confirmRect.gameObject;
 
-            UiKit.CreateBackdrop(confirmRect, "Backdrop", new Color(0f, 0f, 0f, BackdropAlpha));
+                UiKit.CreateBackdrop(confirmRect, "Backdrop", new Color(0f, 0f, 0f, BackdropAlpha));
 
-            Image box = UiKit.CreateImage(confirmRect, "Box", new Vector2(0f, 60f),
-                new Vector2(BoxWidth, BoxHeight), new Color(0.08f, 0.08f, 0.1f, 0.92f));
-            box.raycastTarget = false;
+                Image box = UiKit.CreateImage(confirmRect, "Box", new Vector2(0f, 60f),
+                    new Vector2(BoxWidth, BoxHeight), new Color(0.08f, 0.08f, 0.1f, 0.92f));
+                box.raycastTarget = false;
 
-            UiKit.CreateText(box.rectTransform, "Header", new Vector2(0f, 100f),
-                new Vector2(BoxWidth - 60f, 60f),
-                Texts.Get(TextId.VoidMatchArmHeader), 42f, HeaderColor, TextAlignmentOptions.Center);
+                TextMeshProUGUI headerText = UiKit.CreateText(box.rectTransform, "Header", new Vector2(0f, 100f),
+                    new Vector2(BoxWidth - 60f, 60f),
+                    Texts.Get(TextId.VoidMatchArmHeader), 42f, HeaderColor, TextAlignmentOptions.Center);
 
-            UiKit.CreateText(box.rectTransform, "Body", new Vector2(0f, 20f),
-                new Vector2(BoxWidth - 80f, 90f),
-                Texts.Get(TextId.VoidMatchArmBody), 26f, BodyColor, TextAlignmentOptions.Center);
+                TextMeshProUGUI bodyText = UiKit.CreateText(box.rectTransform, "Body", new Vector2(0f, 20f),
+                    new Vector2(BoxWidth - 80f, 90f),
+                    Texts.Get(TextId.VoidMatchArmBody), 26f, BodyColor, TextAlignmentOptions.Center);
 
-            _promptText = UiKit.CreateText(box.rectTransform, "Prompt", new Vector2(0f, -60f),
-                new Vector2(BoxWidth - 60f, 44f),
-                string.Empty, 30f, Color.white, TextAlignmentOptions.Center);
+                TextMeshProUGUI promptText = UiKit.CreateText(box.rectTransform, "Prompt",
+                    new Vector2(0f, -60f), new Vector2(BoxWidth - 60f, 44f), string.Empty,
+                    30f, Color.white, TextAlignmentOptions.Center);
 
-            _hintText = UiKit.CreateText(box.rectTransform, "Hint", new Vector2(0f, -110f),
-                new Vector2(BoxWidth - 60f, 36f),
-                string.Empty, 22f, HintColor, TextAlignmentOptions.Center);
+                TextMeshProUGUI hintText = UiKit.CreateText(box.rectTransform, "Hint",
+                    new Vector2(0f, -110f), new Vector2(BoxWidth - 60f, 36f), string.Empty,
+                    22f, HintColor, TextAlignmentOptions.Center);
 
-            _confirmRoot.SetActive(false);
+                confirmRoot.SetActive(false);
 
-            _radial = UiKit.CreateRadialImage(rect, "HoldRadial",
-                Vector2.zero, new Vector2(RadialSize, RadialSize), ChargingColor);
-            _radial.raycastTarget = false;
+                Image radial = UiKit.CreateRadialImage(rect, "HoldRadial",
+                    Vector2.zero, new Vector2(RadialSize, RadialSize), ChargingColor);
+                radial.raycastTarget = false;
 
-            _chargingLabel = UiKit.CreateText(rect, "ChargingLabel",
-                new Vector2(0f, -(RadialSize * 0.5f + 34f)), new Vector2(560f, 52f),
-                Texts.Get(TextId.VoidMatchChargingLabel), 38f, ChargingLabelColor,
-                TextAlignmentOptions.Center);
+                TextMeshProUGUI chargingLabel = UiKit.CreateText(rect, "ChargingLabel",
+                    new Vector2(0f, -(RadialSize * 0.5f + 34f)), new Vector2(560f, 52f),
+                    Texts.Get(TextId.VoidMatchChargingLabel), 38f, ChargingLabelColor,
+                    TextAlignmentOptions.Center);
 
-            _root.SetActive(false);
+                root.SetActive(false);
+                _view = new ViewRefs(root, confirmRoot, radial, chargingLabel, promptText, hintText,
+                    headerText, bodyText);
+                _textRefresh.Subscribe(() => Exists, ApplyTexts);
+            }
+            catch
+            {
+                _view = null;
+                if (root != null)
+                {
+                    root.SetActive(false);
+                    Object.Destroy(root);
+                }
+                throw;
+            }
         }
 
         public void Tick(bool charging, float ratio, bool armed, int remainingSeconds, KeyCode confirmKey)
         {
-            if (_root == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
 
             bool anyVisible = charging || armed;
-            if (_root.activeSelf != anyVisible) _root.SetActive(anyVisible);
+            if (view.Root.activeSelf != anyVisible) view.Root.SetActive(anyVisible);
             if (!anyVisible)
             {
-                _lastRemaining = -1;
+                view.LastRemaining = -1;
                 return;
             }
 
-            if (_confirmRoot.activeSelf != armed) _confirmRoot.SetActive(armed);
-            if (_radial.gameObject.activeSelf != charging) _radial.gameObject.SetActive(charging);
-            if (_chargingLabel.gameObject.activeSelf != charging)
+            if (view.ConfirmRoot.activeSelf != armed) view.ConfirmRoot.SetActive(armed);
+            if (view.Radial.gameObject.activeSelf != charging) view.Radial.gameObject.SetActive(charging);
+            if (view.ChargingLabel.gameObject.activeSelf != charging)
             {
-                _chargingLabel.gameObject.SetActive(charging);
+                view.ChargingLabel.gameObject.SetActive(charging);
             }
 
-            if (charging) _radial.fillAmount = Mathf.Clamp01(ratio);
+            if (charging) view.Radial.fillAmount = Mathf.Clamp01(ratio);
 
             if (!armed) return;
 
-            if (_lastKey != confirmKey)
+            if (view.LastKey != confirmKey)
             {
-                _lastKey = confirmKey;
-                _promptText.text = Texts.Format(TextId.VoidMatchConfirmPromptFormat,
+                view.LastKey = confirmKey;
+                view.PromptText.text = Texts.Format(TextId.VoidMatchConfirmPromptFormat,
                     confirmKey.ToString(), (int)VoidMatchHold.ConfirmSeconds);
             }
-            if (_lastRemaining != remainingSeconds)
+            if (view.LastRemaining != remainingSeconds)
             {
-                _lastRemaining = remainingSeconds;
-                _hintText.text = Texts.Format(TextId.VoidMatchCancelHintFormat, remainingSeconds);
+                view.LastRemaining = remainingSeconds;
+                view.HintText.text = Texts.Format(TextId.VoidMatchCancelHintFormat, remainingSeconds);
             }
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+
+            _view = null;
+            return null;
+        }
+
+        private void ApplyTexts()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return;
+            view.HeaderText.text = Texts.Get(TextId.VoidMatchArmHeader);
+            view.BodyText.text = Texts.Get(TextId.VoidMatchArmBody);
+            view.ChargingLabel.text = Texts.Get(TextId.VoidMatchChargingLabel);
+            view.LastKey = KeyCode.None;
+            view.LastRemaining = -1;
         }
 
         public void Destroy()
         {
-            if (_root != null)
-            {
-                Object.Destroy(_root);
-                _root = null;
-            }
-            _confirmRoot = null;
-            _radial = null;
-            _chargingLabel = null;
-            _promptText = null;
-            _hintText = null;
-            _lastRemaining = -1;
-            _lastKey = KeyCode.None;
+            _textRefresh.Unsubscribe();
+            ViewRefs? view = _view;
+            _view = null;
+            if (view != null && view.Root != null) Object.Destroy(view.Root);
         }
     }
 }

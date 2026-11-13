@@ -1,10 +1,11 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
 
 namespace Werewolf.Game.Patches
 {
-    [HarmonyPatch(typeof(TruckScreenText), "PlayerChatBoxStateUpdateRPC")]
+    [HarmonyPatch(typeof(TruckScreenText), nameof(TruckScreenText.PlayerChatBoxStateUpdateRPC))]
     internal static class TruckLockWinPatch
     {
         private static void Postfix(TruckScreenText.PlayerChatBoxState _state)
@@ -13,7 +14,7 @@ namespace Werewolf.Game.Patches
             {
                 if (_state != TruckScreenText.PlayerChatBoxState.LockedStartingTruck) return;
 
-                WerewolfDirector dir = WerewolfDirector.Instance;
+                WerewolfDirector? dir = WerewolfDirector.Instance;
                 if (dir == null || !dir.IsHostSessionActive) return;
                 if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
                 if (dir.HostPhase != GamePhase.Play && dir.HostPhase != GamePhase.Meeting) return;

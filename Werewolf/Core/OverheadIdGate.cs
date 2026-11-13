@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -33,7 +34,7 @@ namespace Werewolf.Core
             float toTargetX, float toTargetY, float toTargetZ,
             float deltaSeconds)
         {
-            if (!_states.TryGetValue(actor, out ActorState state))
+            if (!_states.TryGetValue(actor, out ActorState? state))
             {
                 state = new ActorState();
                 _states[actor] = state;

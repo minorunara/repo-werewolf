@@ -10,11 +10,9 @@ namespace Werewolf.Tests
     public class VanillaBoundaryAuditTests
     {
         private const string VanillaScope = "Assembly-CSharp";
-        private const string GameRefsTypeName = "Werewolf.GameRefs";
 
         internal static bool MayNameVanilla(string rootTypeFullName)
         {
-            if (rootTypeFullName == GameRefsTypeName) return true;
             if (rootTypeFullName.StartsWith("Werewolf.Vanilla.", StringComparison.Ordinal)) return true;
             if (rootTypeFullName.StartsWith("Werewolf.Scenarios.Vanilla.", StringComparison.Ordinal)) return true;
             return rootTypeFullName.Contains(".Patches.", StringComparison.Ordinal);
@@ -26,7 +24,7 @@ namespace Werewolf.Tests
         [InlineData("Werewolf.Scenarios.Vanilla.ScenarioBodyLooks", true)]
         [InlineData("Werewolf.Game.Patches.PlayerDeathPatch", true)]
         [InlineData("Werewolf.Scenarios.Game.Patches.ScenarioDeathGuardPatch", true)]
-        [InlineData("Werewolf.GameRefs", true)]
+        [InlineData("Werewolf.GameRefs", false)]
         [InlineData("Werewolf.Game.WerewolfDirector", false)]
         [InlineData("Werewolf.Game.MeetingClientController", false)]
         [InlineData("Werewolf.UI.ListedAvatar", false)]
@@ -50,7 +48,7 @@ namespace Werewolf.Tests
             }
 
             Assert.True(violations.Count == 0,
-                "接着層（Werewolf.Vanilla.* / *.Patches.* / GameRefs）の外で本体を名指ししている型。"
+                "接着層（Werewolf.Vanilla.* / Werewolf.Scenarios.Vanilla.* / *.Patches.*）の外で本体を名指ししている型。"
                 + "接着層の語彙へ寄せるか、型ごと接着層へ移す:\n  "
                 + string.Join("\n  ", violations));
         }
@@ -217,8 +215,6 @@ namespace Werewolf.Tests
                             foreach (var n in VanillaTypeNames(field.FieldType)) yield return n;
                             if (IsVanilla(field.DeclaringType))
                                 yield return $"{field.DeclaringType.FullName}::{field.Name}";
-                            else if (field.DeclaringType.FullName == GameRefsTypeName)
-                                yield return $"{GameRefsTypeName}::{field.Name}";
                             break;
                     }
                 }

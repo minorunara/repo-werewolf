@@ -1,3 +1,4 @@
+#nullable enable
 namespace Werewolf.Vanilla
 {
     internal interface IReplayDirectorView

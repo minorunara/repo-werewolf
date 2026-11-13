@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -23,66 +24,121 @@ namespace Werewolf.UI
 
         private static readonly Color BackdropColor = new Color(0f, 0f, 0f, 0.75f);
 
-        private GameObject _root;
-        private CanvasGroup _group;
-        private RectTransform _content;
-        private Image _iconImage;
-        private TextMeshProUGUI _titleText;
-        private TextMeshProUGUI _titleTextBack;
-        private readonly List<VoteRow> _rows = new List<VoteRow>();
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, CanvasGroup group, RectTransform content,
+                Image iconImage, TextMeshProUGUI titleText, TextMeshProUGUI titleTextBack)
+            {
+                Root = root;
+                Group = group;
+                Content = content;
+                IconImage = iconImage;
+                TitleText = titleText;
+                TitleTextBack = titleTextBack;
+            }
 
-        public bool Exists => _root != null;
+            public GameObject Root { get; }
+            public CanvasGroup Group { get; }
+            public RectTransform Content { get; }
+            public Image IconImage { get; }
+            public TextMeshProUGUI TitleText { get; }
+            public TextMeshProUGUI TitleTextBack { get; }
+            public int RunGeneration { get; set; }
+        }
 
-        public bool Visible => _root != null && _root.activeSelf;
+        private sealed class Presentation
+        {
+            public Presentation(List<VoteRow> rows) => Rows = rows;
+            public List<VoteRow> Rows { get; }
+        }
+
+        private ViewRefs? _view;
+        private Presentation? _presentation;
+
+        public bool Exists => GetLiveViewOrNull() != null;
+
+        public bool Visible
+        {
+            get
+            {
+                ViewRefs? view = GetLiveViewOrNull();
+                return view != null && view.Root.activeSelf;
+            }
+        }
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
 
-            RectTransform rect = RevealPanelKit.BuildFullscreenRoot(
-                layerRoot, "WW_DeathReveal", BackdropColor, out _group);
-            _root = rect.gameObject;
+            GameObject? root = null;
+            try
+            {
+                RevealPanelKit.FullscreenRoot shell = RevealPanelKit.BuildFullscreenRoot(
+                    layerRoot, "WW_DeathReveal", BackdropColor);
+                RectTransform rect = shell.Rect;
+                root = rect.gameObject;
 
-            _content = UiKit.CreateRect(rect, "Content", Vector2.zero, new Vector2(1280f, 900f));
+                RectTransform content = UiKit.CreateRect(
+                    rect, "Content", Vector2.zero, new Vector2(1280f, 900f));
+                Image iconImage = UiKit.CreateImage(
+                    content, "Icon", new Vector2(0f, 260f), IconSize, Color.white);
+                iconImage.enabled = false;
+                TextMeshProUGUI titleText = RevealPanelKit.CreateStampTitle(
+                    content, new Vector2(0f, 40f), new Vector2(1200f, 140f), "",
+                    TitleFontSize, Color.black, Color.red, 0.15f,
+                    out TextMeshProUGUI titleTextBack);
 
-            _iconImage = UiKit.CreateImage(_content, "Icon", new Vector2(0f, 260f), IconSize, Color.white);
-            _iconImage.enabled = false;
-
-            _titleText = RevealPanelKit.CreateStampTitle(_content, new Vector2(0f, 40f),
-                new Vector2(1200f, 140f), "", TitleFontSize, Color.black, Color.red, 0.15f,
-                out _titleTextBack);
-
-            _root.SetActive(false);
+                root.SetActive(false);
+                _view = new ViewRefs(root, shell.Group, content, iconImage, titleText, titleTextBack);
+            }
+            catch
+            {
+                _view = null;
+                if (root != null)
+                {
+                    root.SetActive(false);
+                    UnityEngine.Object.Destroy(root);
+                }
+                throw;
+            }
         }
 
-        public void Show(IReadOnlyList<WPlayer> deadRoster, Func<int, PlayerHandle> resolveAvatar,
+        public void Show(IReadOnlyList<WPlayer>? deadRoster, Func<int, PlayerHandle> resolveAvatar,
                          ConveneKind kind = ConveneKind.Button)
         {
-            if (_root == null) return;
-            ClearRows();
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
 
-            bool hasDeaths = deadRoster != null && deadRoster.Count > 0;
-            bool guard = kind == ConveneKind.ScatterGuard && hasDeaths;
-            string title = Texts.Get(guard ? TextId.DeathRevealScatterGuardTitle
-                : hasDeaths ? TextId.DeathRevealTitle : TextId.DeathRevealNone);
-            ApplyTitle(_titleText, title, autoShrink: guard);
-            ApplyTitle(_titleTextBack, title, autoShrink: guard);
-
-            Sprite icon = guard
-                ? (AssetCatalog.GetSprite("img_taxman_handover") ?? AssetCatalog.GetSprite("img_taxman_death"))
-                : AssetCatalog.GetSprite(hasDeaths ? "img_taxman_death" : "img_taxman_nodeath");
-            RevealPanelKit.SetIcon(_iconImage, icon);
-
-            if (hasDeaths)
+            InvalidateRun(view);
+            ClearPresentation();
+            view.Root.SetActive(false);
+            var rows = new List<VoteRow>();
+            try
             {
-                for (int i = 0; i < deadRoster.Count; i++)
+                bool hasDeaths = deadRoster != null && deadRoster.Count > 0;
+                bool guard = kind == ConveneKind.ScatterGuard && hasDeaths;
+                string title = Texts.Get(guard ? TextId.DeathRevealScatterGuardTitle
+                    : hasDeaths ? TextId.DeathRevealTitle : TextId.DeathRevealNone);
+                ApplyTitle(view.TitleText, title, autoShrink: guard);
+                ApplyTitle(view.TitleTextBack, title, autoShrink: guard);
+
+                Sprite? icon = guard
+                    ? (AssetCatalog.GetSprite("img_taxman_handover")
+                        ?? AssetCatalog.GetSprite("img_taxman_death"))
+                    : AssetCatalog.GetSprite(hasDeaths ? "img_taxman_death" : "img_taxman_nodeath");
+                RevealPanelKit.SetIcon(view.IconImage, icon);
+
+                if (deadRoster != null)
                 {
-                    WPlayer player = deadRoster[i];
-                    if (player == null) continue;
-                    VoteRow row = VoteRow.Build(_content, player, resolveAvatar, VoteRowGrid.RowSize);
-                    RectTransform rowRect = row.Root;
-                    if (rowRect != null)
+                    for (int i = 0; i < deadRoster.Count; i++)
                     {
+                        WPlayer player = deadRoster[i];
+                        if (player == null) continue;
+                        VoteRow row = VoteRow.Build(
+                            view.Content, player, resolveAvatar, VoteRowGrid.RowSize);
+                        rows.Add(row);
+                        RectTransform? rowRect = row.Root;
+                        if (rowRect == null) continue;
                         if (deadRoster.Count == 1)
                         {
                             rowRect.anchoredPosition = new Vector2(0f, GridTopY);
@@ -95,80 +151,159 @@ namespace Werewolf.UI
                                 GridTopY);
                         }
                     }
-                    _rows.Add(row);
                 }
+
+                _presentation = new Presentation(rows);
+            }
+            catch (Exception e)
+            {
+                DestroyRows(rows);
+                _presentation = null;
+                view.Root.SetActive(false);
+                WLog.Line("death_reveal_show_error", secret: false, ("err", e.Message));
             }
         }
 
-        public IEnumerator Play(Action onImpact)
+        public IEnumerator Play(Action? onImpact)
         {
-            if (_root == null)
+            ViewRefs? view = GetLiveViewOrNull();
+            Presentation? presentation = _presentation;
+            if (view == null || presentation == null)
             {
-                WLog.Line("death_reveal_skip", secret: false, ("reason", "not_built"));
+                WLog.Line("death_reveal_skip", secret: false,
+                    ("reason", view == null ? "not_built" : "not_prepared"));
                 yield break;
             }
 
-            _group.alpha = 0f;
-            _content.localScale = Vector3.one * RevealPanelKit.EntranceStartScale;
-            _content.anchoredPosition = Vector2.zero;
-            _root.SetActive(true);
-            WLog.Line("death_reveal_show", secret: false, ("rows", _rows.Count));
+            int generation = NextRun(view);
+            view.Group.alpha = 0f;
+            view.Content.localScale = Vector3.one * RevealPanelKit.EntranceStartScale;
+            view.Content.anchoredPosition = Vector2.zero;
+            view.Root.SetActive(true);
+            WLog.Line("death_reveal_show", secret: false, ("rows", presentation.Rows.Count));
 
-            yield return RevealPanelKit.StampEntrance(_content, _group, DeathReveal.EntranceSec);
+            yield return RunGuarded(view, presentation, generation,
+                RevealPanelKit.StampEntrance(view.Content, view.Group, DeathReveal.EntranceSec));
+            if (!IsCurrentRun(view, presentation, generation)) yield break;
 
             RevealPanelKit.InvokeCallback(onImpact, "death_reveal_impact_error");
+            if (!IsCurrentRun(view, presentation, generation)) yield break;
 
-            yield return UiTween.Hold(DeathReveal.HoldSec);
+            yield return RunGuarded(
+                view, presentation, generation, UiTween.Hold(DeathReveal.HoldSec));
+            if (!IsCurrentRun(view, presentation, generation)) yield break;
 
-            yield return UiTween.Parallel(
-                UiTween.Move(_content, Vector2.zero, new Vector2(0f, ExitRiseY), DeathReveal.ExitSec, UiTween.EaseIn()),
-                UiTween.Fade(_group, 1f, 0f, DeathReveal.ExitSec, UiTween.EaseIn()));
+            yield return RunGuarded(view, presentation, generation, UiTween.Parallel(
+                UiTween.Move(view.Content, Vector2.zero, new Vector2(0f, ExitRiseY),
+                    DeathReveal.ExitSec, UiTween.EaseIn()),
+                UiTween.Fade(view.Group, 1f, 0f, DeathReveal.ExitSec, UiTween.EaseIn())));
+            if (!IsCurrentRun(view, presentation, generation)) yield break;
 
-            HideNow();
+            HideCurrent(view);
             WLog.Line("death_reveal_end", secret: false);
         }
 
         public void Tick()
         {
-            if (!Visible) return;
-            foreach (VoteRow row in _rows) row.Tick();
+            ViewRefs? view = GetLiveViewOrNull();
+            Presentation? presentation = _presentation;
+            if (view == null || !view.Root.activeSelf || presentation == null) return;
+            foreach (VoteRow row in presentation.Rows) row.Tick();
         }
 
         public void HideNow()
         {
-            ClearRows();
-            if (_root == null) return;
-            _group.alpha = 0f;
-            _content.localScale = Vector3.one;
-            _content.anchoredPosition = Vector2.zero;
-            _root.SetActive(false);
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view != null) HideCurrent(view);
+            else ClearPresentation();
         }
 
         public void Destroy()
         {
-            ClearRows();
-            if (_root != null)
-            {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
-            }
-            _group = null;
-            _content = null;
-            _iconImage = null;
-            _titleText = null;
-            _titleTextBack = null;
+            ViewRefs? view = _view;
+            _view = null;
+            if (view != null) InvalidateRun(view);
+            ClearPresentation();
+            if (view != null && view.Root != null) UnityEngine.Object.Destroy(view.Root);
         }
 
-        private void ClearRows()
+        private IEnumerator RunGuarded(
+            ViewRefs view, Presentation presentation, int generation, IEnumerator routine)
         {
-            foreach (VoteRow row in _rows) row.Destroy();
-            _rows.Clear();
+            while (IsCurrentRun(view, presentation, generation))
+            {
+                bool moved;
+                try { moved = routine.MoveNext(); }
+                catch (Exception e)
+                {
+                    WLog.Line("death_reveal_tween_error", secret: false, ("err", e.Message));
+                    if (IsCurrentRun(view, presentation, generation)) HideCurrent(view);
+                    yield break;
+                }
+                if (!moved || !IsCurrentRun(view, presentation, generation)) yield break;
+                yield return routine.Current;
+            }
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+
+            _view = null;
+            InvalidateRun(view);
+            ClearPresentation();
+            return null;
+        }
+
+        private int NextRun(ViewRefs view)
+        {
+            InvalidateRun(view);
+            return view.RunGeneration;
+        }
+
+        private static void InvalidateRun(ViewRefs view)
+        {
+            unchecked { view.RunGeneration++; }
+        }
+
+        private bool IsCurrentRun(ViewRefs view, Presentation presentation, int generation)
+        {
+            return ReferenceEquals(_view, view)
+                && ReferenceEquals(_presentation, presentation)
+                && view.Root != null
+                && view.RunGeneration == generation;
+        }
+
+        private void HideCurrent(ViewRefs view)
+        {
+            InvalidateRun(view);
+            ClearPresentation();
+            if (view.Root == null) return;
+            view.Group.alpha = 0f;
+            view.Content.localScale = Vector3.one;
+            view.Content.anchoredPosition = Vector2.zero;
+            view.Root.SetActive(false);
+        }
+
+        private void ClearPresentation()
+        {
+            Presentation? presentation = _presentation;
+            _presentation = null;
+            if (presentation != null) DestroyRows(presentation.Rows);
+        }
+
+        private static void DestroyRows(List<VoteRow> rows)
+        {
+            foreach (VoteRow row in rows) row.Destroy();
+            rows.Clear();
         }
 
         private static void ApplyTitle(TextMeshProUGUI label, string title, bool autoShrink)
         {
             if (label == null) return;
-            label.enableWordWrapping = false;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
             label.fontSize = TitleFontSize;
             label.fontSizeMin = GuardTitleFontSizeMin;
             label.fontSizeMax = TitleFontSize;

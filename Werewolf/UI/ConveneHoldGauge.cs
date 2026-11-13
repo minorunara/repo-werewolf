@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using UnityEngine;
 using UnityEngine.UI;
@@ -13,51 +14,76 @@ namespace Werewolf.UI
         private const float RadialSize = 96f;
         private static readonly Color ChargingColor = new Color(1f, 0.85f, 0.15f, 0.65f);
 
-        private GameObject _root;
-        private Image _radial;
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, Image radial)
+            {
+                Root = root;
+                Radial = radial;
+            }
 
-        public bool Exists => _root != null;
+            public GameObject Root { get; }
+            public Image Radial { get; }
+        }
+
+        private ViewRefs? _view;
+
+        public bool Exists => GetLiveViewOrNull() != null;
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
-            if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
-            var go = new GameObject("WW_ConveneHoldGauge", typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(layerRoot, false);
-            UiKit.Stretch(rect);
-            _radial = UiKit.CreateRadialImage(go.transform, "HoldRadial",
-                Vector2.zero, new Vector2(RadialSize, RadialSize), ChargingColor);
-            _root = go;
-            _root.SetActive(false);
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
+
+            GameObject? root = null;
+            try
+            {
+                if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
+                root = new GameObject("WW_ConveneHoldGauge", typeof(RectTransform));
+                var rect = (RectTransform)root.transform;
+                rect.SetParent(layerRoot, false);
+                UiKit.Stretch(rect);
+                Image radial = UiKit.CreateRadialImage(root.transform, "HoldRadial",
+                    Vector2.zero, new Vector2(RadialSize, RadialSize), ChargingColor);
+
+                root.SetActive(false);
+                _view = new ViewRefs(root, radial);
+            }
+            catch
+            {
+                _view = null;
+                if (root != null)
+                {
+                    root.SetActive(false);
+                    UnityEngine.Object.Destroy(root);
+                }
+                throw;
+            }
         }
 
         public void Tick(bool visible, float ratio, Vector3? buttonWorldPos)
         {
-            if (_root == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
             try
             {
-                Camera cam = Camera.main;
-                bool show = visible && buttonWorldPos != null && cam != null;
+                Camera? cam = Camera.main;
+                bool show = false;
                 Vector3 viewport = default;
-                if (show)
+                if (visible && buttonWorldPos.HasValue && cam != null)
                 {
                     viewport = cam.WorldToViewportPoint(buttonWorldPos.Value);
-                    if (viewport.z <= 0f
-                        || viewport.x < 0f || viewport.x > 1f
-                        || viewport.y < 0f || viewport.y > 1f)
-                    {
-                        show = false;
-                    }
+                    show = viewport.z > 0f
+                        && viewport.x >= 0f && viewport.x <= 1f
+                        && viewport.y >= 0f && viewport.y <= 1f;
                 }
-                if (_root.activeSelf != show) _root.SetActive(show);
+                if (view.Root.activeSelf != show) view.Root.SetActive(show);
                 if (!show) return;
 
-                RectTransform canvasRect = (RectTransform)_root.transform;
-                _radial.rectTransform.anchoredPosition = new Vector2(
+                RectTransform canvasRect = (RectTransform)view.Root.transform;
+                view.Radial.rectTransform.anchoredPosition = new Vector2(
                     (viewport.x - 0.5f) * canvasRect.rect.width,
                     (viewport.y - 0.5f) * canvasRect.rect.height);
-                _radial.fillAmount = Mathf.Clamp01(ratio);
+                view.Radial.fillAmount = Mathf.Clamp01(ratio);
             }
             catch (Exception e)
             {
@@ -65,14 +91,21 @@ namespace Werewolf.UI
             }
         }
 
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+
+            _view = null;
+            return null;
+        }
+
         public void Destroy()
         {
-            if (_root != null)
-            {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
-            }
-            _radial = null;
+            ViewRefs? view = _view;
+            _view = null;
+            if (view != null && view.Root != null) UnityEngine.Object.Destroy(view.Root);
         }
     }
 }

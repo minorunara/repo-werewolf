@@ -1,6 +1,8 @@
+#nullable enable
 using System;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 using Werewolf.Core;
 using Werewolf.Core.Replay;
 
@@ -70,7 +72,7 @@ namespace Werewolf.UI
             if (_demoChatTimer < DemoChatIntervalSec) return;
             _demoChatTimer = 0f;
             int actor = _demoCount > 0 ? (_demoChatSeq % _demoCount) + 1 : 1;
-            _danmaku.SpawnAdHoc(actor, DemoChatTexts[_demoChatSeq % DemoChatTexts.Length],
+            _danmaku!.SpawnAdHoc(actor, DemoChatTexts[_demoChatSeq % DemoChatTexts.Length],
                 MeasureCommentWidth);
             _demoChatSeq++;
         }
@@ -132,9 +134,9 @@ namespace Werewolf.UI
                 ResultDigestText.EpigraphText(stamp.Reason));
         }
 
-        private void SetStampTitle(string title, Color color, string epigraph)
+        private void SetStampTitle(string title, Color color, string? epigraph)
         {
-            if (_stampLabel.text != title) _stampLabel.text = title;
+            if (_stampLabel!.text != title) _stampLabel.text = title;
             _stampLabel.color = color;
             bool hasEpigraph = !string.IsNullOrEmpty(epigraph);
             Vector2 titlePos = _stampLabel.rectTransform.anchoredPosition;
@@ -290,34 +292,32 @@ namespace Werewolf.UI
         {
             while (_danmakuPool.Count <= index)
             {
-                var view = new CommentView();
-                RectTransform root = UiKit.CreateRect(_danmakuRoot, "Comment" + _danmakuPool.Count,
+                RectTransform root = UiKit.CreateRect(_danmakuRoot!, "Comment" + _danmakuPool.Count,
                     Vector2.zero, new Vector2(1f, DanmakuShotRootHeight));
-                view.Root = root.gameObject;
-                view.Rect = root;
-                view.Opacity = root.gameObject.AddComponent<CanvasGroup>();
-                view.Opacity.alpha = 0f;
-                view.Opacity.interactable = false;
-                view.Opacity.blocksRaycasts = false;
-                view.Accent = UiKit.CreateImage(root, "Accent", Vector2.zero,
+                CanvasGroup opacity = root.gameObject.AddComponent<CanvasGroup>();
+                opacity.alpha = 0f;
+                opacity.interactable = false;
+                opacity.blocksRaycasts = false;
+                Image accent = UiKit.CreateImage(root, "Accent", Vector2.zero,
                     new Vector2(1f, 12f), Color.clear);
-                view.Accent.gameObject.SetActive(false);
-                view.Meta = UiKit.CreateText(root, "Meta", Vector2.zero, new Vector2(1200f, 30f),
+                accent.gameObject.SetActive(false);
+                TextMeshProUGUI meta = UiKit.CreateText(root, "Meta", Vector2.zero, new Vector2(1200f, 30f),
                     "", DanmakuMetaFontSize, DanmakuMetaColor, TextAlignmentOptions.MidlineLeft);
-                view.Meta.rectTransform.pivot = new Vector2(0f, 0.5f);
-                view.Body1 = UiKit.CreateText(root, "Body1", Vector2.zero,
+                meta.rectTransform.pivot = new Vector2(0f, 0.5f);
+                TextMeshProUGUI body1 = UiKit.CreateText(root, "Body1", Vector2.zero,
                     new Vector2(1400f, DanmakuBodyFontSize * 1.2f),
                     "", DanmakuBodyFontSize, Color.white, TextAlignmentOptions.MidlineLeft);
-                view.Body1.rectTransform.pivot = new Vector2(0f, 0.5f);
-                view.Body2 = UiKit.CreateText(root, "Body2", Vector2.zero,
+                body1.rectTransform.pivot = new Vector2(0f, 0.5f);
+                TextMeshProUGUI body2 = UiKit.CreateText(root, "Body2", Vector2.zero,
                     new Vector2(1400f, DanmakuBodyFontSize * 1.2f),
                     "", DanmakuBodyFontSize, Color.white, TextAlignmentOptions.MidlineLeft);
-                view.Body2.rectTransform.pivot = new Vector2(0f, 0.5f);
+                body2.rectTransform.pivot = new Vector2(0f, 0.5f);
                 if (_danmakuOutlineMaterial != null)
                 {
-                    view.Body1.fontSharedMaterial = _danmakuOutlineMaterial;
-                    view.Body2.fontSharedMaterial = _danmakuOutlineMaterial;
+                    body1.fontSharedMaterial = _danmakuOutlineMaterial;
+                    body2.fontSharedMaterial = _danmakuOutlineMaterial;
                 }
+                var view = new CommentView(root.gameObject, root, opacity, accent, meta, body1, body2);
                 view.Root.SetActive(false);
                 _danmakuPool.Add(view);
             }
@@ -339,12 +339,12 @@ namespace Werewolf.UI
             HideStampViews();
         }
 
-        private void BuildDanmakuOutlineMaterial()
+        private void BuildDanmakuOutlineMaterial(TextMeshProUGUI measurer)
         {
             try
             {
-                if (_danmakuMeasurer == null || _danmakuMeasurer.fontSharedMaterial == null) return;
-                _danmakuOutlineMaterial = new Material(_danmakuMeasurer.fontSharedMaterial);
+                if (measurer.fontSharedMaterial == null) return;
+                _danmakuOutlineMaterial = new Material(measurer.fontSharedMaterial);
                 _danmakuOutlineMaterial.SetFloat(ShaderUtilities.ID_OutlineWidth, DanmakuOutlineWidth);
                 _danmakuOutlineMaterial.SetColor(ShaderUtilities.ID_OutlineColor, new Color(0f, 0f, 0f, 0.9f));
             }

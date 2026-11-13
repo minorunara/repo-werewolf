@@ -57,7 +57,7 @@ namespace Werewolf.Tests
             Assert.Equal(VoteRejectReason.None, h.Session.CastVote(1, 2, Warp));
 
             var progress = Assert.Single(h.ByCode(VoteProgress).ToList());
-            Assert.Equal(MessageTarget.All, progress.Target);
+            Assert.True(progress.IsAllDestination());
             var voted = (int[])progress.Payload[0];
             Assert.Equal(new[] { 1 }, voted);
 

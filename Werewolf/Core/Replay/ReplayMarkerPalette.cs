@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Globalization;
 
@@ -11,7 +12,7 @@ namespace Werewolf.Core.Replay
 
         public const float DarkLuminance = 0.45f;
 
-        public static void ColorFor(int participantId, string hex, out float r, out float g, out float b)
+        public static void ColorFor(int participantId, string? hex, out float r, out float g, out float b)
         {
             if (TryParseHex(hex, out r, out g, out b)) return;
             ColorFor(participantId, out r, out g, out b);
@@ -38,7 +39,7 @@ namespace Werewolf.Core.Replay
             return "#" + Byte(r).ToString("x2") + Byte(g).ToString("x2") + Byte(b).ToString("x2");
         }
 
-        public static bool TryParseHex(string hex, out float r, out float g, out float b)
+        public static bool TryParseHex(string? hex, out float r, out float g, out float b)
         {
             r = g = b = 0f;
             if (hex == null || hex.Length != 7 || hex[0] != '#') return false;

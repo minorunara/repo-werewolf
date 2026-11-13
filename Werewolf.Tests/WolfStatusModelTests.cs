@@ -1,3 +1,5 @@
+#nullable enable
+using System;
 using Werewolf.Core;
 using Xunit;
 
@@ -64,10 +66,13 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void Compute_nullステートは非表示()
+        public void Compute_NullRolesState_ThrowsForRoles()
         {
             var model = new WolfStatusModel();
-            Assert.False(model.Compute(null, Role.Werewolf, GamePhase.Play, false, Now).Visible);
+            var error = Assert.Throws<ArgumentNullException>(() =>
+                model.Compute(null!, Role.Werewolf, GamePhase.Play, false, Now));
+
+            Assert.Equal("roles", error.ParamName);
         }
 
         [Fact]
@@ -201,7 +206,7 @@ namespace Werewolf.Tests
         public void Compute_非表示状態のジャンプ残回数は非表示値()
         {
             var model = new WolfStatusModel();
-            Assert.Equal(-1, model.Compute(null, Role.Werewolf, GamePhase.Play, false, Now,
+            Assert.Equal(-1, model.Compute(new RolesClientState(), Role.Werewolf, GamePhase.Lobby, false, Now,
                 extraJumpLimit: 3, jumpRefillsUsed: 0).JumpCharges);
         }
 

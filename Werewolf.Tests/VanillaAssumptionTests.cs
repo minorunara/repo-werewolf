@@ -56,9 +56,15 @@ namespace Werewolf.Tests
             new Assumption { Type = "EnemyDirector", Method = "AmountSetup", Field = "amountCurve1_1", Calls = "PickEnemies",
                 Why = "階層別の敵セット数（Vanilla.EnemySetOverride）は AmountSetup が amountCurve を評価して PickEnemies を回すことに依る（ADR-0117）" },
             new Assumption { Type = "EnemyDirector", Method = "PickEnemies", Field = "levelsCompletedCondition",
-                Why = "空プールの検査（EnemySetRules.IsEligible）は PickEnemies が levelsCompletedCondition で絞ることの写し" },
+                Why = "空プールの検査（EnemySetRules.IsEligible）は PickEnemies（ローカル関数 IsEligible 込み）が levelsCompletedCondition で絞ることの写し" },
             new Assumption { Type = "EnemyParent", Method = "DespawnedTimerSet", Field = "DespawnedTimer",
                 Why = "ビーコンの呼集（Vanilla.BeaconEffect）とデモの保留（Scenarios.Vanilla.ScenarioEnemyHold）は DespawnedTimerSet が DespawnedTimer を書くことに依る" },
+            new Assumption { Type = "ValuableDirector", Method = "SoftLockLogic", Calls = "SoftLockExtractionCheck",
+                Why = "人狼ラウンド中の補充湧き遮断（Game.Patches.ValuableSoftLockGuardPatch）は SoftLockLogic が SoftLockExtractionCheck を唯一の門として補充へ進むことの写し（ADR-0128）" },
+            new Assumption { Type = "StatsManager", Method = "LoadItemsFromFolder", Field = "folderPath", Calls = "LoadAll",
+                Why = "アイテムカタログ（Vanilla.GameItemDatabase）は itemDictionary 未構築時に本体と同じ Resources.LoadAll(folderPath) で全種を列挙する" },
+            new Assumption { Type = "StatsManager", Method = "RunStartStats", Calls = "LoadItemsFromFolder",
+                Why = "itemDictionary はラン開始（RunStartStats）でしか構築されず、タイトル〜ロビーでは空＝GameItemDatabase がフォールバック列挙する根拠" },
         };
 
         [Fact]
@@ -94,6 +100,8 @@ namespace Werewolf.Tests
                 new Assumption { Type = "PlayerHealth", Method = "Hurt", Field = "noSuchField_Probe" }));
             Assert.Contains("呼んでいない", Verify(game.MainModule,
                 new Assumption { Type = "RunManager", Method = "ChangeLevel", Calls = "NoSuchMethod_Probe" }));
+            Assert.Contains("呼んでいない", Verify(game.MainModule,
+                new Assumption { Type = "ValuableDirector", Method = "SoftLockLogic", Calls = "NoSuchMethod_Probe" }));
             Assert.Equal("メソッドが無い", Verify(game.MainModule,
                 new Assumption { Type = "RunManager", Method = "NoSuchMethod_Probe", Field = "levels" }));
             Assert.Equal("型が無い", Verify(game.MainModule,
@@ -105,9 +113,10 @@ namespace Werewolf.Tests
             var type = module.GetType(a.Type);
             if (type == null) return "型が無い";
 
+            var candidates = type.Methods.Concat(type.NestedTypes.SelectMany(n => n.Methods)).Where(m => m.HasBody);
             var methods = a.Method == null
-                ? type.Methods.Where(m => m.HasBody).ToList()
-                : type.Methods.Where(m => m.Name == a.Method && m.HasBody).ToList();
+                ? candidates.ToList()
+                : candidates.Where(m => m.Name == a.Method || IsCompiledBodyOf(m, a.Method)).ToList();
             if (methods.Count == 0) return a.Method == null ? "本体を持つメソッドが無い" : "メソッドが無い";
 
             var operands = methods.SelectMany(m => m.Body.Instructions).Select(i => i.Operand).ToList();
@@ -116,6 +125,15 @@ namespace Werewolf.Tests
             if (a.Calls != null && !operands.OfType<MethodReference>().Any(m => m.Name == a.Calls))
                 return $"{a.Calls} を呼んでいない";
             return null;
+        }
+
+        private static bool IsCompiledBodyOf(MethodDefinition m, string outerMethod)
+        {
+            string prefix = "<" + outerMethod + ">";
+            if (m.Name.StartsWith(prefix + "g__", StringComparison.Ordinal)) return true;
+            if (m.Name.StartsWith(prefix + "b__", StringComparison.Ordinal)) return true;
+            return m.Name == "MoveNext" && m.DeclaringType.IsNested
+                && m.DeclaringType.Name.StartsWith(prefix + "d__", StringComparison.Ordinal);
         }
     }
 }

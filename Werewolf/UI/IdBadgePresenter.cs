@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using TMPro;
@@ -17,23 +18,61 @@ namespace Werewolf.UI
         private const float BaseAlpha = 0.95f;
         private static readonly Color DefaultColor = new Color(1f, 1f, 1f, BaseAlpha);
 
-        private GameObject _root;
-        private readonly Dictionary<int, TextMeshProUGUI> _labels = new Dictionary<int, TextMeshProUGUI>();
-        private readonly Dictionary<int, int> _labelIds = new Dictionary<int, int>();
-        private readonly OverheadIdGate _gate = new OverheadIdGate();
+        private sealed class Badge
+        {
+            public Badge(TextMeshProUGUI label, int id)
+            {
+                Label = label;
+                Id = id;
+            }
 
-        public bool Exists => _root != null;
+            public TextMeshProUGUI Label { get; }
+            public int Id { get; set; }
+        }
+
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root)
+            {
+                Root = root;
+                Badges = new Dictionary<int, Badge>();
+                Gate = new OverheadIdGate();
+            }
+
+            public GameObject Root { get; }
+            public Dictionary<int, Badge> Badges { get; }
+            public OverheadIdGate Gate { get; }
+        }
+
+        private ViewRefs? _view;
+
+        public bool Exists => GetLiveViewOrNull() != null;
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
-            if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
-            var go = new GameObject("WW_IdBadgePresenter", typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(layerRoot, false);
-            UiKit.Stretch(rect);
-            _root = go;
-            _root.SetActive(false);
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
+
+            GameObject? root = null;
+            try
+            {
+                if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
+                root = new GameObject("WW_IdBadgePresenter", typeof(RectTransform));
+                var rect = (RectTransform)root.transform;
+                rect.SetParent(layerRoot, false);
+                UiKit.Stretch(rect);
+                root.SetActive(false);
+                _view = new ViewRefs(root);
+            }
+            catch
+            {
+                _view = null;
+                if (root != null)
+                {
+                    root.SetActive(false);
+                    UnityEngine.Object.Destroy(root);
+                }
+                throw;
+            }
         }
 
         public void Tick(bool visible,
@@ -42,22 +81,23 @@ namespace Werewolf.UI
             Func<int, Role?> markedRole,
             Func<int, Vector3?> resolveWorldPos)
         {
-            if (_root == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
             try
             {
-                if (_root.activeSelf != visible) _root.SetActive(visible);
+                if (view.Root.activeSelf != visible) view.Root.SetActive(visible);
                 if (!visible || idByActor == null || idByActor.Count == 0)
                 {
-                    HideAll();
-                    _gate.Reset();
+                    HideAll(view);
+                    view.Gate.Reset();
                     return;
                 }
 
                 Camera cam = Camera.main;
                 if (cam == null)
                 {
-                    HideAll();
-                    _gate.Reset();
+                    HideAll(view);
+                    view.Gate.Reset();
                     return;
                 }
 
@@ -74,11 +114,11 @@ namespace Werewolf.UI
                     bool bodyVisible = body != null && OverheadVision.BodyVisibleFromCamera(body.Value, cam);
                     Vector3 anchor = body != null ? body.Value + Vector3.up * HeadOffsetY : Vector3.zero;
                     Vector3 toTarget = anchor - camPos;
-                    float alpha = _gate.Tick(actor, bodyVisible,
+                    float alpha = view.Gate.Tick(actor, bodyVisible,
                         camForward.x, camForward.y, camForward.z,
                         toTarget.x, toTarget.y, toTarget.z, dt);
 
-                    TextMeshProUGUI label = EnsureLabel(actor, pair.Value);
+                    TextMeshProUGUI label = EnsureLabel(view, actor, pair.Value);
                     if (alpha <= 0f || body == null)
                     {
                         if (label.enabled) label.enabled = false;
@@ -86,7 +126,7 @@ namespace Werewolf.UI
                     }
 
                     if (!OverheadProjection.TryProject(cam, anchor,
-                            (RectTransform)_root.transform, out Vector2 uiPos))
+                            (RectTransform)view.Root.transform, out Vector2 uiPos))
                     {
                         if (label.enabled) label.enabled = false;
                         continue;
@@ -110,49 +150,64 @@ namespace Werewolf.UI
 
         public void Hide()
         {
-            if (_root != null && _root.activeSelf) _root.SetActive(false);
-            HideAll();
-            _gate.Reset();
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
+            if (view.Root.activeSelf) view.Root.SetActive(false);
+            HideAll(view);
+            view.Gate.Reset();
         }
 
         public void Destroy()
         {
-            if (_root != null)
-            {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
-            }
-            _labels.Clear();
-            _labelIds.Clear();
-            _gate.Reset();
+            ViewRefs? view = _view;
+            _view = null;
+            if (view == null) return;
+            ResetViewState(view);
+            if (view.Root != null) UnityEngine.Object.Destroy(view.Root);
         }
 
-        private TextMeshProUGUI EnsureLabel(int actor, int id)
+        private static TextMeshProUGUI EnsureLabel(ViewRefs view, int actor, int id)
         {
-            if (_labels.TryGetValue(actor, out TextMeshProUGUI cached) && cached != null)
+            if (view.Badges.TryGetValue(actor, out Badge cached) && cached.Label != null)
             {
-                if (_labelIds.TryGetValue(actor, out int prevId) && prevId != id)
+                if (cached.Id != id)
                 {
-                    cached.text = id.ToString();
-                    _labelIds[actor] = id;
+                    cached.Label.text = id.ToString();
+                    cached.Id = id;
                 }
-                return cached;
+                return cached.Label;
             }
-            TextMeshProUGUI label = UiKit.CreateText(_root.transform, "IdBadge_" + actor,
+            TextMeshProUGUI label = UiKit.CreateText(view.Root.transform, "IdBadge_" + actor,
                 Vector2.zero, new Vector2(120f, 44f), id.ToString(), FontSize,
                 DefaultColor, TextAlignmentOptions.Center);
             label.enabled = false;
-            _labels[actor] = label;
-            _labelIds[actor] = id;
+            view.Badges[actor] = new Badge(label, id);
             return label;
         }
 
-        private void HideAll()
+        private static void HideAll(ViewRefs view)
         {
-            foreach (TextMeshProUGUI label in _labels.Values)
+            foreach (Badge badge in view.Badges.Values)
             {
-                if (label != null && label.enabled) label.enabled = false;
+                if (badge.Label != null && badge.Label.enabled) badge.Label.enabled = false;
             }
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+
+            _view = null;
+            ResetViewState(view);
+            return null;
+        }
+
+        private static void ResetViewState(ViewRefs view)
+        {
+            view.Badges.Clear();
+            view.Gate.Reset();
         }
     }
 }

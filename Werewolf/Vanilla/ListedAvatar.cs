@@ -1,5 +1,5 @@
+#nullable enable
 using System;
-using HarmonyLib;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -22,21 +22,14 @@ namespace Werewolf.Vanilla
 
         private static readonly Color DimNameColor = new Color(0.2f, 0.2f, 0.2f);
 
-        private static AccessTools.FieldRef<MenuPlayerListed, int> _listSpotRef =>
-            GameRefs.MenuPlayerListed_listSpot;
-        private static AccessTools.FieldRef<MenuPlayerHead, bool> _headIsTalkingRef =>
-            GameRefs.MenuPlayerHead_isTalking;
-        private static AccessTools.FieldRef<MenuPlayerHead, RectTransform> _headTransformRef =>
-            GameRefs.MenuPlayerHead_headTransform;
-
-        public static ListedRow TryCreate(Transform holder, PlayerHandle player, string playerName)
+        public static ListedRow? TryCreate(Transform holder, PlayerHandle player, string? playerName)
         {
-            PlayerAvatar avatar = player.Avatar;
+            PlayerAvatar? avatar = player.Avatar;
             if (avatar == null) return null;
             try
             {
-                GameObject prefab = ResolveRowPrefab();
-                if (prefab == null || !HasFieldRefs()) return null;
+                GameObject? prefab = ResolveRowPrefab();
+                if (prefab == null) return null;
 
                 GameObject visual = UnityEngine.Object.Instantiate(prefab, holder);
                 MenuPlayerListed listed = visual.GetComponent<MenuPlayerListed>();
@@ -46,7 +39,7 @@ namespace Werewolf.Vanilla
                     return null;
                 }
                 StripChatDisplay(visual);
-                _listSpotRef(listed) = 0;
+                listed.listSpot = 0;
                 listed.ForcePlayer(avatar);
                 if (listed.playerName != null && !string.IsNullOrEmpty(playerName))
                 {
@@ -64,17 +57,17 @@ namespace Werewolf.Vanilla
             }
         }
 
-        public static ListedRow TryCreateStatic(Transform holder, string playerName, int colorIndex)
+        public static ListedRow? TryCreateStatic(Transform holder, string? playerName, int colorIndex)
         {
             try
             {
-                GameObject prefab = ResolveRowPrefab();
+                GameObject? prefab = ResolveRowPrefab();
                 if (prefab == null) return null;
 
                 GameObject visual = UnityEngine.Object.Instantiate(prefab, holder);
-                MenuPlayerListed listed = visual.GetComponent<MenuPlayerListed>();
-                MenuPlayerHead head = listed != null ? listed.playerHead : null;
-                if (head == null)
+                MenuPlayerListed? listed = visual.GetComponent<MenuPlayerListed>();
+                MenuPlayerHead? head = listed != null ? listed.playerHead : null;
+                if (listed == null || head == null)
                 {
                     UnityEngine.Object.Destroy(visual);
                     return null;
@@ -114,10 +107,11 @@ namespace Werewolf.Vanilla
             }
         }
 
-        public static void SetStaticShade(ListedRow row, bool dead, Color deadNameColor)
+        public static void SetStaticShade(ListedRow? row, bool dead, Color deadNameColor)
         {
-            MenuPlayerListed listed = row?.Listed;
-            if (listed == null || !row.IsStatic || listed.playerHead == null) return;
+            if (row == null || !row.IsStatic) return;
+            MenuPlayerListed? listed = row.Listed;
+            if (listed == null || listed.playerHead == null) return;
 
             TintHead(listed.playerHead, dead ? Color.Lerp(row.StaticHeadColor, Color.black, 0.9f) : row.StaticHeadColor);
             row.SetNameColor(dead ? deadNameColor : row.StaticNameColor);
@@ -132,17 +126,18 @@ namespace Werewolf.Vanilla
             }
         }
 
-        public static bool IsReady(ListedRow row)
+        public static bool IsReady(ListedRow? row)
         {
             if (row != null && row.IsStatic) return row.Exists;
-            MenuPlayerListed listed = row?.Listed;
+            MenuPlayerListed? listed = row?.Listed;
             if (listed == null || listed.playerHead == null) return false;
-            return _headTransformRef != null && _headTransformRef(listed.playerHead) != null;
+            return listed.playerHead.headTransform != null;
         }
 
-        public static void Freeze(ListedRow row, Color nameColor)
+        public static void Freeze(ListedRow? row, Color nameColor)
         {
-            MenuPlayerListed listed = row?.Listed;
+            if (row == null) return;
+            MenuPlayerListed? listed = row.Listed;
             if (listed == null) return;
             try
             {
@@ -150,7 +145,7 @@ namespace Werewolf.Vanilla
                 if (listed.leftCrown != null) listed.leftCrown.SetActive(false);
                 if (listed.rightCrown != null) listed.rightCrown.SetActive(false);
 
-                MenuPlayerHead head = listed.playerHead;
+                MenuPlayerHead? head = listed.playerHead;
                 if (head == null) return;
                 if (head.muteIconTransform != null) head.muteIconTransform.localScale = Vector3.zero;
                 if (MenuManager.instance != null) MenuManager.instance.PlayerHeadRemove(head);
@@ -161,25 +156,26 @@ namespace Werewolf.Vanilla
             }
         }
 
-        public static void SuppressSpeech(ListedRow row, Color mutedNameColor)
+        public static void SuppressSpeech(ListedRow? row, Color mutedNameColor)
         {
-            MenuPlayerListed listed = row?.Listed;
+            MenuPlayerListed? listed = row?.Listed;
             if (listed == null) return;
             listed.enabled = false;
             if (listed.playerName != null) listed.playerName.color = mutedNameColor;
 
-            MenuPlayerHead head = listed.playerHead;
+            MenuPlayerHead? head = listed.playerHead;
             if (head == null) return;
             head.enabled = false;
             if (head.headRight != null) head.headRight.localEulerAngles = Vector3.zero;
             if (head.headLeft != null) head.headLeft.localEulerAngles = Vector3.zero;
-            if (_headIsTalkingRef != null) _headIsTalkingRef(head) = false;
+            head.isTalking = false;
         }
 
-        public static void ResumeSpeech(ListedRow row)
+        public static void ResumeSpeech(ListedRow? row)
         {
-            MenuPlayerListed listed = row?.Listed;
-            if (listed == null || row.IsStatic) return;
+            if (row == null || row.IsStatic) return;
+            MenuPlayerListed? listed = row.Listed;
+            if (listed == null) return;
             listed.enabled = true;
             if (listed.playerHead != null) listed.playerHead.enabled = true;
         }
@@ -202,15 +198,10 @@ namespace Werewolf.Vanilla
             }
         }
 
-        private static GameObject ResolveRowPrefab()
+        private static GameObject? ResolveRowPrefab()
         {
-            MenuSpectateList list = UnityEngine.Object.FindObjectOfType<MenuSpectateList>(true);
+            MenuSpectateList? list = UnityEngine.Object.FindAnyObjectByType<MenuSpectateList>(FindObjectsInactive.Include);
             return list != null ? list.menuPlayerListedPrefab : null;
-        }
-
-        private static bool HasFieldRefs()
-        {
-            return _listSpotRef != null && _headIsTalkingRef != null && _headTransformRef != null;
         }
     }
 }

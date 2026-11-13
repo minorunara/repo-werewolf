@@ -15,15 +15,41 @@ namespace Werewolf.Game
 
         private long _busWaitLogAtMs;
 
+        private readonly struct PhotonRoomSnapshot
+        {
+            public PhotonRoomSnapshot(bool inRoom, int playerCount, int localActor)
+            {
+                InRoom = inRoom;
+                PlayerCount = playerCount;
+                LocalActor = localActor;
+            }
+
+            public bool InRoom { get; }
+            public int PlayerCount { get; }
+            public int LocalActor { get; }
+
+            public static PhotonRoomSnapshot Capture()
+            {
+                Photon.Realtime.Room? room = Photon.Pun.PhotonNetwork.CurrentRoom;
+                Photon.Realtime.Player? local = Photon.Pun.PhotonNetwork.LocalPlayer;
+                bool inRoom = Photon.Pun.PhotonNetwork.InRoom && room != null;
+                return new PhotonRoomSnapshot(
+                    inRoom,
+                    inRoom ? room?.PlayerCount ?? 0 : 0,
+                    inRoom ? local?.ActorNumber ?? -1 : -1);
+            }
+        }
+
         private void EnsureClientBus()
         {
+            PhotonRoomSnapshot room = PhotonRoomSnapshot.Capture();
             bool multiRoom = !Session.IsSoloMode
-                && Photon.Pun.PhotonNetwork.InRoom
-                && Photon.Pun.PhotonNetwork.CurrentRoom.PlayerCount >= 2;
+                && room.InRoom
+                && room.PlayerCount >= 2;
 
             if (!multiRoom && _bus == null
-                && Photon.Pun.PhotonNetwork.InRoom
-                && Photon.Pun.PhotonNetwork.CurrentRoom.PlayerCount >= 2)
+                && room.InRoom
+                && room.PlayerCount >= 2)
             {
                 long now = SessionClock.NowMs();
                 if (now - _busWaitLogAtMs >= 10000L)
@@ -32,7 +58,7 @@ namespace Werewolf.Game
                     WLog.Line("client_bus_waiting", secret: false,
                         ("hasGameManager", Session.HasGameManager),
                         ("gameMode", Session.GameModeOrMinusOne),
-                        ("players", Photon.Pun.PhotonNetwork.CurrentRoom.PlayerCount));
+                        ("players", room.PlayerCount));
                 }
             }
 
@@ -51,7 +77,7 @@ namespace Werewolf.Game
                         ("localActor", _bus.LocalActorNumber));
                 }
             }
-            else if (_bus is PhotonRpcBus && _session == null)
+            else if (_bus is PhotonRpcBus && _hostRound == null)
             {
                 WLog.Line("client_bus_teardown", secret: false, ("reason", "room_left"));
                 TeardownBus();
@@ -65,16 +91,15 @@ namespace Werewolf.Game
 
         private void SelectBus()
         {
-            int roomPlayers = Photon.Pun.PhotonNetwork.CurrentRoom != null
-                ? Photon.Pun.PhotonNetwork.CurrentRoom.PlayerCount : 0;
+            PhotonRoomSnapshot room = PhotonRoomSnapshot.Capture();
+            int roomPlayers = room.PlayerCount;
             bool solo = Session.IsSoloMode
                 || roomPlayers <= 1;
             bool reused = false;
             if (solo)
             {
                 TeardownBus();
-                int localActor = Photon.Pun.PhotonNetwork.InRoom
-                    ? Photon.Pun.PhotonNetwork.LocalPlayer.ActorNumber : 1;
+                int localActor = room.LocalActor > 0 ? room.LocalActor : 1;
                 _bus = new LoopbackNetBus(localActor);
                 _bus.OnReceived += ApplyInbound;
                 _bus.OnPlayerLeft += HandlePlayerLeft;
@@ -118,7 +143,7 @@ namespace Werewolf.Game
         {
             try
             {
-                bool gameActive = _autoStartWait.Armed || _session != null
+                bool gameActive = _autoStartWait.Armed || _hostRound != null
                     || _clientPhase != GamePhase.Lobby
                     || (Session.InRunLevel && IsWerewolfRoundExpected());
                 if (gameActive)
@@ -126,14 +151,15 @@ namespace Werewolf.Game
                     PushToast(SessionNotice.ForPlayerDisconnected(ResolveDisplayName(actorNumber)));
                 }
 
-                _modIntegrityFeature.NotifyPlayerLeft(actorNumber);
+                Runtime.ModIntegrityFeature.NotifyPlayerLeft(actorNumber);
                 _meetingClient.ApplyPlayerLeft(actorNumber);
-                _meeting?.NotifyPlayerLeft(actorNumber, SessionClock.NowMs());
-                if (_bomber != null)
+                HostPlayState? play = _hostRound?.Play;
+                play?.Meeting.NotifyPlayerLeft(actorNumber, SessionClock.NowMs());
+                if (play != null)
                 {
-                    int prevBomber = _bomber.BomberActor;
-                    int prevTarget = _bomber.TargetActor;
-                    _bomber.OnPlayerDisconnected(actorNumber);
+                    int prevBomber = play.Bomber.BomberActor;
+                    int prevTarget = play.Bomber.TargetActor;
+                    play.Bomber.OnPlayerDisconnected(actorNumber);
                     if (prevBomber == actorNumber && prevBomber >= 0)
                     {
                         WLog.Line("bomb_invalidate", secret: false,
@@ -147,7 +173,7 @@ namespace Werewolf.Game
                     SendBomberStateIfDirty();
                 }
 
-                _session?.NotifyPlayerLeft(actorNumber, SessionClock.NowMs());
+                _hostRound?.Session.NotifyPlayerLeft(actorNumber, SessionClock.NowMs());
             }
             catch (Exception e)
             {
@@ -175,10 +201,10 @@ namespace Werewolf.Game
         {
             try
             {
-                _modIntegrityFeature.ResetSession(via);
+                Runtime.ModIntegrityFeature.ResetSession(via);
                 ClearClientState();
                 _clientPhase = GamePhase.Lobby;
-                _lobbySettingsFeature.ResetForRoomLeave();
+                Runtime.LobbySettingsFeature.ResetForRoomLeave();
                 CrownRoster.Clear();
                 _autoStartWait.Disarm();
                 PreplayEnemySpawnHold.Cancel();
@@ -270,7 +296,7 @@ namespace Werewolf.Game
                 }
 
                 if (changed.ContainsKey(RoomState.KeyBomb) &&
-                    _roomState.TryReadBombPack(out int[] bombPack))
+                    _roomState.TryReadBombPack(out int[]? bombPack))
                 {
                     _cfgMirror.BombPack = bombPack;
                     WLog.Line("room_props_applied", secret: false,
@@ -278,7 +304,7 @@ namespace Werewolf.Game
                         ("bomberPossible", bombPack[RoomStateKeys.BombIndex.BomberPossible]));
                 }
                 if (changed.ContainsKey(RoomState.KeyShaman) &&
-                    _roomState.TryReadShamanPack(out int[] shamanPack))
+                    _roomState.TryReadShamanPack(out int[]? shamanPack))
                 {
                     _cfgMirror.ShamanPack = shamanPack;
                     WLog.Line("room_props_applied", secret: false,
@@ -287,9 +313,9 @@ namespace Werewolf.Game
                 }
 
                 if (changed.ContainsKey(RoomState.KeyCfgShared) &&
-                    _roomState.TryReadSharedSettings(out string sharedBlob))
+                    _roomState.TryReadSharedSettings(out string? sharedBlob))
                 {
-                    _lobbySettingsFeature.UpdateBlobMirror(sharedBlob);
+                    Runtime.LobbySettingsFeature.UpdateBlobMirror(sharedBlob);
                 }
             }
             catch (Exception e)

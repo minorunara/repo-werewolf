@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -20,9 +21,10 @@ namespace Werewolf.Core
     {
         public ChatStampDef(byte id, ChatStampCategory category, string emoji, TextId textId)
         {
+            if (emoji == null) throw new ArgumentNullException(nameof(emoji));
             Id = id;
             Category = category;
-            Emoji = emoji ?? string.Empty;
+            Emoji = emoji;
             TextId = textId;
         }
 
@@ -40,9 +42,10 @@ namespace Werewolf.Core
         public ChatStampCategoryDef(ChatStampCategory category, TextId textId,
                                     string iconKey, float iconRotationZ = 0f)
         {
+            if (iconKey == null) throw new ArgumentNullException(nameof(iconKey));
             Category = category;
             TextId = textId;
-            IconKey = iconKey ?? string.Empty;
+            IconKey = iconKey;
             IconRotationZ = iconRotationZ;
         }
 
@@ -123,7 +126,7 @@ namespace Werewolf.Core
             var lists = new Dictionary<ChatStampCategory, List<ChatStampDef>>();
             foreach (ChatStampDef def in _defs)
             {
-                if (!lists.TryGetValue(def.Category, out List<ChatStampDef> list))
+                if (!lists.TryGetValue(def.Category, out List<ChatStampDef>? list))
                 {
                     lists[def.Category] = list = new List<ChatStampDef>();
                 }
@@ -141,10 +144,11 @@ namespace Werewolf.Core
 
         public static IReadOnlyList<ChatStampDef> All => _defs;
 
-        public static bool TryGet(byte id, out ChatStampDef def) => _byId.TryGetValue(id, out def);
+        public static bool TryGet(byte id, out ChatStampDef def)
+            => _byId.TryGetValue(id, out def);
 
         public static IReadOnlyList<ChatStampDef> ForCategory(ChatStampCategory category)
-            => _byCategory.TryGetValue(category, out ChatStampDef[] defs)
+            => _byCategory.TryGetValue(category, out ChatStampDef[]? defs)
                 ? defs
                 : Array.Empty<ChatStampDef>();
 

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -9,15 +10,24 @@ namespace Werewolf.Vanilla
     {
         internal sealed class Still
         {
-            public Texture2D Texture;
-            public float MinX;
-            public float MaxX;
-            public float MinZ;
-            public float MaxZ;
+            public Still(Texture2D texture, float minX, float maxX, float minZ, float maxZ)
+            {
+                Texture = texture;
+                MinX = minX;
+                MaxX = maxX;
+                MinZ = minZ;
+                MaxZ = maxZ;
+            }
 
-            private byte[] _png;
+            public Texture2D Texture { get; }
+            public float MinX { get; }
+            public float MaxX { get; }
+            public float MinZ { get; }
+            public float MaxZ { get; }
 
-            public byte[] PngBytes
+            private byte[]? _png;
+
+            public byte[]? PngBytes
             {
                 get
                 {
@@ -37,9 +47,9 @@ namespace Werewolf.Vanilla
             }
         }
 
-        private static Still _cached;
+        private static Still? _cached;
 
-        internal static Still GetOrCapture(float orthoSizeConfig, int resolutionPreset)
+        internal static Still? GetOrCapture(float orthoSizeConfig, int resolutionPreset)
         {
             if (_cached != null) return _cached;
             _cached = TryCapture(orthoSizeConfig, resolutionPreset);
@@ -53,9 +63,9 @@ namespace Werewolf.Vanilla
             _cached = null;
         }
 
-        private static Still TryCapture(float orthoSizeConfig, int resolutionPreset)
+        private static Still? TryCapture(float orthoSizeConfig, int resolutionPreset)
         {
-            Map map = Map.Instance;
+            Map? map = Map.Instance;
             if (map == null || map.OverLayerParent == null)
             {
                 WLog.Line("map_still_no_map", secret: false);
@@ -66,13 +76,13 @@ namespace Werewolf.Vanilla
             bool mapWasActive = map.Active;
             var layerRestore = new List<(Transform T, Vector3 LocalPos)>();
             var sweptSprites = new List<SpriteRenderer>();
-            Transform playerGraphic = map.PlayerGraphicTransform;
+            Transform? playerGraphic = map.PlayerGraphicTransform;
             bool playerGraphicWasActive = playerGraphic != null && playerGraphic.gameObject.activeSelf;
-            Texture2D tex = null;
+            Texture2D? tex = null;
             try
             {
                 view.Open(orthoSizeConfig, resolutionPreset);
-                Camera cam = view.Camera;
+                Camera? cam = view.Camera;
                 if (cam == null || cam.targetTexture == null)
                 {
                     WLog.Line("map_still_no_camera", secret: false);
@@ -89,7 +99,7 @@ namespace Werewolf.Vanilla
                 cam.Render();
 
                 RenderTexture rt = cam.targetTexture;
-                RenderTexture prevActive = RenderTexture.active;
+                RenderTexture? prevActive = RenderTexture.active;
                 try
                 {
                     RenderTexture.active = rt;
@@ -115,14 +125,12 @@ namespace Werewolf.Vanilla
                 float aspect = (float)rt.width / rt.height;
                 Vector3 camPos = cam.transform.position;
                 Vector3 origin = map.OverLayerParent.position;
-                var still = new Still
-                {
-                    Texture = tex,
-                    MinX = (camPos.x - ortho * aspect - origin.x) / scale,
-                    MaxX = (camPos.x + ortho * aspect - origin.x) / scale,
-                    MinZ = (camPos.z - ortho - origin.z) / scale,
-                    MaxZ = (camPos.z + ortho - origin.z) / scale,
-                };
+                var still = new Still(
+                    tex,
+                    (camPos.x - ortho * aspect - origin.x) / scale,
+                    (camPos.x + ortho * aspect - origin.x) / scale,
+                    (camPos.z - ortho - origin.z) / scale,
+                    (camPos.z + ortho - origin.z) / scale);
                 WLog.Line("map_still_captured", secret: false,
                     ("w", rt.width), ("h", rt.height),
                     ("sweptSprites", sweptSprites.Count),
@@ -176,7 +184,7 @@ namespace Werewolf.Vanilla
             }
         }
 
-        private static void SweepSprites(Transform root, List<SpriteRenderer> swept)
+        private static void SweepSprites(Transform? root, List<SpriteRenderer> swept)
         {
             if (root == null) return;
             SpriteRenderer[] renderers = root.GetComponentsInChildren<SpriteRenderer>(true);

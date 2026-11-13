@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using TMPro;
 using UnityEngine;
@@ -42,21 +43,50 @@ namespace Werewolf.UI
         private static readonly Vector2 TestPlaySize = new Vector2(1100f, 44f);
         private static readonly Color TestPlayColor = new Color(1f, 0.6f, 0.15f, 0.95f);
 
-        private GameObject _root;
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, GameObject badgeRow, Image badgeIcon,
+                TextMeshProUGUI badgeText, GameObject idRow, TextMeshProUGUI idText,
+                GameObject timerRow, TextMeshProUGUI timerText,
+                GameObject scatterGuardRow, TextMeshProUGUI scatterGuardText,
+                GameObject testPlayRow, TextMeshProUGUI testPlayText,
+                GameObject scenarioBannerRow, TextMeshProUGUI scenarioBannerText)
+            {
+                Root = root; BadgeRow = badgeRow; BadgeIcon = badgeIcon; BadgeText = badgeText;
+                IdRow = idRow; IdText = idText; TimerRow = timerRow; TimerText = timerText;
+                ScatterGuardRow = scatterGuardRow; ScatterGuardText = scatterGuardText;
+                TestPlayRow = testPlayRow; TestPlayText = testPlayText;
+                ScenarioBannerRow = scenarioBannerRow; ScenarioBannerText = scenarioBannerText;
+            }
+            public GameObject Root { get; }
+            public GameObject BadgeRow { get; }
+            public Image BadgeIcon { get; }
+            public TextMeshProUGUI BadgeText { get; }
+            public GameObject IdRow { get; }
+            public TextMeshProUGUI IdText { get; }
+            public GameObject TimerRow { get; }
+            public TextMeshProUGUI TimerText { get; }
+            public GameObject ScatterGuardRow { get; }
+            public TextMeshProUGUI ScatterGuardText { get; }
+            public GameObject TestPlayRow { get; }
+            public TextMeshProUGUI TestPlayText { get; }
+            public GameObject ScenarioBannerRow { get; }
+            public TextMeshProUGUI ScenarioBannerText { get; }
+        }
 
-        private GameObject _badgeRow;
-        private Image _badgeIcon;
-        private TextMeshProUGUI _badgeText;
-
-        private GameObject _idRow;
-        private TextMeshProUGUI _idText;
-
-        private GameObject _timerRow;
-        private TextMeshProUGUI _timerText;
-
-        private GameObject _scatterGuardRow;
-        private GameObject _testPlayRow;
-        private GameObject _scenarioBannerRow;
+        private ViewRefs? _view;
+        private readonly TextRefresh _textRefresh = new TextRefresh(nameof(HudPanel));
+        private GameObject? _root => _view?.Root;
+        private GameObject? _badgeRow => _view?.BadgeRow;
+        private Image? _badgeIcon => _view?.BadgeIcon;
+        private TextMeshProUGUI? _badgeText => _view?.BadgeText;
+        private GameObject? _idRow => _view?.IdRow;
+        private TextMeshProUGUI? _idText => _view?.IdText;
+        private GameObject? _timerRow => _view?.TimerRow;
+        private TextMeshProUGUI? _timerText => _view?.TimerText;
+        private GameObject? _scatterGuardRow => _view?.ScatterGuardRow;
+        private GameObject? _testPlayRow => _view?.TestPlayRow;
+        private GameObject? _scenarioBannerRow => _view?.ScenarioBannerRow;
 
         private Role? _lastBadgeRole;
         private long _lastTimerSec = -1;
@@ -79,38 +109,61 @@ namespace Werewolf.UI
         private static readonly Color TimerAlertColorB = new Color(1f, 0.15f, 0.1f, 0.5f);
         private const float TimerBlinkHz = 1.5f;
 
-        public bool Exists => _root != null;
+        public bool Exists => GetLiveViewOrNull() != null;
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
 
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            RectTransform rect = UiKit.CreateAnchoredRect(layerRoot, "WW_HudPanel",
-                UiKit.TopLeft, new Vector2(0f, 1f), Vector2.zero, new Vector2(RootWidth, RootHeight));
-            _root = rect.gameObject;
-            ApplyPositionOffset(force: true);
+            GameObject? root = null;
+            GameObject? timerRow = null;
+            GameObject? scatterGuardRow = null;
+            GameObject? testPlayRow = null;
+            GameObject? scenarioBannerRow = null;
+            try
+            {
+                RectTransform rect = UiKit.CreateAnchoredRect(layerRoot, "WW_HudPanel",
+                    UiKit.TopLeft, new Vector2(0f, 1f), Vector2.zero, new Vector2(RootWidth, RootHeight));
+                root = rect.gameObject;
+                rect.anchoredPosition = new Vector2(
+                    LeftMargin + _positionOffset.x, -(TopMargin + _positionOffset.y));
+                _appliedOffset = _positionOffset;
 
-            _badgeRow = BuildBadgeRow(rect);
-            _idRow = BuildIdRow(rect);
-            _timerRow = BuildTimerBanner(layerRoot, out _timerText);
-            _scatterGuardRow = BuildStaticBanner(layerRoot, "WW_HudScatterGuard",
+                GameObject badgeRow = BuildBadgeRow(rect, out Image badgeIcon, out TextMeshProUGUI badgeText);
+                GameObject idRow = BuildIdRow(rect, out TextMeshProUGUI idText);
+                timerRow = BuildTimerBanner(layerRoot, out TextMeshProUGUI timerText);
+                scatterGuardRow = BuildStaticBanner(layerRoot, "WW_HudScatterGuard",
                 TextId.HudScatterGuardBanner, ScatterGuardTopMargin, ScatterGuardSize,
-                ScatterGuardFontSize, ScatterGuardColor);
-            _testPlayRow = BuildStaticBanner(layerRoot, "WW_HudTestPlay",
+                ScatterGuardFontSize, ScatterGuardColor, out TextMeshProUGUI scatterGuardText);
+                testPlayRow = BuildStaticBanner(layerRoot, "WW_HudTestPlay",
                 TextId.HudTestPlayBanner, TestPlayTopMargin, TestPlaySize,
-                TestPlayFontSize, TestPlayColor);
-            _scenarioBannerRow = BuildStaticBanner(layerRoot, "WW_HudScenarioBanner",
+                TestPlayFontSize, TestPlayColor, out TextMeshProUGUI testPlayText);
+                scenarioBannerRow = BuildStaticBanner(layerRoot, "WW_HudScenarioBanner",
                 TextId.ScenarioHudBadge, ScenarioBannerTopMargin, ScenarioBannerSize,
-                ScenarioBannerFontSize, ScenarioBannerColor);
+                ScenarioBannerFontSize, ScenarioBannerColor, out TextMeshProUGUI scenarioBannerText);
 
-            _badgeRow.SetActive(false);
-            _idRow.SetActive(false);
-            _timerRow.SetActive(false);
-            _scatterGuardRow.SetActive(false);
-            _testPlayRow.SetActive(false);
-            _scenarioBannerRow.SetActive(false);
+                badgeRow.SetActive(false);
+                idRow.SetActive(false);
+                timerRow.SetActive(false);
+                scatterGuardRow.SetActive(false);
+                testPlayRow.SetActive(false);
+                scenarioBannerRow.SetActive(false);
+                _view = new ViewRefs(root, badgeRow, badgeIcon, badgeText, idRow, idText,
+                    timerRow, timerText, scatterGuardRow, scatterGuardText,
+                    testPlayRow, testPlayText, scenarioBannerRow, scenarioBannerText);
+                _textRefresh.Subscribe(() => Exists, ApplyTexts);
+            }
+            catch
+            {
+                if (root != null) UnityEngine.Object.Destroy(root);
+                if (timerRow != null) UnityEngine.Object.Destroy(timerRow);
+                if (scatterGuardRow != null) UnityEngine.Object.Destroy(scatterGuardRow);
+                if (testPlayRow != null) UnityEngine.Object.Destroy(testPlayRow);
+                if (scenarioBannerRow != null) UnityEngine.Object.Destroy(scenarioBannerRow);
+                throw;
+            }
         }
 
         public HudState Tick(HudModel model, HudInput input)
@@ -158,44 +211,66 @@ namespace Werewolf.UI
             if (_scenarioBannerRow != null && _scenarioBannerRow.activeSelf) _scenarioBannerRow.SetActive(false);
         }
 
+        private void ApplyTexts()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return;
+            view.ScatterGuardText.text = Texts.Get(TextId.HudScatterGuardBanner);
+            view.TestPlayText.text = Texts.Get(TextId.HudTestPlayBanner);
+            view.ScenarioBannerText.text = Texts.Get(TextId.ScenarioHudBadge);
+        }
+
         public void Destroy()
         {
-            if (_root != null)
+            _textRefresh.Unsubscribe();
+            ViewRefs? view = _view;
+            _view = null;
+            if (view != null && view.Root != null) UnityEngine.Object.Destroy(view.Root);
+            if (view != null && view.TimerRow != null)
             {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
+                UnityEngine.Object.Destroy(view.TimerRow);
             }
-            if (_timerRow != null)
+            if (view != null && view.ScatterGuardRow != null)
             {
-                UnityEngine.Object.Destroy(_timerRow);
+                UnityEngine.Object.Destroy(view.ScatterGuardRow);
             }
-            if (_scatterGuardRow != null)
+            if (view != null && view.TestPlayRow != null)
             {
-                UnityEngine.Object.Destroy(_scatterGuardRow);
+                UnityEngine.Object.Destroy(view.TestPlayRow);
             }
-            if (_testPlayRow != null)
+            if (view != null && view.ScenarioBannerRow != null)
             {
-                UnityEngine.Object.Destroy(_testPlayRow);
+                UnityEngine.Object.Destroy(view.ScenarioBannerRow);
             }
-            if (_scenarioBannerRow != null)
-            {
-                UnityEngine.Object.Destroy(_scenarioBannerRow);
-            }
-            _badgeRow = null; _badgeIcon = null; _badgeText = null;
-            _idRow = null; _idText = null;
-            _timerRow = null; _timerText = null;
-            _scatterGuardRow = null;
-            _testPlayRow = null;
-            _scenarioBannerRow = null;
             _lastBadgeRole = null;
             _lastTimerSec = -1;
             _lastSelfId = -1;
         }
 
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null && view.TimerRow != null && view.ScatterGuardRow != null
+                && view.TestPlayRow != null && view.ScenarioBannerRow != null) return view;
+
+            _view = null;
+            if (view.Root != null) UnityEngine.Object.Destroy(view.Root);
+            if (view.TimerRow != null) UnityEngine.Object.Destroy(view.TimerRow);
+            if (view.ScatterGuardRow != null) UnityEngine.Object.Destroy(view.ScatterGuardRow);
+            if (view.TestPlayRow != null) UnityEngine.Object.Destroy(view.TestPlayRow);
+            if (view.ScenarioBannerRow != null) UnityEngine.Object.Destroy(view.ScenarioBannerRow);
+            _lastBadgeRole = null;
+            _lastTimerSec = -1;
+            _lastSelfId = -1;
+            return null;
+        }
+
         private void ApplyBadge(HudState s)
         {
-            bool visible = s.ShowBadge && s.BadgeRole.HasValue;
-            if (_badgeRow.activeSelf != visible) _badgeRow.SetActive(visible);
+            Role? badgeRole = s.BadgeRole;
+            bool visible = s.ShowBadge && badgeRole.HasValue;
+            if (_badgeRow!.activeSelf != visible) _badgeRow.SetActive(visible);
             if (!visible)
             {
                 _lastBadgeRole = null;
@@ -203,9 +278,10 @@ namespace Werewolf.UI
             }
             if (_lastBadgeRole != s.BadgeRole)
             {
+                Role role = badgeRole.GetValueOrDefault();
                 _lastBadgeRole = s.BadgeRole;
-                _badgeText.text = RoleLabel(s.BadgeRole.Value);
-                Sprite icon = ResolveRoleIcon(s.BadgeRole.Value);
+                _badgeText!.text = RoleLabel(role);
+                Sprite? icon = ResolveRoleIcon(role);
                 if (_badgeIcon != null)
                 {
                     if (icon != null)
@@ -233,13 +309,13 @@ namespace Werewolf.UI
             if (_lastSelfId != s.SelfId)
             {
                 _lastSelfId = s.SelfId;
-                _idText.text = Texts.Format(TextId.HudSelfIdFormat, s.SelfId);
+                _idText!.text = Texts.Format(TextId.HudSelfIdFormat, s.SelfId);
             }
         }
 
         private void ApplyTimer(HudState s)
         {
-            if (_timerRow.activeSelf != s.ShowTimer) _timerRow.SetActive(s.ShowTimer);
+            if (_timerRow!.activeSelf != s.ShowTimer) _timerRow.SetActive(s.ShowTimer);
             if (!s.ShowTimer) { _lastTimerSec = -1; _lastTimerFrozen = false; return; }
 
             long remainingSec = (s.TimerRemainingMs + 999) / 1000;
@@ -249,7 +325,7 @@ namespace Werewolf.UI
             {
                 _lastTimerSec = remainingSec;
                 _lastTimerFrozen = s.TimerFrozen;
-                _timerText.text = s.TimerFrozen
+                _timerText!.text = s.TimerFrozen
                     ? Texts.Format(TextId.HudTimerFrozenFormat, FormatTime(remainingSec))
                     : FormatTime(remainingSec);
             }
@@ -257,14 +333,14 @@ namespace Werewolf.UI
             if (s.TimerFrozen)
             {
                 float pulse = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * TimerBlinkHz * 2f * Mathf.PI);
-                _timerText.color = Color.Lerp(TimerFrozenColorB, TimerFrozenColorA, pulse);
+                _timerText!.color = Color.Lerp(TimerFrozenColorB, TimerFrozenColorA, pulse);
             }
             else if (s.TimerAlert)
             {
                 float pulse = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * TimerBlinkHz * 2f * Mathf.PI);
-                _timerText.color = Color.Lerp(TimerAlertColorB, TimerAlertColorA, pulse);
+                _timerText!.color = Color.Lerp(TimerAlertColorB, TimerAlertColorA, pulse);
             }
-            else if (_timerText.color != TimerNormalColor)
+            else if (_timerText!.color != TimerNormalColor)
             {
                 _timerText.color = TimerNormalColor;
             }
@@ -288,7 +364,8 @@ namespace Werewolf.UI
                 _scenarioBannerRow.SetActive(s.ShowScenarioBanner);
         }
 
-        private GameObject BuildBadgeRow(RectTransform parent)
+        private static GameObject BuildBadgeRow(RectTransform parent, out Image badgeIcon,
+            out TextMeshProUGUI badgeText)
         {
             var go = new GameObject("BadgeRow", typeof(RectTransform));
             var rect = (RectTransform)go.transform;
@@ -305,14 +382,14 @@ namespace Werewolf.UI
             iconRect.pivot = new Vector2(0f, 0.5f);
             iconRect.anchoredPosition = new Vector2(0f, 0f);
             iconRect.sizeDelta = new Vector2(BadgeIconSize, BadgeIconSize);
-            _badgeIcon = iconGo.AddComponent<Image>();
-            _badgeIcon.raycastTarget = false;
-            _badgeIcon.enabled = false;
+            badgeIcon = iconGo.AddComponent<Image>();
+            badgeIcon.raycastTarget = false;
+            badgeIcon.enabled = false;
 
-            _badgeText = UiKit.CreateText(rect, "Text",
+            badgeText = UiKit.CreateText(rect, "Text",
                 Vector2.zero, new Vector2(RootWidth - BadgeIconSize - BadgeGap, BadgeRowHeight),
                 string.Empty, BadgeFontSize, new Color(1f, 1f, 0.9f, 1f), TextAlignmentOptions.MidlineLeft);
-            var tRect = _badgeText.rectTransform;
+            var tRect = badgeText.rectTransform;
             tRect.anchorMin = new Vector2(0f, 0f);
             tRect.anchorMax = new Vector2(1f, 1f);
             tRect.pivot = new Vector2(0f, 0.5f);
@@ -321,7 +398,7 @@ namespace Werewolf.UI
             return go;
         }
 
-        private GameObject BuildIdRow(RectTransform parent)
+        private static GameObject BuildIdRow(RectTransform parent, out TextMeshProUGUI idText)
         {
             var go = new GameObject("IdRow", typeof(RectTransform));
             var rect = (RectTransform)go.transform;
@@ -331,10 +408,10 @@ namespace Werewolf.UI
             rect.anchoredPosition = new Vector2(0f, -(BadgeRowHeight + 2f));
             rect.sizeDelta = new Vector2(RootWidth, IdRowHeight);
 
-            _idText = UiKit.CreateText(rect, "Text", Vector2.zero,
+            idText = UiKit.CreateText(rect, "Text", Vector2.zero,
                 new Vector2(RootWidth, IdRowHeight), string.Empty, IdFontSize,
                 new Color(1f, 1f, 0.9f, 1f), TextAlignmentOptions.MidlineLeft);
-            var tRect = _idText.rectTransform;
+            var tRect = idText.rectTransform;
             tRect.anchorMin = Vector2.zero;
             tRect.anchorMax = Vector2.one;
             tRect.pivot = new Vector2(0f, 0.5f);
@@ -346,6 +423,8 @@ namespace Werewolf.UI
         private static GameObject BuildTimerBanner(Transform layerRoot, out TextMeshProUGUI text)
         {
             var go = new GameObject("WW_HudTimer", typeof(RectTransform));
+            try
+            {
             var rect = (RectTransform)go.transform;
             rect.SetParent(layerRoot, false);
             rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1f);
@@ -358,12 +437,21 @@ namespace Werewolf.UI
             var tRect = text.rectTransform;
             UiKit.Stretch(tRect);
             return go;
+            }
+            catch
+            {
+                UnityEngine.Object.Destroy(go);
+                throw;
+            }
         }
 
         private static GameObject BuildStaticBanner(Transform layerRoot, string name, TextId textId,
-                                                    float topMargin, Vector2 size, float fontSize, Color color)
+                                                    float topMargin, Vector2 size, float fontSize, Color color,
+                                                    out TextMeshProUGUI text)
         {
             var go = new GameObject(name, typeof(RectTransform));
+            try
+            {
             var rect = (RectTransform)go.transform;
             rect.SetParent(layerRoot, false);
             rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1f);
@@ -371,16 +459,21 @@ namespace Werewolf.UI
             rect.anchoredPosition = new Vector2(0f, -topMargin);
             rect.sizeDelta = size;
 
-            var text = UiKit.CreateText(rect, "Text", Vector2.zero, size,
+            text = UiKit.CreateText(rect, "Text", Vector2.zero, size,
                 Texts.Get(textId), fontSize, color, TextAlignmentOptions.Center);
-            var tRect = text.rectTransform;
-            UiKit.Stretch(tRect);
+            UiKit.Stretch(text.rectTransform);
             return go;
+            }
+            catch
+            {
+                UnityEngine.Object.Destroy(go);
+                throw;
+            }
         }
 
         private static string RoleLabel(Role role) => RoleText.Label(role);
 
-        private static Sprite ResolveRoleIcon(Role role)
+        private static Sprite? ResolveRoleIcon(Role role)
         {
             switch (role)
             {

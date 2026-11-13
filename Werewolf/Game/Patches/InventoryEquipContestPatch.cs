@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using HarmonyLib;
@@ -5,20 +6,20 @@ using Werewolf.Core;
 
 namespace Werewolf.Game.Patches
 {
-    [HarmonyPatch(typeof(InventorySpot), "AttemptEquipItem")]
+    [HarmonyPatch(typeof(InventorySpot), nameof(InventorySpot.AttemptEquipItem))]
     internal static class InventorySpotEquipContestPatch
     {
         private static bool Prefix()
         {
             try
             {
-                WerewolfDirector dir = WerewolfDirector.Instance;
+                WerewolfDirector? dir = WerewolfDirector.Instance;
                 if (dir == null) return true;
 
                 PhysGrabber grabber = PhysGrabber.instance;
                 if (grabber == null || !grabber.grabbed) return true;
 
-                PhysGrabObject grabbed = GameRefs.PhysGrabber_grabbedPhysGrabObject(grabber);
+                PhysGrabObject grabbed = grabber.grabbedPhysGrabObject;
                 if (grabbed == null) return true;
 
                 bool grabbedByOther = IsGrabbedByOther(grabbed, grabber);

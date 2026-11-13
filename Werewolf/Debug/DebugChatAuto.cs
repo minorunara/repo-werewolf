@@ -1,3 +1,6 @@
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
 namespace Werewolf.Debugging
 {
     public sealed class DebugChatAuto
@@ -94,7 +97,11 @@ namespace Werewolf.Debugging
 
         public bool IsDue(long nowMs) => _active && nowMs >= _nextDueMs;
 
-        public bool TryTakeDue(long nowMs, int speakerCount, out int slot, out string text)
+        public bool TryTakeDue(
+            long nowMs,
+            int speakerCount,
+            out int slot,
+            [NotNullWhen(true)] out string? text)
         {
             slot = 0;
             text = null;

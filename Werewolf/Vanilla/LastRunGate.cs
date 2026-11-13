@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
@@ -6,21 +7,14 @@ namespace Werewolf.Vanilla
 {
     internal static class LastRunGate
     {
-        private static AccessTools.FieldRef<RoundDirector, int> PointsRef =>
-            GameRefs.RoundDirector_extractionPoints;
-        private static AccessTools.FieldRef<RoundDirector, int> PointsCompletedRef =>
-            GameRefs.RoundDirector_extractionPointsCompleted;
-        private static AccessTools.FieldRef<RoundDirector, bool> AllCompletedRef =>
-            GameRefs.RoundDirector_allExtractionPointsCompleted;
-
         public static bool IsLastRunActive()
         {
             try
             {
                 RoundDirector rd = RoundDirector.instance;
                 if (rd == null) return false;
-                int points = PointsRef(rd);
-                return points > 0 && PointsCompletedRef(rd) >= points - 1;
+                int points = rd.extractionPoints;
+                return points > 0 && rd.extractionPointsCompleted >= points - 1;
             }
             catch (Exception e)
             {
@@ -35,7 +29,7 @@ namespace Werewolf.Vanilla
             {
                 RoundDirector rd = RoundDirector.instance;
                 if (rd == null) return false;
-                return AllCompletedRef(rd);
+                return rd.allExtractionPointsCompleted;
             }
             catch (Exception e)
             {

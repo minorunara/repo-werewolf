@@ -1,4 +1,6 @@
+#nullable enable
 using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Werewolf.Core
 {
@@ -11,7 +13,8 @@ namespace Werewolf.Core
             return new object[] { grant.Actors, grant.Rarities };
         }
 
-        public static bool TryFromWire(object[] payload, out CosmeticGrant grant)
+        public static bool TryFromWire(object[]? payload,
+            [NotNullWhen(true)] out CosmeticGrant? grant)
         {
             grant = null;
 

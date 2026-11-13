@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -59,15 +60,15 @@ namespace Werewolf.Scenarios.Vanilla
                 PlayerCosmetics cosmetics = root.GetComponentInChildren<PlayerCosmetics>();
                 if (cosmetics != null) ApplySemibotColor(cosmetics, BotColors.IndexFor(actor));
 
-                Animator animator = visuals != null ? visuals.GetComponent<Animator>() : null;
+                Animator? animator = visuals != null ? visuals.GetComponent<Animator>() : null;
                 return new FakeBodyVisual(root, pivotHeight, animator);
             });
         }
 
         internal static FakeBodyVisual DeathHead(int actor, Vector3 groundPos)
         {
-            GameObject prefab = Resources.Load<GameObject>(DeathHeadResource);
-            Transform mesh = prefab != null ? prefab.transform.Find(DeathHeadMeshChild) : null;
+            GameObject? prefab = Resources.Load<GameObject>(DeathHeadResource);
+            Transform? mesh = prefab != null ? prefab.transform.Find(DeathHeadMeshChild) : null;
             return Assemble("death_head", actor, mesh != null ? mesh.gameObject : null, root =>
             {
                 root.name = "WW_FakeBody_DeathHead_" + actor;
@@ -84,7 +85,7 @@ namespace Werewolf.Scenarios.Vanilla
             });
         }
 
-        private static FakeBodyVisual Assemble(string look, int actor, GameObject source,
+        private static FakeBodyVisual Assemble(string look, int actor, GameObject? source,
             Func<GameObject, FakeBodyVisual> build)
         {
             if (source == null) return Fallback(look, actor, "no_prefab");

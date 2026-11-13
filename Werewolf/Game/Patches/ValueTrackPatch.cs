@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using HarmonyLib;
@@ -8,18 +9,6 @@ namespace Werewolf.Game.Patches
 {
     internal static class ValueTrackPatch
     {
-        private static AccessTools.FieldRef<ValuableObject, float> DollarValueCurrent =>
-            GameRefs.ValuableObject_dollarValueCurrent;
-
-        private static AccessTools.FieldRef<ValuableObject, float> DollarValueOriginal =>
-            GameRefs.ValuableObject_dollarValueOriginal;
-
-        private static AccessTools.FieldRef<PhysGrabObjectImpactDetector, ValuableObject> ValuableRef =>
-            GameRefs.PhysGrabObjectImpactDetector_valuableObject;
-
-        private static AccessTools.FieldRef<PhysGrabObjectImpactDetector, PhysGrabObject> PhysGrabObjectRef =>
-            GameRefs.PhysGrabObjectImpactDetector_physGrabObject;
-
         private static readonly HashSet<int> _breakAccountedIds = new HashSet<int>();
 
         internal static void MarkBreakAccounted(int instanceId) => _breakAccountedIds.Add(instanceId);
@@ -31,30 +20,30 @@ namespace Werewolf.Game.Patches
         internal static bool ConsumeBoxAccounted(int instanceId) => _boxAccountedIds.Remove(instanceId);
 
         internal static ValuableObject ResolveValuable(PhysGrabObjectImpactDetector detector)
-            => ValuableRef(detector);
+            => detector.valuableObject;
 
         internal static PhysGrabObject ResolvePhysGrabObject(PhysGrabObjectImpactDetector detector)
-            => PhysGrabObjectRef(detector);
+            => detector.physGrabObject;
 
-        internal static float ReadCurrent(ValuableObject valuable) => DollarValueCurrent(valuable);
+        internal static float ReadCurrent(ValuableObject valuable) => valuable.dollarValueCurrent;
 
-        internal static float ReadOriginal(ValuableObject valuable) => DollarValueOriginal(valuable);
+        internal static float ReadOriginal(ValuableObject valuable) => valuable.dollarValueOriginal;
 
         internal static void ScanAndFreezeBase()
         {
             CloseHaulFreeze();
 
-            WerewolfDirector dir = WerewolfDirector.Instance;
+            WerewolfDirector? dir = WerewolfDirector.Instance;
             if (dir == null || !dir.IsHostMatchLive) return;
             if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
             if (!SemiFunc.RunIsLevel()) return;
 
             float total = 0f;
-            foreach (ValuableObject valuable in UnityEngine.Object.FindObjectsOfType<ValuableObject>())
+            foreach (ValuableObject valuable in UnityEngine.Object.FindObjectsByType<ValuableObject>(UnityEngine.FindObjectsSortMode.None))
             {
-                total += DollarValueCurrent(valuable);
+                total += valuable.dollarValueCurrent;
             }
-            foreach (ItemValuableBox box in UnityEngine.Object.FindObjectsOfType<ItemValuableBox>())
+            foreach (ItemValuableBox box in UnityEngine.Object.FindObjectsByType<ItemValuableBox>(UnityEngine.FindObjectsSortMode.None))
             {
                 total += box.CurrentValue;
             }
@@ -65,18 +54,18 @@ namespace Werewolf.Game.Patches
         internal static float ComputeObtainableDollars()
         {
             float total = 0f;
-            foreach (ValuableObject valuable in UnityEngine.Object.FindObjectsOfType<ValuableObject>())
+            foreach (ValuableObject valuable in UnityEngine.Object.FindObjectsByType<ValuableObject>(UnityEngine.FindObjectsSortMode.None))
             {
-                total += DollarValueCurrent(valuable);
+                total += valuable.dollarValueCurrent;
             }
-            foreach (ItemValuableBox box in UnityEngine.Object.FindObjectsOfType<ItemValuableBox>(true))
+            foreach (ItemValuableBox box in UnityEngine.Object.FindObjectsByType<ItemValuableBox>(UnityEngine.FindObjectsInactive.Include, UnityEngine.FindObjectsSortMode.None))
             {
                 total += box.CurrentValue;
             }
             RoundDirector rd = RoundDirector.instance;
             if (rd != null)
             {
-                total += GameRefs.RoundDirector_extractionPointSurplus(rd);
+                total += rd.extractionPointSurplus;
             }
             return total;
         }
@@ -92,7 +81,7 @@ namespace Werewolf.Game.Patches
             => _haulFreeze.IsHolding(nowUnixMs);
     }
 
-    [HarmonyPatch(typeof(ExtractionPoint), "DestroyTheFirstPhysObjectsInHaulList")]
+    [HarmonyPatch(typeof(ExtractionPoint), nameof(ExtractionPoint.DestroyTheFirstPhysObjectsInHaulList))]
     internal static class HaulSuckPatch
     {
         private static void Postfix()
@@ -108,14 +97,14 @@ namespace Werewolf.Game.Patches
         }
     }
 
-    [HarmonyPatch(typeof(RoundDirector), "ExtractionCompleted")]
+    [HarmonyPatch(typeof(RoundDirector), nameof(RoundDirector.ExtractionCompleted))]
     internal static class CheckmateExtractionPatch
     {
         private static void Postfix()
         {
             try
             {
-                WerewolfDirector dir = WerewolfDirector.Instance;
+                WerewolfDirector? dir = WerewolfDirector.Instance;
                 if (dir == null || !dir.IsRoundActiveClient) return;
                 ValueTrackPatch.CloseHaulFreeze();
                 if (dir.IsHostMatchLive)
@@ -132,7 +121,7 @@ namespace Werewolf.Game.Patches
         }
     }
 
-    [HarmonyPatch(typeof(LevelGenerator), "GenerateDone")]
+    [HarmonyPatch(typeof(LevelGenerator), nameof(LevelGenerator.GenerateDone))]
     internal static class LevelGenerateDonePatch
     {
         private static void Postfix()
@@ -148,7 +137,7 @@ namespace Werewolf.Game.Patches
         }
     }
 
-    [HarmonyPatch(typeof(PhysGrabObjectImpactDetector), "BreakRPC")]
+    [HarmonyPatch(typeof(PhysGrabObjectImpactDetector), nameof(PhysGrabObjectImpactDetector.BreakRPC))]
     internal static class ValuableBreakPatch
     {
         private static void Prefix(
@@ -156,7 +145,7 @@ namespace Werewolf.Game.Patches
         {
             try
             {
-                WerewolfDirector dir = WerewolfDirector.Instance;
+                WerewolfDirector? dir = WerewolfDirector.Instance;
                 if (dir == null || !dir.IsHostMatchLive) return;
                 if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
                 if (!SemiFunc.RunIsLevel()) return;
@@ -183,14 +172,14 @@ namespace Werewolf.Game.Patches
         }
     }
 
-    [HarmonyPatch(typeof(PhysGrabObjectImpactDetector), "DestroyObject")]
+    [HarmonyPatch(typeof(PhysGrabObjectImpactDetector), nameof(PhysGrabObjectImpactDetector.DestroyObject))]
     internal static class ValuableDestroyPatch
     {
         private static void Prefix(PhysGrabObjectImpactDetector __instance)
         {
             try
             {
-                WerewolfDirector dir = WerewolfDirector.Instance;
+                WerewolfDirector? dir = WerewolfDirector.Instance;
                 if (dir == null || !dir.IsHostMatchLive) return;
                 if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
                 if (!SemiFunc.RunIsLevel()) return;
@@ -234,14 +223,14 @@ namespace Werewolf.Game.Patches
         }
     }
 
-    [HarmonyPatch(typeof(ItemValuableBox), "ExplodeValuableBox")]
+    [HarmonyPatch(typeof(ItemValuableBox), nameof(ItemValuableBox.ExplodeValuableBox))]
     internal static class ValuableBoxExplodePatch
     {
         private static void Prefix(ItemValuableBox __instance)
         {
             try
             {
-                WerewolfDirector dir = WerewolfDirector.Instance;
+                WerewolfDirector? dir = WerewolfDirector.Instance;
                 if (dir == null || !dir.IsHostMatchLive) return;
                 if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
                 if (!SemiFunc.RunIsLevel()) return;

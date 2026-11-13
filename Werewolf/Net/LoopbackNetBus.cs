@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using Werewolf.Core;
 
@@ -12,9 +13,9 @@ namespace Werewolf.Net
 
         public int LocalActorNumber { get; }
 
-        public event Action<InboundMessage> OnReceived;
+        public event Action<InboundMessage>? OnReceived;
 
-        public event Action<int> OnPlayerLeft;
+        public event Action<int>? OnPlayerLeft;
 
         public void SimulatePlayerLeft(int actorNumber)
         {
@@ -40,6 +41,7 @@ namespace Werewolf.Net
 
         public bool SendToActors(byte code, object[] payload, int[] targetActors)
         {
+            if (targetActors == null) throw new ArgumentNullException(nameof(targetActors));
             object[] normalized = NetPayload.Build(payload);
             LogSend(code, "actors", normalized, targetActors);
 
@@ -52,13 +54,13 @@ namespace Werewolf.Net
 
         private void Deliver(byte code, object[] payload)
         {
-            if (NetPayload.TryDeserialize(code, payload, out object[] valid, out _))
+            if (NetPayload.TryDeserialize(code, payload, out object[]? valid, out _))
             {
                 OnReceived?.Invoke(new InboundMessage(code, valid, LocalActorNumber));
             }
         }
 
-        private static void LogSend(byte code, string target, object[] payload, int[] targetActors)
+        private static void LogSend(byte code, string target, object[] payload, int[]? targetActors)
         {
             WLog.Event("send", code, target, payload,
                 secret: MessageCodes.IsSecret(code), targetActors: targetActors);
@@ -66,7 +68,6 @@ namespace Werewolf.Net
 
         private static bool Contains(int[] actors, int value)
         {
-            if (actors == null) return false;
             foreach (int actor in actors)
             {
                 if (actor == value) return true;

@@ -107,7 +107,7 @@ namespace Werewolf.Tests
             Assert.Equal(4, h.Session.CallerActor);
 
             var start = Assert.Single(h.ByCode(StartMeeting).ToList());
-            Assert.Equal(MessageTarget.All, start.Target);
+            Assert.True(start.IsAllDestination());
             Assert.Equal(0, MeetingSession.ScatterGuardCountdownSec);
             long expectedEnd = now + MeetingIntro.VotingUiDelayMs + 120_000;
             Assert.Equal(4, start.Payload[0]);

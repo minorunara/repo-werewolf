@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using UnityEngine;
 using Werewolf.Core;
@@ -8,19 +9,31 @@ namespace Werewolf.Vanilla
     {
         private const float InteractDistance = 2.0f;
 
-        private GameObject _visual;
+        private sealed class VisualState
+        {
+            public VisualState(GameObject root, bool usesGrabInteract, MeetingButtonPressVisual press)
+            {
+                Root = root;
+                UsesGrabInteract = usesGrabInteract;
+                Press = press;
+            }
+
+            public GameObject Root { get; }
+            public bool UsesGrabInteract { get; }
+            public MeetingButtonPressVisual Press { get; }
+        }
+
+        private VisualState? _visual;
         private float _promptCooldown;
         private bool _isLocalPlayerNear;
 
-        private bool _useGrabInteract;
-        private readonly MeetingButtonPressVisual _press = new MeetingButtonPressVisual();
         private const float AimDotThreshold = 0.9f;
 
-        public Action OnConvene;
+        public Action? OnConvene;
 
-        public Action OnIncompleteHold;
+        public Action? OnIncompleteHold;
 
-        internal static Func<string, GameObject> PrefabResolver;
+        internal static Func<string, GameObject?>? PrefabResolver;
 
         private readonly ConveneHold _hold = new ConveneHold();
 
@@ -28,15 +41,22 @@ namespace Werewolf.Vanilla
 
         public bool HoldCharging => _hold.IsCharging;
 
-        public bool UsesGrabInteract => _useGrabInteract;
+        public bool UsesGrabInteract => GetLiveVisualOrNull()?.UsesGrabInteract ?? false;
 
-        public Vector3? VisualWorldPos => _visual != null ? (Vector3?)_visual.transform.position : null;
+        public Vector3? VisualWorldPos
+        {
+            get
+            {
+                VisualState? visual = GetLiveVisualOrNull();
+                return visual != null ? (Vector3?)visual.Root.transform.position : null;
+            }
+        }
 
         public MeetingButton()
         {
         }
 
-        public bool Exists => _visual != null;
+        public bool Exists => GetLiveVisualOrNull() != null;
 
         public bool IsLocalPlayerNear => _isLocalPlayerNear;
 
@@ -44,7 +64,7 @@ namespace Werewolf.Vanilla
 
         public bool Create()
         {
-            if (_visual != null) return true;
+            if (GetLiveVisualOrNull() != null) return true;
 
             TruckSafetySpawnPoint anchor = TruckSafetySpawnPoint.instance;
             if (anchor == null)
@@ -54,7 +74,7 @@ namespace Werewolf.Vanilla
             }
 
             Transform baseT = anchor.transform;
-            GameConfig config = Plugin.GameConfig;
+            GameConfig? config = Plugin.GameConfig;
             float ox = config != null ? config.ButtonOffsetX : 0f;
             float oy = config != null ? config.ButtonOffsetY : 0f;
             float oz = config != null ? config.ButtonOffsetZ : 0f;
@@ -64,34 +84,36 @@ namespace Werewolf.Vanilla
             Vector3 pos = baseT.position + baseT.TransformVector(offset);
             Quaternion rot = baseT.rotation * Quaternion.Euler(pitch, yaw, 0f);
 
-            _visual = BuildVisual();
-            if (_visual == null)
+            VisualState? visual = null;
+            try
             {
-                WLog.Line("meeting_button_error", secret: false, ("reason", "visual_build_failed"));
+                visual = BuildVisual();
+                visual.Root.transform.SetPositionAndRotation(pos, rot);
+                _visual = visual;
+                return true;
+            }
+            catch (Exception e)
+            {
+                if (visual != null && visual.Root != null) UnityEngine.Object.Destroy(visual.Root);
+                WLog.Line("meeting_button_error", secret: false,
+                    ("reason", "visual_build_failed"), ("err", e.Message));
                 return false;
             }
-            _visual.transform.SetPositionAndRotation(pos, rot);
-            return true;
         }
 
         public void Destroy()
         {
-            if (_visual != null)
-            {
-                UnityEngine.Object.Destroy(_visual);
-                _visual = null;
-            }
-            _isLocalPlayerNear = false;
-            _hold.Reset();
-            _useGrabInteract = false;
-            _press.Clear();
+            VisualState? visual = _visual;
+            _visual = null;
+            ResetVisualState(visual);
+            if (visual != null && visual.Root != null) UnityEngine.Object.Destroy(visual.Root);
         }
 
-        private bool IsAimingAtButton(PlayerAvatar local)
+        private static bool IsAimingAtButton(PlayerAvatar local, VisualState visual)
         {
             Camera cam = Camera.main;
             if (cam == null) return true;
-            Vector3 toBtn = _visual.transform.position - cam.transform.position;
+            Vector3 toBtn = visual.Root.transform.position - cam.transform.position;
             float len = toBtn.magnitude;
             if (len < 0.01f) return true;
             toBtn /= len;
@@ -101,23 +123,25 @@ namespace Werewolf.Vanilla
 
         private static bool IsLocalTumbling(PlayerAvatar local)
         {
-            return GameRefs.PlayerAvatar_isTumbling != null && GameRefs.PlayerAvatar_isTumbling(local);
+            return local.isTumbling;
         }
 
         public void Tick(bool localCanConvene, long readyAtUnixMs, long nowUnixMs, int rightsRemaining)
         {
-            _press.Tick(Time.deltaTime);
-            TickHold(localCanConvene, readyAtUnixMs, nowUnixMs, rightsRemaining);
-            _press.Sync(_hold.IsCharging);
+            VisualState? visual = GetLiveVisualOrNull();
+            visual?.Press.Tick(Time.deltaTime);
+            TickHold(visual, localCanConvene, readyAtUnixMs, nowUnixMs, rightsRemaining);
+            visual?.Press.Sync(_hold.IsCharging);
         }
 
-        private void TickHold(bool localCanConvene, long readyAtUnixMs, long nowUnixMs, int rightsRemaining)
+        private void TickHold(VisualState? visual, bool localCanConvene,
+            long readyAtUnixMs, long nowUnixMs, int rightsRemaining)
         {
-            if (_visual == null) { _isLocalPlayerNear = false; _hold.Reset(); return; }
+            if (visual == null) { _isLocalPlayerNear = false; _hold.Reset(); return; }
             PlayerAvatar local = PlayerAvatar.instance;
             if (local == null) { _isLocalPlayerNear = false; _hold.Reset(); return; }
 
-            float dist = Vector3.Distance(local.transform.position, _visual.transform.position);
+            float dist = Vector3.Distance(local.transform.position, visual.Root.transform.position);
             bool near = dist <= InteractDistance;
             _isLocalPlayerNear = near;
             if (!near) { _hold.Tick(false, Time.deltaTime); return; }
@@ -138,7 +162,7 @@ namespace Werewolf.Vanilla
                         }
                         else
                         {
-                            string prompt = _useGrabInteract
+                            string prompt = visual.UsesGrabInteract
                                 ? Texts.Get(TextId.MeetingButtonConveneGrabPrompt)
                                 : Texts.Get(TextId.MeetingButtonConveneInteractPrompt);
                             label = rightsRemaining >= 0
@@ -154,10 +178,10 @@ namespace Werewolf.Vanilla
                     _promptCooldown = 0.1f;
                 }
 
-                InputKey inputKey = _useGrabInteract ? InputKey.Grab : InputKey.Interact;
+                InputKey inputKey = visual.UsesGrabInteract ? InputKey.Grab : InputKey.Interact;
                 bool inputHeld = SemiFunc.InputHold(inputKey);
                 bool inputReleased = SemiFunc.InputUp(inputKey);
-                bool aimed = !_useGrabInteract || IsAimingAtButton(local);
+                bool aimed = !visual.UsesGrabInteract || IsAimingAtButton(local, visual);
                 bool suppressed = readyAtUnixMs - nowUnixMs > 0;
                 bool otherwiseEligible = localCanConvene && !suppressed && aimed && !IsLocalTumbling(local);
                 bool wasCharging = _hold.IsCharging;
@@ -166,13 +190,13 @@ namespace Werewolf.Vanilla
                 {
                     WLog.Line("meeting_button_pressed", secret: false,
                         ("localGate", localCanConvene),
-                        ("mode", _useGrabInteract ? "grab" : "interact"));
+                        ("mode", visual.UsesGrabInteract ? "grab" : "interact"));
                     OnConvene?.Invoke();
                 }
                 else if (wasCharging && inputReleased && otherwiseEligible)
                 {
                     WLog.Line("meeting_button_hold_incomplete", secret: false,
-                        ("mode", _useGrabInteract ? "grab" : "interact"));
+                        ("mode", visual.UsesGrabInteract ? "grab" : "interact"));
                     OnIncompleteHold?.Invoke();
                 }
             }
@@ -182,54 +206,72 @@ namespace Werewolf.Vanilla
             }
         }
 
-        private GameObject BuildVisual()
+        private VisualState BuildVisual()
         {
-            GameObject fromShop = TryBuildFromShopButtonTemplate();
+            VisualState? fromShop = TryBuildFromShopButtonTemplate();
             if (fromShop != null) return fromShop;
-            GameObject fromBundle = TryBuildFromAssetBundle();
-            if (fromBundle != null) return fromBundle;
-            return BuildPrimitive();
+            GameObject? fromBundle = TryBuildFromAssetBundle();
+            GameObject root = fromBundle ?? BuildPrimitive();
+            return new VisualState(root, usesGrabInteract: false, new MeetingButtonPressVisual());
         }
 
-        private GameObject TryBuildFromShopButtonTemplate()
+        private VisualState? TryBuildFromShopButtonTemplate()
         {
+            GameObject? instance = null;
             try
             {
                 if (!MeetingButtonAssetResolver.TryResolve())
                 {
                     return null;
                 }
-                GameObject template = MeetingButtonAssetResolver.Template;
+                GameObject? template = MeetingButtonAssetResolver.Template;
                 if (template == null) return null;
 
-                GameObject instance = UnityEngine.Object.Instantiate(template);
+                instance = UnityEngine.Object.Instantiate(template);
                 instance.name = "WW_MeetingButton_ShopClone";
 
-                MeshRenderer mr = instance.GetComponent<MeshRenderer>()
+                MeshRenderer? mr = instance.GetComponent<MeshRenderer>()
                     ?? instance.GetComponentInChildren<MeshRenderer>(true);
 
-                AnimationCurve curve = MeetingButtonAssetResolver.PressCurve;
-                _press.Bind(instance.transform, mr, curve);
-                _useGrabInteract = true;
-                return instance;
+                AnimationCurve? curve = MeetingButtonAssetResolver.PressCurve;
+                var press = new MeetingButtonPressVisual();
+                press.Bind(instance.transform, mr, curve);
+                return new VisualState(instance, usesGrabInteract: true, press);
             }
             catch (System.Exception e)
             {
                 WLog.Line("meeting_button_shop_fallback", secret: false, ("err", e.Message));
-                _useGrabInteract = false;
-                _press.Clear();
+                if (instance != null) UnityEngine.Object.Destroy(instance);
                 return null;
             }
         }
 
-        private GameObject TryBuildFromAssetBundle()
+        private VisualState? GetLiveVisualOrNull()
         {
+            VisualState? visual = _visual;
+            if (visual == null) return null;
+            if (visual.Root != null) return visual;
+            _visual = null;
+            ResetVisualState(visual);
+            return null;
+        }
+
+        private void ResetVisualState(VisualState? visual)
+        {
+            _isLocalPlayerNear = false;
+            _hold.Reset();
+            visual?.Press.Clear();
+        }
+
+        private GameObject? TryBuildFromAssetBundle()
+        {
+            GameObject? instance = null;
             try
             {
-                GameObject prefab = PrefabResolver != null ? PrefabResolver("MeetingButton") : null;
+                GameObject? prefab = PrefabResolver != null ? PrefabResolver("MeetingButton") : null;
                 if (prefab == null) return null;
 
-                GameObject instance = UnityEngine.Object.Instantiate(prefab);
+                instance = UnityEngine.Object.Instantiate(prefab);
                 instance.name = "WW_MeetingButton";
 
                 foreach (Collider col in instance.GetComponentsInChildren<Collider>(true))
@@ -241,6 +283,7 @@ namespace Werewolf.Vanilla
             }
             catch (Exception e)
             {
+                if (instance != null) UnityEngine.Object.Destroy(instance);
                 WLog.Line("meeting_button_bundle_fallback", secret: false, ("err", e.Message));
                 return null;
             }
@@ -248,22 +291,31 @@ namespace Werewolf.Vanilla
 
         private GameObject BuildPrimitive()
         {
-            GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            go.name = "WW_MeetingButton";
-
-            Collider col = go.GetComponent<Collider>();
-            if (col != null) UnityEngine.Object.Destroy(col);
-
-            go.transform.localScale = new Vector3(0.3f, 0.15f, 0.3f);
-
-            Renderer r = go.GetComponent<Renderer>();
-            if (r != null && r.material != null)
+            GameObject? go = null;
+            try
             {
-                r.material.color = Color.red;
-                r.material.EnableKeyword("_EMISSION");
-                r.material.SetColor("_EmissionColor", Color.red);
+                go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                go.name = "WW_MeetingButton";
+
+                Collider col = go.GetComponent<Collider>();
+                if (col != null) UnityEngine.Object.Destroy(col);
+
+                go.transform.localScale = new Vector3(0.3f, 0.15f, 0.3f);
+
+                Renderer r = go.GetComponent<Renderer>();
+                if (r != null && r.material != null)
+                {
+                    r.material.color = Color.red;
+                    r.material.EnableKeyword("_EMISSION");
+                    r.material.SetColor("_EmissionColor", Color.red);
+                }
+                return go;
             }
-            return go;
+            catch
+            {
+                if (go != null) UnityEngine.Object.Destroy(go);
+                throw;
+            }
         }
     }
 }

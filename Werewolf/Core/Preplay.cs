@@ -1,3 +1,5 @@
+#nullable enable
+using System;
 using System.Collections.Generic;
 
 namespace Werewolf.Core
@@ -27,7 +29,9 @@ namespace Werewolf.Core
             IReadOnlyCollection<int> currentActors,
             IReadOnlyList<ParticipantLoadState> avatars)
         {
-            if (currentActors == null || currentActors.Count == 0 || avatars == null) return false;
+            if (currentActors == null) throw new ArgumentNullException(nameof(currentActors));
+            if (avatars == null) throw new ArgumentNullException(nameof(avatars));
+            if (currentActors.Count == 0) return false;
 
             var expected = new HashSet<int>();
             foreach (int actor in currentActors)
@@ -54,19 +58,21 @@ namespace Werewolf.Core
         public float BackdropAlpha { get; }
         public float CardDropRatio { get; }
         public float CardFlipScaleX { get; }
+        public float CardLiftScale { get; }
         public float TextAlpha { get; }
         public float BodyAlpha { get; }
         public float StowRatio { get; }
 
         internal RoleRevealFrame(int pageIndex, bool showBack, float backdropAlpha,
-            float cardDropRatio, float cardFlipScaleX, float textAlpha, float bodyAlpha,
-            float stowRatio)
+            float cardDropRatio, float cardFlipScaleX, float cardLiftScale, float textAlpha,
+            float bodyAlpha, float stowRatio)
         {
             PageIndex = pageIndex;
             ShowBack = showBack;
             BackdropAlpha = backdropAlpha;
             CardDropRatio = cardDropRatio;
             CardFlipScaleX = cardFlipScaleX;
+            CardLiftScale = cardLiftScale;
             TextAlpha = textAlpha;
             BodyAlpha = bodyAlpha;
             StowRatio = stowRatio;
@@ -83,17 +89,30 @@ namespace Werewolf.Core
         public const int CrossfadeHalfMs = 180;
         public const int StowStartMs = 9_000;
         public const int TextOutEndMs = 9_350;
+        public const float FlipLiftPeakScale = 1.07f;
 
         public static RoleRevealFrame At(long elapsedMs)
         {
             float backdrop = elapsedMs < 250 ? Ratio(elapsedMs, 0, 250) : 1f;
-            float drop = Smooth(Ratio(elapsedMs, 0, DropEndMs));
+            float drop = EaseOutCubic(Ratio(elapsedMs, 0, DropEndMs));
             bool showBack = elapsedMs < FlipMidMs;
             float flipX;
             if (elapsedMs < FlipStartMs) flipX = 1f;
             else if (elapsedMs < FlipMidMs) flipX = 1f - 0.98f * Smooth(Ratio(elapsedMs, FlipStartMs, FlipMidMs));
             else if (elapsedMs < FlipEndMs) flipX = 0.02f + 0.98f * Smooth(Ratio(elapsedMs, FlipMidMs, FlipEndMs));
             else flipX = 1f;
+
+            float lift = 1f;
+            if (elapsedMs >= FlipStartMs && elapsedMs < FlipMidMs)
+            {
+                lift += (FlipLiftPeakScale - 1f)
+                    * Smooth(Ratio(elapsedMs, FlipStartMs, FlipMidMs));
+            }
+            else if (elapsedMs >= FlipMidMs && elapsedMs < FlipEndMs)
+            {
+                lift += (FlipLiftPeakScale - 1f)
+                    * (1f - Smooth(Ratio(elapsedMs, FlipMidMs, FlipEndMs)));
+            }
 
             float text = Smooth(Ratio(elapsedMs, FlipMidMs, TextInEndMs));
             float stow = Smooth(Ratio(elapsedMs, StowStartMs, Preplay.RoleRevealDurationMs));
@@ -112,7 +131,7 @@ namespace Werewolf.Core
                 backdrop *= 1f - Smooth(Ratio(elapsedMs, 9_500, Preplay.RoleRevealDurationMs));
 
             return new RoleRevealFrame(page, showBack, Clamp01(backdrop), drop,
-                Clamp01(flipX), Clamp01(text), Clamp01(body), stow);
+                Clamp01(flipX), lift, Clamp01(text), Clamp01(body), stow);
         }
 
         private static float Ratio(long value, long from, long to)
@@ -122,6 +141,11 @@ namespace Werewolf.Core
         }
 
         private static float Smooth(float value) => value * value * (3f - 2f * value);
+        private static float EaseOutCubic(float value)
+        {
+            float inverse = 1f - value;
+            return 1f - inverse * inverse * inverse;
+        }
         private static float Clamp01(float value) => value < 0f ? 0f : value > 1f ? 1f : value;
     }
 

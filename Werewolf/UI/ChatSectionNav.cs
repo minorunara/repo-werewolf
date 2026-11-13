@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -26,14 +27,14 @@ namespace Werewolf.UI
         private static readonly Color ArrowHoverColor = new Color(1f, 0.95f, 0.75f, 1f);
         private static readonly Color TickColor = new Color(1f, 0.85f, 0.5f, 0.85f);
 
-        private RectTransform _prevRect;
-        private RectTransform _nextRect;
-        private Image _prevPlate;
-        private Image _nextPlate;
-        private Image _prevArrow;
-        private Image _nextArrow;
+        private RectTransform? _prevRect;
+        private RectTransform? _nextRect;
+        private Image? _prevPlate;
+        private Image? _nextPlate;
+        private Image? _prevArrow;
+        private Image? _nextArrow;
 
-        private RectTransform _tickParent;
+        private RectTransform? _tickParent;
         private readonly List<RectTransform> _ticks = new List<RectTransform>();
 
         private int _marksLayoutVersion = int.MinValue;
@@ -72,8 +73,8 @@ namespace Werewolf.UI
             Vector2 mouse = Input.mousePosition;
             bool hoverPrev = RectTransformUtility.RectangleContainsScreenPoint(_prevRect, mouse, null);
             bool hoverNext = RectTransformUtility.RectangleContainsScreenPoint(_nextRect, mouse, null);
-            ApplyHover(_prevPlate, _prevArrow, hoverPrev);
-            ApplyHover(_nextPlate, _nextArrow, hoverNext);
+            ApplyHover(_prevPlate!, _prevArrow!, hoverPrev);
+            ApplyHover(_nextPlate!, _nextArrow!, hoverNext);
 
             if (!Input.GetMouseButtonDown(0)) return;
             if (hoverPrev) JumpPrev(layout, sections, view);
@@ -143,7 +144,7 @@ namespace Werewolf.UI
 
         private RectTransform CreateTick()
         {
-            Image image = UiKit.CreateImage(_tickParent, "SectionTick", Vector2.zero,
+            Image image = UiKit.CreateImage(_tickParent!, "SectionTick", Vector2.zero,
                 new Vector2(TickWidth, TickHeight), TickColor);
             image.raycastTarget = false;
             _ticks.Add(image.rectTransform);

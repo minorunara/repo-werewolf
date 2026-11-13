@@ -1,3 +1,4 @@
+#nullable enable
 using Werewolf.Core;
 using Werewolf.UI;
 using Werewolf.Vanilla;
@@ -36,7 +37,7 @@ namespace Werewolf.Game
                 && id != TutorialId.BlackCatSelectedForExecution)
                 return;
 
-            string message = TutorialCatalog.Format(id, blackCatCurseEnabled);
+            string? message = TutorialCatalog.Format(id, blackCatCurseEnabled);
             if (string.IsNullOrEmpty(message)) return;
 
             _tutorialPresenter.Enqueue(id, message);

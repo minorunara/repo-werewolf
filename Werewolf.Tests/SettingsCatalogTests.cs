@@ -66,13 +66,13 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void Entries_LabelJa_And_Section_AreNonEmpty()
+        public void Entries_Label_And_Section_AreNonEmpty()
         {
             foreach (var e in SettingsCatalog.Entries)
             {
                 Assert.False(string.IsNullOrEmpty(e.SettingId));
                 Assert.False(string.IsNullOrEmpty(e.Section));
-                Assert.False(string.IsNullOrEmpty(e.LabelJa));
+                Assert.False(string.IsNullOrEmpty(e.Label));
                 Assert.NotNull(e.Unit);
                 Assert.NotNull(e.RawValue);
                 Assert.NotNull(e.Display);
@@ -125,7 +125,7 @@ namespace Werewolf.Tests
 
             var rows = SettingsCatalog.BuildRows(values);
             Assert.All(rows, r => Assert.Contains(r.Label,
-                SettingsCatalog.Entries.Select(e => e.LabelJa).ToArray()));
+                SettingsCatalog.Entries.Select(e => e.Label).ToArray()));
             Assert.Equal(2, rows.Count);
         }
 
@@ -201,7 +201,7 @@ namespace Werewolf.Tests
             Assert.Equal(SettingsCatalog.Entries.Count + 2, rows.Count);
             for (int i = 0; i < SettingsCatalog.Entries.Count; i++)
             {
-                Assert.Equal(SettingsCatalog.Entries[i].LabelJa, rows[i].Label);
+                Assert.Equal(SettingsCatalog.Entries[i].Label, rows[i].Label);
                 Assert.Equal(SettingsCatalog.Entries[i].Section, rows[i].Section);
             }
             Assert.Equal("能力強化（全員）", rows[SettingsCatalog.Entries.Count].Section);

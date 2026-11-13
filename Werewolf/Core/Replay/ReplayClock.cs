@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 
 namespace Werewolf.Core.Replay
@@ -7,7 +8,7 @@ namespace Werewolf.Core.Replay
         public const float NormalSpeed = 8f;
         public const float FastSpeed = 32f;
 
-        private readonly ReplayPace _pace;
+        private readonly ReplayPace? _pace;
 
         public double Duration { get; private set; }
         public double T { get; private set; }
@@ -17,7 +18,7 @@ namespace Werewolf.Core.Replay
 
         public ReplayClock(double duration) : this(duration, null) { }
 
-        public ReplayClock(double duration, ReplayPace pace)
+        public ReplayClock(double duration, ReplayPace? pace)
         {
             Duration = Math.Max(0, duration);
             _pace = pace;

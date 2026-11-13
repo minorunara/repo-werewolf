@@ -1,3 +1,4 @@
+#nullable enable
 using HarmonyLib;
 using Werewolf.UI;
 using Werewolf.Vanilla;

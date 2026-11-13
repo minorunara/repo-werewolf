@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
@@ -16,9 +17,8 @@ namespace Werewolf.Scenarios.Game.Patches
             {
                 if (!ScenarioRun.DamageClamped || damage <= 0) return true;
                 if (!IsLocalPlayerHealth(__instance)) return true;
-                if (GameRefs.PlayerHealth_health == null) return true;
 
-                int current = GameRefs.PlayerHealth_health(__instance);
+                int current = __instance.health;
                 int clamped = ScenarioSafetyRules.ClampDamage(current, damage);
                 if (clamped <= 0) return false;
                 if (clamped == damage) return true;

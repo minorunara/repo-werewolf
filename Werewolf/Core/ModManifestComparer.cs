@@ -1,5 +1,7 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -8,9 +10,9 @@ namespace Werewolf.Core
     public static class ModManifestComparer
     {
         public static bool TryCreateManifest(
-            IEnumerable<ModManifestEntry> entries,
-            out ModManifest manifest,
-            out string error)
+            IEnumerable<ModManifestEntry?>? entries,
+            [NotNullWhen(true)] out ModManifest? manifest,
+            out string? error)
         {
             manifest = null;
             error = null;
@@ -22,7 +24,7 @@ namespace Werewolf.Core
 
             var canonical = new List<ModManifestEntry>();
             var guids = new HashSet<string>(StringComparer.Ordinal);
-            foreach (ModManifestEntry entry in entries)
+            foreach (ModManifestEntry? entry in entries)
             {
                 if (entry == null)
                 {
@@ -55,7 +57,7 @@ namespace Werewolf.Core
             return true;
         }
 
-        public static bool IsCanonicalFingerprint(string value)
+        public static bool IsCanonicalFingerprint(string? value)
         {
             if (value == null || value.Length != 64) return false;
             for (int i = 0; i < value.Length; i++)
@@ -78,7 +80,7 @@ namespace Werewolf.Core
             for (int i = 0; i < baseline.Entries.Count; i++)
             {
                 ModManifestEntry expected = baseline.Entries[i];
-                if (!participantByGuid.TryGetValue(expected.Guid, out ModManifestEntry actual))
+                if (!participantByGuid.TryGetValue(expected.Guid, out ModManifestEntry? actual))
                 {
                     differences.Add(new ModDifference(
                         ModDifferenceKind.Missing,

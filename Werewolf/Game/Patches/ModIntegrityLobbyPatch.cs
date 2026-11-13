@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
@@ -11,17 +12,15 @@ namespace Werewolf.Game.Patches
     {
         private static bool Prefix(MenuPageLobby __instance)
         {
-            WerewolfDirector director = WerewolfDirector.Instance;
+            WerewolfDirector? director = WerewolfDirector.Instance;
             return director == null
                 || director.TryInterceptLobbyStart(__instance != null ? new LobbyStartPage(__instance) : null);
         }
     }
 
-    [HarmonyPatch(typeof(MenuPlayerListed), "Update")]
+    [HarmonyPatch(typeof(MenuPlayerListed), nameof(MenuPlayerListed.Update))]
     internal static class ModIntegrityPlayerBadgePatch
     {
-        private static AccessTools.FieldRef<MenuPlayerListed, PlayerAvatar> PlayerAvatarRef =>
-            GameRefs.MenuPlayerListed_playerAvatar;
         private static bool _errorLogged;
 
         private static void Postfix(MenuPlayerListed __instance)
@@ -34,13 +33,13 @@ namespace Werewolf.Game.Patches
                     return;
                 }
 
-                ModIntegrityPlayerBadge badge = ModIntegrityPlayerBadge.GetOrCreate(__instance.gameObject,
+                ModIntegrityPlayerBadge? badge = ModIntegrityPlayerBadge.GetOrCreate(__instance.gameObject,
                     __instance.playerName != null ? __instance.playerName.rectTransform : null);
-                PlayerAvatar avatar = PlayerAvatarRef(__instance);
+                PlayerAvatar avatar = __instance.playerAvatar;
                 int actor = avatar != null ? PlayerCrownPatch.ResolveActor(avatar) : -1;
-                WerewolfDirector director = WerewolfDirector.Instance;
+                WerewolfDirector? director = WerewolfDirector.Instance;
                 if (director == null || actor <= 0 ||
-                    !director.TryGetModIntegrityStatus(actor, out ModParticipantRecord record))
+                    !director.TryGetModIntegrityStatus(actor, out ModParticipantRecord? record))
                 {
                     badge?.Hide();
                     return;

@@ -152,7 +152,7 @@ namespace Werewolf.Tests
             Assert.Empty(h.RightsChanges);
 
             var msg = Assert.Single(h.ByCode(MeetingCancelled).ToList());
-            Assert.Equal(MessageTarget.All, msg.Target);
+            Assert.True(msg.IsAllDestination());
             Assert.Equal((byte)0, msg.Payload[0]);
 
             Assert.Equal((-1, 0L), h.MeetingStates.Last());

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Werewolf.Core.Replay;
 using Xunit;
@@ -30,6 +31,30 @@ namespace Werewolf.Tests
 
         private static ReplayEntitySample P(int actor, float x, float y = 0f, float z = 0f)
             => new ReplayEntitySample(ReplayEntityKind.Player, actor, x, y, z);
+
+        [Fact]
+        public void PositionProjection_RejectsMissingTracksAndDestinationBuffers()
+        {
+            var rec = new ReplayRecorder();
+            rec.BeginSegment(Header(), 0.0);
+            rec.Sample(0.0, new[] { P(1, 0f) });
+            rec.EndSegment(1.0);
+            ReplayPlayback playback = Assert.IsType<ReplayPlayback>(ReplayPlayback.FromRecorder(rec));
+            ReplayEntityTrack track = playback.Players[0].Track;
+
+            #nullable enable
+            var positionError = Assert.Throws<ArgumentNullException>(() =>
+                playback.TryGetPos(null!, 0.0, out _, out _, out _));
+            var trackError = Assert.Throws<ArgumentNullException>(() =>
+                playback.TrailInto(null!, 0.0, 1.0, new List<ReplayTrailPoint>()));
+            var intoError = Assert.Throws<ArgumentNullException>(() =>
+                playback.TrailInto(track, 0.0, 1.0, null!));
+            #nullable restore
+
+            Assert.Equal("tr", positionError.ParamName);
+            Assert.Equal("tr", trackError.ParamName);
+            Assert.Equal("into", intoError.ParamName);
+        }
 
         [Fact]
         public void FromRecorder_NoSegments_ReturnsNull()

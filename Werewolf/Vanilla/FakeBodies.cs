@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -7,16 +8,16 @@ namespace Werewolf.Vanilla
 {
     internal readonly struct FakeBodyVisual
     {
-        public FakeBodyVisual(GameObject root, float pivotHeight, Animator animator)
+        public FakeBodyVisual(GameObject? root, float pivotHeight, Animator? animator)
         {
             Root = root;
             PivotHeight = pivotHeight;
             Animator = animator;
         }
 
-        public GameObject Root { get; }
+        public GameObject? Root { get; }
         public float PivotHeight { get; }
-        public Animator Animator { get; }
+        public Animator? Animator { get; }
         public bool IsEmpty => Root == null;
     }
 
@@ -34,9 +35,16 @@ namespace Werewolf.Vanilla
 
         private sealed class Body
         {
-            public Transform Root;
-            public float PivotHeight;
-            public Animator Animator;
+            public Body(Transform root, float pivotHeight, Animator? animator)
+            {
+                Root = root;
+                PivotHeight = pivotHeight;
+                Animator = animator;
+            }
+
+            public readonly Transform Root;
+            public readonly float PivotHeight;
+            public readonly Animator? Animator;
         }
 
         private static readonly Dictionary<int, Body> _bodies = new Dictionary<int, Body>();
@@ -84,7 +92,7 @@ namespace Werewolf.Vanilla
 
         private static Vector3 GroundOf(Body b) => b.Root.position - Vector3.up * b.PivotHeight;
 
-        internal static bool SpawnOrMove(int actor, Vector3 groundPos, FakeBodyLook look = null)
+        internal static bool SpawnOrMove(int actor, Vector3 groundPos, FakeBodyLook? look = null)
         {
             _destinations.Remove(actor);
             if (_bodies.TryGetValue(actor, out Body existing) && existing.Root != null)
@@ -98,7 +106,7 @@ namespace Werewolf.Vanilla
             return true;
         }
 
-        internal static bool MoveTo(int actor, Vector3 groundPos, FakeBodyLook look = null)
+        internal static bool MoveTo(int actor, Vector3 groundPos, FakeBodyLook? look = null)
         {
             if (_bodies.TryGetValue(actor, out Body existing) && existing.Root != null)
             {
@@ -108,7 +116,7 @@ namespace Werewolf.Vanilla
             return SpawnOrMove(actor, groundPos, look);
         }
 
-        internal static bool SetLook(int actor, FakeBodyLook look)
+        internal static bool SetLook(int actor, FakeBodyLook? look)
         {
             if (!_bodies.TryGetValue(actor, out Body existing) || existing.Root == null) return false;
             Vector3 ground = GroundOf(existing);
@@ -173,7 +181,7 @@ namespace Werewolf.Vanilla
             return destroyed;
         }
 
-        private static Body Build(int actor, Vector3 groundPos, FakeBodyLook look)
+        private static Body Build(int actor, Vector3 groundPos, FakeBodyLook? look)
         {
             FakeBodyVisual visual = default;
             if (look != null)
@@ -190,12 +198,8 @@ namespace Werewolf.Vanilla
             }
             if (visual.IsEmpty) visual = BuildCapsule(actor, groundPos);
 
-            var body = new Body
-            {
-                Root = visual.Root.transform,
-                PivotHeight = visual.PivotHeight,
-                Animator = visual.Animator,
-            };
+            GameObject root = visual.Root!;
+            var body = new Body(root.transform, visual.PivotHeight, visual.Animator);
             PlayerAvatar local = PlayerAvatar.instance;
             if (local != null)
             {
@@ -231,7 +235,7 @@ namespace Werewolf.Vanilla
 
         private static void Prune()
         {
-            List<int> stale = null;
+            List<int>? stale = null;
             foreach (var kv in _bodies)
             {
                 if (kv.Value.Root == null) (stale ??= new List<int>()).Add(kv.Key);

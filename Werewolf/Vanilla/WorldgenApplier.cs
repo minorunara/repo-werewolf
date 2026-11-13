@@ -1,6 +1,6 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
-using HarmonyLib;
 using Photon.Pun;
 using Werewolf.Core;
 using Werewolf.Scenarios.Core;
@@ -22,18 +22,6 @@ namespace Werewolf.Vanilla
 
         private const int DefaultPlayerHealth = 100;
 
-        private static AccessTools.FieldRef<RunManager, Level> DebugLevelRef =>
-            GameRefs.RunManager_debugLevel;
-        private static AccessTools.FieldRef<RunManager, bool> RestartingRef =>
-            GameRefs.RunManager_restarting;
-        private static AccessTools.FieldRef<StatsManager, string> SaveFileCurrentRef =>
-            GameRefs.StatsManager_saveFileCurrent;
-        private static AccessTools.FieldRef<StatsManager,
-            SortedDictionary<string, Dictionary<string, int>>> DictOfDictsRef =>
-            GameRefs.StatsManager_dictionaryOfDictionaries;
-        private static AccessTools.FieldRef<PunManager, PhotonView> PunPhotonViewRef =>
-            GameRefs.PunManager_photonView;
-
         internal static bool DebugLevelArmed { get; private set; }
 
         internal static void ClearDebugLevel()
@@ -43,7 +31,7 @@ namespace Werewolf.Vanilla
             try
             {
                 var run = RunManager.instance;
-                if (run != null && DebugLevelRef != null) DebugLevelRef(run) = null;
+                if (run != null) run.debugLevel = null;
             }
             catch (Exception e)
             {
@@ -68,7 +56,7 @@ namespace Werewolf.Vanilla
             {
                 var run = RunManager.instance;
                 if (run == null) { WLog.Line("worldgen_apply_skip", secret: false, ("reason", "no_runmanager")); return; }
-                if (RestartingRef != null && RestartingRef(run)) return;
+                if (run.restarting) return;
                 if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
                 bool isRunLevelTransition =
                     changeLevelType == RunManager.ChangeLevelType.RunLevel
@@ -81,7 +69,7 @@ namespace Werewolf.Vanilla
 
                 if (ScenarioRunState.Active)
                 {
-                    ScenarioDefinition definition = ScenarioRunState.Definition;
+                    ScenarioDefinition? definition = ScenarioRunState.Definition;
                     if (definition != null) ScenarioEnvironment.Apply(run, definition.Environment);
                     else WLog.Line("worldgen_apply_skip", secret: false, ("reason", "no_scenario_definition"));
                     return;
@@ -92,9 +80,8 @@ namespace Werewolf.Vanilla
                 if (config == null) { WLog.Line("worldgen_apply_skip", secret: false, ("reason", "no_config")); return; }
                 if (!config.WerewolfModeEnabled) return;
 
-                int playerCount = PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom != null
-                    ? PhotonNetwork.CurrentRoom.PlayerCount
-                    : 1;
+                Photon.Realtime.Room? room = PhotonNetwork.CurrentRoom;
+                int playerCount = PhotonNetwork.InRoom && room != null ? room.PlayerCount : 1;
                 if (!ScenarioSessionGate.PlayerCountSatisfied(playerCount, config.DebugMode, ScenarioRunState.Active))
                 {
                     WLog.Line("worldgen_apply_skip", secret: false,
@@ -159,7 +146,7 @@ namespace Werewolf.Vanilla
             }
         }
 
-        internal static void ApplyForcedLevel(RunManager run, string configuredMapName, string forcedLevelName)
+        internal static void ApplyForcedLevel(RunManager run, string configuredMapName, string? forcedLevelName)
         {
             if (forcedLevelName == null)
             {
@@ -171,7 +158,7 @@ namespace Werewolf.Vanilla
                 return;
             }
 
-            Level resolved = null;
+            Level? resolved = null;
             if (run.levels != null)
             {
                 foreach (var level in run.levels)
@@ -184,15 +171,15 @@ namespace Werewolf.Vanilla
                 }
             }
 
-            if (resolved == null || DebugLevelRef == null)
+            if (resolved == null)
             {
                 WLog.Line("worldgen_map_fallback", secret: false,
                     ("name", forcedLevelName),
-                    ("reason", resolved == null ? "resolve_failed" : "field_unresolved"));
+                    ("reason", "resolve_failed"));
                 return;
             }
 
-            DebugLevelRef(run) = resolved;
+            run.debugLevel = resolved;
             DebugLevelArmed = true;
         }
 
@@ -223,12 +210,7 @@ namespace Werewolf.Vanilla
         {
             if (upgrades == null || upgrades.Count == 0) return;
 
-            if (DictOfDictsRef == null)
-            {
-                WLog.Line("worldgen_upgrades_error", secret: false, ("err", "dict_field_unresolved"));
-                return;
-            }
-            var dicts = DictOfDictsRef(stats);
+            var dicts = stats.dictionaryOfDictionaries;
             if (dicts == null)
             {
                 WLog.Line("worldgen_upgrades_error", secret: false, ("err", "dict_null"));
@@ -236,7 +218,7 @@ namespace Werewolf.Vanilla
             }
 
             bool multiplayer = SemiFunc.IsMultiplayer();
-            PhotonView punView = PunPhotonViewRef != null ? PunPhotonViewRef(pun) : null;
+            PhotonView? punView = pun.photonView;
             if (multiplayer && punView == null)
             {
                 WLog.Line("worldgen_upgrades_error", secret: false, ("err", "photonview_unresolved"));
@@ -258,7 +240,7 @@ namespace Werewolf.Vanilla
 
                 var deltas = WorldgenUpgradeDeltas.Compute(upgrades, name =>
                 {
-                    Dictionary<string, int> dict;
+                    Dictionary<string, int>? dict;
                     return dicts.TryGetValue("playerUpgrade" + name, out dict) && dict != null
                         ? dict.GetValueOrDefault(steamID, 0)
                         : 0;
@@ -269,7 +251,7 @@ namespace Werewolf.Vanilla
                     int startHealth = -1;
                     if (name == HealthUpgradeName)
                     {
-                        Dictionary<string, int> hpDict;
+                        Dictionary<string, int>? hpDict;
                         int currentHp = dicts.TryGetValue(PlayerHealthDictName, out hpDict) && hpDict != null
                             ? hpDict.GetValueOrDefault(steamID, DefaultPlayerHealth)
                             : DefaultPlayerHealth;
@@ -279,7 +261,7 @@ namespace Werewolf.Vanilla
 
                     if (multiplayer)
                     {
-                        punView.RPC("TesterUpgradeCommandRPC", RpcTarget.All,
+                        punView!.RPC("TesterUpgradeCommandRPC", RpcTarget.All,
                             new object[] { steamID, name, delta });
                     }
                     else
@@ -408,7 +390,7 @@ namespace Werewolf.Vanilla
             {
                 var stats = StatsManager.instance;
                 if (stats == null) return "";
-                return SaveFileCurrentRef != null ? (SaveFileCurrentRef(stats) ?? "") : "";
+                return stats.saveFileCurrent ?? "";
             }
             catch (Exception e)
             {
@@ -422,7 +404,7 @@ namespace Werewolf.Vanilla
         {
             try
             {
-                return SaveFileCurrentRef != null ? (SaveFileCurrentRef(stats) ?? "") : "";
+                return stats.saveFileCurrent ?? "";
             }
             catch (Exception e)
             {

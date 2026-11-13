@@ -59,7 +59,7 @@ namespace Werewolf.Tests
 
             OutboundMessage gameOver = GameOverMessage();
             Assert.NotNull(gameOver);
-            Assert.Equal(MessageTarget.All, gameOver.Target);
+            Assert.True(gameOver.IsAllDestination());
             Assert.Equal(TeamCodes.VoidMatch, (byte)gameOver.Payload[0]);
 
             var actors = (int[])gameOver.Payload[1];

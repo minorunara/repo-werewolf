@@ -1,7 +1,10 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Photon.Pun;
 using Photon.Realtime;
+using UnityEngine;
 using Werewolf.Core;
 using Werewolf.Net;
 using Werewolf.UI;
@@ -13,7 +16,8 @@ namespace Werewolf.Game
     {
         private readonly WerewolfDirector _d;
 
-        private readonly ModManifestCollector _modManifestCollector = new ModManifestCollector();
+        private readonly ModManifestCollector _modManifestCollector =
+            new ModManifestCollector(BepInExModManifestSnapshotSource.Capture);
         private readonly ModIntegrityHostState _modIntegrityHostState = new ModIntegrityHostState();
         private readonly ModIntegrityClientState _modIntegrityClientState = new ModIntegrityClientState();
         private readonly Dictionary<int, ModManifestChunkAssembler> _modManifestAssemblies =
@@ -25,19 +29,31 @@ namespace Werewolf.Game
         private int _modIntegrityHostActor;
         private int _modIntegrityEpochSeed;
         private long _modIntegrityRosterTickAtMs;
-        private ModManifestRequestMessage _modIntegrityPendingRequest;
+        private ModManifestRequestMessage? _modIntegrityPendingRequest;
         private int _modIntegrityUiEpoch;
         private int _modIntegrityUiRevision = -1;
+
+        private readonly TextRefresh _textRefresh = new TextRefresh(nameof(ModIntegrityController));
 
         private bool _modIntegrityHostSignal;
 
         private readonly LobbyStartAttempt _lobbyStartAttempt = new LobbyStartAttempt();
         private readonly LobbyStartWarning _lobbyStartWarning = new LobbyStartWarning();
-        private LobbyStartPage _lobbyStartHeldPage;
+        private LobbyStartPage? _lobbyStartHeldPage;
 
         internal ModIntegrityController(WerewolfDirector director)
         {
             _d = director;
+            _textRefresh.Subscribe(() =>
+            {
+                _modIntegrityUiEpoch = 0;
+                _modIntegrityUiRevision = -1;
+            });
+        }
+
+        internal void Dispose()
+        {
+            _textRefresh.Unsubscribe();
         }
 
         internal bool IsAnyUiVisible =>
@@ -92,8 +108,7 @@ namespace Werewolf.Game
 
         private void TickModIntegrityHost(long nowUnixMs, int masterActor)
         {
-            if (_modManifestCollector.State == CollectorState.Failed) return;
-            if (_modManifestCollector.State != CollectorState.Ready) return;
+            if (!_modManifestCollector.TryGetResult(out ModManifest? manifest)) return;
 
             IReadOnlyList<int> roster = CurrentRoomActors();
             if (roster.Count == 0) return;
@@ -102,12 +117,12 @@ namespace Werewolf.Game
             {
                 int epoch = NextModIntegrityEpoch(nowUnixMs);
                 _modIntegrityHostState.BeginEpoch(
-                    epoch, masterActor, roster, _modManifestCollector.Result, nowUnixMs);
+                    epoch, masterActor, roster, manifest, nowUnixMs);
                 ApplyHostSnapshot();
                 SendManifestRequest(roster, nowUnixMs, force: true);
                 WLog.Line("mod_integrity_epoch", secret: false,
                     ("epoch", epoch), ("master", masterActor), ("actors", roster.Count),
-                    ("fingerprint", _modManifestCollector.Result.Fingerprint.Substring(0, 8)));
+                    ("fingerprint", manifest.Fingerprint.Substring(0, 8)));
             }
             else if (nowUnixMs - _modIntegrityRosterTickAtMs >= 500L)
             {
@@ -137,11 +152,12 @@ namespace Werewolf.Game
             if (retries.Count > 0) SendManifestRequest(retries, nowUnixMs, force: false);
 
             ApplyHostSnapshot();
-            INetBus bus = _d.ClientBus;
+            INetBus? bus = _d.ClientBus;
             if (bus != null && _modIntegrityHostState.ShouldPublishSnapshot(nowUnixMs, false))
             {
-                ModIntegritySnapshot snapshot = _modIntegrityHostState.BuildSnapshot();
-                if (bus.SendToAll(MessageCodes.ModIntegritySnapshot, ModIntegrityWire.BuildSnapshot(snapshot)))
+                ModIntegritySnapshot? snapshot = _modIntegrityHostState.BuildSnapshot();
+                if (snapshot != null &&
+                    bus.SendToAll(MessageCodes.ModIntegritySnapshot, ModIntegrityWire.BuildSnapshot(snapshot)))
                 {
                     _modIntegrityHostState.MarkSnapshotPublished(nowUnixMs);
                     WLog.Line("mod_integrity_status", secret: false,
@@ -154,17 +170,15 @@ namespace Werewolf.Game
         private void TickModIntegrityGuest(long nowUnixMs, int masterActor)
         {
             if (_modIntegrityPendingRequest == null) return;
-            if (_modManifestCollector.State == CollectorState.Collecting ||
-                _modManifestCollector.State == CollectorState.NotStarted)
-                return;
+            if (_modManifestCollector.IsPending) return;
 
             ModManifestRequestMessage request = _modIntegrityPendingRequest;
             _modIntegrityPendingRequest = null;
-            if (_modManifestCollector.State == CollectorState.Ready)
+            if (_modManifestCollector.TryGetResult(out _))
             {
                 SendManifestReport(request);
             }
-            else if (_d.ClientBus != null)
+            else if (_modManifestCollector.IsFailed && _d.ClientBus != null)
             {
                 WLog.Line("mod_integrity_report", secret: false,
                     ("epoch", request.Epoch), ("state", "collection_failed"));
@@ -187,14 +201,15 @@ namespace Werewolf.Game
             {
                 case MessageCodes.ModManifestRequest:
                     if (message.SenderActor != masterActor || IsCurrentMaster()) return true;
-                    if (!ModIntegrityWire.TryReadManifestRequest(message.Payload, out ModManifestRequestMessage request, out string requestError))
+                    if (!ModIntegrityWire.TryReadManifestRequest(message.Payload,
+                            out ModManifestRequestMessage? request, out string? requestError))
                     {
                         LogModIntegrityDrop(message, requestError);
                         return true;
                     }
                     _modIntegrityPendingRequest = request;
                     _modManifestCollector.EnsureStarted();
-                    if (_modManifestCollector.State == CollectorState.Ready)
+                    if (_modManifestCollector.TryGetResult(out _))
                     {
                         _modIntegrityPendingRequest = null;
                         SendManifestReport(request);
@@ -209,7 +224,8 @@ namespace Werewolf.Game
 
                 case MessageCodes.ModIntegritySnapshot:
                     if (message.SenderActor != masterActor) return true;
-                    if (!ModIntegrityWire.TryReadSnapshot(message.Payload, out ModIntegritySnapshot snapshot, out string snapshotError))
+                    if (!ModIntegrityWire.TryReadSnapshot(message.Payload,
+                            out ModIntegritySnapshot? snapshot, out string? snapshotError))
                     {
                         LogModIntegrityDrop(message, snapshotError);
                         return true;
@@ -225,7 +241,8 @@ namespace Werewolf.Game
 
                 case MessageCodes.ModIntegrityDetailResponse:
                     if (message.SenderActor != masterActor) return true;
-                    if (!ModIntegrityWire.TryReadDetailResponse(message.Payload, out ModIntegrityDetailChunk chunk, out string detailError))
+                    if (!ModIntegrityWire.TryReadDetailResponse(message.Payload,
+                            out ModIntegrityDetailChunk? chunk, out string? detailError))
                     {
                         LogModIntegrityDrop(message, detailError);
                         return true;
@@ -238,7 +255,8 @@ namespace Werewolf.Game
 
         private void HandleManifestReport(InboundMessage message, long nowUnixMs)
         {
-            if (!ModIntegrityWire.TryReadManifestReport(message.Payload, out ModManifestReportChunk report, out string error))
+            if (!ModIntegrityWire.TryReadManifestReport(message.Payload,
+                    out ModManifestReportChunk? report, out string? error))
             {
                 ModUnavailableReason reason = error == "protocol"
                     ? ModUnavailableReason.UnsupportedProtocol
@@ -275,7 +293,17 @@ namespace Werewolf.Game
             switch (add)
             {
                 case ModManifestChunkAddOutcome.Completed:
-                    _modIntegrityHostState.ApplyManifest(message.SenderActor, assembler.Manifest, nowUnixMs);
+                    if (assembler.TryGetCompletedManifest(out ModManifest? manifest))
+                    {
+                        _modIntegrityHostState.ApplyManifest(message.SenderActor, manifest, nowUnixMs);
+                    }
+                    else
+                    {
+                        _modIntegrityHostState.MarkUnavailable(
+                            message.SenderActor, ModUnavailableReason.InvalidPayload);
+                        WLog.Line("mod_integrity_manifest_missing", secret: false,
+                            ("actor", message.SenderActor));
+                    }
                     _modManifestAssemblies.Remove(message.SenderActor);
                     break;
                 case ModManifestChunkAddOutcome.Conflict:
@@ -291,14 +319,15 @@ namespace Werewolf.Game
 
         private void HandleDetailRequest(InboundMessage message)
         {
-            if (!ModIntegrityWire.TryReadDetailRequest(message.Payload, out ModIntegrityDetailRequestMessage request, out string error))
+            if (!ModIntegrityWire.TryReadDetailRequest(message.Payload,
+                    out ModIntegrityDetailRequestMessage? request, out string? error))
             {
                 LogModIntegrityDrop(message, error);
                 return;
             }
             if (request.Epoch != _modIntegrityHostState.Epoch) return;
-            ModIntegritySnapshot snapshot = _modIntegrityHostState.BuildSnapshot();
-            if (!snapshot.TryGetRecord(request.Actor, out _)) return;
+            ModIntegritySnapshot? snapshot = _modIntegrityHostState.BuildSnapshot();
+            if (snapshot == null || !snapshot.TryGetRecord(request.Actor, out _)) return;
             IReadOnlyList<object[]> payloads = ModIntegrityWire.BuildDetailResponse(
                 snapshot.Epoch, snapshot.Revision, request.Actor,
                 _modIntegrityHostState.GetDifferences(request.Actor));
@@ -308,7 +337,7 @@ namespace Werewolf.Game
 
         private void RequestModIntegrityDetail(int actor)
         {
-            ModIntegritySnapshot current = _modIntegrityClientState.Current;
+            ModIntegritySnapshot? current = _modIntegrityClientState.Current;
             if (current == null || !_modIntegrityClientState.BeginDetailRequest(actor, SessionClock.NowMs())) return;
 
             if (IsCurrentMaster() && _modIntegrityHostState.IsInitialized)
@@ -317,7 +346,8 @@ namespace Werewolf.Game
                     current.Epoch, current.Revision, actor, _modIntegrityHostState.GetDifferences(actor));
                 for (int i = 0; i < payloads.Count; i++)
                 {
-                    if (ModIntegrityWire.TryReadDetailResponse(payloads[i], out ModIntegrityDetailChunk chunk, out _))
+                    if (ModIntegrityWire.TryReadDetailResponse(payloads[i],
+                            out ModIntegrityDetailChunk? chunk, out _))
                         _modIntegrityClientState.TryApplyDetailChunk(chunk, out _);
                 }
                 return;
@@ -327,9 +357,10 @@ namespace Werewolf.Game
                 ModIntegrityWire.BuildDetailRequest(current.Epoch, actor));
         }
 
-        internal bool TryGetStatus(int actor, out ModParticipantRecord record)
+        internal bool TryGetStatus(int actor,
+            [NotNullWhen(true)] out ModParticipantRecord? record)
         {
-            ModIntegritySnapshot snapshot = _modIntegrityClientState.Current;
+            ModIntegritySnapshot? snapshot = _modIntegrityClientState.Current;
             if (snapshot != null) return snapshot.TryGetRecord(actor, out record);
             record = null;
             return false;
@@ -340,23 +371,40 @@ namespace Werewolf.Game
         private void EnsureModIntegrityUiBuilt()
         {
             if (!_d.EnsureUiCreated()) return;
+            bool rebuilt = false;
             if (!_modIntegrityHeader.Exists)
             {
-                _modIntegrityHeader.Build(_d.GetUiLayerRoot(WerewolfUIManager.ModIntegrityLayer));
-                _modIntegrityHeader.OnOpenPanel = () => _modIntegrityPanel.Open(preferNeedsReview: true);
+                _d.EnsurePanelBuilt(_modIntegrityHeader);
+                if (_modIntegrityHeader.Exists)
+                {
+                    _modIntegrityHeader.OnOpenPanel = () =>
+                        _modIntegrityPanel.Open(preferNeedsReview: true);
+                    rebuilt = true;
+                }
             }
             if (!_modIntegrityPanel.Exists)
             {
-                _modIntegrityPanel.Build(_d.GetUiLayerRoot(WerewolfUIManager.ModIntegrityLayer));
-                _modIntegrityPanel.OnDetailRequested = RequestModIntegrityDetail;
+                _d.EnsurePanelBuilt(_modIntegrityPanel);
+                if (_modIntegrityPanel.Exists)
+                {
+                    _modIntegrityPanel.OnDetailRequested = RequestModIntegrityDetail;
+                    rebuilt = true;
+                }
             }
             if (!_lobbyStartWarning.Exists)
-                _lobbyStartWarning.Build(_d.GetUiLayerRoot(WerewolfUIManager.ModIntegrityModalLayer));
+            {
+                _d.EnsurePanelBuilt(_lobbyStartWarning);
+            }
+            if (rebuilt)
+            {
+                _modIntegrityUiEpoch = 0;
+                _modIntegrityUiRevision = -1;
+            }
         }
 
         private void RefreshModIntegrityUi()
         {
-            ModIntegritySnapshot snapshot = _modIntegrityClientState.Current;
+            ModIntegritySnapshot? snapshot = _modIntegrityClientState.Current;
             if (snapshot == null) return;
             if (_modIntegrityUiEpoch == snapshot.Epoch && _modIntegrityUiRevision == snapshot.Revision) return;
             _modIntegrityUiEpoch = snapshot.Epoch;
@@ -384,14 +432,14 @@ namespace Werewolf.Game
 
         private void ApplyHostSnapshot()
         {
-            ModIntegritySnapshot snapshot = _modIntegrityHostState.BuildSnapshot();
+            ModIntegritySnapshot? snapshot = _modIntegrityHostState.BuildSnapshot();
             if (snapshot != null)
                 _modIntegrityClientState.TryApplySnapshot(snapshot, _modIntegrityHostState.BaselineActor);
         }
 
         private void SendManifestRequest(IReadOnlyList<int> actors, long nowUnixMs, bool force)
         {
-            INetBus bus = _d.ClientBus;
+            INetBus? bus = _d.ClientBus;
             if (bus == null || !_modIntegrityHostState.IsInitialized || actors == null || actors.Count == 0) return;
             var targets = new List<int>();
             for (int i = 0; i < actors.Count; i++)
@@ -400,8 +448,10 @@ namespace Werewolf.Game
                 if (actor > 0 && actor != _modIntegrityHostState.BaselineActor) targets.Add(actor);
             }
             if (targets.Count == 0) return;
+            ModManifest? baseline = _modIntegrityHostState.Baseline;
+            if (baseline == null) return;
             object[] payload = ModIntegrityWire.BuildManifestRequest(
-                _modIntegrityHostState.Epoch, _modIntegrityHostState.Baseline.Fingerprint);
+                _modIntegrityHostState.Epoch, baseline.Fingerprint);
             if (bus.SendToActors(MessageCodes.ModManifestRequest, payload, targets.ToArray()))
             {
                 WLog.Line("mod_integrity_request", secret: false,
@@ -411,15 +461,16 @@ namespace Werewolf.Game
 
         private void SendManifestReport(ModManifestRequestMessage request)
         {
-            INetBus bus = _d.ClientBus;
-            if (bus == null || request == null || _modManifestCollector.State != CollectorState.Ready) return;
+            INetBus? bus = _d.ClientBus;
+            if (bus == null || request == null ||
+                !_modManifestCollector.TryGetResult(out ModManifest? manifest)) return;
             IReadOnlyList<object[]> payloads = ModIntegrityWire.BuildManifestReport(
-                request.Epoch, request.BaselineFingerprint, _modManifestCollector.Result);
+                request.Epoch, request.BaselineFingerprint, manifest);
             for (int i = 0; i < payloads.Count; i++)
                 bus.SendToMaster(MessageCodes.ModManifestReport, payloads[i]);
             WLog.Line("mod_integrity_report", secret: false,
                 ("epoch", request.Epoch), ("chunks", payloads.Count),
-                ("mode", _modManifestCollector.Result.Fingerprint == request.BaselineFingerprint ? "fingerprint" : "manifest"));
+                ("mode", manifest.Fingerprint == request.BaselineFingerprint ? "fingerprint" : "manifest"));
         }
 
         internal void NotifyPlayerLeft(int actorNumber)
@@ -444,7 +495,6 @@ namespace Werewolf.Game
             _lobbyStartWarning.Hide();
             _modIntegrityPanel.Close();
             _modIntegrityHeader.Tick(false);
-            _modManifestCollector.ResetSessionView();
         }
 
         private static bool IsModIntegrityLobbyScope()
@@ -467,14 +517,14 @@ namespace Werewolf.Game
 
         private static int CurrentMasterActor()
         {
-            return PhotonNetwork.InRoom && PhotonNetwork.MasterClient != null
-                ? PhotonNetwork.MasterClient.ActorNumber : 0;
+            Player? master = PhotonNetwork.MasterClient;
+            return PhotonNetwork.InRoom && master != null ? master.ActorNumber : 0;
         }
 
         private int LocalActorNumber()
         {
-            if (PhotonNetwork.InRoom && PhotonNetwork.LocalPlayer != null)
-                return PhotonNetwork.LocalPlayer.ActorNumber;
+            Player? local = PhotonNetwork.LocalPlayer;
+            if (PhotonNetwork.InRoom && local != null) return local.ActorNumber;
             return _d.ClientBus?.LocalActorNumber ?? 1;
         }
 
@@ -540,7 +590,7 @@ namespace Werewolf.Game
             return candidate;
         }
 
-        private static HashSet<int> SnapshotActors(ModIntegritySnapshot snapshot)
+        private static HashSet<int> SnapshotActors(ModIntegritySnapshot? snapshot)
         {
             var result = new HashSet<int>();
             if (snapshot == null) return result;
@@ -551,17 +601,17 @@ namespace Werewolf.Game
         private static bool IsOversizedManifestPayload(object[] payload)
         {
             if (payload == null || payload.Length != 9) return false;
-            string[] guids = payload[5] as string[];
+            string[]? guids = payload[5] as string[];
             return guids != null && guids.Length > ModIntegrityWire.ManifestEntriesPerChunk;
         }
 
-        private static void LogModIntegrityDrop(InboundMessage message, string reason)
+        private static void LogModIntegrityDrop(InboundMessage message, string? reason)
         {
             WLog.Line("mod_integrity_drop", secret: false,
                 ("code", (int)message.Code), ("actor", message.SenderActor), ("reason", reason ?? "invalid"));
         }
 
-        internal bool TryInterceptLobbyStart(LobbyStartPage lobbyPage)
+        internal bool TryInterceptLobbyStart(LobbyStartPage? lobbyPage)
         {
             try
             {
@@ -653,7 +703,7 @@ namespace Werewolf.Game
 
         private void OpenModIntegrityDetailsFromWarning()
         {
-            LobbyStartPage page = _lobbyStartHeldPage;
+            LobbyStartPage? page = _lobbyStartHeldPage;
             try
             {
                 _lobbyStartAttempt.Clear();
@@ -671,7 +721,7 @@ namespace Werewolf.Game
 
         private void ContinueLobbyStart()
         {
-            LobbyStartPage page = _lobbyStartHeldPage;
+            LobbyStartPage? page = _lobbyStartHeldPage;
             try
             {
                 if (page != null) ReinvokeLobbyStart(page, SessionClock.NowMs(), "explicit_continue");
@@ -702,7 +752,7 @@ namespace Werewolf.Game
 
         private void FailOpenLobbyStart(long nowUnixMs)
         {
-            LobbyStartPage page = _lobbyStartHeldPage;
+            LobbyStartPage? page = _lobbyStartHeldPage;
             _lobbyStartHeldPage = null;
             if (page != null && PhotonNetwork.InRoom && IsCurrentMaster())
                 ReinvokeLobbyStart(page, nowUnixMs, "fail_open");
@@ -712,12 +762,12 @@ namespace Werewolf.Game
 
         private LobbyStartDecision CurrentStartDecision()
         {
-            ModIntegritySnapshot snapshot = _modIntegrityHostState.IsInitialized
+            ModIntegritySnapshot? snapshot = _modIntegrityHostState.IsInitialized
                 ? _modIntegrityHostState.BuildSnapshot()
                 : null;
             return LobbyStartGate.Evaluate(
                 snapshot,
-                _modManifestCollector.State == CollectorState.Ready && _modIntegrityHostState.IsInitialized,
+                _modManifestCollector.TryGetResult(out _) && _modIntegrityHostState.IsInitialized,
                 LobbyStartPlayerCount(),
                 LiveConfig.WerewolfCount(),
                 LiveConfig.DebugMode());
@@ -725,10 +775,10 @@ namespace Werewolf.Game
 
         private int LobbyStartPlayerCount()
         {
-            int room = PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom != null
-                ? PhotonNetwork.CurrentRoom.PlayerCount
-                : 1;
-            return room + _d.PendingBotCount;
+            Room? currentRoom = PhotonNetwork.CurrentRoom;
+            int playerCount = PhotonNetwork.InRoom && currentRoom != null
+                ? currentRoom.PlayerCount : 1;
+            return playerCount + _d.PendingBotCount;
         }
     }
 }

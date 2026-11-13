@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 
 namespace Werewolf.Core
@@ -38,13 +39,11 @@ namespace Werewolf.Core
 
         public static long CeremonyDelayMs(int[] voteCounts)
         {
+            if (voteCounts == null) throw new ArgumentNullException(nameof(voteCounts));
             int max = 0;
-            if (voteCounts != null)
+            foreach (int c in voteCounts)
             {
-                foreach (int c in voteCounts)
-                {
-                    if (c > max) max = c;
-                }
+                if (c > max) max = c;
             }
             return TallyEndMs(max) + BannerDelayMs;
         }

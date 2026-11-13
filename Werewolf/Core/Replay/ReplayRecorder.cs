@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -36,15 +37,15 @@ namespace Werewolf.Core.Replay
     {
         public int Actor;
         public int ParticipantId;
-        public string Name;
-        public string Color;
+        public string Name = string.Empty;
+        public string? Color;
     }
 
     public sealed class ReplayEpInfo
     {
         public int Id;
         public byte State;
-        public string StateName;
+        public string StateName = string.Empty;
         public float X;
         public float Y;
         public float Z;
@@ -53,7 +54,7 @@ namespace Werewolf.Core.Replay
     public sealed class ReplayValuableInfo
     {
         public int Id;
-        public string Name;
+        public string Name = string.Empty;
         public int Dollars;
         public int Vid;
         public float X;
@@ -88,16 +89,16 @@ namespace Werewolf.Core.Replay
 
     public sealed class ReplaySegmentHeader
     {
-        public string LevelName;
-        public string StartedAtIso;
+        public string LevelName = string.Empty;
+        public string StartedAtIso = string.Empty;
         public bool IsHost;
         public int LocalActor;
         public List<ReplayPlayerInfo> Players = new List<ReplayPlayerInfo>();
         public List<ReplayEpInfo> ExtractionPoints = new List<ReplayEpInfo>();
         public List<ReplayValuableInfo> Valuables = new List<ReplayValuableInfo>();
-        public ReplayMapMesh Map;
+        public ReplayMapMesh? Map;
 
-        public ReplayMapImage MapImage;
+        public ReplayMapImage? MapImage;
     }
 
     public sealed class ReplayRecorder
@@ -122,7 +123,7 @@ namespace Werewolf.Core.Replay
 
         internal sealed class Segment
         {
-            public ReplaySegmentHeader Header;
+            public ReplaySegmentHeader Header = null!;
             public readonly List<object> Records = new List<object>();
             public readonly List<ReplayLossEntry> Losses = new List<ReplayLossEntry>();
             public double StartClock;
@@ -134,18 +135,18 @@ namespace Werewolf.Core.Replay
         internal sealed class PosRecord
         {
             public double T;
-            public List<ReplayEntitySample> Entries;
+            public List<ReplayEntitySample> Entries = new List<ReplayEntitySample>();
         }
 
         internal sealed class EventRecord
         {
             public double T;
-            public string Name;
-            public (string Key, object Value)[] Fields;
+            public string Name = string.Empty;
+            public (string Key, object? Value)[] Fields = Array.Empty<(string, object?)>();
 
-            public object FieldValue(string key) => FieldValue(Fields, key);
+            public object? FieldValue(string key) => FieldValue(Fields, key);
 
-            public static object FieldValue((string Key, object Value)[] fields, string key)
+            public static object? FieldValue((string Key, object? Value)[]? fields, string key)
             {
                 if (fields == null) return null;
                 for (int i = 0; i < fields.Length; i++)
@@ -161,12 +162,12 @@ namespace Werewolf.Core.Replay
             public double T;
             public ReplayEntityKind Kind;
             public int Id;
-            public string Name;
+            public string Name = string.Empty;
             public int Vid;
         }
 
         private readonly List<Segment> _segments = new List<Segment>();
-        private Segment _open;
+        private Segment? _open;
         private double _lastSampleClock;
         private int _positionEntries;
         private int _eventCount;
@@ -206,7 +207,7 @@ namespace Werewolf.Core.Replay
 
         public void BeginSegment(ReplaySegmentHeader header, double nowSec)
         {
-            if (header == null) return;
+            if (header == null) throw new ArgumentNullException(nameof(header));
             if (_open != null) EndSegment(nowSec);
 
             _lastOnChangePos.Clear();
@@ -252,7 +253,8 @@ namespace Werewolf.Core.Replay
 
         public void Sample(double nowSec, IReadOnlyList<ReplayEntitySample> states)
         {
-            if (_open == null || states == null) return;
+            if (states == null) throw new ArgumentNullException(nameof(states));
+            if (_open == null) return;
             _lastSampleClock = nowSec;
             double t = Tick(_open, nowSec);
 
@@ -266,7 +268,7 @@ namespace Werewolf.Core.Replay
             foreach (int id in _presentValuables)
             {
                 if (_seenValuablesScratch.Contains(id)) continue;
-                AppendEvent(_open, t, "val_gone", new (string, object)[] { ("v", id) });
+                AppendEvent(_open, t, "val_gone", new (string, object?)[] { ("v", id) });
             }
             _presentValuables.Clear();
             foreach (int id in _seenValuablesScratch) _presentValuables.Add(id);
@@ -274,12 +276,12 @@ namespace Werewolf.Core.Replay
             foreach (int id in _presentItems)
             {
                 if (_seenItemsScratch.Contains(id)) continue;
-                AppendEvent(_open, t, "item_gone", new (string, object)[] { ("i", id) });
+                AppendEvent(_open, t, "item_gone", new (string, object?)[] { ("i", id) });
             }
             _presentItems.Clear();
             foreach (int id in _seenItemsScratch) _presentItems.Add(id);
 
-            List<ReplayEntitySample> entries = null;
+            List<ReplayEntitySample>? entries = null;
             for (int i = 0; i < states.Count; i++)
             {
                 ReplayEntitySample s = states[i];
@@ -324,10 +326,10 @@ namespace Werewolf.Core.Replay
         {
             if (target.CapNoted) return;
             target.CapNoted = true;
-            AppendEvent(target, t, "rec_cap", null);
+            AppendEvent(target, t, "rec_cap", Array.Empty<(string, object?)>());
         }
 
-        public void NoteEntity(double nowSec, ReplayEntityKind kind, int id, string name, int vid = 0)
+        public void NoteEntity(double nowSec, ReplayEntityKind kind, int id, string? name, int vid = 0)
         {
             if (_open == null) return;
             if (!_knownEntities.Add(EntityKey(kind, id))) return;
@@ -347,31 +349,33 @@ namespace Werewolf.Core.Replay
             if (_valueById.TryGetValue(id, out int prev) && prev == dollars) return;
             _valueById[id] = dollars;
             AppendEvent(_open, Tick(_open, nowSec), "val_value",
-                new (string, object)[] { ("v", id), ("$", dollars) });
+                new (string, object?)[] { ("v", id), ("$", dollars) });
         }
 
-        public void NoteEpState(double nowSec, int epId, byte state, string stateName)
+        public void NoteEpState(double nowSec, int epId, byte state, string? stateName)
         {
             if (_open == null) return;
             if (_epStateById.TryGetValue(epId, out byte prev) && prev == state) return;
             _epStateById[epId] = state;
             AppendEvent(_open, Tick(_open, nowSec), "ep_state",
-                new (string, object)[] { ("ep", epId), ("s", (int)state), ("n", stateName ?? "") });
+                new (string, object?)[] { ("ep", epId), ("s", (int)state), ("n", stateName ?? "") });
         }
 
-        public void NoteEvent(double nowSec, string name, params (string Key, object Value)[] fields)
+        public void NoteEvent(double nowSec, string name, params (string Key, object? Value)[] fields)
         {
-            Segment target = ResolveEventTarget(nowSec);
+            if (name == null) throw new ArgumentNullException(nameof(name));
+            if (fields == null) throw new ArgumentNullException(nameof(fields));
+            Segment? target = ResolveEventTarget(nowSec);
             if (target == null) return;
             AppendEvent(target, Tick(target, nowSec), name, fields);
         }
 
         public void NoteLoss(double nowSec, int vid, int dollars, bool isOrb, bool destroyed)
         {
-            Segment target = ResolveEventTarget(nowSec);
+            Segment? target = ResolveEventTarget(nowSec);
             if (target == null) return;
             AppendEvent(target, Tick(target, nowSec), "loss",
-                new (string, object)[] { ("$", dollars), ("orb", isOrb), ("vid", vid), ("d", destroyed) });
+                new (string, object?)[] { ("$", dollars), ("orb", isOrb), ("vid", vid), ("d", destroyed) });
             target.Losses.Add(new ReplayLossEntry
             {
                 Vid = vid,
@@ -383,9 +387,10 @@ namespace Werewolf.Core.Replay
 
         public void NoteHaulIds(double nowSec, IReadOnlyList<int> ids)
         {
-            if (_open == null || ids == null) return;
+            if (ids == null) throw new ArgumentNullException(nameof(ids));
+            if (_open == null) return;
 
-            List<int> added = null;
+            List<int>? added = null;
             for (int i = 0; i < ids.Count; i++)
             {
                 if (_haulIds.Contains(ids[i])) continue;
@@ -407,14 +412,14 @@ namespace Werewolf.Core.Replay
             foreach (int gone in _haulDiffScratch) _haulIds.Remove(gone);
             if (added != null) foreach (int id in added) _haulIds.Add(id);
 
-            AppendEvent(_open, Tick(_open, nowSec), "haul", new (string, object)[]
+            AppendEvent(_open, Tick(_open, nowSec), "haul", new (string, object?)[]
             {
                 ("add", added ?? new List<int>()),
                 ("del", new List<int>(_haulDiffScratch)),
             });
         }
 
-        public object[] BuildLossLedgerWire()
+        public object[]? BuildLossLedgerWire()
         {
             if (_segments.Count == 0) return null;
             var segIdx = new List<int>();
@@ -437,7 +442,7 @@ namespace Werewolf.Core.Replay
             };
         }
 
-        public bool ApplyLossLedgerWire(object[] payload)
+        public bool ApplyLossLedgerWire(object[]? payload)
         {
             if (payload == null || payload.Length < 5) return false;
             if (!(payload[0] is int segCount) || segCount <= 0) return false;
@@ -454,7 +459,7 @@ namespace Werewolf.Core.Replay
             _hostLedgerSegmentCount = segCount;
             for (int i = 0; i < segIdx.Length; i++)
             {
-                if (!_hostLedger.TryGetValue(segIdx[i], out List<ReplayLossEntry> list))
+                if (!_hostLedger.TryGetValue(segIdx[i], out List<ReplayLossEntry>? list))
                 {
                     list = new List<ReplayLossEntry>();
                     _hostLedger[segIdx[i]] = list;
@@ -486,18 +491,19 @@ namespace Werewolf.Core.Replay
                 return true;
             }
             if (segmentIndex >= _hostLedgerSegmentCount) return false;
-            entries = _hostLedger.TryGetValue(segmentIndex, out List<ReplayLossEntry> list)
+            entries = _hostLedger.TryGetValue(segmentIndex, out List<ReplayLossEntry>? list)
                 ? (IReadOnlyList<ReplayLossEntry>)list
                 : EmptyLosses;
             return true;
         }
 
-        public ReplaySegmentHeader FirstSegmentHeader
+        public ReplaySegmentHeader? FirstSegmentHeader
             => _segments.Count > 0 ? _segments[0].Header : null;
 
         public void OpenSegmentPlayerTrackInto(int actor, List<ReplayTrailPoint> into)
         {
-            if (_open == null || into == null) return;
+            if (into == null) throw new ArgumentNullException(nameof(into));
+            if (_open == null) return;
             foreach (object record in _open.Records)
             {
                 if (!(record is PosRecord pos)) continue;
@@ -513,9 +519,11 @@ namespace Werewolf.Core.Replay
         }
 
         public void OpenSegmentEventTimesInto(string name, List<double> into,
-            string fieldKey = null, string fieldValue = null)
+            string? fieldKey = null, string? fieldValue = null)
         {
-            if (_open == null || into == null || string.IsNullOrEmpty(name)) return;
+            if (name == null) throw new ArgumentNullException(nameof(name));
+            if (into == null) throw new ArgumentNullException(nameof(into));
+            if (_open == null || name.Length == 0) return;
             foreach (object record in _open.Records)
             {
                 if (!(record is EventRecord ev) || ev.Name != name) continue;
@@ -524,9 +532,9 @@ namespace Werewolf.Core.Replay
             }
         }
 
-        private static bool HasField(EventRecord ev, string key, string value)
+        private static bool HasField(EventRecord ev, string key, string? value)
         {
-            object actual = ev.FieldValue(key);
+            object? actual = ev.FieldValue(key);
             if (actual == null) return false;
             return string.Equals(
                 Convert.ToString(actual, System.Globalization.CultureInfo.InvariantCulture), value,
@@ -535,7 +543,8 @@ namespace Werewolf.Core.Replay
 
         public void AttachMapImage(ReplayMapImage image)
         {
-            if (image == null || _segments.Count == 0) return;
+            if (image == null) throw new ArgumentNullException(nameof(image));
+            if (_segments.Count == 0) return;
             _segments[_segments.Count - 1].Header.MapImage = image;
         }
 
@@ -577,7 +586,7 @@ namespace Werewolf.Core.Replay
                 }
                 else if (i < _hostLedgerSegmentCount)
                 {
-                    _hostLedger.TryGetValue(i, out List<ReplayLossEntry> entries);
+                    _hostLedger.TryGetValue(i, out List<ReplayLossEntry>? entries);
                     yield return ReplayJson.LedgerLine(entries ?? EmptyLosses);
                 }
                 foreach (object record in seg.Records)
@@ -592,16 +601,16 @@ namespace Werewolf.Core.Replay
 
         private static readonly List<ReplayLossEntry> EmptyLosses = new List<ReplayLossEntry>();
 
-        private Segment ResolveEventTarget(double nowSec)
+        private Segment? ResolveEventTarget(double nowSec)
         {
             if (_open != null) return _open;
-            Segment last = _segments.Count > 0 ? _segments[_segments.Count - 1] : null;
+            Segment? last = _segments.Count > 0 ? _segments[_segments.Count - 1] : null;
             if (last == null || last.EndClock < 0) return null;
             if (nowSec - last.EndClock > LateEventGraceSec) return null;
             return last;
         }
 
-        private void AppendEvent(Segment target, double t, string name, (string Key, object Value)[] fields)
+        private void AppendEvent(Segment target, double t, string name, (string Key, object? Value)[] fields)
         {
             target.Records.Add(new EventRecord { T = t, Name = name, Fields = fields });
             _eventCount++;

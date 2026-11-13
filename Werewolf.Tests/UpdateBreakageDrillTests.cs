@@ -35,14 +35,68 @@ namespace Werewolf.Tests
             }
         }
 
-        private static void AuditAgainst(string drillDir)
+        [Theory]
+        [InlineData("ItemMelee", "hurtCollider", false, "Werewolf.Game.Patches.ItemMeleeFriendlyFire")]
+        [InlineData("PlayerHealth", "health", false, "Werewolf.Vanilla.BombExplosionDriver")]
+        [InlineData("EnemyShadow", "UpdatePlayerTarget", true, "Werewolf.Game.Patches.EnemyShadowStateFollowPatch")]
+        [InlineData("LevelGenerator", "DebugLevelSize", false, "Werewolf.Scenarios.Vanilla.ScenarioLevelSize")]
+        public void RenamedNonPublicMember_IsReportedWithItsConsumer(
+            string typeName, string memberName, bool isMethod, string consumer)
         {
-            using var resolver = new DefaultAssemblyResolver();
+            string drillDir = Path.Combine(Path.GetTempPath(), $"WerewolfPrivateDrill_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(drillDir);
+            try
+            {
+                using (var sourceResolver = AuditEnvironment.CreateResolver())
+                using (var game = AssemblyDefinition.ReadAssembly(
+                    Path.Combine(AuditEnvironment.Meta("Werewolf.GameManagedDir"), "Assembly-CSharp.dll"),
+                    new ReaderParameters { AssemblyResolver = sourceResolver }))
+                {
+                    var type = game.MainModule.GetType(typeName);
+                    Assert.NotNull(type);
+                    if (isMethod)
+                    {
+                        var member = type.Methods.Single(m => m.Name == memberName);
+                        Assert.False(member.IsPublic, "ドリルは未加工の本体 DLL の非公開メンバーを使う");
+                        member.Name += "__drill";
+                    }
+                    else
+                    {
+                        var member = type.Fields.Single(f => f.Name == memberName);
+                        Assert.False(member.IsPublic, "ドリルは未加工の本体 DLL の非公開メンバーを使う");
+                        member.Name += "__drill";
+                    }
+                    game.Write(Path.Combine(drillDir, "Assembly-CSharp.dll"));
+                }
+
+                using var resolver = CreateDrillResolver(drillDir);
+                using var mod = ModuleDefinition.ReadModule(AuditEnvironment.Meta("Werewolf.ModDllPath"),
+                    new ReaderParameters { AssemblyResolver = resolver });
+                var failures = GameRefAudit.FindUnresolvedRefs(mod, AuditEnvironment.InAuditScope);
+                Assert.Single(failures);
+                Assert.Contains($"{typeName}::{memberName}", failures[0]);
+                Assert.Contains(consumer, failures[0]);
+            }
+            finally
+            {
+                Directory.Delete(drillDir, recursive: true);
+            }
+        }
+
+        private static DefaultAssemblyResolver CreateDrillResolver(string drillDir)
+        {
+            var resolver = new DefaultAssemblyResolver();
             resolver.AddSearchDirectory(drillDir);
             resolver.AddSearchDirectory(AuditEnvironment.Meta("Werewolf.GameManagedDir"));
             resolver.AddSearchDirectory(AuditEnvironment.Meta("Werewolf.BepInExCoreDir"));
             resolver.AddSearchDirectory(AuditEnvironment.Meta("Werewolf.MenuLibDir"));
             resolver.AddSearchDirectory(Path.GetDirectoryName(AuditEnvironment.Meta("Werewolf.ModDllPath")));
+            return resolver;
+        }
+
+        private static void AuditAgainst(string drillDir)
+        {
+            using var resolver = CreateDrillResolver(drillDir);
 
             using var mod = ModuleDefinition.ReadModule(AuditEnvironment.Meta("Werewolf.ModDllPath"),
                 new ReaderParameters { AssemblyResolver = resolver });

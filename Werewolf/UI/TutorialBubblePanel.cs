@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using TMPro;
 using UnityEngine;
@@ -37,152 +38,199 @@ namespace Werewolf.UI
 
         private enum SlideState { Hidden, In, Shown, Out }
 
-        private GameObject _root;
-        private RectTransform _slider;
-        private RectTransform _bubbleRect;
-        private TextMeshProUGUI _text;
-        private TextMeshProUGUI _hint;
-        private SlideState _state = SlideState.Hidden;
-        private float _animFrom;
-        private float _animT;
-        private float _slideDistance;
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, RectTransform slider, RectTransform bubbleRect,
+                TextMeshProUGUI text, TextMeshProUGUI hint)
+            {
+                Root = root;
+                Slider = slider;
+                BubbleRect = bubbleRect;
+                Text = text;
+                Hint = hint;
+            }
+
+            public GameObject Root { get; }
+            public RectTransform Slider { get; }
+            public RectTransform BubbleRect { get; }
+            public TextMeshProUGUI Text { get; }
+            public TextMeshProUGUI Hint { get; }
+            public SlideState State { get; set; } = SlideState.Hidden;
+            public float AnimFrom { get; set; }
+            public float AnimT { get; set; }
+            public float SlideDistance { get; set; }
+        }
+
+        private ViewRefs? _view;
 
         private static bool _escSuppressErrorLogged;
         private static bool _skipInputErrorLogged;
 
-        public bool Exists => _root != null;
+        public bool Exists => GetLiveViewOrNull() != null;
 
-        public bool Visible =>
-            _root != null && _root.activeSelf
-            && (_state == SlideState.In || _state == SlideState.Shown);
+        public bool Visible
+        {
+            get
+            {
+                ViewRefs? view = GetLiveViewOrNull();
+                return view != null && view.Root.activeSelf
+                    && (view.State == SlideState.In || view.State == SlideState.Shown);
+            }
+        }
 
-        public bool Idle => _state == SlideState.Hidden;
+        public bool Idle
+        {
+            get
+            {
+                ViewRefs? view = GetLiveViewOrNull();
+                return view == null || view.State == SlideState.Hidden;
+            }
+        }
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
 
-            if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
-
-            RectTransform rect = UiKit.CreateStretched(layerRoot, "WW_TutorialBubble");
-            var go = rect.gameObject;
-            _root = go;
-
-            var canvas = go.AddComponent<Canvas>();
-            canvas.overrideSorting = true;
-            canvas.sortingOrder = WerewolfUIManager.TutorialBubbleSortingOrder;
-
-            _slider = UiKit.CreateStretched(rect, "Slider");
-
-            Sprite taxman = AssetCatalog.GetSprite("img_taxman_death");
-            if (taxman != null)
+            GameObject? root = null;
+            try
             {
-                RectTransform iconRect = UiKit.CreateRect(
-                    _slider, "Taxman", Vector2.zero, new Vector2(IconSize, IconSize));
-                UiKit.SetAnchorsBottomLeft(iconRect,
-                    new Vector2(IconMargin + IconSize * 0.5f, IconMargin + IconSize * 0.5f),
-                    new Vector2(IconSize, IconSize));
-                Image icon = iconRect.gameObject.AddComponent<Image>();
-                icon.sprite = taxman;
-                icon.preserveAspect = true;
-                icon.raycastTarget = false;
-                icon.color = new Color(1f, 1f, 1f, BackgroundAlpha);
-            }
+                if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            Sprite bubbleSprite = AssetCatalog.GetSprite("img_tutorial_bubble");
-            if (bubbleSprite != null)
+                RectTransform rect = UiKit.CreateStretched(layerRoot, "WW_TutorialBubble");
+                root = rect.gameObject;
+
+                var canvas = root.AddComponent<Canvas>();
+                canvas.overrideSorting = true;
+                canvas.sortingOrder = WerewolfUIManager.TutorialBubbleSortingOrder;
+
+                RectTransform slider = UiKit.CreateStretched(rect, "Slider");
+
+                Sprite? taxman = AssetCatalog.GetSprite("img_taxman_death");
+                if (taxman != null)
+                {
+                    RectTransform iconRect = UiKit.CreateRect(
+                        slider, "Taxman", Vector2.zero, new Vector2(IconSize, IconSize));
+                    UiKit.SetAnchorsBottomLeft(iconRect,
+                        new Vector2(IconMargin + IconSize * 0.5f, IconMargin + IconSize * 0.5f),
+                        new Vector2(IconSize, IconSize));
+                    Image icon = iconRect.gameObject.AddComponent<Image>();
+                    icon.sprite = taxman;
+                    icon.preserveAspect = true;
+                    icon.raycastTarget = false;
+                    icon.color = new Color(1f, 1f, 1f, BackgroundAlpha);
+                }
+
+                RectTransform bubbleRect;
+                Sprite? bubbleSprite = AssetCatalog.GetSprite("img_tutorial_bubble");
+                if (bubbleSprite != null)
+                {
+                    bubbleRect = UiKit.CreateRect(slider, "Bubble", Vector2.zero, Vector2.one);
+                    Image bubble = bubbleRect.gameObject.AddComponent<Image>();
+                    bubble.sprite = bubbleSprite;
+                    bubble.raycastTarget = false;
+                    bubble.color = new Color(1f, 1f, 1f, BackgroundAlpha);
+                }
+                else
+                {
+                    Image bubble = UiKit.CreateRoundedImage(
+                        slider, "Bubble", Vector2.zero, Vector2.one, FallbackBubbleColor);
+                    bubbleRect = bubble.rectTransform;
+                    WLog.Line("tutorial_bubble_sprite_missing", secret: false, ("key", "img_tutorial_bubble"));
+                }
+
+                TextMeshProUGUI text = UiKit.CreateText(bubbleRect, "Text", Vector2.zero, Vector2.one,
+                    string.Empty, BaseFontSize, TextColor, TextAlignmentOptions.TopLeft);
+                text.textWrappingMode = TextWrappingModes.Normal;
+
+                TextMeshProUGUI hint = UiKit.CreateText(bubbleRect, "SkipHint", Vector2.zero, Vector2.one,
+                    string.Empty, HintFontSize, HintColor, TextAlignmentOptions.BottomRight);
+
+                root.SetActive(false);
+                _view = new ViewRefs(root, slider, bubbleRect, text, hint);
+            }
+            catch
             {
-                RectTransform bubbleRect = UiKit.CreateRect(_slider, "Bubble", Vector2.zero, Vector2.one);
-                Image bubble = bubbleRect.gameObject.AddComponent<Image>();
-                bubble.sprite = bubbleSprite;
-                bubble.raycastTarget = false;
-                bubble.color = new Color(1f, 1f, 1f, BackgroundAlpha);
-                _bubbleRect = bubbleRect;
+                _view = null;
+                if (root != null)
+                {
+                    root.SetActive(false);
+                    UnityEngine.Object.Destroy(root);
+                }
+                throw;
             }
-            else
-            {
-                Image bubble = UiKit.CreateRoundedImage(
-                    _slider, "Bubble", Vector2.zero, Vector2.one, FallbackBubbleColor);
-                _bubbleRect = bubble.rectTransform;
-                WLog.Line("tutorial_bubble_sprite_missing", secret: false, ("key", "img_tutorial_bubble"));
-            }
-
-            _text = UiKit.CreateText(_bubbleRect, "Text", Vector2.zero, Vector2.one,
-                string.Empty, BaseFontSize, TextColor, TextAlignmentOptions.TopLeft);
-            _text.enableWordWrapping = true;
-
-            _hint = UiKit.CreateText(_bubbleRect, "SkipHint", Vector2.zero, Vector2.one,
-                string.Empty, HintFontSize, HintColor, TextAlignmentOptions.BottomRight);
-
-            _root.SetActive(false);
         }
 
         public void ShowMessage(string message, float fontScale)
         {
-            if (_root == null || string.IsNullOrEmpty(message)) return;
-            _root.SetActive(true);
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null || string.IsNullOrEmpty(message)) return;
+            view.Root.SetActive(true);
 
-            _text.fontSize = BaseFontSize * Mathf.Clamp(fontScale, 0.1f, 2f);
-            _text.text = message;
-            _hint.text = BuildSkipHintText();
+            view.Text.fontSize = BaseFontSize * Mathf.Clamp(fontScale, 0.1f, 2f);
+            view.Text.text = message;
+            view.Hint.text = BuildSkipHintText();
 
             Vector2 size = UiText.PreferredAutoscaledSize(
-                _text, TextMaxWidth, float.PositiveInfinity, 5);
+                view.Text, TextMaxWidth, float.PositiveInfinity, 5);
             float textW = Mathf.Clamp(size.x, MinTextWidth, TextMaxWidth);
             float bodyH = PadTop + size.y + HintHeight;
             float bubbleW = textW + PadX * 2f;
             float bubbleH = bodyH / (1f - TailFraction);
 
-            UiKit.SetAnchorsBottomLeft(_bubbleRect,
+            UiKit.SetAnchorsBottomLeft(view.BubbleRect,
                 new Vector2(BubbleLeft + bubbleW * 0.5f, BubbleBottom + bubbleH * 0.5f),
                 new Vector2(bubbleW, bubbleH));
 
-            RectTransform textRect = _text.rectTransform;
+            RectTransform textRect = view.Text.rectTransform;
             textRect.sizeDelta = new Vector2(textW, size.y);
             textRect.anchoredPosition = new Vector2(0f, bubbleH * 0.5f - PadTop - size.y * 0.5f);
 
-            RectTransform hintRect = _hint.rectTransform;
+            RectTransform hintRect = view.Hint.rectTransform;
             hintRect.sizeDelta = new Vector2(textW, HintHeight);
             hintRect.anchoredPosition = new Vector2(
                 0f, -bubbleH * 0.5f + bubbleH * TailFraction + HintHeight * 0.5f);
 
-            _slideDistance = BubbleLeft + bubbleW + SlideMargin;
-            _animFrom = _state == SlideState.Hidden ? -_slideDistance : _slider.anchoredPosition.x;
-            _animT = 0f;
-            _state = SlideState.In;
-            SetSlideX(_animFrom);
+            view.SlideDistance = BubbleLeft + bubbleW + SlideMargin;
+            view.AnimFrom = view.State == SlideState.Hidden
+                ? -view.SlideDistance
+                : view.Slider.anchoredPosition.x;
+            view.AnimT = 0f;
+            view.State = SlideState.In;
+            SetSlideX(view, view.AnimFrom);
         }
 
         public void Hide()
         {
-            if (_root == null || !_root.activeSelf || _state == SlideState.Out) return;
-            _animFrom = _slider.anchoredPosition.x;
-            _animT = 0f;
-            _state = SlideState.Out;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null || !view.Root.activeSelf || view.State == SlideState.Out) return;
+            view.AnimFrom = view.Slider.anchoredPosition.x;
+            view.AnimT = 0f;
+            view.State = SlideState.Out;
         }
 
         public bool Tick()
         {
-            if (_root == null || !_root.activeSelf) return false;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null || !view.Root.activeSelf) return false;
 
-            if (_state == SlideState.In)
+            if (view.State == SlideState.In)
             {
-                _animT += Time.deltaTime / SlideInSeconds;
-                float t = Mathf.Clamp01(_animT);
+                view.AnimT += Time.deltaTime / SlideInSeconds;
+                float t = Mathf.Clamp01(view.AnimT);
                 float eased = 1f - (1f - t) * (1f - t) * (1f - t);
-                SetSlideX(Mathf.Lerp(_animFrom, 0f, eased));
-                if (t >= 1f) _state = SlideState.Shown;
+                SetSlideX(view, Mathf.Lerp(view.AnimFrom, 0f, eased));
+                if (t >= 1f) view.State = SlideState.Shown;
             }
-            else if (_state == SlideState.Out)
+            else if (view.State == SlideState.Out)
             {
-                _animT += Time.deltaTime / SlideOutSeconds;
-                float t = Mathf.Clamp01(_animT);
+                view.AnimT += Time.deltaTime / SlideOutSeconds;
+                float t = Mathf.Clamp01(view.AnimT);
                 float eased = t * t * t;
-                SetSlideX(Mathf.Lerp(_animFrom, -_slideDistance, eased));
+                SetSlideX(view, Mathf.Lerp(view.AnimFrom, -view.SlideDistance, eased));
                 if (t >= 1f)
                 {
-                    _root.SetActive(false);
-                    _state = SlideState.Hidden;
+                    view.Root.SetActive(false);
+                    view.State = SlideState.Hidden;
                 }
                 return false;
             }
@@ -201,7 +249,7 @@ namespace Werewolf.UI
             }
             try
             {
-                return Inputs.NoTextInputsActive && Inputs.Down(GameKey.Menu);
+                return Inputs.NoTextInputsActive && Inputs.Down(GameKey.Back);
             }
             catch (Exception e)
             {
@@ -214,25 +262,28 @@ namespace Werewolf.UI
             }
         }
 
-        private void SetSlideX(float x)
+        private static void SetSlideX(ViewRefs view, float x)
         {
-            Vector2 pos = _slider.anchoredPosition;
+            Vector2 pos = view.Slider.anchoredPosition;
             pos.x = x;
-            _slider.anchoredPosition = pos;
+            view.Slider.anchoredPosition = pos;
         }
 
         public void Destroy()
         {
-            if (_root != null)
-            {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
-            }
-            _slider = null;
-            _bubbleRect = null;
-            _text = null;
-            _hint = null;
-            _state = SlideState.Hidden;
+            ViewRefs? view = _view;
+            _view = null;
+            if (view != null && view.Root != null) UnityEngine.Object.Destroy(view.Root);
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+
+            _view = null;
+            return null;
         }
 
         private static string BuildSkipHintText()

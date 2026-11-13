@@ -1,3 +1,4 @@
+#nullable enable
 using UnityEngine;
 using Werewolf.Core;
 
@@ -9,11 +10,11 @@ namespace Werewolf.Vanilla
         private static readonly Color PressColorStart = new Color(1f, 0.5f, 0f, 1f);
 
         private readonly ButtonPressState _state = new ButtonPressState();
-        private Transform _target;
-        private MeshRenderer _renderer;
-        private AnimationCurve _curve;
+        private Transform? _target;
+        private MeshRenderer? _renderer;
+        private AnimationCurve? _curve;
 
-        public void Bind(Transform target, MeshRenderer renderer, AnimationCurve curve)
+        public void Bind(Transform target, MeshRenderer? renderer, AnimationCurve? curve)
         {
             _target = target;
             _renderer = renderer;

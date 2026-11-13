@@ -1,3 +1,4 @@
+#nullable enable
 using TMPro;
 using UnityEngine;
 using Werewolf.Core;
@@ -8,16 +9,16 @@ namespace Werewolf.UI
     {
         private const float BadgeX = 135f;
         private const float BadgeYOffsetFromName = 5f;
-        private TextMeshProUGUI _label;
-        private RectTransform _rect;
-        private RectTransform _nameRect;
+        private TextMeshProUGUI? _label;
+        private RectTransform? _rect;
+        private RectTransform? _nameRect;
         private int _lastRevision = -1;
         private ModIntegrityStatus _lastStatus;
 
-        public static ModIntegrityPlayerBadge GetOrCreate(GameObject rowObject, RectTransform nameRect)
+        public static ModIntegrityPlayerBadge? GetOrCreate(GameObject? rowObject, RectTransform? nameRect)
         {
             if (rowObject == null) return null;
-            ModIntegrityPlayerBadge badge = rowObject.GetComponent<ModIntegrityPlayerBadge>();
+            ModIntegrityPlayerBadge? badge = rowObject.GetComponent<ModIntegrityPlayerBadge>();
             if (badge == null) badge = rowObject.AddComponent<ModIntegrityPlayerBadge>();
             badge._nameRect = nameRect;
             badge.EnsureBuilt();
@@ -64,7 +65,7 @@ namespace Werewolf.UI
         private void AlignWithPlayerName()
         {
             if (_rect == null) return;
-            RectTransform nameRect = _nameRect;
+            RectTransform? nameRect = _nameRect;
             if (nameRect == null) return;
 
             Vector3 nameCenter = transform.InverseTransformPoint(nameRect.TransformPoint(nameRect.rect.center));

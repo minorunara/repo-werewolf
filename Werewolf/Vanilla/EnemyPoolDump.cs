@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -58,7 +59,7 @@ namespace Werewolf.Vanilla
                 names.Add(string.IsNullOrEmpty(parent.enemyName) ? "?" : parent.enemyName);
                 try
                 {
-                    if (GameRefs.EnemyParent_Spawned != null && GameRefs.EnemyParent_Spawned(parent)) alive++;
+                    if (parent.Spawned) alive++;
                 }
                 catch (Exception e)
                 {
@@ -92,7 +93,7 @@ namespace Werewolf.Vanilla
                     foreach (PrefabRef spawnObject in setup.spawnObjects)
                     {
                         if (spawnObject == null) continue;
-                        EnemyParent parent = ResolveEnemyParent(setup, spawnObject);
+                        EnemyParent? parent = ResolveEnemyParent(setup, spawnObject);
                         if (parent != null) bodies++;
                         kinds.Add(Kind(spawnObject, parent));
                     }
@@ -109,7 +110,7 @@ namespace Werewolf.Vanilla
             }
         }
 
-        private static EnemyParent ResolveEnemyParent(EnemySetup setup, PrefabRef spawnObject)
+        private static EnemyParent? ResolveEnemyParent(EnemySetup setup, PrefabRef spawnObject)
         {
             try
             {
@@ -124,7 +125,7 @@ namespace Werewolf.Vanilla
             }
         }
 
-        private static string Kind(PrefabRef spawnObject, EnemyParent parent)
+        private static string Kind(PrefabRef spawnObject, EnemyParent? parent)
         {
             string name = spawnObject.PrefabName;
             if (string.IsNullOrEmpty(name)) name = spawnObject.ResourcePath;
@@ -132,7 +133,7 @@ namespace Werewolf.Vanilla
             return name + ":" + Digit(parent);
         }
 
-        private static string Digit(EnemyParent parent)
+        private static string Digit(EnemyParent? parent)
         {
             if (parent == null) return "?";
             switch (parent.difficulty)
@@ -144,7 +145,7 @@ namespace Werewolf.Vanilla
             }
         }
 
-        private static object Eligible(EnemySetup setup, int levelsCompleted, int runsPlayed)
+        private static object? Eligible(EnemySetup setup, int levelsCompleted, int runsPlayed)
         {
             if (levelsCompleted < 0 || runsPlayed < 0) return null;
             return EnemySetOverride.IsEligible(setup, levelsCompleted, runsPlayed);

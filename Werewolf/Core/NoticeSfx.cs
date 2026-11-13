@@ -1,3 +1,6 @@
+#nullable enable
+using System;
+
 namespace Werewolf.Core
 {
     public static class NoticeSfx
@@ -14,7 +17,7 @@ namespace Werewolf.Core
 
         public static string Resolve(SessionNotice notice)
         {
-            if (notice == null) return DefaultClipKey;
+            if (notice == null) throw new ArgumentNullException(nameof(notice));
 
             switch (notice.Kind)
             {

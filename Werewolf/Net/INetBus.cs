@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 
 namespace Werewolf.Net
@@ -24,9 +25,9 @@ namespace Werewolf.Net
 
         bool SendToMaster(byte code, object[] payload);
 
-        event Action<InboundMessage> OnReceived;
+        event Action<InboundMessage>? OnReceived;
 
-        event Action<int> OnPlayerLeft;
+        event Action<int>? OnPlayerLeft;
 
         int LocalActorNumber { get; }
     }

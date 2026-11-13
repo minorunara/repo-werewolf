@@ -14,7 +14,7 @@ namespace Werewolf.Game
 
         public void OnEnemySetupStarted()
         {
-            if (!Session.IsHost || _session != null || !IsWerewolfRoundExpected()) return;
+            if (!Session.IsHost || _hostRound != null || !IsWerewolfRoundExpected()) return;
             PreplayEnemySpawnHold.Begin(SessionClock.NowMs());
         }
 
@@ -29,7 +29,7 @@ namespace Werewolf.Game
                 {
                     return;
                 }
-                if (_session != null) return;
+                if (_hostRound != null) return;
 
                 bool isRunLevel = Session.InRunLevel;
                 GamePhase phase = HostPhase;
@@ -49,7 +49,7 @@ namespace Werewolf.Game
         {
             if (!_autoStartWait.Armed) return;
 
-            if (_session != null || !Session.InRunLevel || !Session.IsHost)
+            if (_hostRound != null || !Session.InRunLevel || !Session.IsHost)
             {
                 _autoStartWait.Disarm();
                 return;
@@ -82,9 +82,7 @@ namespace Werewolf.Game
         private void CacheLoadWaitRosterNames()
         {
             Dictionary<int, string> roomNames = Players.RoomRosterNames();
-            List<WPlayer> players = Registry != null && Registry.Available
-                ? Registry.BuildRealPlayers()
-                : new List<WPlayer>();
+            List<WPlayer> players = Registry.BuildRealPlayers();
             if (roomNames.Count == 0 && players.Count == 0) return;
             if (_roundMirror.DisplayNameCache == null)
                 _roundMirror.DisplayNameCache = new Dictionary<int, string>();
@@ -99,10 +97,11 @@ namespace Werewolf.Game
 
         private void CacheHostSessionRosterNames()
         {
-            if (_session == null) return;
+            GameSession? session = _hostRound?.Session;
+            if (session == null) return;
             if (_roundMirror.DisplayNameCache == null)
                 _roundMirror.DisplayNameCache = new Dictionary<int, string>();
-            foreach (WPlayer player in _session.Players)
+            foreach (WPlayer player in session.Players)
             {
                 if (player != null && !string.IsNullOrEmpty(player.Name))
                     _roundMirror.DisplayNameCache[player.ActorNumber] = player.Name;
@@ -111,7 +110,7 @@ namespace Werewolf.Game
 
         private void CachePreplayRosterIfNeeded()
         {
-            if (_session != null || _roundMirror.DisplayNameCache != null) return;
+            if (_hostRound != null || _roundMirror.DisplayNameCache != null) return;
             if (!Session.InRunLevel || !IsWerewolfRoundExpected()) return;
             CacheLoadWaitRosterNames();
         }
@@ -123,7 +122,7 @@ namespace Werewolf.Game
             _clientPhase = GamePhase.PreplayAborted;
             _roomState.PublishPhase(GamePhase.PreplayAborted, 0);
             _bus?.SendToAll(MessageCodes.PreplayAborted, new object[] { (byte)reason });
-            _resultSequence.Begin(nowUnixMs, _resultFlowFeature.RoundGameOverAutoReturnSec);
+            _resultSequence.Begin(nowUnixMs, Runtime.ResultFlowFeature.RoundGameOverAutoReturnSec);
             _resetArmed = true;
             WLog.Line("preplay_aborted", secret: false, ("reason", reason));
         }

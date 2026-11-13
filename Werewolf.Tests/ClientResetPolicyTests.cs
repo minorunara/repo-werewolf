@@ -1,3 +1,5 @@
+#nullable enable
+using System;
 using Werewolf.Core;
 using Xunit;
 
@@ -21,15 +23,27 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void ApplyRoomLeft_DoesNotThrow_WhenMeetingRowsAreEmpty()
+        public void ApplyRoomLeft_IsIdempotent_WhenClientStatesAreEmpty()
         {
             var mc = new MeetingClientState();
 
-            ClientResetPolicy.ApplyRoomLeft(mc, null);
+            ClientResetPolicy.ApplyRoomLeft(mc, new IdRosterClient());
 
             Assert.False(mc.MeetingActive);
             Assert.Equal(RowStatus.Alive, mc.GetRowStatus(1));
             Assert.Equal(RowStatus.Alive, mc.GetRowStatus(2));
+        }
+
+        [Fact]
+        public void ApplyRoomLeft_RejectsMissingResetTargets()
+        {
+            var meetingError = Assert.Throws<ArgumentNullException>(() =>
+                ClientResetPolicy.ApplyRoomLeft(null!, new IdRosterClient()));
+            var rosterError = Assert.Throws<ArgumentNullException>(() =>
+                ClientResetPolicy.ApplyRoomLeft(new MeetingClientState(), null!));
+
+            Assert.Equal("meetingClient", meetingError.ParamName);
+            Assert.Equal("idRoster", rosterError.ParamName);
         }
 
         [Fact]

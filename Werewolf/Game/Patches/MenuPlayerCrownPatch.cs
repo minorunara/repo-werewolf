@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using HarmonyLib;
@@ -5,12 +6,9 @@ using Werewolf.Core;
 
 namespace Werewolf.Game.Patches
 {
-    [HarmonyPatch(typeof(MenuPlayerListed), "Update")]
+    [HarmonyPatch(typeof(MenuPlayerListed), nameof(MenuPlayerListed.Update))]
     internal static class MenuPlayerCrownPatch
     {
-        private static AccessTools.FieldRef<MenuPlayerListed, PlayerAvatar> PlayerAvatarRef =>
-            GameRefs.MenuPlayerListed_playerAvatar;
-
         private static bool _errorLogged;
         private static int _loggedVersion = -1;
         private static readonly HashSet<int> _loggedActors = new HashSet<int>();
@@ -22,7 +20,7 @@ namespace Werewolf.Game.Patches
                 if (!CrownRoster.HasWinners) return;
                 if (__instance.forceCrown) return;
 
-                PlayerAvatar avatar = PlayerAvatarRef(__instance);
+                PlayerAvatar avatar = __instance.playerAvatar;
                 if (avatar == null) return;
 
                 int actor = PlayerCrownPatch.ResolveActor(avatar);

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using TMPro;
@@ -54,6 +55,7 @@ namespace Werewolf.UI
             public RectTransform Rect;
             public Image Bg;
             public ChatStampCategory Category;
+            public TextMeshProUGUI? Label;
         }
 
         private struct ItemEntry
@@ -63,7 +65,7 @@ namespace Werewolf.UI
             public byte Id;
         }
 
-        private RectTransform _panelRect;
+        private RectTransform? _panelRect;
         private float _panelWidth;
         private float _panelHeight;
         private float _headerHeight;
@@ -71,16 +73,17 @@ namespace Werewolf.UI
         private float _paletteBottomY;
         private float _paletteHeight;
 
-        private RectTransform _bar;
-        private CanvasGroup _barGroup;
-        private RectTransform _buttonRect;
-        private Image _buttonBg;
+        private RectTransform? _bar;
+        private CanvasGroup? _barGroup;
+        private RectTransform? _buttonRect;
+        private Image? _buttonBg;
+        private TextMeshProUGUI? _buttonLabel;
 
-        private GameObject _palette;
-        private RectTransform _paletteRect;
-        private RectTransform _itemsViewport;
-        private RectTransform _itemsRoot;
-        private CanvasGroup _itemsGroup;
+        private GameObject? _palette;
+        private RectTransform? _paletteRect;
+        private RectTransform? _itemsViewport;
+        private RectTransform? _itemsRoot;
+        private CanvasGroup? _itemsGroup;
         private readonly List<TabEntry> _tabs = new List<TabEntry>();
         private readonly List<ItemEntry> _items = new List<ItemEntry>();
 
@@ -122,7 +125,8 @@ namespace Werewolf.UI
             TextMeshProUGUI label = UiKit.CreateText(_buttonRect, "Label", Vector2.zero,
                 new Vector2(ButtonWidth, ButtonHeight), Texts.Get(TextId.ChatStampButtonLabel),
                 ButtonFontSize, ButtonTextColor, TextAlignmentOptions.Center);
-            label.enableWordWrapping = false;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
+            _buttonLabel = label;
 
             foreach (ChatStampCategoryDef cat in ChatStampCatalog.CategoryDefs)
             {
@@ -312,8 +316,8 @@ namespace Werewolf.UI
             foreach (ItemEntry item in _items) item.Bg.color = ItemColor;
         }
 
-        private static Sprite ItemIconSprite(ChatStampDef def)
-            => ChatEmoji.TryReadSpriteAt(def.Emoji, 0, out string key, out _) ? AssetCatalog.GetSprite(key) : null;
+        private static Sprite? ItemIconSprite(ChatStampDef def)
+            => ChatEmoji.TryReadSpriteAt(def.Emoji, 0, out string? key, out _) ? AssetCatalog.GetSprite(key) : null;
 
         private void EnsurePalette()
         {
@@ -343,7 +347,8 @@ namespace Werewolf.UI
                 Image tabBg = UiKit.CreateRoundedImage(_paletteRect, "Tab" + i,
                     new Vector2(x, tabTopY), new Vector2(tabWidth, TabHeight), TabColor);
 
-                Sprite tabSprite = AssetCatalog.GetSprite(cat.IconKey);
+                TextMeshProUGUI? tabText = null;
+                Sprite? tabSprite = AssetCatalog.GetSprite(cat.IconKey);
                 if (tabSprite != null)
                 {
                     Image tabIcon = UiKit.CreateImage(tabBg.rectTransform, "Icon", Vector2.zero,
@@ -360,7 +365,8 @@ namespace Werewolf.UI
                     TextMeshProUGUI tabLabel = UiKit.CreateText(tabBg.rectTransform, "Label",
                         Vector2.zero, new Vector2(tabWidth, TabHeight), Texts.Get(cat.TextId),
                         TabFontSize, TabTextColor, TextAlignmentOptions.Center);
-                    tabLabel.enableWordWrapping = false;
+                    tabLabel.textWrappingMode = TextWrappingModes.NoWrap;
+                    tabText = tabLabel;
                 }
 
                 _tabs.Add(new TabEntry
@@ -368,6 +374,7 @@ namespace Werewolf.UI
                     Rect = tabBg.rectTransform,
                     Bg = tabBg,
                     Category = cat.Category,
+                    Label = tabText,
                 });
             }
 
@@ -400,7 +407,7 @@ namespace Werewolf.UI
                 Image itemBg = UiKit.CreateRoundedImage(_itemsRoot, "Item" + defs[i].Id.ToString(),
                     new Vector2(0f, topY), new Vector2(innerWidth, ItemHeight), ItemColor);
 
-                Sprite icon = ItemIconSprite(defs[i]);
+                Sprite? icon = ItemIconSprite(defs[i]);
                 if (icon != null)
                 {
                     Image img = UiKit.CreateImage(itemBg.rectTransform, "Icon",
@@ -415,7 +422,7 @@ namespace Werewolf.UI
                     new Vector2(textWidth, ItemHeight),
                     Texts.Get(defs[i].TextId),
                     ItemFontSize, ItemTextColor, TextAlignmentOptions.MidlineLeft);
-                label.enableWordWrapping = true;
+                label.textWrappingMode = TextWrappingModes.Normal;
                 label.overflowMode = TextOverflowModes.Ellipsis;
                 _items.Add(new ItemEntry
                 {
@@ -426,6 +433,20 @@ namespace Werewolf.UI
             }
         }
 
+        public void ApplyTexts()
+        {
+            if (_buttonLabel != null) _buttonLabel.text = Texts.Get(TextId.ChatStampButtonLabel);
+            foreach (TabEntry tab in _tabs)
+            {
+                if (tab.Label == null) continue;
+                foreach (ChatStampCategoryDef cat in ChatStampCatalog.CategoryDefs)
+                {
+                    if (cat.Category == tab.Category) { tab.Label.text = Texts.Get(cat.TextId); break; }
+                }
+            }
+            if (_itemsRoot != null) RebuildItems();
+        }
+
         public void Clear()
         {
             ForgetPalette();
@@ -434,6 +455,7 @@ namespace Werewolf.UI
             _barGroup = null;
             _buttonRect = null;
             _buttonBg = null;
+            _buttonLabel = null;
             _click.Reset();
             _windowOpen = true;
         }

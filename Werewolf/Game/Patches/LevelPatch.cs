@@ -1,10 +1,11 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
 
 namespace Werewolf.Game.Patches
 {
-    [HarmonyPatch(typeof(RunManager), "ChangeLevel")]
+    [HarmonyPatch(typeof(RunManager), nameof(RunManager.ChangeLevel))]
     internal static class LevelPatch
     {
         private static void Prefix(bool _completedLevel, bool _levelFailed, RunManager.ChangeLevelType _changeLevelType)
@@ -13,7 +14,7 @@ namespace Werewolf.Game.Patches
             {
                 if (_changeLevelType == RunManager.ChangeLevelType.LobbyMenu) return;
 
-                WerewolfDirector dir = WerewolfDirector.Instance;
+                WerewolfDirector? dir = WerewolfDirector.Instance;
                 if (dir == null || !dir.IsHostSessionActive) return;
                 if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
                 if (dir.HostPhase != GamePhase.Play && dir.HostPhase != GamePhase.Meeting) return;

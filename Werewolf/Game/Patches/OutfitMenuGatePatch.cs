@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using UnityEngine;
@@ -5,14 +6,14 @@ using Werewolf.Core;
 
 namespace Werewolf.Game.Patches
 {
-    [HarmonyPatch(typeof(MenuPageEsc), "ButtonEventChangeColor")]
+    [HarmonyPatch(typeof(MenuPageEsc), nameof(MenuPageEsc.ButtonEventChangeColor))]
     internal static class OutfitMenuGatePatch
     {
         private static bool Prefix()
         {
             try
             {
-                WerewolfDirector dir = WerewolfDirector.Instance;
+                WerewolfDirector? dir = WerewolfDirector.Instance;
                 if (dir == null) return true;
 
                 if (!OutfitRules.ShouldBlockOutfitChange(dir.ClientPhase, dir.ClientOutfitChangeAllowed))

@@ -1,3 +1,4 @@
+#nullable enable
 namespace Werewolf.Core
 {
     public enum SessionEventKind : byte
@@ -30,7 +31,7 @@ namespace Werewolf.Core
 
         public DeathCause DeathCause { get; private set; }
 
-        public WinResult Winner { get; private set; }
+        public WinResult? Winner { get; private set; }
 
         public bool Vanished { get; private set; }
 

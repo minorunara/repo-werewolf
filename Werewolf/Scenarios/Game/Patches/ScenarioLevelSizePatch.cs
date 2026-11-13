@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
@@ -5,7 +6,7 @@ using Werewolf.Scenarios.Vanilla;
 
 namespace Werewolf.Scenarios.Game.Patches
 {
-    [HarmonyPatch(typeof(LevelGenerator), "Start")]
+    [HarmonyPatch(typeof(LevelGenerator), nameof(LevelGenerator.Start))]
     internal static class ScenarioLevelSizePatch
     {
         private static void Postfix(LevelGenerator __instance)
@@ -21,7 +22,7 @@ namespace Werewolf.Scenarios.Game.Patches
         }
     }
 
-    [HarmonyPatch(typeof(LevelGenerator), "SetExtractionTile")]
+    [HarmonyPatch(typeof(LevelGenerator), nameof(LevelGenerator.SetDeadEndTile))]
     internal static class ScenarioExtractionRoomsPatch
     {
         private static bool Prefix(Module.Type _type)

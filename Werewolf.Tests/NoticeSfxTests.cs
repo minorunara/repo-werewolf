@@ -1,3 +1,5 @@
+#nullable enable
+using System;
 using Werewolf.Core;
 using Xunit;
 
@@ -13,9 +15,11 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void Null_FallsBackToDefault()
+        public void Null_ThrowsForNotice()
         {
-            Assert.Equal(NoticeSfx.DefaultClipKey, NoticeSfx.Resolve(null));
+            var error = Assert.Throws<ArgumentNullException>(() => NoticeSfx.Resolve(null!));
+
+            Assert.Equal("notice", error.ParamName);
         }
 
         [Theory]

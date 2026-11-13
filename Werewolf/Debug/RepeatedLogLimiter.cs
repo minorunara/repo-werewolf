@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using Werewolf.Core;
@@ -47,7 +48,7 @@ namespace Werewolf.Debugging
         {
             public DateTime LastEmittedAt;
             public int SuppressedCount;
-            public string Kind;
+            public string Kind = string.Empty;
             public WLogLevel Level;
             public bool Secret;
         }
@@ -74,7 +75,7 @@ namespace Werewolf.Debugging
 
             lock (_lock)
             {
-                if (!_states.TryGetValue(key, out State state))
+                if (!_states.TryGetValue(key, out State? state))
                 {
                     _states.Add(key, new State
                     {

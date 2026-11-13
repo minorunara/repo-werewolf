@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using TMPro;
@@ -48,34 +49,60 @@ namespace Werewolf.UI
         private static readonly Vector2 TimeTextBarPos = new Vector2(410f, MeetingTimeBarView.BarY);
         private static readonly Vector2 TimeTextHeaderPos = new Vector2(390f, 358f);
 
-        public event Action<int> OnVoteSubmit;
+        public event Action<int>? OnVoteSubmit;
 
-        public Action<string, float> PlaySfx;
+        public Action<string, float>? PlaySfx;
 
         private readonly List<VoteRow> _rows = new List<VoteRow>();
         private readonly Dictionary<int, VoteRow> _rowsByActor = new Dictionary<int, VoteRow>();
 
-        private GameObject _root;
-        private RectTransform _rootRect;
-        private TextMeshProUGUI _timeText;
-        private TextMeshProUGUI _resultBanner;
-        private Image _skipButtonBg;
-        private TextMeshProUGUI _skipLabel;
-        private TextMeshProUGUI _skipCountLabel;
-        private Image _pagePrevBg;
-        private Image _pageNextBg;
-        private TextMeshProUGUI _pageLabel;
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, RectTransform rootRect, TextMeshProUGUI timeText,
+                TextMeshProUGUI resultBanner, Image skipButtonBg, TextMeshProUGUI skipLabel,
+                TextMeshProUGUI skipCountLabel, Image pagePrevBg, Image pageNextBg,
+                TextMeshProUGUI pageLabel, TextMeshProUGUI titleLabel)
+            {
+                Root = root;
+                RootRect = rootRect;
+                TimeText = timeText;
+                ResultBanner = resultBanner;
+                SkipButtonBg = skipButtonBg;
+                SkipLabel = skipLabel;
+                SkipCountLabel = skipCountLabel;
+                PagePrevBg = pagePrevBg;
+                PageNextBg = pageNextBg;
+                PageLabel = pageLabel;
+                TitleLabel = titleLabel;
+            }
+
+            public GameObject Root { get; }
+            public RectTransform RootRect { get; }
+            public TextMeshProUGUI TimeText { get; }
+            public TextMeshProUGUI ResultBanner { get; }
+            public Image SkipButtonBg { get; }
+            public TextMeshProUGUI SkipLabel { get; }
+            public TextMeshProUGUI SkipCountLabel { get; }
+            public Image PagePrevBg { get; }
+            public Image PageNextBg { get; }
+            public TextMeshProUGUI PageLabel { get; }
+            public TextMeshProUGUI TitleLabel { get; }
+        }
+
+        private ViewRefs? _view;
+
+        private readonly TextRefresh _textRefresh = new TextRefresh(nameof(VotePanel));
 
         private readonly MeetingTimeBarView _timeBarView = new MeetingTimeBarView();
 
         public bool HideTimeLimit { get; set; }
 
-        private ITargetSelectionSource _selectionSource;
-        private DefaultVoteTargetProvider _defaultProvider;
+        private ITargetSelectionSource? _selectionSource;
+        private DefaultVoteTargetProvider? _defaultProvider;
 
-        private Func<int, Role?> _teamMarkerRole;
+        private Func<int, Role?>? _teamMarkerRole;
 
-        private MeetingClientState _lastState;
+        private MeetingClientState? _lastState;
         private int _localActor = -1;
         private int _page;
         private bool _pendingSend;
@@ -101,76 +128,97 @@ namespace Werewolf.UI
 
         public VotePanel()
         {
-            _scatter = new ScatterRevealView(_rows, () => _rootRect, TitleTextColor);
-            _tallyView = new VoteTallyRevealView(_rows, () => _rootRect,
+            _scatter = new ScatterRevealView(_rows, () => GetLiveViewOrNull()?.RootRect, TitleTextColor);
+            _tallyView = new VoteTallyRevealView(_rows, () => GetLiveViewOrNull()?.RootRect,
                 (key, volume) => PlaySfx?.Invoke(key, volume));
         }
 
-        public bool Exists => _root != null;
+        public bool Exists => GetLiveViewOrNull() != null;
 
         public string LayerName => WerewolfUIManager.MeetingLayer;
 
-        public Func<Vector2, bool> IsPointerBlocked;
+        public Func<Vector2, bool>? IsPointerBlocked;
 
         public int CurrentPage => _page;
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
 
-            RectTransform rect = UiKit.CreateRect(layerRoot, "WW_VotePanel", PanelPos, PanelSize);
-            _root = rect.gameObject;
-            _rootRect = rect;
+            GameObject? root = null;
+            try
+            {
+                RectTransform rect = UiKit.CreateRect(layerRoot, "WW_VotePanel", PanelPos, PanelSize);
+                root = rect.gameObject;
 
-            UiKit.CreateImage(rect, "Bg", Vector2.zero, PanelSize, PanelBgColor);
+                UiKit.CreateImage(rect, "Bg", Vector2.zero, PanelSize, PanelBgColor);
 
             UiKit.CreateImage(rect, "HeaderBg", new Vector2(0f, 358f), new Vector2(960f, 56f), HeaderBgColor);
-            UiKit.CreateText(rect, "Title", new Vector2(0f, 358f), new Vector2(400f, 44f),
+            TextMeshProUGUI titleLabel = UiKit.CreateText(rect, "Title", new Vector2(0f, 358f), new Vector2(400f, 44f),
                 Texts.Get(TextId.VoteMeetingTitle), 34f, TitleTextColor, TextAlignmentOptions.Center);
 
-            _timeText = UiKit.CreateText(rect, "Time", TimeTextHeaderPos, new Vector2(200f, 44f),
-                "--:--", 30f, TimeNormalColor, TextAlignmentOptions.Center);
+                TextMeshProUGUI timeText = UiKit.CreateText(rect, "Time", TimeTextHeaderPos, new Vector2(200f, 44f),
+                    "--:--", 30f, TimeNormalColor, TextAlignmentOptions.Center);
 
-            _timeBarView.Build(rect);
+                _timeBarView.Build(rect);
 
-            _resultBanner = UiKit.CreateText(rect, "Result", new Vector2(0f, 318f), new Vector2(960f, 36f),
-                "", 26f, ResultExecutedColor, TextAlignmentOptions.Center);
-            _resultBanner.gameObject.SetActive(false);
+                TextMeshProUGUI resultBanner = UiKit.CreateText(rect, "Result", new Vector2(0f, 318f), new Vector2(960f, 36f),
+                    "", 26f, ResultExecutedColor, TextAlignmentOptions.Center);
+                resultBanner.gameObject.SetActive(false);
 
-            _skipButtonBg = UiKit.CreateImage(rect, "SkipButton", new Vector2(0f, -352f),
-                new Vector2(220f, 50f), NeutralButtonEnabledColor);
-            _skipLabel = UiKit.CreateText(_skipButtonBg.rectTransform, "Label", Vector2.zero,
-                new Vector2(220f, 50f), Texts.Get(TextId.VoteSkipLabel), 24f, Color.white, TextAlignmentOptions.Center);
-            Sprite skipIcon = AssetCatalog.GetSprite("icon_btn_skip");
+                Image skipButtonBg = UiKit.CreateImage(rect, "SkipButton", new Vector2(0f, -352f),
+                    new Vector2(220f, 50f), NeutralButtonEnabledColor);
+                TextMeshProUGUI skipLabel = UiKit.CreateText(skipButtonBg.rectTransform, "Label", Vector2.zero,
+                    new Vector2(220f, 50f), Texts.Get(TextId.VoteSkipLabel), 24f, Color.white, TextAlignmentOptions.Center);
+            Sprite? skipIcon = AssetCatalog.GetSprite("icon_btn_skip");
             if (skipIcon != null)
             {
-                Image icon = UiKit.CreateImage(_skipButtonBg.rectTransform, "Icon",
+                Image icon = UiKit.CreateImage(skipButtonBg.rectTransform, "Icon",
                     new Vector2(-220f / 2f + 30f / 2f + 8f, 0f),
                     new Vector2(30f, 30f), Color.white);
                 icon.sprite = skipIcon;
                 icon.preserveAspect = true;
             }
-            _skipCountLabel = UiKit.CreateText(rect, "SkipCount", new Vector2(175f, -352f), new Vector2(110f, 50f),
-                "", 28f, TitleTextColor, TextAlignmentOptions.MidlineLeft);
-            _skipCountLabel.enableWordWrapping = false;
-            _skipCountLabel.gameObject.SetActive(false);
+                TextMeshProUGUI skipCountLabel = UiKit.CreateText(rect, "SkipCount", new Vector2(175f, -352f), new Vector2(110f, 50f),
+                    "", 28f, TitleTextColor, TextAlignmentOptions.MidlineLeft);
+                skipCountLabel.textWrappingMode = TextWrappingModes.NoWrap;
+                skipCountLabel.gameObject.SetActive(false);
 
-            _pagePrevBg = UiKit.CreateImage(rect, "PagePrev", new Vector2(-420f, -352f),
-                new Vector2(60f, 50f), NeutralButtonEnabledColor);
-            UiKit.CreateText(_pagePrevBg.rectTransform, "Label", Vector2.zero, new Vector2(60f, 50f),
-                "◀", 24f, Color.white, TextAlignmentOptions.Center);
-            _pageNextBg = UiKit.CreateImage(rect, "PageNext", new Vector2(420f, -352f),
-                new Vector2(60f, 50f), NeutralButtonEnabledColor);
-            UiKit.CreateText(_pageNextBg.rectTransform, "Label", Vector2.zero, new Vector2(60f, 50f),
-                "▶", 24f, Color.white, TextAlignmentOptions.Center);
-            _pageLabel = UiKit.CreateText(rect, "PageLabel", new Vector2(-340f, -352f), new Vector2(90f, 50f),
-                "", 22f, Color.white, TextAlignmentOptions.Center);
-            SetPagerVisible(false);
+                Image pagePrevBg = UiKit.CreateImage(rect, "PagePrev", new Vector2(-420f, -352f),
+                    new Vector2(60f, 50f), NeutralButtonEnabledColor);
+                UiKit.CreateText(pagePrevBg.rectTransform, "Label", Vector2.zero, new Vector2(60f, 50f),
+                    "◀", 24f, Color.white, TextAlignmentOptions.Center);
+                Image pageNextBg = UiKit.CreateImage(rect, "PageNext", new Vector2(420f, -352f),
+                    new Vector2(60f, 50f), NeutralButtonEnabledColor);
+                UiKit.CreateText(pageNextBg.rectTransform, "Label", Vector2.zero, new Vector2(60f, 50f),
+                    "▶", 24f, Color.white, TextAlignmentOptions.Center);
+                TextMeshProUGUI pageLabel = UiKit.CreateText(rect, "PageLabel", new Vector2(-340f, -352f), new Vector2(90f, 50f),
+                    "", 22f, Color.white, TextAlignmentOptions.Center);
+                pagePrevBg.gameObject.SetActive(false);
+                pageNextBg.gameObject.SetActive(false);
+                pageLabel.gameObject.SetActive(false);
+
+                _view = new ViewRefs(root, rect, timeText, resultBanner, skipButtonBg, skipLabel,
+                    skipCountLabel, pagePrevBg, pageNextBg, pageLabel, titleLabel);
+                _textRefresh.Subscribe(() => Exists, ApplyTexts);
+            }
+            catch
+            {
+                _view = null;
+                _timeBarView.OnPanelDestroy();
+                if (root != null)
+                {
+                    root.SetActive(false);
+                    UnityEngine.Object.Destroy(root);
+                }
+                throw;
+            }
         }
 
         public void BeginMeeting(IReadOnlyList<WPlayer> roster, Func<int, PlayerHandle> resolveAvatar, int localActor)
         {
-            if (_root == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
             ClearRows();
             _localActor = localActor;
             _page = 0;
@@ -183,12 +231,9 @@ namespace Werewolf.UI
             _slideActive = true;
             _reorderApplied = false;
             _timeBarView.Reset();
-            if (_rootRect != null)
-            {
-                _rootRect.anchoredPosition = new Vector2(PanelPos.x, PanelPos.y + SlideStartOffsetY);
-            }
-            _resultBanner.gameObject.SetActive(false);
-            _skipCountLabel.gameObject.SetActive(false);
+            view.RootRect.anchoredPosition = new Vector2(PanelPos.x, PanelPos.y + SlideStartOffsetY);
+            view.ResultBanner.gameObject.SetActive(false);
+            view.SkipCountLabel.gameObject.SetActive(false);
 
             if (_selectionSource == null || _defaultProvider != null)
             {
@@ -201,7 +246,7 @@ namespace Werewolf.UI
                 foreach (WPlayer player in roster)
                 {
                     if (player == null) continue;
-                    VoteRow row = VoteRow.Build(_root.transform, player, resolveAvatar, VoteRowGrid.RowSize);
+                    VoteRow row = VoteRow.Build(view.Root.transform, player, resolveAvatar, VoteRowGrid.RowSize);
                     _rows.Add(row);
                     _rowsByActor[player.ActorNumber] = row;
                 }
@@ -218,7 +263,7 @@ namespace Werewolf.UI
                 ("localActor", localActor), ("pages", PageCount));
         }
 
-        public void SetSelectionSource(ITargetSelectionSource source)
+        public void SetSelectionSource(ITargetSelectionSource? source)
         {
             if (source == null)
             {
@@ -233,7 +278,7 @@ namespace Werewolf.UI
             }
         }
 
-        public void SetTeamMarkerProvider(Func<int, Role?> markedRole)
+        public void SetTeamMarkerProvider(Func<int, Role?>? markedRole)
         {
             _teamMarkerRole = markedRole;
             if (markedRole == null)
@@ -245,9 +290,10 @@ namespace Werewolf.UI
         public void ShowStatusBanner(string text)
         {
             _resultShown = true;
-            if (_resultBanner == null) return;
-            _resultBanner.text = text ?? string.Empty;
-            _resultBanner.gameObject.SetActive(true);
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
+            view.ResultBanner.text = text ?? string.Empty;
+            view.ResultBanner.gameObject.SetActive(true);
         }
 
         public void SetTimeOverride(long endUnixMs)
@@ -267,7 +313,7 @@ namespace Werewolf.UI
 
         public void Tick(MeetingClientState state, long nowUnixMs)
         {
-            if (_root == null || state == null) return;
+            if (GetLiveViewOrNull() == null || state == null) return;
             _lastState = state;
             try
             {
@@ -302,25 +348,58 @@ namespace Werewolf.UI
             _timeOverrideEndUnixMs = 0;
             _lastState = null;
             _timeBarView.Reset();
-            if (_timeText != null) _timeText.rectTransform.anchoredPosition = TimeTextHeaderPos;
-            if (_resultBanner != null) _resultBanner.gameObject.SetActive(false);
-            if (_skipCountLabel != null) _skipCountLabel.gameObject.SetActive(false);
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view != null)
+            {
+                view.TimeText.rectTransform.anchoredPosition = TimeTextHeaderPos;
+                view.ResultBanner.gameObject.SetActive(false);
+                view.SkipCountLabel.gameObject.SetActive(false);
+            }
+        }
+
+        private void ApplyTexts()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return;
+            view.TitleLabel.text = Texts.Get(TextId.VoteMeetingTitle);
+            RefreshSkipVisual();
+            foreach (VoteRow row in _rows) row.ApplyTexts();
+            _scatter.ApplyTexts();
         }
 
         public void Destroy()
         {
+            _textRefresh.Unsubscribe();
+            ViewRefs? view = _view;
+            _view = null;
             StopScatterReveal();
             _scatter.OnPanelDestroy();
             _tallyView.Stop();
             _tallyView.OnPanelDestroy();
             _timeBarView.OnPanelDestroy();
             ClearRows();
-            if (_root != null)
+            if (view != null && view.Root != null)
             {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
+                UnityEngine.Object.Destroy(view.Root);
             }
             _lastState = null;
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+
+            _view = null;
+            StopScatterReveal();
+            _scatter.OnPanelDestroy();
+            _tallyView.Stop();
+            _tallyView.OnPanelDestroy();
+            _timeBarView.OnPanelDestroy();
+            ClearRows();
+            _lastState = null;
+            return null;
         }
 
         private int PageCount => _rows.Count == 0 ? 1 : (_rows.Count + VoteRowGrid.RowsPerPage - 1) / VoteRowGrid.RowsPerPage;
@@ -336,6 +415,8 @@ namespace Werewolf.UI
 
         private void LayoutRows()
         {
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
             int pageCount = PageCount;
             if (_page >= pageCount) _page = pageCount - 1;
             if (_page < 0) _page = 0;
@@ -343,7 +424,7 @@ namespace Werewolf.UI
             for (int i = 0; i < _rows.Count; i++)
             {
                 VoteRow row = _rows[i];
-                RectTransform rect = row.Root;
+                RectTransform? rect = row.Root;
                 if (rect == null) continue;
 
                 int page = i / VoteRowGrid.RowsPerPage;
@@ -356,27 +437,30 @@ namespace Werewolf.UI
 
             bool multiPage = pageCount > 1;
             SetPagerVisible(multiPage);
-            if (multiPage && _pageLabel != null)
+            if (multiPage)
             {
-                _pageLabel.text = $"{_page + 1}/{pageCount}";
+                view.PageLabel.text = $"{_page + 1}/{pageCount}";
             }
         }
 
         private void SetPagerVisible(bool visible)
         {
-            if (_pagePrevBg != null) _pagePrevBg.gameObject.SetActive(visible);
-            if (_pageNextBg != null) _pageNextBg.gameObject.SetActive(visible);
-            if (_pageLabel != null) _pageLabel.gameObject.SetActive(visible);
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
+            view.PagePrevBg.gameObject.SetActive(visible);
+            view.PageNextBg.gameObject.SetActive(visible);
+            view.PageLabel.gameObject.SetActive(visible);
         }
 
         private void UpdateSlide(MeetingClientState state, long nowUnixMs)
         {
-            if (!_slideActive || _rootRect == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (!_slideActive || view == null) return;
             float eased = (float)state.GaugeMoveProgress(nowUnixMs);
             if (eased >= 1f) { eased = 1f; _slideActive = false; }
             float startY = PanelPos.y + SlideStartOffsetY;
             float y = startY + (PanelPos.y - startY) * eased;
-            _rootRect.anchoredPosition = new Vector2(PanelPos.x, y);
+            view.RootRect.anchoredPosition = new Vector2(PanelPos.x, y);
         }
 
         private void ApplyInitialSortIfNeeded(MeetingClientState state)
@@ -390,19 +474,21 @@ namespace Werewolf.UI
 
         private void UpdateTime(MeetingClientState state, long nowUnixMs)
         {
-            if (_timeText == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
+            TextMeshProUGUI timeText = view.TimeText;
             if (HideTimeLimit && _timeOverrideEndUnixMs == 0)
             {
-                if (_timeText.gameObject.activeSelf) _timeText.gameObject.SetActive(false);
+                if (timeText.gameObject.activeSelf) timeText.gameObject.SetActive(false);
                 return;
             }
-            if (!_timeText.gameObject.activeSelf) _timeText.gameObject.SetActive(true);
+            if (!timeText.gameObject.activeSelf) timeText.gameObject.SetActive(true);
             long remainMs = _timeOverrideEndUnixMs > 0
                 ? Math.Max(0L, _timeOverrideEndUnixMs - nowUnixMs)
                 : state.RemainingMs(nowUnixMs);
             long totalSec = (remainMs + 999) / 1000;
-            _timeText.text = $"{totalSec / 60:00}:{totalSec % 60:00}";
-            _timeText.color = totalSec <= 10 ? TimeUrgentColor : TimeNormalColor;
+            timeText.text = $"{totalSec / 60:00}:{totalSec % 60:00}";
+            timeText.color = totalSec <= 10 ? TimeUrgentColor : TimeNormalColor;
         }
 
         private void UpdateTimeBar(MeetingClientState state, long nowUnixMs)
@@ -410,9 +496,10 @@ namespace Werewolf.UI
             bool visible = !HideTimeLimit
                 && _timeOverrideEndUnixMs == 0 && state.MeetingActive && state.Result == null;
             _timeBarView.SetVisible(visible);
-            if (_timeText != null)
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view != null)
             {
-                _timeText.rectTransform.anchoredPosition = visible ? TimeTextBarPos : TimeTextHeaderPos;
+                view.TimeText.rectTransform.anchoredPosition = visible ? TimeTextBarPos : TimeTextHeaderPos;
             }
             if (!visible) return;
             _timeBarView.Tick(state, nowUnixMs);
@@ -421,14 +508,14 @@ namespace Werewolf.UI
         private void UpdateRows(MeetingClientState state)
         {
             bool canConfirm = _selectionSource != null && _selectionSource.CanConfirm(_localActor);
-            IReadOnlyList<int> targets = _selectionSource != null ? _selectionSource.TargetActors : null;
+            IReadOnlyList<int>? targets = _selectionSource != null ? _selectionSource.TargetActors : null;
             int selectedActor = _selectionSource != null ? _selectionSource.CurrentSelection : SkipTarget;
 
             if (_armedTarget != ArmedNone)
             {
                 bool armedValid = _defaultProvider != null && canConfirm && !SelectionLocked &&
                     (_armedTarget == SkipTarget
-                        ? _selectionSource.AllowSkip
+                        ? _selectionSource!.AllowSkip
                         : ContainsActor(targets, _armedTarget));
                 if (!armedValid) _armedTarget = ArmedNone;
             }
@@ -459,17 +546,15 @@ namespace Werewolf.UI
 
         private void RefreshSkipVisual()
         {
-            if (_skipButtonBg == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
             bool armed = _skipEnabled && _defaultProvider != null && _armedTarget == SkipTarget;
             ButtonVisual.Resolve(NeutralPalette,
                 armed: armed, hover: _skipHover, selected: false, enabled: _skipEnabled,
                 out Color bg, out Color label);
-            _skipButtonBg.color = bg;
-            if (_skipLabel != null)
-            {
-                _skipLabel.text = armed ? Texts.Get(TextId.VoteConfirmLabel) : Texts.Get(TextId.VoteSkipLabel);
-                _skipLabel.color = label;
-            }
+            view.SkipButtonBg.color = bg;
+            view.SkipLabel.text = armed ? Texts.Get(TextId.VoteConfirmLabel) : Texts.Get(TextId.VoteSkipLabel);
+            view.SkipLabel.color = label;
         }
 
         private static bool ContainsInt(IReadOnlyCollection<int> set, int value)
@@ -482,7 +567,7 @@ namespace Werewolf.UI
             return false;
         }
 
-        private static bool ContainsActor(IReadOnlyList<int> list, int actor)
+        private static bool ContainsActor(IReadOnlyList<int>? list, int actor)
         {
             if (list == null) return false;
             for (int i = 0; i < list.Count; i++)
@@ -495,12 +580,14 @@ namespace Werewolf.UI
         private void UpdateResult(MeetingClientState state, long nowUnixMs)
         {
             if (state.Result == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
             MeetingOutcome outcome = state.Result;
 
             if (!_countsApplied)
             {
                 _countsApplied = true;
-                _tallyView.Start(outcome, nowUnixMs, _skipCountLabel);
+                _tallyView.Start(outcome, nowUnixMs, view.SkipCountLabel);
             }
             _tallyView.Tick(nowUnixMs);
 
@@ -516,16 +603,16 @@ namespace Werewolf.UI
                     ? executed.PlayerName
                     : $"#{outcome.ExecutedActor}";
                 banner = Texts.Format(TextId.VoteExecutedFormat, name);
-                _resultBanner.color = ResultExecutedColor;
+                view.ResultBanner.color = ResultExecutedColor;
             }
             else
             {
                 banner = Texts.Get(TextId.VoteNoExecution);
-                _resultBanner.color = ResultNoneColor;
+                view.ResultBanner.color = ResultNoneColor;
             }
             if (skipVotes > 0) banner += Texts.Format(TextId.VoteSkipSuffixFormat, skipVotes);
-            _resultBanner.text = banner;
-            _resultBanner.gameObject.SetActive(true);
+            view.ResultBanner.text = banner;
+            view.ResultBanner.gameObject.SetActive(true);
 
             WLog.Line("vote_panel_result", secret: false,
                 ("executed", outcome.ExecutedActor), ("skipVotes", skipVotes));
@@ -545,6 +632,8 @@ namespace Werewolf.UI
 
         private void HandleInput(MeetingClientState state)
         {
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
             if (_slideActive) return;
             bool canConfirm = !SelectionLocked && _selectionSource != null && _selectionSource.CanConfirm(_localActor);
             bool pagerActive = PageCount > 1;
@@ -562,7 +651,7 @@ namespace Werewolf.UI
                 foreach (VoteRow row in _rows)
                 {
                     if (!row.VoteButtonActive) continue;
-                    RectTransform buttonRect = row.VoteButtonRect;
+                    RectTransform? buttonRect = row.VoteButtonRect;
                     if (buttonRect == null || !buttonRect.gameObject.activeInHierarchy) continue;
                     bool hover = !blocked && RectTransformUtility.RectangleContainsScreenPoint(buttonRect, mouse, null);
                     row.SetHover(hover);
@@ -573,8 +662,8 @@ namespace Werewolf.UI
                     }
                 }
 
-                if (!blocked && _selectionSource.AllowSkip && _skipButtonBg != null &&
-                    RectTransformUtility.RectangleContainsScreenPoint(_skipButtonBg.rectTransform, mouse, null))
+                if (!blocked && _selectionSource!.AllowSkip &&
+                    RectTransformUtility.RectangleContainsScreenPoint(view.SkipButtonBg.rectTransform, mouse, null))
                 {
                     skipHover = true;
                     if (clicked)
@@ -592,13 +681,13 @@ namespace Werewolf.UI
 
             if (pagerActive && clicked && !blocked)
             {
-                if (RectTransformUtility.RectangleContainsScreenPoint(_pagePrevBg.rectTransform, mouse, null))
+                if (RectTransformUtility.RectangleContainsScreenPoint(view.PagePrevBg.rectTransform, mouse, null))
                 {
                     _page = (_page - 1 + PageCount) % PageCount;
                     LayoutRows();
                     WLog.Line("vote_panel_page", secret: false, ("page", _page));
                 }
-                else if (RectTransformUtility.RectangleContainsScreenPoint(_pageNextBg.rectTransform, mouse, null))
+                else if (RectTransformUtility.RectangleContainsScreenPoint(view.PageNextBg.rectTransform, mouse, null))
                 {
                     _page = (_page + 1) % PageCount;
                     LayoutRows();
@@ -628,7 +717,7 @@ namespace Werewolf.UI
         {
             try
             {
-                _selectionSource.Confirm(_localActor, targetActor);
+                _selectionSource!.Confirm(_localActor, targetActor);
             }
             catch (Exception e)
             {
@@ -651,7 +740,7 @@ namespace Werewolf.UI
                 get
                 {
                     _targets.Clear();
-                    MeetingClientState state = _panel._lastState;
+                    MeetingClientState? state = _panel._lastState;
                     if (state != null)
                     {
                         foreach (VoteRow row in _panel._rows)
@@ -672,7 +761,7 @@ namespace Werewolf.UI
 
             public bool CanConfirm(int localActor)
             {
-                MeetingClientState state = _panel._lastState;
+                MeetingClientState? state = _panel._lastState;
                 if (state == null || localActor < 0) return false;
                 if (state.GetRowStatus(localActor) != RowStatus.Alive) return false;
                 if (ContainsInt(state.VotedActors, localActor)) return false;

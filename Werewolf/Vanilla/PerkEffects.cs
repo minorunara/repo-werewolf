@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using UnityEngine;
 using Werewolf.Core;
@@ -9,8 +10,8 @@ namespace Werewolf.Vanilla
         private bool _staminaApplied;
         private readonly NaturalHealClock _healClock = new NaturalHealClock();
 
-        public void Tick(RolesClientState state, Role? localRole, Action<byte, int, byte> sendRoleAction,
-                         Action<bool> onWolfModeChanged = null)
+        public void Tick(RolesClientState state, Role? localRole, Action<byte, int, byte>? sendRoleAction,
+                         Action<bool>? onWolfModeChanged = null)
         {
             bool keysFree = InputGate.KeysFree;
             if (keysFree && Plugin.WolfModeKey != null && Input.GetKeyDown(Plugin.WolfModeKey.Value))
@@ -37,7 +38,7 @@ namespace Werewolf.Vanilla
             if (!_healClock.ShouldHeal(active, nowUnixMs, intervalSec)) return;
 
             PlayerAvatar avatar = PlayerAvatar.instance;
-            PlayerHealth health = avatar != null ? avatar.playerHealth : null;
+            PlayerHealth? health = avatar != null ? avatar.playerHealth : null;
             if (health == null) return;
             health.Heal(1, false);
         }

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -18,7 +19,10 @@ namespace Werewolf.Core
         private float _lastGaugePct;
 
         public BombSession(GameConfig config, GameSession session, long nowUnixMs)
-            : this(config, session != null ? session.Players : null, nowUnixMs) { }
+            : this(
+                config,
+                (session ?? throw new ArgumentNullException(nameof(session))).Players,
+                nowUnixMs) { }
 
         public BombSession(GameConfig config, IReadOnlyList<WPlayer> players, long nowUnixMs)
         {
@@ -197,7 +201,7 @@ namespace Werewolf.Core
             return reason;
         }
 
-        private WPlayer FindPlayer(int actor)
+        private WPlayer? FindPlayer(int actor)
         {
             foreach (var p in _players)
             {

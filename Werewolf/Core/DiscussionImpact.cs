@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 
 namespace Werewolf.Core
@@ -97,7 +98,7 @@ namespace Werewolf.Core
             return CharOffsetPx * CharPattern[index % CharPattern.Length] * jitterK;
         }
 
-        public static bool IsSquareScript(string text)
+        public static bool IsSquareScript(string? text)
         {
             if (string.IsNullOrEmpty(text)) return false;
             bool any = false;
@@ -121,7 +122,7 @@ namespace Werewolf.Core
                 || (c >= '\uAC00' && c <= '\uD7A3');
         }
 
-        public static ImpactJitterUnit ResolveUnit(string left, string right)
+        public static ImpactJitterUnit ResolveUnit(string? left, string? right)
         {
             if (!IsSquareScript(left) || !IsSquareScript(right)) return ImpactJitterUnit.Word;
             if (CountUnits(left) > MaxCharUnitsPerWord) return ImpactJitterUnit.Word;
@@ -129,7 +130,7 @@ namespace Werewolf.Core
             return ImpactJitterUnit.Char;
         }
 
-        public static int CountUnits(string text)
+        public static int CountUnits(string? text)
         {
             if (string.IsNullOrEmpty(text)) return 0;
             int n = 0;

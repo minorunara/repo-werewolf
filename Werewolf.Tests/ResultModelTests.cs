@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using Werewolf.Core;
@@ -8,6 +9,8 @@ namespace Werewolf.Tests
     public class ResultModelTests
     {
         private static string Name(int actor) => "P" + actor;
+        private static readonly IReadOnlyDictionary<int, DeathCause> NoDeaths =
+            new Dictionary<int, DeathCause>();
 
         [Fact]
         public void Build_VillagerWinTeam_MarksVillagerRowsAsWinningSide()
@@ -44,7 +47,7 @@ namespace Werewolf.Tests
             var actors = new[] { 1, 2 };
             var roles = new[] { (byte)Role.Werewolf, (byte)Role.BlackCat };
 
-            var rows = ResultModel.Build((byte)Team.Werewolves, actors, roles, null, Name);
+            var rows = ResultModel.Build((byte)Team.Werewolves, actors, roles, NoDeaths, Name);
 
             Assert.True(rows[0].IsWinningSide);
             Assert.True(rows[1].IsWinningSide);
@@ -110,14 +113,15 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void Build_NullDeathMirror_AllRowsDefaultToAlive()
+        public void Build_NullDeathMirror_ThrowsForDeathMirror()
         {
             var actors = new[] { 1, 2 };
             var roles = new[] { (byte)Role.Villager, (byte)Role.Werewolf };
 
-            var rows = ResultModel.Build((byte)Team.Villagers, actors, roles, null, Name);
+            var error = Assert.Throws<ArgumentNullException>(() =>
+                ResultModel.Build((byte)Team.Villagers, actors, roles, null!, Name));
 
-            Assert.All(rows, r => Assert.True(r.Alive));
+            Assert.Equal("deathMirror", error.ParamName);
         }
 
         [Fact]
@@ -138,7 +142,7 @@ namespace Werewolf.Tests
             var actors = new[] { 7 };
             var roles = new[] { (byte)Role.Villager };
 
-            var rows = ResultModel.Build((byte)Team.Villagers, actors, roles, null, _ => null);
+            var rows = ResultModel.Build((byte)Team.Villagers, actors, roles, NoDeaths, _ => null);
 
             Assert.Equal("Actor7", rows[0].Name);
         }
@@ -150,28 +154,29 @@ namespace Werewolf.Tests
             var roles = new[] { (byte)Role.Villager };
 
             Assert.Throws<ArgumentException>(() =>
-                ResultModel.Build((byte)Team.Villagers, actors, roles, null, Name));
+                ResultModel.Build((byte)Team.Villagers, actors, roles, NoDeaths, Name));
         }
 
         [Fact]
         public void Build_NullActors_ThrowsArgumentNullException()
         {
             Assert.Throws<ArgumentNullException>(() =>
-                ResultModel.Build((byte)Team.Villagers, null, new byte[0], null, Name));
+                ResultModel.Build((byte)Team.Villagers, null!, new byte[0], NoDeaths, Name));
         }
 
         [Fact]
         public void Build_NullRoles_ThrowsArgumentNullException()
         {
             Assert.Throws<ArgumentNullException>(() =>
-                ResultModel.Build((byte)Team.Villagers, new int[0], null, null, Name));
+                ResultModel.Build((byte)Team.Villagers, Array.Empty<int>(), null!, NoDeaths, Name));
         }
 
         [Fact]
         public void Build_NullResolveName_ThrowsArgumentNullException()
         {
             Assert.Throws<ArgumentNullException>(() =>
-                ResultModel.Build((byte)Team.Villagers, new int[0], new byte[0], null, null));
+                ResultModel.Build((byte)Team.Villagers, Array.Empty<int>(), Array.Empty<byte>(),
+                    NoDeaths, null!));
         }
 
         [Fact]
@@ -180,7 +185,7 @@ namespace Werewolf.Tests
             var actors = new[] { 3, 1, 2 };
             var roles = new[] { (byte)Role.Villager, (byte)Role.Werewolf, (byte)Role.Villager };
 
-            var rows = ResultModel.Build((byte)Team.Villagers, actors, roles, null, Name);
+            var rows = ResultModel.Build((byte)Team.Villagers, actors, roles, NoDeaths, Name);
 
             Assert.Equal(new[] { 3, 1, 2 }, new List<int> { rows[0].ActorNumber, rows[1].ActorNumber, rows[2].ActorNumber });
         }

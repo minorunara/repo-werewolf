@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using Werewolf.Core.Replay;
@@ -36,10 +37,10 @@ namespace Werewolf.Core
 
         public double CycleSec => DurationSec / PlaybackSpeed;
 
-        public static MeetingPath Build(
-            IReadOnlyList<ReplayTrailPoint> track,
-            IReadOnlyList<double> warpTimes,
-            IReadOnlyList<double> resumeTimes)
+        public static MeetingPath? Build(
+            IReadOnlyList<ReplayTrailPoint>? track,
+            IReadOnlyList<double>? warpTimes,
+            IReadOnlyList<double>? resumeTimes)
         {
             if (track == null || warpTimes == null || warpTimes.Count == 0) return null;
             double warpT = warpTimes[warpTimes.Count - 1];
@@ -52,8 +53,8 @@ namespace Werewolf.Core
                 }
             }
 
-            List<ReplayTrailPoint> best = null;
-            List<ReplayTrailPoint> run = null;
+            List<ReplayTrailPoint>? best = null;
+            List<ReplayTrailPoint>? run = null;
             ReplayTrailPoint prev = default;
             for (int i = 0; i < track.Count; i++)
             {
@@ -83,7 +84,7 @@ namespace Werewolf.Core
             return points.GetRange(head, tail - head + 1);
         }
 
-        public static MeetingPath FromRecorder(ReplayRecorder recorder, int actor)
+        public static MeetingPath? FromRecorder(ReplayRecorder? recorder, int actor)
         {
             if (recorder == null) return null;
             var track = new List<ReplayTrailPoint>();
@@ -98,6 +99,7 @@ namespace Werewolf.Core
 
         public void DecimatedInto(int maxPoints, List<ReplayTrailPoint> into)
         {
+            if (into == null) throw new ArgumentNullException(nameof(into));
             int stride = maxPoints <= 0 ? 1 : Math.Max(1, (_points.Count + maxPoints - 1) / maxPoints);
             for (int i = 0; i < _points.Count; i += stride) into.Add(_points[i]);
             if ((_points.Count - 1) % stride != 0) into.Add(Goal);
@@ -105,7 +107,7 @@ namespace Werewolf.Core
 
         public void TrailInto(double pathT, int maxPoints, List<ReplayTrailPoint> into)
         {
-            if (into == null) return;
+            if (into == null) throw new ArgumentNullException(nameof(into));
             double toT = Math.Max(StartT, Math.Min(EndT, pathT));
             double fromT = Math.Max(StartT, toT - TrailSeconds);
             into.Add(PointAt(fromT));

@@ -15,7 +15,7 @@ namespace Werewolf.Game
     {
 
         public void DebugPlayConveneCountdown(string callerLabel, int totalSeconds)
-            => _meetingClientFeature.DebugPlayConveneCountdown(callerLabel, totalSeconds);
+            => Runtime.MeetingClientFeature.DebugPlayConveneCountdown(callerLabel, totalSeconds);
 
         private int DebugRevealSelfId
         {
@@ -41,7 +41,7 @@ namespace Werewolf.Game
                     ClientValuableMapMode, IsBlackCatCurseEnabledForClient(),
                     DebugRevealSelfId);
 
-                if (!_roleRevealFeature.DebugPlay(content))
+                if (!Runtime.RoleRevealFeature.DebugPlay(content))
                 {
                     WLog.Line("cmd_fx_reveal_skipped", secret: false, ("reason", "not_built"));
                     return;
@@ -60,7 +60,7 @@ namespace Werewolf.Game
             {
                 if (string.IsNullOrEmpty(message)) message = "テスト通知";
 
-                _rolesClientFeature.PushDebugToast(message);
+                Runtime.RolesClientFeature.PushDebugToast(message);
                 WLog.Line("cmd_fx_toast", secret: false, ("message", message));
             }
             catch (Exception e)
@@ -73,7 +73,7 @@ namespace Werewolf.Game
         {
             try
             {
-                _resultFlowFeature.ClearResultCountdown();
+                Runtime.ResultFlowFeature.ClearResultCountdown();
                 int[] actors = { 1, 2, 3, 4, 5 };
                 byte[] roles =
                 {
@@ -143,15 +143,15 @@ namespace Werewolf.Game
         {
             try
             {
-                _roleRevealFeature.HideCinematicNow();
+                Runtime.RoleRevealFeature.HideCinematicNow();
 
-                _meetingClientFeature.HideConveneCountdown();
+                Runtime.MeetingClientFeature.HideConveneCountdown();
 
                 if (_resultScreen.Exists) _resultScreen.Hide();
-                _resultFlowFeature.ClearResultCountdown();
+                Runtime.ResultFlowFeature.ClearResultCountdown();
 
-                _rolesClientFeature.HideDeadlineBanner();
-                _rolesClientFeature.HideDiscussionImpact();
+                Runtime.RolesClientFeature.HideDeadlineBanner();
+                Runtime.RolesClientFeature.HideDiscussionImpact();
 
                 CrownRoster.Clear();
 
@@ -165,14 +165,14 @@ namespace Werewolf.Game
 
         public void DebugInjectCfgBlob(string blob)
         {
-            _lobbySettingsFeature.DebugInjectBlob(blob);
+            Runtime.LobbySettingsFeature.DebugInjectBlob(blob);
             WLog.Line("cmd_cfg_inject", secret: false,
                 ("len", blob == null ? 0 : blob.Length));
         }
 
         public void DebugClearCfgBlob()
         {
-            _lobbySettingsFeature.DebugClearInjectedBlob();
+            Runtime.LobbySettingsFeature.DebugClearInjectedBlob();
             WLog.Line("cmd_cfg_clear", secret: false);
         }
 

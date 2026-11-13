@@ -1,3 +1,6 @@
+#nullable enable
+using System;
+
 namespace Werewolf.Core
 {
     public enum WolfPerkVisual : byte
@@ -65,8 +68,9 @@ namespace Werewolf.Core
             int extraJumpLimit = -1, int jumpRefillsUsed = 0,
             bool injectedJumpAvailable = false)
         {
+            if (roles == null) throw new ArgumentNullException(nameof(roles));
             bool sessionActive = phase == GamePhase.Play || phase == GamePhase.Meeting;
-            if (!sessionActive || warpedInMeeting || roles == null
+            if (!sessionActive || warpedInMeeting
                 || effectiveRole != Role.Werewolf || !roles.CanShowHud(effectiveRole))
             {
                 return WolfStatusState.Hidden;

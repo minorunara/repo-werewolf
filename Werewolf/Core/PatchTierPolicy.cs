@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 
 namespace Werewolf.Core
@@ -15,7 +16,7 @@ namespace Werewolf.Core
     {
         public const string ScenarioNamespacePrefix = "Werewolf.Scenarios.";
 
-        public static bool IsScenarioTier(string patchClassFullName)
+        public static bool IsScenarioTier(string? patchClassFullName)
             => patchClassFullName != null
                && patchClassFullName.StartsWith(ScenarioNamespacePrefix, StringComparison.Ordinal);
 

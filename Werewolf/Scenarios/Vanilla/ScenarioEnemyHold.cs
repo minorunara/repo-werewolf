@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using Werewolf.Core;
@@ -23,7 +24,7 @@ namespace Werewolf.Scenarios.Vanilla
             {
                 try
                 {
-                    if (GameRefs.EnemyParent_Spawned(parent))
+                    if (parent.Spawned)
                     {
                         parent.Despawn();
                         despawned++;
@@ -51,7 +52,7 @@ namespace Werewolf.Scenarios.Vanilla
             {
                 try
                 {
-                    if (GameRefs.EnemyParent_Spawned(parent) || parent.DespawnedTimer < HoldSeconds / 2f) continue;
+                    if (parent.Spawned || parent.DespawnedTimer < HoldSeconds / 2f) continue;
                     released++;
                     parent.DespawnedTimerSet(ReleaseStepSeconds * released, _min: true);
                 }
@@ -66,7 +67,7 @@ namespace Werewolf.Scenarios.Vanilla
 
         private static IEnumerable<EnemyParent> Enemies()
         {
-            List<EnemyParent> spawned = EnemyDirector.instance != null ? EnemyDirector.instance.enemiesSpawned : null;
+            List<EnemyParent>? spawned = EnemyDirector.instance != null ? EnemyDirector.instance.enemiesSpawned : null;
             if (spawned == null) yield break;
             foreach (EnemyParent parent in spawned.ToArray())
             {

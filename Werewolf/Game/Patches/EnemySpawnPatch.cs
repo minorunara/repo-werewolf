@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
@@ -5,7 +6,7 @@ using Werewolf.Vanilla;
 
 namespace Werewolf.Game.Patches
 {
-    [HarmonyPatch(typeof(LevelGenerator), "EnemySetup")]
+    [HarmonyPatch(typeof(LevelGenerator), nameof(LevelGenerator.EnemySetup))]
     internal static class PreplayEnemySetupPatch
     {
         private static void Prefix()
@@ -21,7 +22,7 @@ namespace Werewolf.Game.Patches
         }
     }
 
-    [HarmonyPatch(typeof(EnemyParent), "Spawn")]
+    [HarmonyPatch(typeof(EnemyParent), nameof(EnemyParent.Spawn))]
     internal static class EnemySpawnPatch
     {
         internal static volatile bool SuppressSpawns;

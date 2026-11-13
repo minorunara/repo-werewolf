@@ -1,3 +1,5 @@
+#nullable enable
+using System;
 using System.Collections.Generic;
 
 namespace Werewolf.Core
@@ -15,15 +17,15 @@ namespace Werewolf.Core
 
         public GaugeMarkerKind Kind { get; }
 
-        public string IconKey { get; }
+        public string? IconKey { get; }
 
-        public string Label { get; }
+        public string? Label { get; }
 
         public int Tier { get; }
 
         public bool Unlocked { get; }
 
-        public GaugeMarker(int pct, GaugeMarkerKind kind, string iconKey, string label, int tier, bool unlocked)
+        public GaugeMarker(int pct, GaugeMarkerKind kind, string? iconKey, string? label, int tier, bool unlocked)
         {
             Pct = pct;
             Kind = kind;
@@ -38,8 +40,8 @@ namespace Werewolf.Core
     {
         public static List<GaugeMarker> Build(MeetingGaugeSnapshot s, int permille, int minGapPct)
         {
+            if (s == null) throw new ArgumentNullException(nameof(s));
             var markers = new List<GaugeMarker>();
-            if (s == null) return markers;
 
             var perks = new List<KeyValuePair<int, string[]>>();
             InsertSorted(perks, s.StaminaPct, "perk_stamina", Texts.Get(TextId.GaugePerkStaminaLabel));
@@ -82,7 +84,7 @@ namespace Werewolf.Core
 
         public static int UnlockedCount(MeetingGaugeSnapshot s, int permille)
         {
-            if (s == null) return 0;
+            if (s == null) throw new ArgumentNullException(nameof(s));
             return UnlockedIf(s.StaminaPct, permille)
                  + UnlockedIf(s.JumpPct, permille)
                  + UnlockedIf(s.EnemyIgnorePct, permille)

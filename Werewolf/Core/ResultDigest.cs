@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -72,7 +73,7 @@ namespace Werewolf.Core
 
         public bool Started => _started;
 
-        public void Observe(byte code, object[] payload, long nowUnixMs, WinResult winner = null)
+        public void Observe(byte code, object[]? payload, long nowUnixMs, WinResult? winner = null)
         {
             if (code == WWEventCodes.GameStart)
             {
@@ -191,7 +192,7 @@ namespace Werewolf.Core
             return new object[] { kinds, atSec, actors, argA, argB };
         }
 
-        public static IReadOnlyList<DigestEntry> FromWire(object[] payload)
+        public static IReadOnlyList<DigestEntry>? FromWire(object[]? payload)
         {
             if (payload == null || payload.Length < 5) return null;
             if (!(payload[0] is byte[] kinds) || !(payload[1] is int[] atSec)
@@ -213,7 +214,7 @@ namespace Werewolf.Core
             return list;
         }
 
-        public static int MatchEndReason(IReadOnlyList<DigestEntry> entries)
+        public static int MatchEndReason(IReadOnlyList<DigestEntry>? entries)
         {
             if (entries == null) return ReasonUnknown;
             for (int i = entries.Count - 1; i >= 0; i--)

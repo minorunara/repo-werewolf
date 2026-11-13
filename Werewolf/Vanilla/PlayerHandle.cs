@@ -1,14 +1,15 @@
+#nullable enable
 using UnityEngine;
 
 namespace Werewolf.Vanilla
 {
     public readonly struct PlayerHandle
     {
-        internal readonly PlayerAvatar Avatar;
+        internal readonly PlayerAvatar? Avatar;
 
         public int Actor { get; }
 
-        internal PlayerHandle(int actor, PlayerAvatar avatar)
+        internal PlayerHandle(int actor, PlayerAvatar? avatar)
         {
             Actor = actor;
             Avatar = avatar;

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -26,9 +27,9 @@ namespace Werewolf.Core
     {
         public int ExecutedActor;
 
-        public int[] TargetActors;
+        public int[]? TargetActors;
 
-        public int[] VoteCounts;
+        public int[]? VoteCounts;
 
         public int SkipVotes
         {

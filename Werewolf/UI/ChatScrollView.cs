@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -12,9 +13,9 @@ namespace Werewolf.UI
         private readonly float _padding;
         private readonly float _bottomSlack;
 
-        private ScrollRect _scroll;
-        private RectTransform _viewport;
-        private RectTransform _content;
+        private ScrollRect? _scroll;
+        private RectTransform? _viewport;
+        private RectTransform? _content;
 
         private readonly Dictionary<int, GameObject> _live = new Dictionary<int, GameObject>();
         private readonly List<int> _evictScratch = new List<int>();
@@ -27,14 +28,14 @@ namespace Werewolf.UI
             _bottomSlack = bottomSlack;
         }
 
-        public RectTransform Content => _content;
+        public RectTransform? Content => _content;
 
         public bool Attached => _content != null && _viewport != null;
 
-        public RectTransform Viewport => _viewport;
+        public RectTransform? Viewport => _viewport;
 
-        public GameObject Live(int index)
-            => _live.TryGetValue(index, out GameObject go) ? go : null;
+        public GameObject? Live(int index)
+            => _live.TryGetValue(index, out GameObject? go) ? go : null;
 
         public int LiveCount => _live.Count;
 
@@ -45,7 +46,7 @@ namespace Werewolf.UI
             _content = content;
         }
 
-        public void Sync(ChatLayout layout, Func<int, GameObject> createBlock)
+        public void Sync(ChatLayout layout, Func<int, GameObject?> createBlock)
         {
             if (!Attached || layout == null || createBlock == null) return;
 
@@ -55,9 +56,9 @@ namespace Werewolf.UI
                 _liveEpoch = layout.Epoch;
             }
 
-            float windowTop = _content.anchoredPosition.y - _padding;
+            float windowTop = _content!.anchoredPosition.y - _padding;
             float from = windowTop - _overscan;
-            float to = windowTop + _viewport.rect.height + _overscan;
+            float to = windowTop + _viewport!.rect.height + _overscan;
             layout.GetVisibleRange(from, to, out int first, out int end);
 
             _evictScratch.Clear();
@@ -75,7 +76,7 @@ namespace Werewolf.UI
             for (int i = first; i < end; i++)
             {
                 if (_live.ContainsKey(i)) continue;
-                GameObject go = createBlock(i);
+                GameObject? go = createBlock(i);
                 if (go != null) _live[i] = go;
             }
         }

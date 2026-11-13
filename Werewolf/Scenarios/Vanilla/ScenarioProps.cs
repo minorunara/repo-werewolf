@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -30,7 +31,7 @@ namespace Werewolf.Scenarios.Vanilla
             SpawnPoint[] spawns = TruckWarper.ResolveTruckSpawnPoints();
             if (spawns == null || spawns.Length == 0) return false;
 
-            SpawnPoint best = null;
+            SpawnPoint? best = null;
             float bestSqr = -1f;
             foreach (SpawnPoint sp in spawns)
             {
@@ -81,7 +82,7 @@ namespace Werewolf.Scenarios.Vanilla
         private static bool TryPickSite(Func<List<Vector3>, int> pick, out Vector3 ground)
         {
             ground = default;
-            List<Vector3> candidates = CollectCandidates();
+            List<Vector3>? candidates = CollectCandidates();
             if (candidates == null || candidates.Count == 0) return false;
             int index = pick(candidates);
             if (index < 0 || index >= candidates.Count) return false;
@@ -89,9 +90,9 @@ namespace Werewolf.Scenarios.Vanilla
             return true;
         }
 
-        private static List<Vector3> CollectCandidates()
+        private static List<Vector3>? CollectCandidates()
         {
-            List<LevelPoint> points;
+            List<LevelPoint>? points;
             try
             {
                 points = SemiFunc.LevelPointsGetAll();

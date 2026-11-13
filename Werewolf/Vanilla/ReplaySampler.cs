@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -37,7 +38,7 @@ namespace Werewolf.Vanilla
                 MapStillCapture.Invalidate();
                 if (gate)
                 {
-                    BeginSegment(dir);
+                    BeginSegment(dir!);
                 }
                 else
                 {
@@ -51,7 +52,7 @@ namespace Werewolf.Vanilla
             }
             if (!gate) return;
             if (!Recorder.ShouldSample(Now)) return;
-            CollectAndSample(dir);
+            CollectAndSample(dir!);
         }
 
         internal static void ResetAll()
@@ -98,9 +99,10 @@ namespace Werewolf.Vanilla
         internal static void NoteGuardWindow(int sec)
             => Recorder.NoteEvent(Now, "guard", ("sec", sec));
 
-        internal static void NoteGameOver(int team, int[] actors, byte[] roles, int reason)
+        internal static void NoteGameOver(int team, int[] actors, byte[]? roles, int reason)
             => Recorder.NoteEvent(Now, "gameover", ("team", team), ("actors", actors),
-                ("roles", roles != null ? Array.ConvertAll(roles, b => (int)b) : null), ("reason", reason));
+                ("roles", roles != null ? Array.ConvertAll(roles, b => (int)b) : null),
+                ("reason", reason));
 
         internal static void NoteValueLoss(float dollars, bool isOrb, int vid, bool destroyed)
             => Recorder.NoteLoss(Now, vid, (int)(dollars + 0.5f), isOrb, destroyed);
@@ -111,7 +113,7 @@ namespace Werewolf.Vanilla
             return view != null && view.ViewID != 0 ? view.ViewID : valuable.GetInstanceID();
         }
 
-        internal static object[] BuildLossLedgerWire() => Recorder.BuildLossLedgerWire();
+        internal static object[]? BuildLossLedgerWire() => Recorder.BuildLossLedgerWire();
 
         internal static void ApplyHostLedger(object[] payload)
         {
@@ -128,8 +130,8 @@ namespace Werewolf.Vanilla
             RoundDirector round = RoundDirector.instance;
             if (round == null) return;
             Recorder.NoteEvent(Now, "extract",
-                ("completed", GameRefs.RoundDirector_extractionPointsCompleted(round)),
-                ("total", GameRefs.RoundDirector_extractionPoints(round)));
+                ("completed", round.extractionPointsCompleted),
+                ("total", round.extractionPoints));
         }
 
         internal static string DumpToFile()
@@ -148,11 +150,11 @@ namespace Werewolf.Vanilla
         {
             try
             {
-                MapStillCapture.Still still = MapStillCapture.GetOrCapture(
+                MapStillCapture.Still? still = MapStillCapture.GetOrCapture(
                     Plugin.Bindings != null ? Plugin.Bindings.MeetingMapOrthoSize.Value : 15f,
                     Plugin.Bindings != null ? Plugin.Bindings.MeetingMapResolution.Value : 1);
                 if (still == null || still.Texture == null) return;
-                byte[] png = still.PngBytes;
+                byte[]? png = still.PngBytes;
                 if (png == null || png.Length == 0) return;
                 Recorder.AttachMapImage(new ReplayMapImage
                 {
@@ -176,7 +178,7 @@ namespace Werewolf.Vanilla
 
         internal static ReplayExportReport ExportForUser()
         {
-            ReplaySegmentHeader header = Recorder.FirstSegmentHeader;
+            ReplaySegmentHeader? header = Recorder.FirstSegmentHeader;
             if (header == null || Recorder.SegmentCount == 0)
             {
                 return new ReplayExportReport { Outcome = ReplayExportOutcome.Empty };
@@ -251,7 +253,8 @@ namespace Werewolf.Vanilla
 
         private static string FallbackReplayDir()
         {
-            string dllDir = Path.GetDirectoryName(typeof(ReplaySampler).Assembly.Location);
+            string dllDir = Path.GetDirectoryName(typeof(ReplaySampler).Assembly.Location)
+                ?? AppContext.BaseDirectory;
             return Path.Combine(dllDir, "Replays");
         }
 
@@ -267,7 +270,7 @@ namespace Werewolf.Vanilla
                 LocalActor = dir.LocalActor,
             };
 
-            List<PlayerAvatar> players = GameDirector.instance != null ? GameDirector.instance.PlayerList : null;
+            List<PlayerAvatar>? players = GameDirector.instance != null ? GameDirector.instance.PlayerList : null;
             if (players != null)
             {
                 foreach (PlayerAvatar avatar in players)
@@ -296,9 +299,9 @@ namespace Werewolf.Vanilla
                 });
             }
 
-            foreach (ExtractionPoint ep in UnityEngine.Object.FindObjectsOfType<ExtractionPoint>())
+            foreach (ExtractionPoint ep in FindAll<ExtractionPoint>())
             {
-                ExtractionPoint.State state = GameRefs.ExtractionPoint_currentState(ep);
+                ExtractionPoint.State state = ep.currentState;
                 Vector3 pos = ep.transform.position;
                 header.ExtractionPoints.Add(new ReplayEpInfo
                 {
@@ -311,14 +314,14 @@ namespace Werewolf.Vanilla
                 });
             }
 
-            foreach (ValuableObject valuable in UnityEngine.Object.FindObjectsOfType<ValuableObject>())
+            foreach (ValuableObject valuable in FindAll<ValuableObject>())
             {
                 Vector3 pos = valuable.transform.position;
                 header.Valuables.Add(new ReplayValuableInfo
                 {
                     Id = valuable.GetInstanceID(),
                     Name = CleanName(valuable.gameObject.name),
-                    Dollars = (int)GameRefs.ValuableObject_dollarValueCurrent(valuable),
+                    Dollars = (int)valuable.dollarValueCurrent,
                     Vid = ReplayVid(valuable),
                     X = pos.x,
                     Y = pos.y,
@@ -337,7 +340,7 @@ namespace Werewolf.Vanilla
                 ("mapTris", header.Map != null ? header.Map.Triangles.Length / 3 : 0));
         }
 
-        private static ReplayMapMesh CaptureNavMeshMap()
+        private static ReplayMapMesh? CaptureNavMeshMap()
         {
             NavMeshTriangulation tri = NavMesh.CalculateTriangulation();
             if (tri.vertices == null || tri.vertices.Length == 0 || tri.indices == null) return null;
@@ -360,7 +363,7 @@ namespace Werewolf.Vanilla
             if (_rostersPrimed) RefreshOneRoster(now);
             else RefreshAllRosters(now);
 
-            List<PlayerAvatar> players = GameDirector.instance != null ? GameDirector.instance.PlayerList : null;
+            List<PlayerAvatar>? players = GameDirector.instance != null ? GameDirector.instance.PlayerList : null;
             if (players != null)
             {
                 foreach (PlayerAvatar avatar in players)
@@ -370,7 +373,7 @@ namespace Werewolf.Vanilla
                     Vector3 pos = avatar.transform.position;
                     _samples.Add(new ReplayEntitySample(ReplayEntityKind.Player, actor, pos.x, pos.y, pos.z));
 
-                    if (GameRefs.PlayerAvatar_deadSet(avatar)
+                    if (avatar.deadSet
                         && TruckWarper.TryGetDeathHeadPosition(avatar, out Vector3 headPos))
                     {
                         _samples.Add(new ReplayEntitySample(
@@ -382,10 +385,10 @@ namespace Werewolf.Vanilla
             foreach (EnemyParent parent in _enemies)
             {
                 if (parent == null) continue;
-                if (!GameRefs.EnemyParent_Spawned(parent)) continue;
-                Enemy enemy = GameRefs.EnemyParent_Enemy(parent);
+                if (!parent.Spawned) continue;
+                Enemy enemy = parent.Enemy;
                 if (enemy == null) continue;
-                EnemyRigidbody rigidbody = GameRefs.Enemy_HasRigidbody(enemy) ? GameRefs.Enemy_Rigidbody(enemy) : null;
+                EnemyRigidbody? rigidbody = enemy.HasRigidbody ? enemy.Rigidbody : null;
                 Vector3 pos = (rigidbody != null ? rigidbody.transform : enemy.transform).position;
                 int id = parent.GetInstanceID();
                 Recorder.NoteEntity(now, ReplayEntityKind.Enemy, id, parent.enemyName);
@@ -405,7 +408,7 @@ namespace Werewolf.Vanilla
                 if (valuable == null) continue;
                 int id = valuable.GetInstanceID();
                 Vector3 pos = valuable.transform.position;
-                Recorder.NoteValuableValue(now, id, (int)GameRefs.ValuableObject_dollarValueCurrent(valuable));
+                Recorder.NoteValuableValue(now, id, (int)valuable.dollarValueCurrent);
                 _samples.Add(new ReplayEntitySample(ReplayEntityKind.Valuable, id, pos.x, pos.y, pos.z));
             }
 
@@ -433,7 +436,7 @@ namespace Werewolf.Vanilla
             foreach (ExtractionPoint ep in _extractionPoints)
             {
                 if (ep == null) continue;
-                ExtractionPoint.State state = GameRefs.ExtractionPoint_currentState(ep);
+                ExtractionPoint.State state = ep.currentState;
                 Recorder.NoteEpState(now, ep.GetInstanceID(), (byte)state, state.ToString());
             }
 

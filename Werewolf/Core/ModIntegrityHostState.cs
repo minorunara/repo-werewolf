@@ -1,5 +1,7 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Werewolf.Core
 {
@@ -16,8 +18,8 @@ namespace Werewolf.Core
             public ModIntegrityStatus Status;
             public ModUnavailableReason Reason;
             public ModDifferenceSummary Summary;
-            public IReadOnlyList<ModDifference> Differences = ModIntegrityCollections.Freeze<ModDifference>(null);
-            public string AcceptedFingerprint;
+            public IReadOnlyList<ModDifference> Differences = Array.Empty<ModDifference>();
+            public string? AcceptedFingerprint;
             public bool LockedInvalid;
             public long FirstRequestUnixMs;
             public long LastRequestUnixMs;
@@ -30,7 +32,7 @@ namespace Werewolf.Core
         public int Epoch { get; private set; }
         public int Revision { get; private set; }
         public int BaselineActor { get; private set; }
-        public ModManifest Baseline { get; private set; }
+        public ModManifest? Baseline { get; private set; }
         public bool Dirty { get; private set; }
         public bool IsInitialized => Baseline != null;
 
@@ -98,10 +100,10 @@ namespace Werewolf.Core
 
         public FingerprintReportOutcome ApplyFingerprintReport(
             int actor,
-            string reportedFingerprint,
+            string? reportedFingerprint,
             long nowUnixMs)
         {
-            if (!TryGetParticipant(actor, out ActorState state)) return FingerprintReportOutcome.RejectedInvalid;
+            if (!TryGetParticipant(actor, out ActorState? state)) return FingerprintReportOutcome.RejectedInvalid;
             if (!ModManifestComparer.IsCanonicalFingerprint(reportedFingerprint))
             {
                 SetUnavailable(state, ModUnavailableReason.InvalidPayload);
@@ -119,20 +121,21 @@ namespace Werewolf.Core
                 return FingerprintReportOutcome.RejectedInvalid;
             }
 
-            if (!string.Equals(reportedFingerprint, Baseline.Fingerprint, StringComparison.Ordinal))
+            if (!string.Equals(reportedFingerprint, Baseline!.Fingerprint, StringComparison.Ordinal))
             {
                 state.LastRequestUnixMs = nowUnixMs;
                 return FingerprintReportOutcome.RetryCurrentRequest;
             }
 
             state.AcceptedFingerprint = reportedFingerprint;
-            SetResolved(state, ModIntegrityStatus.Match, default, ModIntegrityCollections.Freeze<ModDifference>(null));
+            SetResolved(state, ModIntegrityStatus.Match, default, Array.Empty<ModDifference>());
             return FingerprintReportOutcome.Matched;
         }
 
         public void ApplyManifest(int actor, ModManifest manifest, long nowUnixMs)
         {
-            if (manifest == null || !TryGetParticipant(actor, out ActorState state)) return;
+            if (manifest == null) throw new ArgumentNullException(nameof(manifest));
+            if (!TryGetParticipant(actor, out ActorState? state)) return;
             if (state.LockedInvalid) return;
 
             if (!string.IsNullOrEmpty(state.AcceptedFingerprint))
@@ -143,7 +146,7 @@ namespace Werewolf.Core
             }
 
             state.AcceptedFingerprint = manifest.Fingerprint;
-            ModComparisonResult comparison = ModManifestComparer.Compare(Baseline, manifest);
+            ModComparisonResult comparison = ModManifestComparer.Compare(Baseline!, manifest);
             SetResolved(
                 state,
                 comparison.IsMatch ? ModIntegrityStatus.Match : ModIntegrityStatus.Difference,
@@ -153,7 +156,7 @@ namespace Werewolf.Core
 
         public void MarkUnavailable(int actor, ModUnavailableReason reason)
         {
-            if (reason == ModUnavailableReason.None || !TryGetParticipant(actor, out ActorState state)) return;
+            if (reason == ModUnavailableReason.None || !TryGetParticipant(actor, out ActorState? state)) return;
             SetUnavailable(state, reason);
         }
 
@@ -186,7 +189,7 @@ namespace Werewolf.Core
                 state.Status = ModIntegrityStatus.Unavailable;
                 state.Reason = ModUnavailableReason.NoResponse;
                 state.Summary = default;
-                state.Differences = ModIntegrityCollections.Freeze<ModDifference>(null);
+                state.Differences = Array.Empty<ModDifference>();
                 changed = true;
             }
             if (changed) Touch();
@@ -199,11 +202,11 @@ namespace Werewolf.Core
             return force || nowUnixMs - _lastSnapshotPublishedUnixMs >= SnapshotCoalesceMs;
         }
 
-        public ModIntegritySnapshot BuildSnapshot()
+        public ModIntegritySnapshot? BuildSnapshot()
         {
             if (!IsInitialized) return null;
             var records = new List<ModParticipantRecord>(_actors.Count);
-            if (_actors.TryGetValue(BaselineActor, out ActorState baseline)) records.Add(ToRecord(baseline));
+            if (_actors.TryGetValue(BaselineActor, out ActorState? baseline)) records.Add(ToRecord(baseline));
             var actorNumbers = new List<int>(_actors.Keys);
             actorNumbers.Sort();
             for (int i = 0; i < actorNumbers.Count; i++)
@@ -215,16 +218,16 @@ namespace Werewolf.Core
 
             if (!ModIntegritySnapshot.TryCreate(
                 Epoch, Revision, BaselineActor, records,
-                out ModIntegritySnapshot snapshot, out string error))
+                out ModIntegritySnapshot? snapshot, out string? error))
                 throw new InvalidOperationException($"snapshot:{error}");
             return snapshot;
         }
 
         public IReadOnlyList<ModDifference> GetDifferences(int actor)
         {
-            return _actors.TryGetValue(actor, out ActorState state)
+            return _actors.TryGetValue(actor, out ActorState? state)
                 ? state.Differences
-                : ModIntegrityCollections.Freeze<ModDifference>(null);
+                : Array.Empty<ModDifference>();
         }
 
         public void MarkSnapshotPublished(long nowUnixMs)
@@ -268,7 +271,7 @@ namespace Werewolf.Core
             };
         }
 
-        private bool TryGetParticipant(int actor, out ActorState state)
+        private bool TryGetParticipant(int actor, [NotNullWhen(true)] out ActorState? state)
         {
             if (actor == BaselineActor || !_actors.TryGetValue(actor, out state))
             {
@@ -300,7 +303,7 @@ namespace Werewolf.Core
             state.Status = ModIntegrityStatus.Unavailable;
             state.Reason = reason;
             state.Summary = default;
-            state.Differences = ModIntegrityCollections.Freeze<ModDifference>(null);
+            state.Differences = Array.Empty<ModDifference>();
             Touch();
         }
 

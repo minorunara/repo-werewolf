@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -18,7 +19,7 @@ namespace Werewolf.Vanilla
 
         public readonly List<(int actor, string slot)> LastAssignments = new List<(int actor, string slot)>();
 
-        public object[] BuildGroupsWire() => ScatterGroupsWire.ToWire(LastAssignments, _rng);
+        public object[]? BuildGroupsWire() => ScatterGroupsWire.ToWire(LastAssignments, _rng);
 
         public void LogDiagnostics()
         {
@@ -30,11 +31,11 @@ namespace Werewolf.Vanilla
 
             RoundDirector round = RoundDirector.instance;
             WLog.Line("scatter_diag", secret: false,
-                ("points", round != null ? GameRefs.RoundDirector_extractionPoints(round) : -1),
-                ("completed", round != null ? GameRefs.RoundDirector_extractionPointsCompleted(round) : -1),
-                ("allCompleted", round != null && GameRefs.RoundDirector_allExtractionPointsCompleted(round)));
+                ("points", round != null ? round.extractionPoints : -1),
+                ("completed", round != null ? round.extractionPointsCompleted : -1),
+                ("allCompleted", round != null && round.allExtractionPointsCompleted));
 
-            List<LevelPoint> levelPoints = null;
+            List<LevelPoint>? levelPoints = null;
             try { levelPoints = SemiFunc.LevelPointsGetAll(); }
             catch (Exception e)
             {
@@ -43,11 +44,11 @@ namespace Werewolf.Vanilla
 
             SpawnPoint[] truckSpawns = TruckWarper.ResolveTruckSpawnPoints();
 
-            foreach (ExtractionPoint ep in UnityEngine.Object.FindObjectsOfType<ExtractionPoint>())
+            foreach (ExtractionPoint ep in UnityEngine.Object.FindObjectsByType<ExtractionPoint>(FindObjectsSortMode.None))
             {
-                ExtractionPoint.State state = GameRefs.ExtractionPoint_currentState(ep);
+                ExtractionPoint.State state = ep.currentState;
                 bool startRoom = ep.GetComponentInParent<StartRoom>() != null;
-                RoomVolume epRoom = ep.roomVolume != null ? ep.roomVolume.GetComponent<RoomVolume>() : null;
+                RoomVolume? epRoom = ep.roomVolume != null ? ep.roomVolume.GetComponent<RoomVolume>() : null;
 
                 int roomPoints = 0;
                 float nearestLp = -1f;
@@ -83,10 +84,10 @@ namespace Werewolf.Vanilla
         private sealed class PlannedEntry
         {
             public int Actor;
-            public PlayerAvatar Avatar;
+            public PlayerAvatar? Avatar;
             public Vector3 Pos;
             public Quaternion Rot;
-            public string Label;
+            public string Label = string.Empty;
             public bool Physical;
             public bool IsBot;
         }
@@ -104,14 +105,14 @@ namespace Werewolf.Vanilla
         public void ClearPlan() => _plan.Clear();
 
         public bool WarpScatter(Func<int, bool> isAlive, bool warpTruckSlot = true,
-            bool uniformDebug = false, IReadOnlyList<int> botActors = null)
+            bool uniformDebug = false, IReadOnlyList<int>? botActors = null)
         {
             return PlanScatter(isAlive, warpTruckSlot, uniformDebug, botActors)
                 && ExecutePlan(isAlive);
         }
 
         public bool PlanScatter(Func<int, bool> isAlive, bool warpTruckSlot = true,
-            bool uniformDebug = false, IReadOnlyList<int> botActors = null)
+            bool uniformDebug = false, IReadOnlyList<int>? botActors = null)
         {
             LastAssignments.Clear();
             _plan.Clear();
@@ -128,7 +129,7 @@ namespace Werewolf.Vanilla
                 return false;
             }
 
-            List<PlayerAvatar> players = GameDirector.instance != null ? GameDirector.instance.PlayerList : null;
+            List<PlayerAvatar>? players = GameDirector.instance != null ? GameDirector.instance.PlayerList : null;
             if (players == null || players.Count == 0)
             {
                 WLog.Line("scatter_warp_error", secret: false, ("reason", "no_players"));
@@ -136,7 +137,7 @@ namespace Werewolf.Vanilla
             }
 
             RoundDirector round = RoundDirector.instance;
-            bool allCompleted = round != null && GameRefs.RoundDirector_allExtractionPointsCompleted(round);
+            bool allCompleted = round != null && round.allExtractionPointsCompleted;
             List<ExtractionPoint> slotEps = allCompleted
                 ? new List<ExtractionPoint>()
                 : CollectEligibleExtractionPoints();
@@ -160,7 +161,8 @@ namespace Werewolf.Vanilla
                 return false;
             }
 
-            int botCount = botActors != null ? botActors.Count : 0;
+            IReadOnlyList<int> bots = botActors ?? Array.Empty<int>();
+            int botCount = bots.Count;
             int slotCount = 1 + slotEps.Count;
             int totalCount = alive.Count + botCount;
             int[] slotByIndex = uniformDebug
@@ -249,9 +251,9 @@ namespace Werewolf.Vanilla
                 if (slot != 0 && slotFailed[slot]) fallbacks++;
                 _plan.Add(new PlannedEntry
                 {
-                    Actor = botActors[b], Avatar = null, Label = botLabel, Physical = false, IsBot = true,
+                    Actor = bots[b], Avatar = null, Label = botLabel, Physical = false, IsBot = true,
                 });
-                LastAssignments.Add((botActors[b], botLabel));
+                LastAssignments.Add((bots[b], botLabel));
             }
 
             _planSlotCount = slotCount;
@@ -316,9 +318,9 @@ namespace Werewolf.Vanilla
         private static List<ExtractionPoint> CollectEligibleExtractionPoints()
         {
             var eligible = new List<ExtractionPoint>();
-            foreach (ExtractionPoint ep in UnityEngine.Object.FindObjectsOfType<ExtractionPoint>())
+            foreach (ExtractionPoint ep in UnityEngine.Object.FindObjectsByType<ExtractionPoint>(FindObjectsSortMode.None))
             {
-                ExtractionPoint.State state = GameRefs.ExtractionPoint_currentState(ep);
+                ExtractionPoint.State state = ep.currentState;
                 if (state != ExtractionPoint.State.Complete) continue;
                 if (ep.GetComponentInParent<StartRoom>() != null) continue;
                 eligible.Add(ep);
@@ -356,10 +358,10 @@ namespace Werewolf.Vanilla
             return false;
         }
 
-        private static int ActorOf(PlayerAvatar avatar) =>
+        private static int ActorOf(PlayerAvatar? avatar) =>
             avatar != null && avatar.photonView != null ? avatar.photonView.OwnerActorNr : -1;
 
-        private static float NearestDistance(SpawnPoint[] points, Vector3 pos)
+        private static float NearestDistance(SpawnPoint[]? points, Vector3 pos)
         {
             float nearest = -1f;
             if (points == null) return nearest;

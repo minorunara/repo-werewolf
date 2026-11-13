@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using Werewolf.Core;
 using Werewolf.Scenarios.Core;
@@ -22,13 +23,7 @@ namespace Werewolf.Scenarios.Vanilla
                 float multiplier = ScenarioLevelSizeRules.SizeMultiplier(
                     spec.LevelsCompleted, spec.ModuleAmount);
                 if (multiplier <= 1f) return;
-                if (GameRefs.LevelGenerator_DebugLevelSize == null)
-                {
-                    ScenarioVanillaProbe.Failed("level_size_ref", "fieldref_null");
-                    return;
-                }
-
-                GameRefs.LevelGenerator_DebugLevelSize(generator) = multiplier;
+                generator.DebugLevelSize = multiplier;
                 WLog.Line("scenario_level_size", secret: false,
                     ("level", spec.LevelsCompleted + 1),
                     ("vanillaModules", ScenarioLevelSizeRules.VanillaModuleAmount(spec.LevelsCompleted)),
@@ -64,7 +59,7 @@ namespace Werewolf.Scenarios.Vanilla
         private static bool TryGetSpec(out ScenarioEnvironmentSpec spec)
         {
             spec = default;
-            ScenarioDefinition definition = ScenarioRunState.Definition;
+            ScenarioDefinition? definition = ScenarioRunState.Definition;
             if (definition == null) return false;
             spec = definition.Environment;
             return spec.LevelSizeOverridden;

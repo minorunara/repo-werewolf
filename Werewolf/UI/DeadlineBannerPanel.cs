@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using TMPro;
 using UnityEngine;
@@ -36,58 +37,101 @@ namespace Werewolf.UI
         private static readonly Color Line2GhostColor = new Color(1f, 0.816f, 0.439f, 1f);
         private static readonly Color Line2HaloColor = new Color(1f, 0.510f, 0.078f, 1f);
 
-        private GameObject _root;
-        private Image[] _emojis;
-        private Row _row1;
-        private Row _row2;
-        private float _elapsedSec;
-        private bool _playing;
+        private ViewRefs? _view;
+
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, Image[] emojis, Row row1, Row row2)
+            {
+                Root = root;
+                Emojis = emojis;
+                Row1 = row1;
+                Row2 = row2;
+            }
+
+            public GameObject Root { get; }
+            public Image[] Emojis { get; }
+            public Row Row1 { get; }
+            public Row Row2 { get; }
+            public float ElapsedSec { get; set; }
+            public bool Playing { get; set; }
+        }
 
         private sealed class Row
         {
-            public TextMeshProUGUI Main;
-            public TextMeshProUGUI SlideGhost;
-            public TextMeshProUGUI PopGhost;
-            public TextMeshProUGUI HaloInner;
-            public TextMeshProUGUI HaloOuter;
-            public float RestWidthPx;
-            public float CenterY;
-            public float TargetWidthPx;
-            public bool FromLeft;
+            public Row(TextMeshProUGUI main, TextMeshProUGUI slideGhost,
+                TextMeshProUGUI popGhost, TextMeshProUGUI haloInner,
+                TextMeshProUGUI haloOuter, float centerY, float targetWidthPx, bool fromLeft)
+            {
+                Main = main;
+                SlideGhost = slideGhost;
+                PopGhost = popGhost;
+                HaloInner = haloInner;
+                HaloOuter = haloOuter;
+                CenterY = centerY;
+                TargetWidthPx = targetWidthPx;
+                FromLeft = fromLeft;
+            }
+
+            public TextMeshProUGUI Main { get; }
+            public TextMeshProUGUI SlideGhost { get; }
+            public TextMeshProUGUI PopGhost { get; }
+            public TextMeshProUGUI HaloInner { get; }
+            public TextMeshProUGUI HaloOuter { get; }
+            public float RestWidthPx { get; set; }
+            public float CenterY { get; }
+            public float TargetWidthPx { get; }
+            public bool FromLeft { get; }
         }
 
-        public bool Exists => _root != null;
+        public bool Exists => GetLiveViewOrNull() != null;
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
-            if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
 
-            RectTransform rect = UiKit.CreateStretched(layerRoot, "WW_DeadlineBanner");
-            _root = rect.gameObject;
+            GameObject? root = null;
+            try
+            {
+                if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            BuildEmojis(rect);
+                RectTransform rect = UiKit.CreateStretched(layerRoot, "WW_DeadlineBanner");
+                root = rect.gameObject;
 
-            _row1 = BuildRow(rect, "Line1", DeadlineBanner.RowOffsetY,
-                DeadlineBanner.Line1WidthPx, fromLeft: true,
-                faceColor: Line1FaceColor, ghostColor: Line1GhostColor, haloColor: Line1HaloColor, italic: false);
-            _row2 = BuildRow(rect, "Line2", -DeadlineBanner.RowOffsetY,
-                DeadlineBanner.Line2WidthPx, fromLeft: false,
-                faceColor: Line2FaceColor, ghostColor: Line2GhostColor, haloColor: Line2HaloColor, italic: true);
+                Image[] emojis = BuildEmojis(rect);
+                Row row1 = BuildRow(rect, "Line1", DeadlineBanner.RowOffsetY,
+                    DeadlineBanner.Line1WidthPx, fromLeft: true,
+                    faceColor: Line1FaceColor, ghostColor: Line1GhostColor, haloColor: Line1HaloColor, italic: false);
+                Row row2 = BuildRow(rect, "Line2", -DeadlineBanner.RowOffsetY,
+                    DeadlineBanner.Line2WidthPx, fromLeft: false,
+                    faceColor: Line2FaceColor, ghostColor: Line2GhostColor, haloColor: Line2HaloColor, italic: true);
 
-            _root.SetActive(false);
+                root.SetActive(false);
+                _view = new ViewRefs(root, emojis, row1, row2);
+            }
+            catch
+            {
+                _view = null;
+                if (root != null)
+                {
+                    root.SetActive(false);
+                    UnityEngine.Object.Destroy(root);
+                }
+                throw;
+            }
         }
 
-        private void BuildEmojis(RectTransform parent)
+        private static Image[] BuildEmojis(RectTransform parent)
         {
-            _emojis = new Image[DeadlineBanner.EmojiCount];
-            Sprite sprite = AssetCatalog.GetSprite("emoji_zany_face");
+            Sprite? sprite = AssetCatalog.GetSprite("emoji_zany_face");
             if (sprite == null)
             {
                 WLog.Line("deadline_banner_emoji_missing", secret: false);
-                return;
+                return Array.Empty<Image>();
             }
-            for (int i = 0; i < _emojis.Length; i++)
+
+            var emojis = new Image[DeadlineBanner.EmojiCount];
+            for (int i = 0; i < emojis.Length; i++)
             {
                 var go = new GameObject("Emoji" + i, typeof(RectTransform));
                 var rect = (RectTransform)go.transform;
@@ -97,31 +141,27 @@ namespace Werewolf.UI
                 img.sprite = sprite;
                 img.raycastTarget = false;
                 img.enabled = false;
-                _emojis[i] = img;
+                emojis[i] = img;
             }
+            return emojis;
         }
 
-        private Row BuildRow(RectTransform parent, string name, float centerY, float targetWidthPx,
+        private static Row BuildRow(RectTransform parent, string name, float centerY, float targetWidthPx,
             bool fromLeft, Color faceColor, Color ghostColor, Color haloColor, bool italic)
         {
-            var row = new Row
-            {
-                CenterY = centerY,
-                TargetWidthPx = targetWidthPx,
-                FromLeft = fromLeft,
-            };
             var pos = new Vector2(0f, centerY);
             FontStyles style = italic ? (FontStyles.Bold | FontStyles.Italic) : FontStyles.Bold;
 
-            row.SlideGhost = CreateLayer(parent, name + "_SlideGhost", pos, ghostColor, style);
-            row.HaloOuter = CreateLayer(parent, name + "_HaloOuter", pos, haloColor, style,
+            TextMeshProUGUI slideGhost = CreateLayer(parent, name + "_SlideGhost", pos, ghostColor, style);
+            TextMeshProUGUI haloOuter = CreateLayer(parent, name + "_HaloOuter", pos, haloColor, style,
                 haloColor, HaloOuterOutlineWidth);
-            row.HaloInner = CreateLayer(parent, name + "_HaloInner", pos, haloColor, style,
+            TextMeshProUGUI haloInner = CreateLayer(parent, name + "_HaloInner", pos, haloColor, style,
                 haloColor, HaloInnerOutlineWidth);
-            row.Main = CreateLayer(parent, name + "_Main", pos, faceColor, style,
+            TextMeshProUGUI main = CreateLayer(parent, name + "_Main", pos, faceColor, style,
                 Color.Lerp(OutlineColor, haloColor, OutlineTintTowardHalo), OutlineWidth);
-            row.PopGhost = CreateLayer(parent, name + "_PopGhost", pos, ghostColor, style);
-            return row;
+            TextMeshProUGUI popGhost = CreateLayer(parent, name + "_PopGhost", pos, ghostColor, style);
+            return new Row(main, slideGhost, popGhost, haloInner, haloOuter,
+                centerY, targetWidthPx, fromLeft);
         }
 
         private static TextMeshProUGUI CreateLayer(RectTransform parent, string name, Vector2 pos,
@@ -141,65 +181,86 @@ namespace Werewolf.UI
 
         public void Show(string line1, string line2)
         {
-            if (_root == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
             try
             {
-                ApplyText(_row1, line1 ?? string.Empty);
-                ApplyText(_row2, line2 ?? string.Empty);
-                _elapsedSec = 0f;
-                _playing = true;
-                if (!_root.activeSelf) _root.SetActive(true);
-                Apply();
+                ApplyText(view.Row1, line1 ?? string.Empty);
+                ApplyText(view.Row2, line2 ?? string.Empty);
+                view.ElapsedSec = 0f;
+                view.Playing = true;
+                if (!view.Root.activeSelf) view.Root.SetActive(true);
+                Apply(view);
             }
             catch (Exception e)
             {
                 WLog.Line("deadline_banner_show_error", secret: false, ("err", e.Message));
+                Hide(view);
             }
         }
 
         public void Tick()
         {
-            if (!_playing || _root == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null || !view.Playing) return;
             try
             {
-                _elapsedSec += Time.unscaledDeltaTime;
-                if (_elapsedSec > DeadlineBanner.TotalSec)
+                view.ElapsedSec += Time.unscaledDeltaTime;
+                if (view.ElapsedSec > DeadlineBanner.TotalSec)
                 {
-                    Hide();
+                    Hide(view);
                     return;
                 }
-                Apply();
+                Apply(view);
             }
             catch (Exception e)
             {
                 WLog.Line("deadline_banner_tick_error", secret: false, ("err", e.Message));
-                Hide();
+                Hide(view);
             }
         }
 
         public void Hide()
         {
-            _playing = false;
-            _elapsedSec = 0f;
-            if (_root != null && _root.activeSelf) _root.SetActive(false);
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view != null) Hide(view);
         }
 
         public void Destroy()
         {
-            _playing = false;
-            if (_root != null)
+            ViewRefs? view = _view;
+            _view = null;
+            if (view == null) return;
+
+            view.Playing = false;
+            view.ElapsedSec = 0f;
+            if (view.Root != null)
             {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
+                view.Root.SetActive(false);
+                UnityEngine.Object.Destroy(view.Root);
             }
-            _row1 = null;
-            _row2 = null;
-            _emojis = null;
         }
 
-        private void ApplyText(Row row, string text)
+        private ViewRefs? GetLiveViewOrNull()
         {
-            if (row == null) return;
+            ViewRefs? view = _view;
+            if (view == null || view.Root != null) return view;
+
+            _view = null;
+            view.Playing = false;
+            view.ElapsedSec = 0f;
+            return null;
+        }
+
+        private static void Hide(ViewRefs view)
+        {
+            view.Playing = false;
+            view.ElapsedSec = 0f;
+            if (view.Root != null && view.Root.activeSelf) view.Root.SetActive(false);
+        }
+
+        private static void ApplyText(Row row, string text)
+        {
             row.Main.text = row.SlideGhost.text = row.PopGhost.text
                 = row.HaloInner.text = row.HaloOuter.text = text;
 
@@ -221,20 +282,19 @@ namespace Werewolf.UI
             row.RestWidthPx = restWidth;
         }
 
-        private void Apply()
+        private static void Apply(ViewRefs view)
         {
-            if (!UiKit.TryMeasureCanvas((RectTransform)_root.transform, out CanvasBounds canvas)) return;
-            ApplyEmojis(_elapsedSec, canvas);
-            ApplyRow(_row1, _elapsedSec, canvas);
-            ApplyRow(_row2, _elapsedSec - DeadlineBanner.Line2StaggerSec, canvas);
+            if (!UiKit.TryMeasureCanvas((RectTransform)view.Root.transform, out CanvasBounds canvas)) return;
+            ApplyEmojis(view.Emojis, view.ElapsedSec, canvas);
+            ApplyRow(view.Row1, view.ElapsedSec, canvas);
+            ApplyRow(view.Row2, view.ElapsedSec - DeadlineBanner.Line2StaggerSec, canvas);
         }
 
-        private void ApplyEmojis(float t, CanvasBounds canvas)
+        private static void ApplyEmojis(Image[] emojis, float t, CanvasBounds canvas)
         {
-            if (_emojis == null) return;
-            for (int i = 0; i < _emojis.Length; i++)
+            for (int i = 0; i < emojis.Length; i++)
             {
-                Image img = _emojis[i];
+                Image img = emojis[i];
                 if (img == null) continue;
                 BannerEmojiState state = DeadlineBanner.ComputeEmoji(t, i, canvas);
                 if (!state.Visible)
@@ -253,7 +313,6 @@ namespace Werewolf.UI
 
         private static void ApplyRow(Row row, float t, CanvasBounds canvas)
         {
-            if (row == null) return;
             float startOffsetX = DeadlineBanner.StartOffsetX(canvas, row.RestWidthPx, row.FromLeft);
             BannerRowState state = DeadlineBanner.Compute(t, startOffsetX);
             ApplyLayer(row.Main, state.Main, row.CenterY);

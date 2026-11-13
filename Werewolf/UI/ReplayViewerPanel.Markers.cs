@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -67,13 +68,13 @@ namespace Werewolf.UI
                     }
                 }
 
-                UpdateDotPool(_enemyPool, _enemyLayer, _playback.Enemies, t, proj,
+                UpdateDotPool(_enemyPool, _enemyLayer!, _playback.Enemies, t, proj,
                     EnemyDotSize, EnemyColor, circle: true, labelled: true);
-                UpdateDotPool(_valuablePool, _valuableLayer, _playback.Valuables, t, proj,
+                UpdateDotPool(_valuablePool, _valuableLayer!, _playback.Valuables, t, proj,
                     ValuableDotSize, ValuableColor, circle: true, labelled: false);
-                UpdateDotPool(_itemPool, _itemLayer, _playback.Items, t, proj,
+                UpdateDotPool(_itemPool, _itemLayer!, _playback.Items, t, proj,
                     ItemDotSize, ItemColor, circle: true, labelled: false);
-                UpdateDotPool(_cartPool, _cartLayer, _playback.Carts, t, proj,
+                UpdateDotPool(_cartPool, _cartLayer!, _playback.Carts, t, proj,
                     CartSize, CartColor, circle: false, labelled: false);
                 UpdateEpMarkers(t, proj);
                 deathMarkCount = UpdateDeathMarks(t, proj);
@@ -116,11 +117,11 @@ namespace Werewolf.UI
         private bool TryGetMarkerPos(ReplayPlayerEntry entry, bool dead, double t, out float x, out float z)
         {
             if (dead && entry.CorpseTrack != null
-                && _playback.TryGetPos(entry.CorpseTrack, t, out x, out _, out z))
+                && _playback!.TryGetPos(entry.CorpseTrack, t, out x, out _, out z))
             {
                 return true;
             }
-            return _playback.TryGetPos(entry.Track, t, out x, out _, out z);
+            return _playback!.TryGetPos(entry.Track, t, out x, out _, out z);
         }
 
         private int DrawTrail(ReplayPlayerEntry entry, double t, MapPanelProjection proj, int trailCount)
@@ -129,7 +130,7 @@ namespace Werewolf.UI
                 ? entry.CorpseTrack
                 : entry.Track;
             _trailScratch.Clear();
-            _playback.TrailInto(track, t - TrailSeconds, t, _trailScratch);
+            _playback!.TrailInto(track, t - TrailSeconds, t, _trailScratch);
             if (_playback.TryGetPos(track, t, out float cx, out _, out float cz))
             {
                 _trailScratch.Add(new ReplayTrailPoint { T = t, X = cx, Z = cz });
@@ -151,10 +152,10 @@ namespace Werewolf.UI
 
                 Vector2 center = (a + c) * 0.5f;
                 float angle = Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg;
-                Image under = EnsureTrailSegment(_trailUnderPool, _trailUnderLayer, "TrailUnder", trailCount);
+                Image under = EnsureTrailSegment(_trailUnderPool, _trailUnderLayer!, "TrailUnder", trailCount);
                 under.color = TrailUnderColor;
                 PlaceTrailSegment(under, center, len + (TrailUnderThickness - TrailThickness), TrailUnderThickness, angle);
-                Image seg = EnsureTrailSegment(_trailPool, _trailLayer, "Trail", trailCount);
+                Image seg = EnsureTrailSegment(_trailPool, _trailLayer!, "Trail", trailCount);
                 seg.color = color;
                 PlaceTrailSegment(seg, center, len, TrailThickness, angle);
                 trailCount++;
@@ -212,7 +213,7 @@ namespace Werewolf.UI
                 {
                     ReplayEntityTrack track = tracks[i];
                     if (track.HiddenDuplicate) continue;
-                    if (!_playback.TryGetPos(track, t, out float wx, out _, out float wz)) continue;
+                    if (!_playback!.TryGetPos(track, t, out float wx, out _, out float wz)) continue;
                     DotMarker dot = EnsureDot(pool, layer, count++, size, color, circle, labelled);
                     dot.Rect.anchoredPosition = new Vector2(proj.PanelX(wx), proj.PanelY(wz));
                     if (dot.Dot.color != color) dot.Dot.color = color;
@@ -276,7 +277,7 @@ namespace Werewolf.UI
         private int UpdateDeathMarks(double t, MapPanelProjection proj)
         {
             int count = 0;
-            List<ReplayDeathMark> marks = _playback.DeathMarks;
+            List<ReplayDeathMark> marks = _playback!.DeathMarks;
             for (int i = 0; i < marks.Count; i++)
             {
                 ReplayDeathMark mark = marks[i];
@@ -292,7 +293,7 @@ namespace Werewolf.UI
         {
             while (_deathMarkPool.Count <= index)
             {
-                RectTransform root = UiKit.CreateRect(_deathMarkLayer, "Death" + _deathMarkPool.Count,
+                RectTransform root = UiKit.CreateRect(_deathMarkLayer!, "Death" + _deathMarkPool.Count,
                     Vector2.zero, new Vector2(DeathMarkSize, DeathMarkSize));
                 if (_deathMarkSprite != null)
                 {
@@ -363,8 +364,8 @@ namespace Werewolf.UI
             if (_gaugeRoot.activeSelf != show) _gaugeRoot.SetActive(show);
             if (!show) return;
 
-            double t = _clock.T;
-            int baseDollars = _playback.BaseDollars;
+            double t = _clock!.T;
+            int baseDollars = _playback!.BaseDollars;
             int lost = _playback.LostDollarsAt(t);
             int delivered = _playback.DeliveredDollarsAt(t);
 
@@ -400,18 +401,14 @@ namespace Werewolf.UI
         {
             while (_playerPool.Count <= index)
             {
-                var marker = new PlayerMarker();
-                UiKit.DiamondMarker diamond = UiKit.CreateDiamondMarker(_playerLayer, "Player" + _playerPool.Count,
+                UiKit.DiamondMarker diamond = UiKit.CreateDiamondMarker(_playerLayer!, "Player" + _playerPool.Count,
                     PlayerFrameSize, PlayerFillSize, PlayerIdFontSize, FrameDefaultColor);
                 RectTransform root = diamond.Rect;
-                marker.Root = root.gameObject;
-                marker.Rect = root;
-                marker.Frame = diamond.Frame;
-                marker.Fill = diamond.Fill;
-                marker.Id = diamond.Id;
-                marker.Name = UiKit.CreateText(root, "Name", new Vector2(0f, PlayerNameOffsetY),
+                TextMeshProUGUI name = UiKit.CreateText(root, "Name", new Vector2(0f, PlayerNameOffsetY),
                     new Vector2(160f, 18f),
                     "", PlayerNameFontSize, NameDefaultColor, TextAlignmentOptions.Center);
+                var marker = new PlayerMarker(root.gameObject, root, diamond.Frame, diamond.Fill,
+                    diamond.Id, name);
 
                 marker.Root.SetActive(false);
                 _playerPool.Add(marker);
@@ -432,19 +429,18 @@ namespace Werewolf.UI
         {
             while (pool.Count <= index)
             {
-                var dot = new DotMarker();
                 RectTransform root = UiKit.CreateRect(layer, "Dot" + pool.Count,
                     Vector2.zero, new Vector2(size, size));
-                dot.Root = root.gameObject;
-                dot.Rect = root;
-                dot.Dot = UiKit.CreateImage(root, "Img", Vector2.zero, new Vector2(size, size), color);
-                if (circle) dot.Dot.sprite = UiKit.CircleSprite();
+                Image image = UiKit.CreateImage(root, "Img", Vector2.zero, new Vector2(size, size), color);
+                if (circle) image.sprite = UiKit.CircleSprite();
+                TextMeshProUGUI? label = null;
                 if (labelled)
                 {
-                    dot.Label = UiKit.CreateText(root, "Label",
+                    label = UiKit.CreateText(root, "Label",
                         new Vector2(0f, EnemyNameOffsetY), new Vector2(140f, 16f),
                         "", EnemyNameFontSize, EnemyColor, TextAlignmentOptions.Center);
                 }
+                var dot = new DotMarker(root.gameObject, root, image, label);
                 dot.Root.SetActive(false);
                 pool.Add(dot);
             }
@@ -455,19 +451,17 @@ namespace Werewolf.UI
         {
             while (_epPool.Count <= index)
             {
-                var dot = new DotMarker();
-                RectTransform root = UiKit.CreateRect(_epLayer, "Ep" + _epPool.Count,
+                RectTransform root = UiKit.CreateRect(_epLayer!, "Ep" + _epPool.Count,
                     Vector2.zero, new Vector2(EpSize, EpSize));
-                dot.Root = root.gameObject;
-                dot.Rect = root;
-                dot.Dot = UiKit.CreateImage(root, "Img", Vector2.zero,
+                Image image = UiKit.CreateImage(root, "Img", Vector2.zero,
                     new Vector2(EpSize, EpSize), Color.white);
-                dot.Label = UiKit.CreateText(root, "Number", Vector2.zero,
+                TextMeshProUGUI label = UiKit.CreateText(root, "Number", Vector2.zero,
                     new Vector2(EpSize * 2f, EpSize),
                     "", EpFontSize, Color.black, TextAlignmentOptions.Center);
-                dot.Sub = UiKit.CreateText(root, "State", new Vector2(0f, EpStateOffsetY),
+                TextMeshProUGUI sub = UiKit.CreateText(root, "State", new Vector2(0f, EpStateOffsetY),
                     new Vector2(220f, 18f),
                     "", EpStateFontSize, Color.white, TextAlignmentOptions.Center);
+                var dot = new DotMarker(root.gameObject, root, image, label, sub);
                 dot.Root.SetActive(false);
                 _epPool.Add(dot);
             }
@@ -478,7 +472,7 @@ namespace Werewolf.UI
         {
             while (_popupPool.Count <= index)
             {
-                TextMeshProUGUI label = UiKit.CreateText(_popupRoot, "Popup" + _popupPool.Count,
+                TextMeshProUGUI label = UiKit.CreateText(_popupRoot!, "Popup" + _popupPool.Count,
                     Vector2.zero, new Vector2(180f, 24f),
                     "", PopupFontSize, PopupLostColor, TextAlignmentOptions.Center);
                 label.gameObject.SetActive(false);
@@ -545,7 +539,7 @@ namespace Werewolf.UI
         {
             while (pool.Count <= index)
             {
-                Image img = UiKit.CreateImage(_seekBarRect, namePrefix + pool.Count,
+                Image img = UiKit.CreateImage(_seekBarRect!, namePrefix + pool.Count,
                     Vector2.zero, new Vector2(2f, SeekBarThickness), color);
                 pool.Add(img);
             }

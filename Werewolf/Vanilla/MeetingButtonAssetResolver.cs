@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 using UnityEngine;
 using Werewolf.Core;
@@ -10,11 +11,11 @@ namespace Werewolf.Vanilla
 
         private static bool _resolved;
         private static bool _adopted;
-        private static GameObject _template;
-        private static AnimationCurve _pressCurve;
+        private static GameObject? _template;
+        private static AnimationCurve? _pressCurve;
 
-        internal static GameObject Template => _template;
-        internal static AnimationCurve PressCurve => _pressCurve;
+        internal static GameObject? Template => _template;
+        internal static AnimationCurve? PressCurve => _pressCurve;
 
         internal static bool TryWarmup()
         {

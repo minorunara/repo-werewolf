@@ -3,6 +3,8 @@
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>disable</Nullable>
+
+    <WarningsAsErrors>$(WarningsAsErrors);nullable</WarningsAsErrors>
     <LangVersion>latest</LangVersion>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
@@ -38,6 +40,8 @@
     <Compile Include="..\Werewolf\Debug\SecretLogBuffer.cs" Link="Debug\SecretLogBuffer.cs" />
     <Compile Include="..\Werewolf\Debug\StructuredLogPolicy.cs" Link="Debug\StructuredLogPolicy.cs" />
     <Compile Include="..\Werewolf\Debug\SelfTest.cs" Link="Debug\SelfTest.cs" />
+
+    <Compile Include="..\Werewolf\Game\ModManifestCollector.cs" Link="Game\ModManifestCollector.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="!Exists('..\Werewolf\Assets\emoji_people.png')">

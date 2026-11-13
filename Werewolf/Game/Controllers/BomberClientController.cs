@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -15,8 +16,8 @@ namespace Werewolf.Game
 
         private readonly BombClientState _bomberClient = new BombClientState();
 
-        private ProximityGauge _bomberProximity;
-        private ProximityGauge _selfDefenseProximity;
+        private ProximityGauge? _bomberProximity;
+        private ProximityGauge? _selfDefenseProximity;
         private float _bomberProximityFullSec;
 
         private bool _warningShown;
@@ -35,7 +36,7 @@ namespace Werewolf.Game
             _d = director;
         }
 
-        internal ProximityGauge DebugProximityGauge => _bomberProximity;
+        internal ProximityGauge? DebugProximityGauge => _bomberProximity;
 
         internal void ApplyBomberState(int targetActor, byte ammo, byte lastDenyByte,
             long plantReadyUnixMs, long detonateReadyUnixMs)
@@ -66,7 +67,7 @@ namespace Werewolf.Game
                 bool scenarioOnly = snap.LastDeny == BombDenyReason.ScenarioDistance
                                     || snap.LastDeny == BombDenyReason.ScenarioTarget
                                     || snap.LastDeny == BombDenyReason.ScenarioTargetMoving;
-                string message = scenarioOnly ? null : FormatBomberDenyToast(snap.LastDeny);
+                string? message = scenarioOnly ? null : FormatBomberDenyToast(snap.LastDeny);
                 if (!string.IsNullOrEmpty(message) && TryPassDenyToast(snap.LastDeny))
                 {
                     _d.PushRawToast(message);
@@ -156,16 +157,16 @@ namespace Werewolf.Game
                 if (proximity <= 0f) proximity = 8f;
                 float selfDefenseProximity = proximity + GameConfig.SelfDefenseProximityMarginMeters;
 
-                List<(int actor, Vector3 pos)> bodies = null;
-                if (localAvatar.IsValid
+                List<(int actor, Vector3 pos)>? bodies = null;
+                if (localPos.HasValue
                     && ((localIsBomber && _bomberProximity != null)
                         || (bomberPossible && _selfDefenseProximity != null)))
                 {
                     bodies = CollectOtherBodies(players, localActor);
                 }
 
-                Dictionary<int, float> radialTargets = null;
-                if (localIsBomber && _bomberProximity != null && bodies != null)
+                Dictionary<int, float>? radialTargets = null;
+                if (localIsBomber && _bomberProximity != null && bodies != null && localPos.HasValue)
                 {
                     radialTargets = new Dictionary<int, float>();
                     foreach ((int actor, Vector3 bodyPos) in bodies)
@@ -184,7 +185,8 @@ namespace Werewolf.Game
                     }
                 }
 
-                if (!localIsBomber && bomberPossible && _selfDefenseProximity != null && bodies != null)
+                if (!localIsBomber && bomberPossible && _selfDefenseProximity != null
+                    && bodies != null && localPos.HasValue)
                 {
                     foreach ((int actor, Vector3 bodyPos) in bodies)
                     {
@@ -306,7 +308,7 @@ namespace Werewolf.Game
         }
 
         private void DriveBomberUi(long now, int localActor, bool localIsBomber,
-            Dictionary<int, float> radialTargets, IReadOnlyList<PlayerHandle> players)
+            Dictionary<int, float>? radialTargets, IReadOnlyList<PlayerHandle> players)
         {
             _d.EnsurePanelBuilt(_bomberHud);
             bool warpedInMeeting = _d.MeetingClientView.MeetingActive
@@ -360,7 +362,7 @@ namespace Werewolf.Game
         }
 
         private int FindNearestFullTarget(Vector3? localPos,
-            IReadOnlyList<(int actor, Vector3 pos)> bodies, int excludedActor)
+            IReadOnlyList<(int actor, Vector3 pos)>? bodies, int excludedActor)
         {
             if (_bomberProximity == null || localPos == null || bodies == null) return -1;
             int bestActor = -1;
@@ -406,7 +408,7 @@ namespace Werewolf.Game
 
         private void SendBomberRoleAction(byte subtype, int arg)
         {
-            INetBus bus = _d.ClientBus;
+            INetBus? bus = _d.ClientBus;
             if (bus == null)
             {
                 WLog.Line("bomber_send_fail", secret: true, ("subtype", subtype), ("reason", "no_bus"));
@@ -458,7 +460,7 @@ namespace Werewolf.Game
             _bombWarningPresenter.Destroy();
         }
 
-        private static string FormatBomberDenyToast(BombDenyReason reason)
+        private static string? FormatBomberDenyToast(BombDenyReason reason)
         {
             switch (reason)
             {

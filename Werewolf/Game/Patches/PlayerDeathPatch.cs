@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
@@ -5,14 +6,14 @@ using Werewolf.Vanilla;
 
 namespace Werewolf.Game.Patches
 {
-    [HarmonyPatch(typeof(PlayerAvatar), "PlayerDeathRPC")]
+    [HarmonyPatch(typeof(PlayerAvatar), nameof(PlayerAvatar.PlayerDeathRPC))]
     internal static class PlayerDeathPatch
     {
         private static void Postfix(PlayerAvatar __instance)
         {
             try
             {
-                WerewolfDirector dir = WerewolfDirector.Instance;
+                WerewolfDirector? dir = WerewolfDirector.Instance;
                 if (dir == null || !dir.IsHostSessionActive) return;
                 if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
 

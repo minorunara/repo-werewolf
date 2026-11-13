@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using TMPro;
@@ -44,23 +45,52 @@ namespace Werewolf.UI
         private static readonly Color LockedTextColor = new Color(0.75f, 0.75f, 0.75f, 1f);
         private static readonly Color UnlockedTextColor = new Color(0.65f, 1f, 0.65f, 1f);
 
-        private GameObject _root;
-        private RectTransform _rootRect;
-        private RectTransform _trackRect;
-        private Image _fillImage;
-        private GameObject _deliveryTrack;
-        private RectTransform _deliveryTrackRect;
-        private Image _deliveryFillImage;
-        private Image _quotaLine;
-        private Image _checkmateLine;
-        private GameObject _deliveryIcon;
-        private TextMeshProUGUI _pctText;
-        private TextMeshProUGUI _nextUpdateText;
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, RectTransform rootRect, RectTransform trackRect, Image fillImage,
+                GameObject deliveryTrack, RectTransform deliveryTrackRect, Image deliveryFillImage,
+                Image quotaLine, Image checkmateLine, GameObject? deliveryIcon,
+                TextMeshProUGUI pctText, TextMeshProUGUI nextUpdateText)
+            {
+                Root = root; RootRect = rootRect; TrackRect = trackRect; FillImage = fillImage;
+                DeliveryTrack = deliveryTrack; DeliveryTrackRect = deliveryTrackRect;
+                DeliveryFillImage = deliveryFillImage; QuotaLine = quotaLine;
+                CheckmateLine = checkmateLine; DeliveryIcon = deliveryIcon;
+                PctText = pctText; NextUpdateText = nextUpdateText;
+            }
+            public GameObject Root { get; }
+            public RectTransform RootRect { get; }
+            public RectTransform TrackRect { get; }
+            public Image FillImage { get; }
+            public GameObject DeliveryTrack { get; }
+            public RectTransform DeliveryTrackRect { get; }
+            public Image DeliveryFillImage { get; }
+            public Image QuotaLine { get; }
+            public Image CheckmateLine { get; }
+            public GameObject? DeliveryIcon { get; }
+            public TextMeshProUGUI PctText { get; }
+            public TextMeshProUGUI NextUpdateText { get; }
+        }
+
+        private ViewRefs? _view;
+        private GameObject? _root => _view?.Root;
+        private RectTransform? _rootRect => _view?.RootRect;
+        private RectTransform? _trackRect => _view?.TrackRect;
+        private Image? _fillImage => _view?.FillImage;
+        private GameObject? _deliveryTrack => _view?.DeliveryTrack;
+        private RectTransform? _deliveryTrackRect => _view?.DeliveryTrackRect;
+        private Image? _deliveryFillImage => _view?.DeliveryFillImage;
+        private Image? _quotaLine => _view?.QuotaLine;
+        private Image? _checkmateLine => _view?.CheckmateLine;
+        private GameObject? _deliveryIcon => _view?.DeliveryIcon;
+        private TextMeshProUGUI? _pctText => _view?.PctText;
+        private TextMeshProUGUI? _nextUpdateText => _view?.NextUpdateText;
         private readonly List<GameObject> _markerObjects = new List<GameObject>();
 
-        private MeetingGaugeSnapshot _renderedSnapshot;
+        private MeetingGaugeSnapshot? _renderedSnapshot;
         private bool _wasMeetingActive;
         private int _lastNextUpdateSec = -1;
+        private readonly TextRefresh _textRefresh = new TextRefresh(nameof(MeetingGaugePanel));
 
         private readonly GaugeReveal _reveal = new GaugeReveal();
         private int _lastRevealedPermille;
@@ -72,9 +102,9 @@ namespace Werewolf.UI
         private int _lastRevealedDeliveryPermille;
         private bool _deliverySfxPlayed;
 
-        public Action OnRevealBreak;
+        public Action? OnRevealBreak;
 
-        public Action OnDeliveryReveal;
+        public Action? OnDeliveryReveal;
 
         public int LastRevealedPermille => _lastRevealedPermille;
 
@@ -105,62 +135,64 @@ namespace Werewolf.UI
             _markerScale = markerScale;
         }
 
-        public bool Exists => _root != null;
+        public bool Exists => GetLiveViewOrNull() != null;
 
         public string LayerName => WerewolfUIManager.RoleGaugeLayer;
 
         public bool Visible => _root != null && _root.activeSelf;
 
-        public RectTransform PanelRect => _rootRect;
+        public RectTransform? PanelRect => _rootRect;
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
 
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
             Vector2 pctSize = new Vector2(_panelSize.x - 24f, 22f);
 
+            GameObject? root = null;
+            try
+            {
             RectTransform rect = UiKit.CreateRect(layerRoot, _rootName, _rootPos, _panelSize);
             rect.anchorMin = rect.anchorMax = _rootAnchor;
             rect.pivot = _rootPivot;
             rect.localScale = Vector3.one * _scale;
-            _root = rect.gameObject;
-            _rootRect = rect;
+            root = rect.gameObject;
 
             UiKit.CreateImage(rect, "Bg", Vector2.zero, _panelSize, new Color(0.02f, 0.02f, 0.05f, 0.75f));
 
             Image track = UiKit.CreateImage(rect, "Track", TrackPos, TrackSize, TrackBgColor);
-            _trackRect = track.rectTransform;
-            _fillImage = UiKit.CreateFilledImage(_trackRect, "Fill", Vector2.zero, TrackSize, FillColor);
+            RectTransform trackRect = track.rectTransform;
+            Image fillImage = UiKit.CreateFilledImage(trackRect, "Fill", Vector2.zero, TrackSize, FillColor);
 
             const float nextUpdateLeftPad = 80f;
             Image deliveryTrack = UiKit.CreateImage(rect, "DeliveryTrack",
                 TrackPos + new Vector2(0f, -TrackSize.y), TrackSize, TrackBgColor);
-            _deliveryTrackRect = deliveryTrack.rectTransform;
-            _deliveryTrack = deliveryTrack.gameObject;
-            _deliveryFillImage = UiKit.CreateFilledImage(_deliveryTrackRect, "DeliveryFill",
+            RectTransform deliveryTrackRect = deliveryTrack.rectTransform;
+            GameObject deliveryTrackGo = deliveryTrack.gameObject;
+            Image deliveryFillImage = UiKit.CreateFilledImage(deliveryTrackRect, "DeliveryFill",
                 Vector2.zero, TrackSize, DeliveryFillColor);
-            _deliveryFillImage.fillOrigin = (int)Image.OriginHorizontal.Right;
-            _quotaLine = UiKit.CreateImage(rect, "QuotaLine",
+            deliveryFillImage.fillOrigin = (int)Image.OriginHorizontal.Right;
+            Image quotaLine = UiKit.CreateImage(rect, "QuotaLine",
                 new Vector2(0f, TrackPos.y - TrackSize.y / 2f),
                 new Vector2(QuotaLineWidth, TrackSize.y * 2f + 8f), QuotaLineColor);
-            _quotaLine.gameObject.SetActive(false);
-            _checkmateLine = UiKit.CreateImage(rect, "CheckmateLine",
+            quotaLine.gameObject.SetActive(false);
+            Image checkmateLine = UiKit.CreateImage(rect, "CheckmateLine",
                 new Vector2(0f, TrackPos.y - TrackSize.y / 2f),
                 new Vector2(QuotaLineWidth, TrackSize.y * 2f + 8f), CheckmateLineColor);
-            _checkmateLine.gameObject.SetActive(false);
-            _deliveryTrack.SetActive(false);
+            checkmateLine.gameObject.SetActive(false);
+            deliveryTrackGo.SetActive(false);
 
-            _pctText = UiKit.CreateText(rect, "PctText", PctTextPos, pctSize,
+            TextMeshProUGUI pctText = UiKit.CreateText(rect, "PctText", PctTextPos, pctSize,
                 "", 22f * _markerScale, Color.white, TextAlignmentOptions.Center);
 
             Vector2 nextUpdateSize = new Vector2(pctSize.x - nextUpdateLeftPad * 2f, 28f);
-            _nextUpdateText = UiKit.CreateText(rect, "NextUpdate",
+            TextMeshProUGUI nextUpdateText = UiKit.CreateText(rect, "NextUpdate",
                 new Vector2(PctTextPos.x + nextUpdateLeftPad, PctTextPos.y), nextUpdateSize,
                 "", 24f * _markerScale, new Color(0.9f, 0.9f, 0.9f, 0.95f), TextAlignmentOptions.MidlineLeft);
 
-            Sprite gaugeIcon = AssetCatalog.GetSprite("icon_gauge_valuable_loss");
+            Sprite? gaugeIcon = AssetCatalog.GetSprite("icon_gauge_valuable_loss");
             if (gaugeIcon != null)
             {
                 const float iconSize = 128f;
@@ -172,7 +204,8 @@ namespace Werewolf.UI
                 iconImg.preserveAspect = true;
             }
 
-            Sprite deliveryIcon = AssetCatalog.GetSprite("icon_gauge_delivery");
+            Sprite? deliveryIcon = AssetCatalog.GetSprite("icon_gauge_delivery");
+            GameObject? deliveryIconGo = null;
             if (deliveryIcon != null)
             {
                 const float iconSize = 128f;
@@ -182,14 +215,25 @@ namespace Werewolf.UI
                     new Vector2(iconSize, iconSize), Color.white);
                 iconImg.sprite = deliveryIcon;
                 iconImg.preserveAspect = true;
-                _deliveryIcon = iconImg.gameObject;
-                _deliveryIcon.SetActive(false);
+                deliveryIconGo = iconImg.gameObject;
+                deliveryIconGo.SetActive(false);
             }
 
-            _root.SetActive(false);
+            root.SetActive(false);
+            _view = new ViewRefs(root, rect, trackRect, fillImage, deliveryTrackGo,
+                deliveryTrackRect, deliveryFillImage, quotaLine, checkmateLine,
+                deliveryIconGo, pctText, nextUpdateText);
+            _textRefresh.Subscribe(() => Exists, ApplyTexts);
+            }
+            catch
+            {
+                _view = null;
+                if (root != null) UnityEngine.Object.Destroy(root);
+                throw;
+            }
         }
 
-        public void Tick(RolesClientState roles, MeetingClientState meeting, long nowUnixMs)
+        public void Tick(RolesClientState? roles, MeetingClientState? meeting, long nowUnixMs)
         {
             if (_root == null) return;
             try
@@ -203,29 +247,32 @@ namespace Werewolf.UI
                 }
                 _wasMeetingActive = meetingActive;
 
-                MeetingGaugeSnapshot snapshot = roles != null ? roles.MeetingGauge : null;
-                bool visible = meetingActive && snapshot != null && meeting.GaugeIntroReady(nowUnixMs);
+                MeetingGaugeSnapshot? snapshot = roles != null ? roles.MeetingGauge : null;
+                bool visible = meeting != null && meeting.MeetingActive && snapshot != null
+                    && meeting.GaugeIntroReady(nowUnixMs);
                 if (_root.activeSelf != visible)
                 {
                     _root.SetActive(visible);
                     WLog.Line("gauge_panel_visible", secret: false, ("visible", visible));
                 }
                 if (!visible) return;
+                MeetingClientState activeMeeting = meeting!;
+                MeetingGaugeSnapshot activeSnapshot = snapshot!;
 
                 if (_rootRect != null)
                 {
                     _rootRect.anchoredPosition = Vector2.Lerp(
-                        CenterPanelPos, FullPanelPos, (float)meeting.GaugeMoveProgress(nowUnixMs));
+                        CenterPanelPos, FullPanelPos, (float)activeMeeting.GaugeMoveProgress(nowUnixMs));
                 }
 
                 if (!ReferenceEquals(snapshot, _renderedSnapshot))
                 {
-                    BeginReveal(snapshot, nowUnixMs);
+                    BeginReveal(activeSnapshot, nowUnixMs);
                     _renderedSnapshot = snapshot;
                 }
                 else if (_reveal.Active || _deliveryReveal.Active)
                 {
-                    TickReveal(snapshot, nowUnixMs);
+                    TickReveal(activeSnapshot, nowUnixMs);
                 }
             }
             catch (Exception e)
@@ -234,30 +281,32 @@ namespace Werewolf.UI
             }
         }
 
-        public void TickPlay(RolesClientState roles, MeetingClientState meeting, GamePhase phase,
+        public void TickPlay(RolesClientState? roles, MeetingClientState? meeting, GamePhase phase,
                              Role? localRole, long nowUnixMs)
         {
             if (_root == null) return;
             try
             {
                 bool warped = meeting != null && meeting.MeetingActive && meeting.WarpDone(nowUnixMs);
-                MeetingGaugeSnapshot snapshot = roles != null ? roles.PlayGauge : null;
+                MeetingGaugeSnapshot? snapshot = roles != null ? roles.PlayGauge : null;
                 bool visible = (phase == GamePhase.Play || phase == GamePhase.Meeting) && !warped
-                    && snapshot != null && roles.CanShowHud(localRole);
+                    && snapshot != null && roles != null && roles.CanShowHud(localRole);
                 if (_root.activeSelf != visible)
                 {
                     _root.SetActive(visible);
                     WLog.Line("play_gauge_visible", secret: false, ("visible", visible));
                 }
                 if (!visible) return;
+                RolesClientState activeRoles = roles!;
+                MeetingGaugeSnapshot activeSnapshot = snapshot!;
 
                 if (!ReferenceEquals(snapshot, _renderedSnapshot))
                 {
-                    Render(snapshot);
+                    Render(activeSnapshot);
                     _renderedSnapshot = snapshot;
                 }
 
-                UpdateNextUpdateText(roles, nowUnixMs);
+                UpdateNextUpdateText(activeRoles, nowUnixMs);
             }
             catch (Exception e)
             {
@@ -283,25 +332,21 @@ namespace Werewolf.UI
             _nextUpdateText.text = sec < 0 ? "" : Texts.Format(TextId.GaugeNextUpdateFormat, sec);
         }
 
+        private void ApplyTexts()
+        {
+            _lastNextUpdateSec = -1;
+            MeetingGaugeSnapshot? s = _renderedSnapshot;
+            if (s == null || _reveal.Active || _deliveryReveal.Active) return;
+            Render(s);
+        }
+
         public void Destroy()
         {
+            _textRefresh.Unsubscribe();
             ClearMarkers();
-            if (_root != null)
-            {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
-            }
-            _rootRect = null;
-            _trackRect = null;
-            _fillImage = null;
-            _deliveryTrack = null;
-            _deliveryTrackRect = null;
-            _deliveryFillImage = null;
-            _quotaLine = null;
-            _checkmateLine = null;
-            _deliveryIcon = null;
-            _pctText = null;
-            _nextUpdateText = null;
+            ViewRefs? view = _view;
+            _view = null;
+            if (view != null && view.Root != null) UnityEngine.Object.Destroy(view.Root);
             _renderedSnapshot = null;
             _wasMeetingActive = false;
             _lastNextUpdateSec = -1;
@@ -313,6 +358,21 @@ namespace Werewolf.UI
             _deliveryReveal.Stop();
             _lastRevealedDeliveryPermille = 0;
             _deliverySfxPlayed = false;
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+            _view = null;
+            _markerObjects.Clear();
+            _renderedSnapshot = null;
+            _wasMeetingActive = false;
+            _lastNextUpdateSec = -1;
+            _reveal.Stop();
+            _deliveryReveal.Stop();
+            return null;
         }
 
         private void BeginReveal(MeetingGaugeSnapshot s, long nowUnixMs)
@@ -513,7 +573,7 @@ namespace Werewolf.UI
                     m.Unlocked ? UnlockedTickColor : LockedTickColor);
                 _markerObjects.Add(tick.gameObject);
 
-                Sprite sprite = AssetCatalog.GetSprite(m.IconKey);
+                Sprite? sprite = AssetCatalog.GetSprite(m.IconKey);
                 if (sprite != null)
                 {
                     float size = PerkIconSize * _markerScale;
@@ -533,7 +593,7 @@ namespace Werewolf.UI
                         new Vector2(bw, bh), m.Unlocked ? UnlockedBalloonBg : LockedBalloonBg);
                     _markerObjects.Add(balloon.gameObject);
                     UiKit.CreateText(balloon.rectTransform, "Label", Vector2.zero,
-                        new Vector2(bw - 8f, bh - 4f), m.Label, 14f * _markerScale,
+                        new Vector2(bw - 8f, bh - 4f), m.Label ?? string.Empty, 14f * _markerScale,
                         m.Unlocked ? UnlockedTextColor : LockedTextColor, TextAlignmentOptions.Center);
                 }
             }
@@ -570,18 +630,18 @@ namespace Werewolf.UI
         private float RenderRuleUnit(float x, float rowY, string iconKey, string valueText, string fallbackText)
         {
             Color ruleColor = new Color(0.9f, 0.9f, 0.9f, 0.95f);
-            Sprite icon = AssetCatalog.GetSprite(iconKey);
+            Sprite? icon = AssetCatalog.GetSprite(iconKey);
             if (icon != null)
             {
                 float size = 20f * _markerScale;
                 float textW = 90f * _markerScale;
-                Image iconImg = UiKit.CreateImage(_trackRect, "RuleIcon",
+                Image iconImg = UiKit.CreateImage(_trackRect!, "RuleIcon",
                     new Vector2(x + size / 2f, rowY), new Vector2(size, size), Color.white);
                 iconImg.sprite = icon;
                 iconImg.preserveAspect = true;
                 _markerObjects.Add(iconImg.gameObject);
 
-                var text = UiKit.CreateText(_trackRect, "RuleText",
+                var text = UiKit.CreateText(_trackRect!, "RuleText",
                     new Vector2(x + size + 4f + textW / 2f, rowY),
                     new Vector2(textW, 24f * _markerScale), valueText, 16f * _markerScale,
                     ruleColor, TextAlignmentOptions.MidlineLeft);
@@ -590,7 +650,7 @@ namespace Werewolf.UI
             }
 
             float fw = 200f * _markerScale;
-            var fallback = UiKit.CreateText(_trackRect, "RuleText",
+            var fallback = UiKit.CreateText(_trackRect!, "RuleText",
                 new Vector2(x + fw / 2f, rowY), new Vector2(fw, 24f * _markerScale),
                 fallbackText, 16f * _markerScale, ruleColor, TextAlignmentOptions.MidlineLeft);
             _markerObjects.Add(fallback.gameObject);
@@ -602,19 +662,19 @@ namespace Werewolf.UI
             if (s.BeaconChargePct < 1) return;
 
             Color ruleColor = new Color(0.9f, 0.9f, 0.9f, 0.95f);
-            Sprite icon = AssetCatalog.GetSprite("perk_beacon");
+            Sprite? icon = AssetCatalog.GetSprite("perk_beacon");
             if (icon != null)
             {
                 float textW = 90f * _markerScale;
                 float size = 20f * _markerScale;
-                var text = UiKit.CreateText(_trackRect, "BeaconRule",
+                var text = UiKit.CreateText(_trackRect!, "BeaconRule",
                     new Vector2(TrackSize.x / 2f - textW / 2f, rowY),
                     new Vector2(textW, 24f * _markerScale),
                     "+1/" + s.BeaconChargePct + "%", 16f * _markerScale, ruleColor,
                     TextAlignmentOptions.MidlineRight);
                 _markerObjects.Add(text.gameObject);
 
-                Image iconImg = UiKit.CreateImage(_trackRect, "BeaconRuleIcon",
+                Image iconImg = UiKit.CreateImage(_trackRect!, "BeaconRuleIcon",
                     new Vector2(TrackSize.x / 2f - textW - size / 2f - 4f, rowY),
                     new Vector2(size, size), Color.white);
                 iconImg.sprite = icon;
@@ -624,7 +684,7 @@ namespace Werewolf.UI
             else
             {
                 float textW = 200f * _markerScale;
-                var text = UiKit.CreateText(_trackRect, "BeaconRule",
+                var text = UiKit.CreateText(_trackRect!, "BeaconRule",
                     new Vector2(TrackSize.x / 2f - textW / 2f, rowY),
                     new Vector2(textW, 24f * _markerScale),
                     Texts.Format(TextId.GaugeBeaconRuleFormat, s.BeaconChargePct), 16f * _markerScale, ruleColor,

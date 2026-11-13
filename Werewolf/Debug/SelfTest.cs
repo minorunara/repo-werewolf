@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using Werewolf.Core;
@@ -97,6 +98,9 @@ namespace Werewolf.Debugging
             if (!condition) fails.Add(what);
         }
 
+        private static int[]? TargetActorsOf(OutboundMessage message)
+            => (message.Destination as MessageDestination.ActorsDestination)?.Actors;
+
         private sealed class Harness
         {
             public readonly GameSession Session = new GameSession();
@@ -110,15 +114,15 @@ namespace Werewolf.Debugging
                 Session.OnSend += m =>
                 {
                     Sent.Add(m);
-                    switch (m.Target)
+                    switch (m.Destination)
                     {
-                        case MessageTarget.All:
+                        case MessageDestination.AllDestination:
                             Bus.SendToAll(m.Code, m.Payload);
                             break;
-                        case MessageTarget.Actors:
-                            Bus.SendToActors(m.Code, m.Payload, m.TargetActors);
+                        case MessageDestination.ActorsDestination actors:
+                            Bus.SendToActors(m.Code, m.Payload, actors.Actors);
                             break;
-                        case MessageTarget.Master:
+                        case MessageDestination.MasterDestination:
                             Bus.SendToMaster(m.Code, m.Payload);
                             break;
                     }
@@ -175,7 +179,7 @@ namespace Werewolf.Debugging
                 {
                     if (p.ActorNumber == actor) return p;
                 }
-                return null;
+                throw new InvalidOperationException("self-test player not found: " + actor);
             }
 
             public int CountRole(Role role)
@@ -305,7 +309,8 @@ namespace Werewolf.Debugging
 
             foreach (var m in h.Sent)
             {
-                if (m.Code == WWEventCodes.AssignRole && m.TargetActors[0] == -3)
+                int[]? targets = TargetActorsOf(m);
+                if (m.Code == WWEventCodes.AssignRole && targets != null && targets[0] == -3)
                 {
                     Check(fails, (byte)m.Payload[0] == (byte)Role.Villager,
                         "blackcat initial notice is not Villager");
@@ -342,7 +347,7 @@ namespace Werewolf.Debugging
             Check(fails, h.Session.RequestPhaseChange(GamePhase.Play, resumeAt).Success,
                 "play transition rejected");
 
-            OutboundMessage lastPhase = null;
+            OutboundMessage? lastPhase = null;
             foreach (var m in h.Sent)
             {
                 if (m.Code == WWEventCodes.PhaseChanged) lastPhase = m;
@@ -460,7 +465,7 @@ namespace Werewolf.Debugging
                 return Clock;
             }
 
-            public InboundMessage LastReceived(byte code)
+            public InboundMessage? LastReceived(byte code)
             {
                 for (int i = Received.Count - 1; i >= 0; i--)
                 {
@@ -484,15 +489,15 @@ namespace Werewolf.Debugging
             private void SendViaBus(OutboundMessage m)
             {
                 HostSent.Add(m);
-                switch (m.Target)
+                switch (m.Destination)
                 {
-                    case MessageTarget.All:
+                    case MessageDestination.AllDestination:
                         Bus.SendToAll(m.Code, m.Payload);
                         break;
-                    case MessageTarget.Actors:
-                        Bus.SendToActors(m.Code, m.Payload, m.TargetActors);
+                    case MessageDestination.ActorsDestination actors:
+                        Bus.SendToActors(m.Code, m.Payload, actors.Actors);
                         break;
-                    case MessageTarget.Master:
+                    case MessageDestination.MasterDestination:
                         Bus.SendToMaster(m.Code, m.Payload);
                         break;
                 }
@@ -627,7 +632,7 @@ namespace Werewolf.Debugging
         private static void ScenarioMeetingVoteSecrecy(List<string> fails)
         {
             var recorded = new List<(string Line, bool Secret)>();
-            Action<string, bool> prev = WLog.Sink;
+            Action<string, bool>? prev = WLog.Sink;
             WLog.Sink = (line, secret) =>
             {
                 recorded.Add((line, secret));
@@ -737,6 +742,11 @@ namespace Werewolf.Debugging
             Check(fails, end == h.Meeting.EndUnixMs, "published end differs from session end");
 
             var start = h.LastReceived(WWMeetingCodesStartMeeting);
+            if (start == null)
+            {
+                fails.Add("163 not received after convene");
+                return;
+            }
             h.Clock = (long)start.Payload[1];
             h.Meeting.Tick(h.Clock);
             h.SelfVote(-2);
@@ -861,8 +871,9 @@ namespace Werewolf.Debugging
                 foreach (var m in M.HostSent)
                 {
                     if (m.Code != WWRolesCodes.SyncPerkGauge) continue;
-                    if (m.Target != MessageTarget.Actors || m.TargetActors == null) continue;
-                    if (ContainsInt(m.TargetActors, actor)) count++;
+                    int[]? targets = TargetActorsOf(m);
+                    if (targets == null) continue;
+                    if (ContainsInt(targets, actor)) count++;
                 }
                 return count;
             }
@@ -1007,8 +1018,8 @@ namespace Werewolf.Debugging
             foreach (var m in h.M.HostSent)
             {
                 if (m.Code != WWRolesCodes.SyncPerkGauge) continue;
-                if (m.Target != MessageTarget.Actors || m.TargetActors == null
-                    || !ContainsInt(m.TargetActors, actor))
+                int[]? targets = TargetActorsOf(m);
+                if (targets == null || !ContainsInt(targets, actor))
                 {
                     continue;
                 }
@@ -1035,8 +1046,9 @@ namespace Werewolf.Debugging
             bool teammatesToCat = false;
             foreach (var m in h2.M.HostSent)
             {
-                if (m.Code == WWEventCodes.RevealTeammates && m.Target == MessageTarget.Actors
-                    && m.TargetActors != null && ContainsInt(m.TargetActors, -2))
+                int[]? targets = TargetActorsOf(m);
+                if (m.Code == WWEventCodes.RevealTeammates
+                    && targets != null && ContainsInt(targets, -2))
                 {
                     teammatesToCat = true;
                 }
@@ -1343,11 +1355,12 @@ namespace Werewolf.Debugging
             toWolf = 0; toCat = 0; toVillager = 0;
             CountGaugeTargets(sent, ref toWolf, ref toCat, ref toVillager);
             Check(fails, toCat == 1, $"periodic tick cat={toCat} expected=1");
-            int[] catMeta = null;
+            int[]? catMeta = null;
             foreach (var m in sent)
             {
-                if (m.Code == WWRolesCodes.SyncPerkGauge && m.TargetActors != null
-                    && ContainsInt(m.TargetActors, 3))
+                int[]? targets = TargetActorsOf(m);
+                if (m.Code == WWRolesCodes.SyncPerkGauge
+                    && targets != null && ContainsInt(targets, 3))
                 {
                     catMeta = (int[])m.Payload[5];
                 }
@@ -1366,8 +1379,8 @@ namespace Werewolf.Debugging
             {
                 if (m.Code == WWRolesCodes.SyncPerkGauge)
                 {
-                    Check(fails, m.Target == MessageTarget.Actors && m.TargetActors != null
-                        && m.TargetActors.Length == 1, "171 not single-target");
+                    int[]? targets = TargetActorsOf(m);
+                    Check(fails, targets != null && targets.Length == 1, "171 not single-target");
                 }
             }
         }
@@ -1377,10 +1390,12 @@ namespace Werewolf.Debugging
         {
             foreach (var m in sent)
             {
-                if (m.Code != WWRolesCodes.SyncPerkGauge || m.TargetActors == null) continue;
-                if (ContainsInt(m.TargetActors, 2)) toWolf++;
-                if (ContainsInt(m.TargetActors, 3)) toCat++;
-                if (ContainsInt(m.TargetActors, 1)) toVillager++;
+                if (m.Code != WWRolesCodes.SyncPerkGauge) continue;
+                int[]? targets = TargetActorsOf(m);
+                if (targets == null) continue;
+                if (ContainsInt(targets, 2)) toWolf++;
+                if (ContainsInt(targets, 3)) toCat++;
+                if (ContainsInt(targets, 1)) toVillager++;
             }
         }
 
@@ -1394,13 +1409,14 @@ namespace Werewolf.Debugging
             Check(fails, h.CountHostSent(WWRolesCodes.RoleState, RoleStateSubtype.MeetingGauge) == 1,
                 "175(gauge) not sent exactly once at meeting start");
 
-            OutboundMessage snapshot = null;
+            OutboundMessage? snapshot = null;
             foreach (var m in h.M.HostSent)
             {
                 if (m.Code == WWRolesCodes.RoleState
                     && (byte)m.Payload[0] == RoleStateSubtype.MeetingGauge) snapshot = m;
             }
-            Check(fails, snapshot != null && snapshot.Target == MessageTarget.All, "175(gauge) not to all");
+            Check(fails, snapshot != null
+                && snapshot.Destination is MessageDestination.AllDestination, "175(gauge) not to all");
             if (snapshot != null)
             {
                 int[] data = (int[])snapshot.Payload[1];
@@ -1503,7 +1519,7 @@ namespace Werewolf.Debugging
                 return c;
             }
 
-            public InboundMessage LastReceived(byte code)
+            public InboundMessage? LastReceived(byte code)
             {
                 for (int i = Received.Count - 1; i >= 0; i--)
                 {
@@ -1515,7 +1531,7 @@ namespace Werewolf.Debugging
             public WPlayer Player(int actor)
             {
                 foreach (var p in Players) if (p.ActorNumber == actor) return p;
-                return null;
+                throw new InvalidOperationException("self-test player not found: " + actor);
             }
         }
 

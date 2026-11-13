@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 using UnityEngine;
 using Werewolf.Core;
@@ -12,7 +13,7 @@ namespace Werewolf.Vanilla
         {
             get
             {
-                PlayerAvatar local = PlayerAvatar.instance;
+                PlayerAvatar? local = PlayerAvatar.instance;
                 return local != null ? new PlayerHandle(ActorOf(local), local) : PlayerHandle.None;
             }
         }
@@ -50,35 +51,33 @@ namespace Werewolf.Vanilla
         public static bool IsVanillaAlive(int actor)
         {
             PlayerHandle p = Resolve(actor);
-            return p.IsValid && !GameRefs.PlayerAvatar_isDisabled(p.Avatar);
+            PlayerAvatar? avatar = p.Avatar;
+            return avatar != null && !avatar.isDisabled;
         }
 
         public static void KillByHost(PlayerHandle player)
         {
-            if (!player.IsValid) return;
-            player.Avatar.PlayerDeath(-1);
+            PlayerAvatar? avatar = player.Avatar;
+            if (avatar == null) return;
+            avatar.PlayerDeath(-1);
         }
 
         public static bool IsTalking(PlayerHandle player)
         {
-            if (!player.IsValid) return false;
-            if (GameRefs.PlayerAvatar_voiceChat == null || GameRefs.PlayerAvatar_voiceChatFetched == null
-                || GameRefs.PlayerVoiceChat_isTalking == null)
-            {
-                return false;
-            }
-            if (!GameRefs.PlayerAvatar_voiceChatFetched(player.Avatar)) return false;
-            PlayerVoiceChat vc = GameRefs.PlayerAvatar_voiceChat(player.Avatar);
-            return vc != null && GameRefs.PlayerVoiceChat_isTalking(vc);
+            PlayerAvatar? avatar = player.Avatar;
+            if (avatar == null) return false;
+            if (!avatar.voiceChatFetched) return false;
+            PlayerVoiceChat vc = avatar.voiceChat;
+            return vc != null && vc.isTalking;
         }
 
         public static bool AllLoadAnimationsCompleted()
         {
-            List<PlayerAvatar> avatars = SemiFunc.PlayerGetList();
+            List<PlayerAvatar>? avatars = SemiFunc.PlayerGetList();
             if (avatars == null || avatars.Count == 0) return false;
             if (SemiFunc.IsMultiplayer())
             {
-                Photon.Realtime.Room room = Photon.Pun.PhotonNetwork.CurrentRoom;
+                Photon.Realtime.Room? room = Photon.Pun.PhotonNetwork.CurrentRoom;
                 if (room?.Players == null || room.Players.Count == 0) return false;
 
                 var currentActors = new List<int>(room.Players.Keys);
@@ -87,14 +86,14 @@ namespace Werewolf.Vanilla
                 {
                     if (avatar == null) continue;
                     states.Add(new ParticipantLoadState(
-                        ActorOf(avatar), GameRefs.PlayerAvatar_levelAnimationCompleted(avatar)));
+                        ActorOf(avatar), avatar.levelAnimationCompleted));
                 }
                 return PreplayRosterGate.AllCurrentParticipantsLoaded(currentActors, states);
             }
             foreach (PlayerAvatar avatar in avatars)
             {
                 if (avatar == null) continue;
-                if (!GameRefs.PlayerAvatar_levelAnimationCompleted(avatar)) return false;
+                if (!avatar.levelAnimationCompleted) return false;
             }
             return true;
         }
@@ -102,7 +101,7 @@ namespace Werewolf.Vanilla
         public static Dictionary<int, string> RoomRosterNames()
         {
             var result = new Dictionary<int, string>();
-            Photon.Realtime.Room room = Photon.Pun.PhotonNetwork.CurrentRoom;
+            Photon.Realtime.Room? room = Photon.Pun.PhotonNetwork.CurrentRoom;
             if (room?.Players == null) return result;
             foreach (var pair in room.Players)
             {

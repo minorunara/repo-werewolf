@@ -40,8 +40,8 @@ namespace Werewolf.Scenarios.Game
             RolesClientState roles = _d.RolesClient;
             if (roles == null) return;
 
-            RolesSession session = _d.HostRolesSession;
-            if (session == null) return;
+            HostPlayState? play = _d.HostGameplay;
+            if (play == null) return;
 
             _wolfWatch.Observe(
                 new ScenarioWolfSample(_d.HostValuablesDestroyed, roles.UnlockedFlags,
@@ -61,13 +61,15 @@ namespace Werewolf.Scenarios.Game
 
         private void TickCorpseHint(long now)
         {
-            if (!ScriptRunning) return;
+            if (!TryGetRunningScript(out ScenarioScriptRun? script)) return;
+            ScenarioFlow flow = script.Flow;
+            ScenarioDefinition definition = script.Definition;
 
-            ScenarioCorpseHint hint = _definition.CorpseHint;
+            ScenarioCorpseHint hint = definition.CorpseHint;
             if (!hint.Enabled) return;
 
             bool fired = _corpseHintClock.Tick(now,
-                _flow.IsLatched(hint.After), _flow.IsLatched(hint.Until), hint.DelayMs);
+                flow.IsLatched(hint.After), flow.IsLatched(hint.Until), hint.DelayMs);
             if (!fired) return;
 
             _interrupt.Raise(ScenarioInterrupt.CorpseHint, now, hint.Lines);
@@ -76,17 +78,20 @@ namespace Werewolf.Scenarios.Game
         }
 
         private Vector3? CorpseHintMarkPos()
-            => ScriptRunning && _corpseHintClock.MarkerShown
-                ? BotFootPos(_definition.CorpseHint.ParticipantId)
+            => TryGetRunningScript(out ScenarioScriptRun? script)
+               && _corpseHintClock.MarkerShown
+                ? BotFootPos(script.Definition.CorpseHint.ParticipantId)
                 : null;
 
         private void TickExtractionWatch(long now)
         {
-            if (!ScriptRunning) return;
+            if (!TryGetRunningScript(out ScenarioScriptRun? script)) return;
+            ScenarioFlow flow = script.Flow;
+            ScenarioDefinition definition = script.Definition;
             if (now < _extractionNextCheckAtMs) return;
             _extractionNextCheckAtMs = now + PollIntervalMs;
 
-            if (!ScenarioQuota.TryReadExtraction(out int points, out int completed, out string failReason))
+            if (!ScenarioQuota.TryReadExtraction(out int points, out int completed, out string? failReason))
             {
                 ScenarioVanillaProbe.Failed("extraction_watch", failReason);
                 return;
@@ -108,28 +113,29 @@ namespace Werewolf.Scenarios.Game
             _lastRunSeen = lastRun;
             if (!extracted) return;
 
-            ScenarioBreakWatch watch = _definition.Watch;
+            ScenarioBreakWatch watch = definition.Watch;
             if (watch.BreakOnAllExtractionsCompleted && completed >= points)
             {
                 Break(ScenarioBreakKind.AllExtractionsCompleted, now);
                 return;
             }
             if (watch.ExtractionBreaksBefore != ScenarioMilestone.None
-                && !_flow.HasReached(watch.ExtractionBreaksBefore))
+                && !flow.HasReached(watch.ExtractionBreaksBefore))
             {
                 Break(ScenarioBreakKind.EarlyExtraction, now, watch.ExtractionBreaksBefore.ToString());
                 return;
             }
 
-            if (_definition.Notices.ExtractionNag.Count == 0) return;
-            _interrupt.Raise(ScenarioInterrupt.ExtractionNag, now, _definition.Notices.ExtractionNag);
+            if (definition.Notices.ExtractionNag.Count == 0) return;
+            _interrupt.Raise(ScenarioInterrupt.ExtractionNag, now, definition.Notices.ExtractionNag);
             WLog.Line("scenario_extraction_nag", secret: false,
                 ("completed", completed), ("points", points));
         }
 
         private void TickGrabRelease(long now)
         {
-            if (_definition == null || !_definition.Safety.GrabReleaseEnabled) return;
+            ScenarioScriptRun? script = _script;
+            if (script == null || !script.Definition.Safety.GrabReleaseEnabled) return;
             if (now < _grabReleaseNextCheckAtMs) return;
             _grabReleaseNextCheckAtMs = now + PollIntervalMs;
 
@@ -145,13 +151,13 @@ namespace Werewolf.Scenarios.Game
                 _grabbedSinceMs = now;
                 return;
             }
-            if (now - _grabbedSinceMs < _definition.Safety.GrabReleaseMs) return;
+            if (now - _grabbedSinceMs < script.Definition.Safety.GrabReleaseMs) return;
 
             _grabbedSinceMs = 0;
             if (!Session.IsHost) return;
             _d.EnemyFreezerView.Begin();
             _d.EnemyFreezerView.End();
-            WLog.Line("scenario_grab_released", secret: false, ("scenario", _scenario));
+            WLog.Line("scenario_grab_released", secret: false, ("scenario", script.Scenario));
         }
 
         private void TickMapClose()

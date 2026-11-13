@@ -108,7 +108,7 @@ namespace Werewolf.Tests
 
             Assert.Equal(new[] { 168, 192 }, _sent.Select(m => (int)m.Code).ToArray());
             var reveal = _sent.Single(m => m.Code == MessageCodes.EradicationReveal);
-            Assert.Equal(MessageTarget.All, reveal.Target);
+            Assert.True(reveal.IsAllDestination());
             var data = EradicationRevealWire.FromWire(reveal.Payload);
             Assert.Equal(1, data.ActorNumber);
             Assert.Equal((byte)Team.Villagers, data.Outcome);

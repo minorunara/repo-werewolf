@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 
 namespace Werewolf.Core
@@ -81,7 +82,7 @@ namespace Werewolf.Core
         private long _syncedDropped;
         private int _lastActor = int.MinValue;
 
-        private Func<ChatLogEntry, bool> _filter;
+        private Func<ChatLogEntry, bool>? _filter;
 
         private float _cursor;
         private float _origin;
@@ -112,12 +113,13 @@ namespace Werewolf.Core
 
         public void Sync(MeetingChatLog log, Func<ChatLogEntry, ChatBlockSize> measureBubble)
         {
-            if (log == null || measureBubble == null) return;
+            if (log == null) throw new ArgumentNullException(nameof(log));
+            if (measureBubble == null) throw new ArgumentNullException(nameof(measureBubble));
             if (log.DroppedTotal != _syncedDropped) DropLeading(log.DroppedTotal);
             if (log.AppendedTotal != _syncedAppended) AppendTail(log, measureBubble);
         }
 
-        public void SetFilter(Func<ChatLogEntry, bool> filter)
+        public void SetFilter(Func<ChatLogEntry, bool>? filter)
         {
             if (ReferenceEquals(_filter, filter)) return;
             _filter = filter;

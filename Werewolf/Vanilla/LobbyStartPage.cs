@@ -1,3 +1,4 @@
+#nullable enable
 namespace Werewolf.Vanilla
 {
     public sealed class LobbyStartPage

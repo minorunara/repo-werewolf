@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -49,7 +50,7 @@ namespace Werewolf.Core
     {
         public const int PeacefulMinAlive = 2;
 
-        public static WinResult Judge(
+        public static WinResult? Judge(
             IReadOnlyList<WPlayer> players,
             bool extractionCompleted = false,
             bool timerExpired = false,

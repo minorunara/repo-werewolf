@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using Werewolf.Core;
@@ -10,17 +11,17 @@ namespace Werewolf.Scenarios.Core
         private static readonly ScenarioSignal[] NoSignals = new ScenarioSignal[0];
         private static readonly ScenarioEntryStep[] NoSteps = new ScenarioEntryStep[0];
 
-        private readonly TextId[] _lines;
-        private readonly ScenarioSignal[] _skipIf;
-        private readonly ScenarioEntryStep[] _entrySteps;
-        private readonly ScenarioSignal[] _forgets;
-        private readonly TextId[] _nagLines;
+        private readonly TextId[]? _lines;
+        private readonly ScenarioSignal[]? _skipIf;
+        private readonly ScenarioEntryStep[]? _entrySteps;
+        private readonly ScenarioSignal[]? _forgets;
+        private readonly TextId[]? _nagLines;
 
-        private ScenarioPage(TextId[] lines, ScenarioSignal gate, ScenarioAnchor anchor,
-                             ScenarioSignal[] skipIf, ScenarioCue cue, ScenarioEntryStep[] entrySteps,
+        private ScenarioPage(TextId[]? lines, ScenarioSignal gate, ScenarioAnchor anchor,
+                             ScenarioSignal[]? skipIf, ScenarioCue cue, ScenarioEntryStep[]? entrySteps,
                              ScenarioMilestone milestone, ScenarioNeed need,
                              bool mustRead, ScenarioHighlight highlight, int meetingIndex,
-                             ScenarioSignal[] forgets, TextId[] nagLines, ScenarioBlastRule blastRule,
+                             ScenarioSignal[]? forgets, TextId[]? nagLines, ScenarioBlastRule blastRule,
                              int bombTarget, bool markBombTarget)
         {
             _lines = lines ?? NoLines;
@@ -102,12 +103,12 @@ namespace Werewolf.Scenarios.Core
 
         public ScenarioPage MustBeRead() => With(mustRead: true);
 
-        private ScenarioPage With(ScenarioAnchor? anchor = null, ScenarioSignal[] skipIf = null,
-                                  ScenarioCue? cue = null, ScenarioEntryStep[] entrySteps = null,
+        private ScenarioPage With(ScenarioAnchor? anchor = null, ScenarioSignal[]? skipIf = null,
+                                  ScenarioCue? cue = null, ScenarioEntryStep[]? entrySteps = null,
                                   ScenarioMilestone? milestone = null, ScenarioNeed? need = null,
                                   bool? mustRead = null, ScenarioHighlight? highlight = null,
-                                  int? meetingIndex = null, ScenarioSignal[] forgets = null,
-                                  TextId[] nagLines = null, ScenarioBlastRule? blastRule = null,
+                                  int? meetingIndex = null, ScenarioSignal[]? forgets = null,
+                                  TextId[]? nagLines = null, ScenarioBlastRule? blastRule = null,
                                   int? bombTarget = null, bool? markBombTarget = null)
             => new ScenarioPage(_lines, Gate, anchor ?? Anchor, skipIf ?? _skipIf, cue ?? Cue,
                 entrySteps ?? _entrySteps,
@@ -118,7 +119,7 @@ namespace Werewolf.Scenarios.Core
 
         public IReadOnlyList<TextId> Lines => _lines ?? NoLines;
 
-        public TextId Text => HasText ? _lines[0] : default;
+        public TextId Text => HasText ? _lines![0] : default;
 
         public ScenarioSignal Gate { get; }
 

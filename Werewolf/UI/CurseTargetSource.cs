@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using Werewolf.Core;
@@ -30,7 +31,7 @@ namespace Werewolf.UI
             {
                 _targets.Clear();
                 int catActor = _roles.CurseCatActor;
-                int[] candidates = _roles.CurseCandidates;
+                int[]? candidates = _roles.CurseCandidates;
                 foreach (WPlayer player in _roster)
                 {
                     if (player == null) continue;
@@ -70,7 +71,7 @@ namespace Werewolf.UI
         private bool IsValidTarget(int targetActor)
         {
             if (targetActor == _roles.CurseCatActor) return false;
-            int[] candidates = _roles.CurseCandidates;
+            int[]? candidates = _roles.CurseCandidates;
             if (candidates != null && Array.IndexOf(candidates, targetActor) < 0) return false;
             if (_meeting.GetRowStatus(targetActor) != RowStatus.Alive) return false;
             foreach (WPlayer player in _roster)

@@ -1,3 +1,4 @@
+#nullable enable
 namespace Werewolf.Net
 {
     public static class InboundAuthority

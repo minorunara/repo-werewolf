@@ -710,7 +710,7 @@ namespace Werewolf.Debugging
                 {
                     int count = 0;
                     if (args.Length >= 2) int.TryParse(args[1], out count);
-                    WerewolfDirector demoDirector = WerewolfDirector.Instance;
+                    WerewolfDirector? demoDirector = WerewolfDirector.Instance;
                     if (demoDirector == null)
                     {
                         WLog.Line("cmd_error", secret: false,

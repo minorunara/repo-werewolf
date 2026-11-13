@@ -11,7 +11,7 @@ namespace Werewolf.Scenarios.Game
 {
     internal sealed partial class ScenarioController
     {
-        private GameObject _quotaBag;
+        private GameObject? _quotaBag;
         private int _quotaBagIssues;
         private long _quotaBagNextCheckAtMs;
         private bool _quotaBagWatched;
@@ -26,10 +26,14 @@ namespace Werewolf.Scenarios.Game
 
         private void TickQuotaBagWatch(long now)
         {
-            if (!ScriptRunning || !_quotaBagWatched) return;
+            if (!_quotaBagWatched
+                || !TryGetRunningScript(out ScenarioScriptRun? script)) return;
 
-            ScenarioSignal? until = _definition.Watch.QuotaBagUntil;
-            if (until.HasValue && _flow.IsLatched(until.Value))
+            ScenarioFlow flow = script.Flow;
+            ScenarioDefinition definition = script.Definition;
+
+            ScenarioSignal? until = definition.Watch.QuotaBagUntil;
+            if (until.HasValue && flow.IsLatched(until.Value))
             {
                 _quotaBagWatched = false;
                 return;
@@ -44,7 +48,7 @@ namespace Werewolf.Scenarios.Game
                 return;
             }
 
-            if (!TryReadReachableBagDollars(out int reachable))
+            if (!TryReadReachableBagDollars(definition, out int reachable))
             {
                 WLog.Line("scenario_quota_bag_skipped", secret: false, ("reason", "bag_unreadable"));
                 return;
@@ -54,7 +58,7 @@ namespace Werewolf.Scenarios.Game
                 surplus, reachable);
             if (dollars <= 0) return;
 
-            int max = _definition.Watch.MaxQuotaBagReissues;
+            int max = definition.Watch.MaxQuotaBagReissues;
             if (max > 0 && _quotaBagIssues > max)
             {
                 Break(ScenarioBreakKind.QuotaBagLost, now);
@@ -62,7 +66,7 @@ namespace Werewolf.Scenarios.Game
             }
 
             _quotaBagIssues++;
-            bool spawned = _d.SpawnMoneyBagInFront(dollars, out _quotaBag, out string reason);
+            bool spawned = _d.SpawnMoneyBagInFront(dollars, out _quotaBag, out string? reason);
             WLog.Line("scenario_quota_bag", secret: false, ("dollars", dollars),
                 ("spawned", spawned), ("reason", reason ?? ""),
                 ("issues", _quotaBagIssues), ("reachable", reachable),
@@ -70,15 +74,16 @@ namespace Werewolf.Scenarios.Game
                 ("surplus", surplus));
         }
 
-        private bool TryReadReachableBagDollars(out int dollars)
+        private bool TryReadReachableBagDollars(ScenarioDefinition definition, out int dollars)
         {
             dollars = 0;
-            if (_quotaBag == null) return true;
+            GameObject? bag = _quotaBag;
+            if (bag == null) return true;
 
-            float leash = _definition.Environment.TruckLeashMeters;
+            float leash = definition.Environment.TruckLeashMeters;
             if (leash > 0f)
             {
-                if (!TruckWarper.TryNearestTruckSpawn(_quotaBag.transform.position, out _, out _,
+                if (!TruckWarper.TryNearestTruckSpawn(bag.transform.position, out _, out _,
                         out float sqr))
                 {
                     return false;
@@ -86,7 +91,7 @@ namespace Werewolf.Scenarios.Game
                 if (sqr > leash * leash) return true;
             }
 
-            return ScenarioQuota.TryReadBagDollars(_quotaBag, out dollars);
+            return ScenarioQuota.TryReadBagDollars(bag, out dollars);
         }
 
         private void ResetQuotaBag()

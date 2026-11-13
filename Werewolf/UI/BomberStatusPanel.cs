@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using TMPro;
 using UnityEngine;
@@ -33,96 +34,135 @@ namespace Werewolf.UI
 
         private sealed class Slot
         {
-            public GameObject Root;
-            public Image Icon;
-            public Sprite ColorSprite;
-            public Sprite GraySprite;
-            public Image CooldownGrayOverlay;
-            public TextMeshProUGUI Fallback;
-            public TextMeshProUGUI Cooldown;
-            public TextMeshProUGUI Ammo;
-            public TextMeshProUGUI KeyLabel;
+            public Slot(GameObject root, Image icon, TextMeshProUGUI cooldown,
+                TextMeshProUGUI keyLabel)
+            {
+                Root = root;
+                Icon = icon;
+                Cooldown = cooldown;
+                KeyLabel = keyLabel;
+            }
+
+            public GameObject Root { get; }
+            public Image Icon { get; }
+            public TextMeshProUGUI Cooldown { get; }
+            public TextMeshProUGUI KeyLabel { get; }
+            public Sprite? ColorSprite { get; set; }
+            public Sprite? GraySprite { get; set; }
+            public Image? CooldownGrayOverlay { get; set; }
+            public TextMeshProUGUI? Fallback { get; set; }
+            public TextMeshProUGUI? Ammo { get; set; }
         }
 
-        private GameObject _root;
-        private Slot _plantSlot;
-        private Slot _detonateSlot;
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, Slot plantSlot, Slot detonateSlot)
+            {
+                Root = root;
+                PlantSlot = plantSlot;
+                DetonateSlot = detonateSlot;
+            }
 
-        private int _lastPlantBrightQ = -1;
-        private int _lastDetonateBrightQ = -1;
-        private int _lastPlantCd = -1;
-        private int _lastDetonateCd = -1;
-        private byte _lastAmmo = 255;
-        private string _lastPlantKeyName;
-        private string _lastDetonateKeyName;
+            public GameObject Root { get; }
+            public Slot PlantSlot { get; }
+            public Slot DetonateSlot { get; }
+            public int LastPlantBrightQ { get; set; } = -1;
+            public int LastDetonateBrightQ { get; set; } = -1;
+            public int LastPlantCd { get; set; } = -1;
+            public int LastDetonateCd { get; set; } = -1;
+            public byte LastAmmo { get; set; } = 255;
+            public string? LastPlantKeyName { get; set; }
+            public string? LastDetonateKeyName { get; set; }
+        }
 
-        public bool Exists => _root != null;
+        private ViewRefs? _view;
+        private readonly TextRefresh _textRefresh = new TextRefresh(nameof(BomberStatusPanel));
+
+        public bool Exists => GetLiveViewOrNull() != null;
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
-            if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
 
-            float rootWidth = HudGeometry.BomberHud.Width;
-            float rootHeight = HudGeometry.BomberHud.Height;
+            GameObject? root = null;
+            try
+            {
+                if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            RectTransform rect = UiKit.CreateAnchoredRect(layerRoot, "WW_BomberStatusPanel",
-                UiKit.BottomLeft, Vector2.zero,
-                new Vector2(LeftMargin, BottomMargin), new Vector2(rootWidth, rootHeight));
-            _root = rect.gameObject;
+                float rootWidth = HudGeometry.BomberHud.Width;
+                float rootHeight = HudGeometry.BomberHud.Height;
 
-            float iconRowCenterY = LabelHeight + LabelGap + SlotSize / 2f;
+                RectTransform rect = UiKit.CreateAnchoredRect(layerRoot, "WW_BomberStatusPanel",
+                    UiKit.BottomLeft, Vector2.zero,
+                    new Vector2(LeftMargin, BottomMargin), new Vector2(rootWidth, rootHeight));
+                root = rect.gameObject;
 
-            float plantCenterX = SlotSize / 2f;
-            _plantSlot = BuildSlot(rect, "Plant", new Vector2(plantCenterX, iconRowCenterY),
-                spriteKey: PlantSpriteKey, includeAmmo: true);
-            AddProgressOverlay(_plantSlot, "PlantProgressGray");
+                float iconRowCenterY = LabelHeight + LabelGap + SlotSize / 2f;
 
-            float detonateCenterX = SlotSize + SlotGap + SlotSize / 2f;
-            _detonateSlot = BuildSlot(rect, "Detonate", new Vector2(detonateCenterX, iconRowCenterY),
-                spriteKey: DetonateSpriteKey, includeAmmo: false);
-            AddProgressOverlay(_detonateSlot, "DetonateCooldownGray");
+                float plantCenterX = SlotSize / 2f;
+                Slot plantSlot = BuildSlot(rect, "Plant", new Vector2(plantCenterX, iconRowCenterY),
+                    spriteKey: PlantSpriteKey, includeAmmo: true);
+                AddProgressOverlay(plantSlot, "PlantProgressGray");
 
-            _root.SetActive(false);
+                float detonateCenterX = SlotSize + SlotGap + SlotSize / 2f;
+                Slot detonateSlot = BuildSlot(rect, "Detonate", new Vector2(detonateCenterX, iconRowCenterY),
+                    spriteKey: DetonateSpriteKey, includeAmmo: false);
+                AddProgressOverlay(detonateSlot, "DetonateCooldownGray");
+
+                root.SetActive(false);
+                _view = new ViewRefs(root, plantSlot, detonateSlot);
+                _textRefresh.Subscribe(() => Exists, ApplyTexts);
+            }
+            catch
+            {
+                _view = null;
+                if (root != null)
+                {
+                    root.SetActive(false);
+                    UnityEngine.Object.Destroy(root);
+                }
+                throw;
+            }
         }
 
         public void Tick(bool visible,
                          float plantFraction, int plantCooldownSec, byte ammo,
                          float detonateBrightFraction, int detonateCooldownSec,
-                         string plantKeyName, string detonateKeyName)
+                         string? plantKeyName, string? detonateKeyName)
         {
-            if (_root == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
             try
             {
-                if (_root.activeSelf != visible) _root.SetActive(visible);
+                if (view.Root.activeSelf != visible) view.Root.SetActive(visible);
                 if (!visible)
                 {
-                    _lastPlantKeyName = null;
-                    _lastDetonateKeyName = null;
+                    view.LastPlantKeyName = null;
+                    view.LastDetonateKeyName = null;
                     return;
                 }
 
                 int plantBrightQ = Mathf.Clamp(Mathf.RoundToInt(plantFraction * 100f), 0, 100);
-                if (plantBrightQ != _lastPlantBrightQ || plantCooldownSec != _lastPlantCd
-                    || ammo != _lastAmmo || plantKeyName != _lastPlantKeyName)
+                if (plantBrightQ != view.LastPlantBrightQ || plantCooldownSec != view.LastPlantCd
+                    || ammo != view.LastAmmo || plantKeyName != view.LastPlantKeyName)
                 {
-                    ApplySlot(_plantSlot, plantBrightQ / 100f, plantCooldownSec, ammo,
+                    ApplySlot(view.PlantSlot, plantBrightQ / 100f, plantCooldownSec, ammo,
                         Texts.Format(TextId.HudBomberPlantKeyFormat, plantKeyName ?? "?"));
-                    _lastPlantBrightQ = plantBrightQ;
-                    _lastPlantCd = plantCooldownSec;
-                    _lastAmmo = ammo;
-                    _lastPlantKeyName = plantKeyName;
+                    view.LastPlantBrightQ = plantBrightQ;
+                    view.LastPlantCd = plantCooldownSec;
+                    view.LastAmmo = ammo;
+                    view.LastPlantKeyName = plantKeyName;
                 }
 
                 int detonateBrightQ = Mathf.Clamp(Mathf.RoundToInt(detonateBrightFraction * 100f), 0, 100);
-                if (detonateBrightQ != _lastDetonateBrightQ || detonateCooldownSec != _lastDetonateCd
-                    || detonateKeyName != _lastDetonateKeyName)
+                if (detonateBrightQ != view.LastDetonateBrightQ || detonateCooldownSec != view.LastDetonateCd
+                    || detonateKeyName != view.LastDetonateKeyName)
                 {
-                    ApplySlot(_detonateSlot, detonateBrightQ / 100f, detonateCooldownSec, ammo: 0,
+                    ApplySlot(view.DetonateSlot, detonateBrightQ / 100f, detonateCooldownSec, ammo: 0,
                         Texts.Format(TextId.HudBomberDetonateKeyFormat, detonateKeyName ?? "?"));
-                    _lastDetonateBrightQ = detonateBrightQ;
-                    _lastDetonateCd = detonateCooldownSec;
-                    _lastDetonateKeyName = detonateKeyName;
+                    view.LastDetonateBrightQ = detonateBrightQ;
+                    view.LastDetonateCd = detonateCooldownSec;
+                    view.LastDetonateKeyName = detonateKeyName;
                 }
             }
             catch (Exception e)
@@ -133,22 +173,39 @@ namespace Werewolf.UI
 
         public void Hide()
         {
-            if (_root != null && _root.activeSelf) _root.SetActive(false);
-            _lastPlantKeyName = null;
-            _lastDetonateKeyName = null;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
+            if (view.Root.activeSelf) view.Root.SetActive(false);
+            view.LastPlantKeyName = null;
+            view.LastDetonateKeyName = null;
+        }
+
+        private void ApplyTexts()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return;
+            if (view.PlantSlot.Fallback != null) view.PlantSlot.Fallback.text = Texts.Get(TextId.RoleNameBomber);
+            if (view.DetonateSlot.Fallback != null) view.DetonateSlot.Fallback.text = Texts.Get(TextId.RoleNameBomber);
+            view.LastPlantBrightQ = -1;
+            view.LastDetonateBrightQ = -1;
         }
 
         public void Destroy()
         {
-            if (_root != null)
-            {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
-            }
-            _plantSlot = null;
-            _detonateSlot = null;
-            _lastPlantKeyName = null;
-            _lastDetonateKeyName = null;
+            _textRefresh.Unsubscribe();
+            ViewRefs? view = _view;
+            _view = null;
+            if (view != null && view.Root != null) UnityEngine.Object.Destroy(view.Root);
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+
+            _view = null;
+            return null;
         }
 
         private static void ApplySlot(Slot slot, float brightness, int cooldownSec, byte ammo, string keyLabel)
@@ -158,12 +215,12 @@ namespace Werewolf.UI
             Color iconTint = Color.Lerp(LockedIconTint, ReadyIconTint, b);
             Color labelColor = Color.Lerp(LockedLabelColor, ReadyLabelColor, b);
 
-            if (slot.Icon != null && slot.Icon.enabled)
+            if (slot.Icon.enabled)
             {
                 slot.Icon.color = iconTint;
                 if (slot.CooldownGrayOverlay == null)
                 {
-                    Sprite want = b >= 0.999f
+                    Sprite? want = b >= 0.999f
                         ? slot.ColorSprite
                         : (slot.GraySprite ?? slot.ColorSprite);
                     if (want != null && slot.Icon.sprite != want) slot.Icon.sprite = want;
@@ -175,74 +232,74 @@ namespace Werewolf.UI
                 slot.Icon.color = ReadyIconTint;
                 slot.CooldownGrayOverlay.fillAmount = 1f - b;
             }
-            if (slot.Cooldown != null)
-                slot.Cooldown.text = cooldownSec > 0 ? cooldownSec.ToString() : string.Empty;
+            slot.Cooldown.text = cooldownSec > 0 ? cooldownSec.ToString() : string.Empty;
             if (slot.Ammo != null) slot.Ammo.text = ammo.ToString();
-            if (slot.KeyLabel != null)
-            {
-                slot.KeyLabel.text = keyLabel;
-                slot.KeyLabel.color = labelColor;
-            }
+            slot.KeyLabel.text = keyLabel;
+            slot.KeyLabel.color = labelColor;
         }
 
         private static Slot BuildSlot(RectTransform parent, string name, Vector2 centerPos,
             string spriteKey, bool includeAmmo)
         {
-            var slot = new Slot();
-
             RectTransform slotRect = UiKit.CreateRect(parent, name + "Slot", Vector2.zero,
                 new Vector2(SlotSize, SlotSize));
             UiKit.SetAnchorsBottomLeft(slotRect, centerPos, new Vector2(SlotSize, SlotSize));
-            slot.Root = slotRect.gameObject;
 
-            slot.Icon = UiKit.CreateImage(slotRect, name + "Icon", Vector2.zero,
+            Image icon = UiKit.CreateImage(slotRect, name + "Icon", Vector2.zero,
                 new Vector2(SlotSize, SlotSize), LockedIconTint);
-            Sprite sprite = AssetCatalog.GetSprite(spriteKey);
-            Sprite gray = sprite != null ? AssetCatalog.GetGraySprite(spriteKey) : null;
+            Sprite? sprite = AssetCatalog.GetSprite(spriteKey);
+            Sprite? gray = sprite != null ? AssetCatalog.GetGraySprite(spriteKey) : null;
             if (sprite == null) sprite = AssetCatalog.GetBombIcon();
+            TextMeshProUGUI? fallback = null;
             if (sprite != null)
             {
-                slot.ColorSprite = sprite;
-                slot.GraySprite = gray;
-                slot.Icon.sprite = gray ?? sprite;
-                slot.Icon.preserveAspect = true;
+                icon.sprite = gray ?? sprite;
+                icon.preserveAspect = true;
             }
             else
             {
-                slot.Icon.enabled = false;
-                slot.Fallback = UiKit.CreateText(slotRect, name + "Fallback",
+                icon.enabled = false;
+                fallback = UiKit.CreateText(slotRect, name + "Fallback",
                     Vector2.zero, new Vector2(SlotSize, SlotSize),
                     Texts.Get(TextId.RoleNameBomber), 20f, LockedIconTint, TextAlignmentOptions.Center);
             }
 
-            slot.Cooldown = UiKit.CreateText(slotRect, name + "Cooldown",
+            TextMeshProUGUI cooldown = UiKit.CreateText(slotRect, name + "Cooldown",
                 Vector2.zero, new Vector2(SlotSize, SlotSize),
                 string.Empty, CooldownFontSize, Color.white, TextAlignmentOptions.Center);
-            slot.Cooldown.outlineWidth = 0.25f;
-            slot.Cooldown.outlineColor = Color.black;
+            cooldown.outlineWidth = 0.25f;
+            cooldown.outlineColor = Color.black;
 
+            TextMeshProUGUI? ammo = null;
             if (includeAmmo)
             {
-                slot.Ammo = UiKit.CreateText(slotRect, name + "Ammo",
+                ammo = UiKit.CreateText(slotRect, name + "Ammo",
                     new Vector2(0f, -SlotSize / 4f), new Vector2(SlotSize, SlotSize / 2f),
                     string.Empty, AmmoFontSize, AmmoTextColor, TextAlignmentOptions.Center);
-                slot.Ammo.outlineWidth = 0.25f;
-                slot.Ammo.outlineColor = Color.black;
+                ammo.outlineWidth = 0.25f;
+                ammo.outlineColor = Color.black;
             }
 
-            slot.KeyLabel = UiKit.CreateText(parent, name + "KeyLabel",
+            TextMeshProUGUI keyLabel = UiKit.CreateText(parent, name + "KeyLabel",
                 new Vector2(centerPos.x, LabelHeight / 2f), new Vector2(220f, LabelHeight),
                 string.Empty, LabelFontSize, ReadyLabelColor, TextAlignmentOptions.Center);
-            RectTransform keyRect = slot.KeyLabel.rectTransform;
+            RectTransform keyRect = keyLabel.rectTransform;
             UiKit.SetAnchorsBottomLeft(keyRect, new Vector2(centerPos.x, LabelHeight / 2f),
                 new Vector2(220f, LabelHeight));
 
+            var slot = new Slot(slotRect.gameObject, icon, cooldown, keyLabel)
+            {
+                ColorSprite = sprite,
+                GraySprite = gray,
+                Fallback = fallback,
+                Ammo = ammo,
+            };
             return slot;
         }
 
         private static void AddProgressOverlay(Slot slot, string name)
         {
-            if (slot == null || slot.Icon == null || !slot.Icon.enabled || slot.Icon.sprite == null) return;
+            if (!slot.Icon.enabled || slot.Icon.sprite == null) return;
 
             slot.Icon.preserveAspect = false;
             if (slot.ColorSprite != null) slot.Icon.sprite = slot.ColorSprite;

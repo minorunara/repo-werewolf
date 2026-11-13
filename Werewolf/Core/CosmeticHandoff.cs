@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 
 namespace Werewolf.Core
@@ -21,7 +22,7 @@ namespace Werewolf.Core
 
         public static Route Decide(bool departedToLobbyMenu, bool roundDirectorAlive,
                                    bool cooldownKnown, float cooldownSeconds,
-                                   out string fallbackReason)
+                                   out string? fallbackReason)
         {
             if (!departedToLobbyMenu)
             {

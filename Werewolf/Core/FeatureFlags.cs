@@ -1,3 +1,4 @@
+#nullable enable
 namespace Werewolf.Core
 {
     internal static class FeatureFlags

@@ -35,28 +35,7 @@ namespace Werewolf.Tests
 
         private static readonly Dictionary<string, string> ExemptFields = new Dictionary<string, string>
         {
-            ["_uiManager"] = ReasonPermanentHolder,
-            ["_votePanel"] = ReasonPermanentHolder,
-            ["_roundPanels"] = ReasonPermanentHolder,
-            ["_movementFreezer"] = ReasonPermanentHolder,
-            ["_enemyFreezer"] = ReasonPermanentHolder,
-            ["_truckWarper"] = ReasonPermanentHolder,
-            ["_voiceDriver"] = ReasonPermanentHolder,
-            ["_voiceIsDeadActor"] = ReasonPermanentHolder,
-            ["_voiceIsEavesdropTarget"] = ReasonPermanentHolder,
-            ["_bomberFeature"] = ReasonPermanentHolder,
-            ["_shamanFeature"] = ReasonPermanentHolder,
-            ["_modIntegrityFeature"] = ReasonPermanentHolder,
-            ["_tutorialFeature"] = ReasonPermanentHolder,
-            ["_scenarioFeature"] = ReasonPermanentHolder,
-            ["_chatFeature"] = ReasonPermanentHolder,
-            ["_resultFlowFeature"] = ReasonPermanentHolder,
-            ["_lobbySettingsFeature"] = ReasonPermanentHolder,
-            ["_roleRevealFeature"] = ReasonPermanentHolder,
-            ["_winCeremonyFeature"] = ReasonPermanentHolder,
-            ["_scatterFeature"] = ReasonPermanentHolder,
-            ["_rolesClientFeature"] = ReasonPermanentHolder,
-            ["_meetingClientFeature"] = ReasonPermanentHolder,
+            ["_runtime"] = ReasonPermanentHolder,
 
             ["_busWaitLogAtMs"] = ReasonDiagnosticOnly,
 

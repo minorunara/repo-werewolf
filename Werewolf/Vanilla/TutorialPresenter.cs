@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -16,7 +17,7 @@ namespace Werewolf.Vanilla
 
         public float FontScale { get; set; } = 1f;
 
-        public ITutorialBubble Bubble { get; set; }
+        public ITutorialBubble? Bubble { get; set; }
 
         public int ElevatedSortingOrder { get; set; }
 
@@ -24,9 +25,9 @@ namespace Werewolf.Vanilla
         private float _remaining;
         private float _fontRestoreRemaining;
         private float _originalFontSizeMax = -1f;
-        private TutorialUI _elevatedUi;
+        private TutorialUI? _elevatedUi;
         private bool _onBubble;
-        private string _currentMessage;
+        private string? _currentMessage;
 
         public void Enqueue(TutorialId id, string message)
         {
@@ -45,16 +46,16 @@ namespace Werewolf.Vanilla
 
         public TutorialId? Tick(bool meetingUiVisible)
         {
-            TutorialUI ui = TutorialUI.instance;
-            ITutorialBubble bubble = Bubble;
+            TutorialUI? ui = TutorialUI.instance;
+            ITutorialBubble? bubble = Bubble;
             bool bubbleReady = bubble != null && bubble.Exists;
-            bool bubbleSkip = bubbleReady && bubble.Tick();
+            bool bubbleSkip = bubbleReady && bubble!.Tick();
 
             if (_remaining > 0f)
             {
                 if (_onBubble)
                 {
-                    if (!bubbleReady || !bubble.Visible)
+                    if (!bubbleReady || !bubble!.Visible)
                     {
                         EndDisplay();
                         return null;
@@ -76,7 +77,7 @@ namespace Werewolf.Vanilla
                     }
                     if (meetingUiVisible && bubbleReady && _currentMessage != null)
                     {
-                        bubble.ShowMessage(_currentMessage, FontScale);
+                        bubble!.ShowMessage(_currentMessage, FontScale);
                         _onBubble = true;
                         _fontRestoreRemaining = FontRestoreDelaySeconds;
                     }
@@ -93,14 +94,14 @@ namespace Werewolf.Vanilla
             if (_queue.Count > 0)
             {
                 bool useBubble = meetingUiVisible && bubbleReady;
-                if (useBubble && !bubble.Idle) return null;
+                if (useBubble && !bubble!.Idle) return null;
                 if (!useBubble && ui == null) return null;
                 (TutorialId id, string message) = _queue[0];
                 _queue.RemoveAt(0);
                 _currentMessage = message;
                 _onBubble = useBubble;
-                if (useBubble) bubble.ShowMessage(message, FontScale);
-                else Display(ui, message);
+                if (useBubble) bubble!.ShowMessage(message, FontScale);
+                else Display(ui!, message);
                 _remaining = DisplaySeconds;
                 return id;
             }

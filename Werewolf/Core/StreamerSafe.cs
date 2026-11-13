@@ -1,10 +1,11 @@
+#nullable enable
 using System.Collections.Generic;
 
 namespace Werewolf.Core
 {
     public static class StreamerSafe
     {
-        private static readonly Dictionary<string, string> Overrides = new Dictionary<string, string>
+        private static readonly Dictionary<string, string?> Overrides = new Dictionary<string, string?>
         {
             { "perk_bomb_plant", null },
             { "perk_bomb_detonate", null },
@@ -13,7 +14,7 @@ namespace Werewolf.Core
             { "sfx_execution_curse", null },
         };
 
-        public static bool TryResolve(bool safeMode, string assetKey, out string replacementKey)
+        public static bool TryResolve(bool safeMode, string? assetKey, out string? replacementKey)
         {
             replacementKey = null;
             if (!safeMode || string.IsNullOrEmpty(assetKey)) return false;

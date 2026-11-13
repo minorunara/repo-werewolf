@@ -24,7 +24,7 @@ namespace Werewolf.Tests
             Assert.Equal(3, h.Session.CallerActor);
 
             var start = Assert.Single(h.ByCode(StartMeeting).ToList());
-            Assert.Equal(MessageTarget.All, start.Target);
+            Assert.True(start.IsAllDestination());
             long expectedWarp = MeetingSessionHarness.GameStart + 5_000;
             long expectedEnd = expectedWarp + MeetingIntro.VotingUiDelayMs + 120_000;
             Assert.Equal(3, start.Payload[0]);

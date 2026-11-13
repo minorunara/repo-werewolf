@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using HarmonyLib;
@@ -8,19 +9,16 @@ namespace Werewolf.Game.Patches
 {
     internal static class ItemMeleeFriendlyFire
     {
-        private static AccessTools.FieldRef<ItemMelee, HurtCollider> HurtColliderRef =>
-            GameRefs.ItemMelee_hurtCollider;
-
         internal static void Apply(ItemMelee melee)
         {
             try
             {
                 if (melee == null || melee.swingLogicOnly) return;
 
-                WerewolfDirector dir = WerewolfDirector.Instance;
+                WerewolfDirector? dir = WerewolfDirector.Instance;
                 if (dir == null) return;
 
-                HurtCollider hurtCollider = HurtColliderRef(melee);
+                HurtCollider hurtCollider = melee.hurtCollider;
                 if (hurtCollider == null) return;
 
                 int overridden = CombatRules.OverrideMeleePlayerDamage(
@@ -37,16 +35,7 @@ namespace Werewolf.Game.Patches
         }
     }
 
-    [HarmonyPatch(typeof(ItemMelee), "Start")]
-    internal static class ItemMeleeStartPatch
-    {
-        private static void Postfix(ItemMelee __instance)
-        {
-            ItemMeleeFriendlyFire.Apply(__instance);
-        }
-    }
-
-    [HarmonyPatch(typeof(ItemMelee), "StateSwinging")]
+    [HarmonyPatch(typeof(ItemMelee), nameof(ItemMelee.StateSwinging))]
     internal static class ItemMeleeStateSwingingPatch
     {
         private static void Postfix(ItemMelee __instance)
@@ -62,7 +51,7 @@ namespace Werewolf.Game.Patches
         {
             try
             {
-                WerewolfDirector dir = WerewolfDirector.Instance;
+                WerewolfDirector? dir = WerewolfDirector.Instance;
                 if (dir == null) return;
 
                 bool arenaOrShop = SemiFunc.RunIsArena() || SemiFunc.RunIsShop();
@@ -91,7 +80,7 @@ namespace Werewolf.Game.Patches
             {
                 if (__instance == null || __instance.swingLogicOnly) return;
 
-                WerewolfDirector dir = WerewolfDirector.Instance;
+                WerewolfDirector? dir = WerewolfDirector.Instance;
                 if (dir == null) return;
 
                 PlayerAvatar victim = SemiFunc.PlayerAvatarLocal();
@@ -113,7 +102,7 @@ namespace Werewolf.Game.Patches
             PhysGrabber grabber = victim.physGrabber;
             if (grabber == null || !grabber.grabbed) return false;
 
-            PhysGrabObject grabbed = GameRefs.PhysGrabber_grabbedPhysGrabObject(grabber);
+            PhysGrabObject grabbed = grabber.grabbedPhysGrabObject;
             return grabbed != null && grabbed.gameObject == melee.gameObject;
         }
 
@@ -122,10 +111,10 @@ namespace Werewolf.Game.Patches
             PhysGrabber grabber = victim.physGrabber;
             if (grabber == null || !grabber.grabbed) return;
 
-            PhysGrabObject grabbed = GameRefs.PhysGrabber_grabbedPhysGrabObject(grabber);
+            PhysGrabObject grabbed = grabber.grabbedPhysGrabObject;
             if (grabbed == null) return;
 
-            bool grabbedIsMelee = GameRefs.PhysGrabObject_isMelee(grabbed);
+            bool grabbedIsMelee = grabbed.isMelee;
             if (!CombatRules.ShouldDisarmGrabbedOnMeleeHit(dir.ClientPhase, true, grabbedIsMelee)) return;
 
             PhotonView view = grabbed.GetComponent<PhotonView>();

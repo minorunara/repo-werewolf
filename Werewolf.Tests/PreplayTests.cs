@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using Werewolf.Core;
 using Werewolf.Net;
@@ -157,6 +156,21 @@ namespace Werewolf.Tests
         }
 
         [Fact]
+        public void RosterGate_RejectsMissingRequiredSnapshots()
+        {
+            #nullable enable
+            var actorsError = Assert.Throws<ArgumentNullException>(() =>
+                PreplayRosterGate.AllCurrentParticipantsLoaded(
+                    null!, Array.Empty<ParticipantLoadState>()));
+            var avatarsError = Assert.Throws<ArgumentNullException>(() =>
+                PreplayRosterGate.AllCurrentParticipantsLoaded(Array.Empty<int>(), null!));
+            #nullable restore
+
+            Assert.Equal("currentActors", actorsError.ParamName);
+            Assert.Equal("avatars", avatarsError.ParamName);
+        }
+
+        [Fact]
         public void DisconnectDuringReveal_WhenBothTeamsRemain_StillStartsPlay()
         {
             GameSession session = Prepared(4, out _, reserve: s =>
@@ -198,19 +212,27 @@ namespace Werewolf.Tests
         public void Timeline_UsesBackFlipTwoPagesAndFinalStowWithoutProgressState()
         {
             RoleRevealFrame entry = RoleRevealTimeline.At(0);
+            RoleRevealFrame halfwayDrop = RoleRevealTimeline.At(RoleRevealTimeline.DropEndMs / 2);
             RoleRevealFrame settledBack = RoleRevealTimeline.At(RoleRevealTimeline.DropEndMs);
             RoleRevealFrame beforeFlip = RoleRevealTimeline.At(RoleRevealTimeline.FlipStartMs - 1);
+            RoleRevealFrame flipStart = RoleRevealTimeline.At(RoleRevealTimeline.FlipStartMs);
+            RoleRevealFrame flipMid = RoleRevealTimeline.At(RoleRevealTimeline.FlipMidMs);
             RoleRevealFrame front = RoleRevealTimeline.At(RoleRevealTimeline.FlipEndMs);
             RoleRevealFrame second = RoleRevealTimeline.At(Preplay.PageBoundaryMs + 1);
             RoleRevealFrame stowed = RoleRevealTimeline.At(Preplay.RoleRevealDurationMs);
 
             Assert.True(entry.ShowBack);
+            Assert.Equal(0.875f, halfwayDrop.CardDropRatio);
             Assert.True(settledBack.ShowBack);
             Assert.Equal(1f, settledBack.CardDropRatio);
             Assert.Equal(1f, settledBack.CardFlipScaleX);
+            Assert.Equal(1f, settledBack.CardLiftScale);
             Assert.True(beforeFlip.ShowBack);
             Assert.Equal(1f, beforeFlip.CardFlipScaleX);
+            Assert.Equal(1f, flipStart.CardLiftScale);
+            Assert.Equal(RoleRevealTimeline.FlipLiftPeakScale, flipMid.CardLiftScale);
             Assert.False(front.ShowBack);
+            Assert.Equal(1f, front.CardLiftScale);
             Assert.Equal(0, front.PageIndex);
             Assert.Equal(1, second.PageIndex);
             Assert.Equal(1f, stowed.StowRatio);
@@ -235,16 +257,6 @@ namespace Werewolf.Tests
             Assert.Equal(new[] { typeof(byte) }, MessageCodes.Schema(MessageCodes.PreplayAborted));
             Assert.False(MessageCodes.IsSecret(MessageCodes.PreplayStart));
             Assert.False(MessageCodes.IsSecret(MessageCodes.PreplayAborted));
-        }
-
-        [Fact]
-        public void InitialReveal_DoesNotSuppressMenuOrImplementSkipInput()
-        {
-            string source = File.ReadAllText(Path.Combine(
-                AuditEnvironment.Meta("Werewolf.SourceDir"), "UI", "RoleRevealCinematic.cs"));
-            Assert.DoesNotContain("DisableEscMenu", source, StringComparison.Ordinal);
-            Assert.DoesNotContain("SkipInput", source, StringComparison.Ordinal);
-            Assert.Contains("Session.IsEscMenuOpen", source, StringComparison.Ordinal);
         }
 
     }

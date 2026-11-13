@@ -1,16 +1,9 @@
-using HarmonyLib;
+#nullable enable
 
 namespace Werewolf.Vanilla
 {
     internal static class Extraction
     {
-        private static AccessTools.FieldRef<RoundDirector, int> HaulGoalRef =>
-            GameRefs.RoundDirector_haulGoal;
-        private static AccessTools.FieldRef<RoundDirector, int> PointsRef =>
-            GameRefs.RoundDirector_extractionPoints;
-        private static AccessTools.FieldRef<RoundDirector, int> PointsCompletedRef =>
-            GameRefs.RoundDirector_extractionPointsCompleted;
-
         public static bool RoundDirectorAlive => RoundDirector.instance != null;
 
         public static bool TryReadQuota(out int haulGoal, out int points, out int completed)
@@ -23,9 +16,9 @@ namespace Werewolf.Vanilla
                 completed = 0;
                 return false;
             }
-            haulGoal = HaulGoalRef(rd);
-            points = PointsRef(rd);
-            completed = PointsCompletedRef(rd);
+            haulGoal = rd.haulGoal;
+            points = rd.extractionPoints;
+            completed = rd.extractionPointsCompleted;
             return true;
         }
 

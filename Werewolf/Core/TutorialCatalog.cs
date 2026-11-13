@@ -1,3 +1,4 @@
+#nullable enable
 namespace Werewolf.Core
 {
     public static class TutorialCatalog
@@ -9,7 +10,7 @@ namespace Werewolf.Core
                    && id != TutorialId.BlackCatSelectedForExecution
                    && id != TutorialId.BlackCatExecutionRevealed);
 
-        public static string Format(TutorialId id, bool blackCatCurseEnabled = true)
+        public static string? Format(TutorialId id, bool blackCatCurseEnabled = true)
         {
             switch (id)
             {

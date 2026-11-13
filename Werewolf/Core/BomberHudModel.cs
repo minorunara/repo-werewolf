@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 
 namespace Werewolf.Core
@@ -5,7 +6,7 @@ namespace Werewolf.Core
     public static class BomberHudModel
     {
         public static float PlantFraction(bool phaseAllows, int cooldownSec,
-            bool hasPlantResource, IReadOnlyDictionary<int, float> ratios,
+            bool hasPlantResource, IReadOnlyDictionary<int, float>? ratios,
             int excludedTarget)
         {
             if (!phaseAllows || cooldownSec > 0 || !hasPlantResource || ratios == null)

@@ -16,26 +16,20 @@ namespace Werewolf.Scenarios.Game
         public static bool Available { get; private set; } = true;
 
         public static void DisableForFailedPatches(int failedClasses)
-            => Disable("patch_failed", failedClasses);
-
-        public static void DisableForFailedRefs(int failedFields)
-            => Disable("ref_failed", failedFields);
-
-        private static void Disable(string reason, int failed)
         {
             Available = false;
-            WLog.Line("scenario_unavailable", secret: false, ("reason", reason), ("failed", failed));
+            WLog.Line("scenario_unavailable", secret: false, ("reason", "patch_failed"), ("failed", failedClasses));
         }
 
         public static ScenarioId Scenario { get => ScenarioRunState.Scenario; private set => ScenarioRunState.Scenario = value; }
 
-        public static ScenarioDefinition Definition => ScenarioRunState.Definition;
+        public static ScenarioDefinition? Definition => ScenarioRunState.Definition;
 
         public static ScenarioSafetySpec Safety
         {
             get
             {
-                ScenarioDefinition definition = Definition;
+                ScenarioDefinition? definition = Definition;
                 return definition != null ? definition.Safety : ScenarioSafetySpec.Sheltered;
             }
         }
@@ -70,7 +64,7 @@ namespace Werewolf.Scenarios.Game
                 return false;
             }
 
-            if (!ScenarioCatalog.TryGetDefinition(id, out ScenarioDefinition startDefinition))
+            if (!ScenarioCatalog.TryGetDefinition(id, out ScenarioDefinition? startDefinition))
             {
                 WLog.Line("scenario_start_rejected", secret: false,
                     ("scenario", id), ("reason", "not_implemented"));
@@ -79,7 +73,7 @@ namespace Werewolf.Scenarios.Game
 
             try
             {
-                if (!ScenarioWorld.CheckStart(startDefinition.Environment, out string rejectReason))
+                if (!ScenarioWorld.CheckStart(startDefinition.Environment, out string? rejectReason))
                 {
                     WLog.Line("scenario_start_rejected", secret: false, ("scenario", id), ("reason", rejectReason));
                     return false;
@@ -91,10 +85,9 @@ namespace Werewolf.Scenarios.Game
                 ScenarioVanillaProbe.Reset();
                 Scenario = id;
 
-                ScenarioWorld.StartRunLevel(out bool saveCleared);
+                ScenarioWorld.StartRunLevel();
 
-                WLog.Line("scenario_started", secret: false,
-                    ("scenario", id), ("saveCleared", saveCleared));
+                WLog.Line("scenario_started", secret: false, ("scenario", id));
                 return true;
             }
             catch (Exception e)

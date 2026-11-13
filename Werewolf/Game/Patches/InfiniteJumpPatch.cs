@@ -1,18 +1,13 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
 
 namespace Werewolf.Game.Patches
 {
-    [HarmonyPatch(typeof(PlayerController), "Update")]
+    [HarmonyPatch(typeof(PlayerController), nameof(PlayerController.Update))]
     internal static class InfiniteJumpPatch
     {
-        private static AccessTools.FieldRef<PlayerController, bool> JumpFirst =>
-            GameRefs.PlayerController_JumpFirst;
-
-        private static AccessTools.FieldRef<PlayerController, int> JumpExtraCurrent =>
-            GameRefs.PlayerController_JumpExtraCurrent;
-
         private static int _refillsThisAirTime;
         private static bool _injectedChargeAvailable;
 
@@ -24,21 +19,21 @@ namespace Werewolf.Game.Patches
         {
             try
             {
-                if (JumpFirst(__instance))
+                if (__instance.JumpFirst)
                 {
                     _refillsThisAirTime = 0;
                     _injectedChargeAvailable = false;
                     return;
                 }
 
-                WerewolfDirector dir = WerewolfDirector.Instance;
+                WerewolfDirector? dir = WerewolfDirector.Instance;
                 if (dir == null || !dir.RolesClient.JumpActive)
                 {
                     _injectedChargeAvailable = false;
                     return;
                 }
 
-                if (JumpExtraCurrent(__instance) > 0)
+                if (__instance.JumpExtraCurrent > 0)
                 {
                     _injectedChargeAvailable = _refillsThisAirTime > 0;
                     return;
@@ -51,7 +46,7 @@ namespace Werewolf.Game.Patches
                     return;
                 }
 
-                JumpExtraCurrent(__instance) = 1;
+                __instance.JumpExtraCurrent = 1;
                 _refillsThisAirTime++;
                 _injectedChargeAvailable = true;
             }

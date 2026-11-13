@@ -46,8 +46,10 @@ namespace Werewolf.Tests
             Assert.Equal(ModManifestChunkAddOutcome.Accepted, assembler.Add(second));
             Assert.Equal(ModManifestChunkAddOutcome.Duplicate, assembler.Add(second));
             Assert.Equal(ModManifestChunkAddOutcome.Completed, assembler.Add(first));
-            Assert.Equal(participant.Fingerprint, assembler.Manifest.Fingerprint);
-            Assert.Equal(33, assembler.Manifest.Entries.Count);
+            Assert.True(assembler.TryGetCompletedManifest(out ModManifest completed));
+            Assert.Same(assembler.Manifest, completed);
+            Assert.Equal(participant.Fingerprint, completed.Fingerprint);
+            Assert.Equal(33, completed.Entries.Count);
         }
 
         [Fact]

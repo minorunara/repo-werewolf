@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using HarmonyLib;
@@ -9,7 +10,7 @@ namespace Werewolf.Game.Patches
     {
         internal static bool RoundActive()
         {
-            WerewolfDirector dir = WerewolfDirector.Instance;
+            WerewolfDirector? dir = WerewolfDirector.Instance;
             return dir != null && dir.IsRoundActiveClient;
         }
     }
@@ -72,7 +73,7 @@ namespace Werewolf.Game.Patches
         }
     }
 
-    [HarmonyPatch(typeof(PlayerAvatar), "ReviveRPC")]
+    [HarmonyPatch(typeof(PlayerAvatar), nameof(PlayerAvatar.ReviveRPC))]
     internal static class ReviveRpcPatch
     {
         private static bool Prefix()

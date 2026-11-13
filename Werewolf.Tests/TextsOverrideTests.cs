@@ -9,14 +9,14 @@ namespace Werewolf.Tests
     {
         public void Dispose()
         {
-            Texts.ClearOverride();
+            Texts.Apply(Texts.Current, null);
             Texts.FormatErrorLogger = null;
         }
 
         [Fact]
-        public void Get_AfterSetOverride_ReturnsOverriddenValue()
+        public void Get_AfterApplyWithOverride_ReturnsOverriddenValue()
         {
-            Texts.SetOverride(new Dictionary<TextId, string>
+            Texts.Apply(Texts.Current, new Dictionary<TextId, string>
             {
                 [TextId.NoticeCatAwakened] = "The black cat stirs",
             });
@@ -27,7 +27,7 @@ namespace Werewolf.Tests
         [Fact]
         public void Get_KeyMissingFromOverride_FallsBackToJapanese()
         {
-            Texts.SetOverride(new Dictionary<TextId, string>
+            Texts.Apply(Texts.Current, new Dictionary<TextId, string>
             {
                 [TextId.NoticeCatAwakened] = "override only for this key",
             });
@@ -36,13 +36,13 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void ClearOverride_RestoresJapaneseForPreviouslyOverriddenKey()
+        public void Apply_WithoutOverride_RestoresJapaneseForPreviouslyOverriddenKey()
         {
-            Texts.SetOverride(new Dictionary<TextId, string>
+            Texts.Apply(Texts.Current, new Dictionary<TextId, string>
             {
                 [TextId.NoticeCatAwakened] = "override",
             });
-            Texts.ClearOverride();
+            Texts.Apply(Texts.Current, null);
 
             Assert.Equal("もし黒猫がいるなら、目覚めている頃です…", Texts.Get(TextId.NoticeCatAwakened));
         }
@@ -50,7 +50,7 @@ namespace Werewolf.Tests
         [Fact]
         public void Format_BrokenOverrideTemplate_FallsBackToJapaneseInsteadOfThrowing()
         {
-            Texts.SetOverride(new Dictionary<TextId, string>
+            Texts.Apply(Texts.Current, new Dictionary<TextId, string>
             {
                 [TextId.NoticeExecutedFormat] = "{9} was executed",
             });
@@ -65,7 +65,7 @@ namespace Werewolf.Tests
         {
             var calls = new List<string>();
             Texts.FormatErrorLogger = id => calls.Add(id);
-            Texts.SetOverride(new Dictionary<TextId, string>
+            Texts.Apply(Texts.Current, new Dictionary<TextId, string>
             {
                 [TextId.NoticeExecutedFormat] = "{9} broken",
             });
@@ -82,7 +82,7 @@ namespace Werewolf.Tests
         public void Format_UnsetLogger_DoesNotThrow()
         {
             Texts.FormatErrorLogger = null;
-            Texts.SetOverride(new Dictionary<TextId, string>
+            Texts.Apply(Texts.Current, new Dictionary<TextId, string>
             {
                 [TextId.NoticeExecutedFormat] = "{9} broken",
             });
@@ -95,7 +95,7 @@ namespace Werewolf.Tests
         [Fact]
         public void Format_NonOverriddenKey_IsUnaffectedByOtherOverrides()
         {
-            Texts.SetOverride(new Dictionary<TextId, string>
+            Texts.Apply(Texts.Current, new Dictionary<TextId, string>
             {
                 [TextId.NoticeExecutedFormat] = "{9} broken",
             });

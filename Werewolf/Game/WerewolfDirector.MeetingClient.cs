@@ -36,8 +36,9 @@ namespace Werewolf.Game
 
         internal bool IsSessionAliveActor(int actor)
         {
-            if (_session == null) return false;
-            foreach (var p in _session.Players)
+            GameSession? session = _hostRound?.Session;
+            if (session == null) return false;
+            foreach (var p in session.Players)
             {
                 if (p.ActorNumber == actor) return p.Alive;
             }
@@ -45,9 +46,9 @@ namespace Werewolf.Game
         }
 
         internal bool LocalIsNearUnannouncedCorpse =>
-            _meetingClientFeature != null && _meetingClientFeature.LocalIsNearUnannouncedCorpse;
+            Runtime.MeetingClientFeature.LocalIsNearUnannouncedCorpse;
 
         internal bool CorpseReportConsumedPress =>
-            _meetingClientFeature != null && _meetingClientFeature.CorpseReportConsumedPress;
+            Runtime.MeetingClientFeature.CorpseReportConsumedPress;
     }
 }

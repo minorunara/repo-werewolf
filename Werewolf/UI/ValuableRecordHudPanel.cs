@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using TMPro;
 using UnityEngine;
@@ -26,125 +27,148 @@ namespace Werewolf.UI
         private static readonly Color IdleLabelColor = new Color(0.55f, 0.55f, 0.55f, 0.90f);
         private static readonly Color ActiveLabelColor = new Color(0.55f, 0.90f, 1f, 1f);
 
-        private GameObject _root;
-        private RectTransform _slotRect;
-        private Image _icon;
-        private Image _grayOverlay;
-        private Sprite _iconSpriteColor;
-        private Sprite _iconSpriteGray;
-        private TextMeshProUGUI _iconFallback;
-        private TextMeshProUGUI _keyLabel;
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, Image? grayOverlay,
+                TextMeshProUGUI? iconFallback, TextMeshProUGUI keyLabel)
+            {
+                Root = root;
+                GrayOverlay = grayOverlay;
+                IconFallback = iconFallback;
+                KeyLabel = keyLabel;
+            }
 
-        private float _lastY = float.NaN;
-        private bool _lastOn;
-        private string _lastKeyName;
+            public GameObject Root { get; }
+            public Image? GrayOverlay { get; }
+            public TextMeshProUGUI? IconFallback { get; }
+            public TextMeshProUGUI KeyLabel { get; }
+            public float LastY { get; set; } = float.NaN;
+            public bool LastOn { get; set; }
+            public string? LastKeyName { get; set; }
+        }
 
-        public bool Exists => _root != null;
+        private ViewRefs? _view;
+        private readonly TextRefresh _textRefresh = new TextRefresh(nameof(ValuableRecordHudPanel));
+
+        public bool Exists => GetLiveViewOrNull() != null;
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
-            if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
 
-            float plate = IconSize + PlatePadding;
-            float rootWidth = plate;
-            float rootHeight = plate + LabelGap + LabelHeight;
-
-            RectTransform rect = UiKit.CreateAnchoredRect(layerRoot, "WW_ValuableRecordHudPanel",
-                UiKit.BottomRight, new Vector2(1f, 0f),
-                new Vector2(-RightMargin, HudGeometry.HudIcon.ReportBottom(true)),
-                new Vector2(rootWidth, rootHeight));
-            _root = rect.gameObject;
-
-            float iconCenterX = rootWidth / 2f;
-            float iconCenterY = LabelHeight + LabelGap + plate / 2f;
-
-            _slotRect = UiKit.CreateRect(rect, "Slot", Vector2.zero, new Vector2(plate, plate));
-            UiKit.SetAnchorsBottomLeft(_slotRect, new Vector2(iconCenterX, iconCenterY),
-                new Vector2(plate, plate));
-
-            _icon = UiKit.CreateImage(_slotRect, "Icon", Vector2.zero,
-                new Vector2(IconSize, IconSize), IconTint);
-
-            Sprite sprite = AssetCatalog.GetSprite(IconKey);
-            if (sprite != null)
+            GameObject? root = null;
+            try
             {
-                _iconSpriteColor = sprite;
-                _iconSpriteGray = AssetCatalog.GetGraySprite(IconKey);
-                _icon.sprite = _iconSpriteColor;
-                _icon.preserveAspect = false;
+                if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-                _grayOverlay = UiKit.CreateImage(_slotRect, "RecordGray", Vector2.zero,
-                    new Vector2(IconSize, IconSize), GrayOverlayTint);
-                _grayOverlay.sprite = _iconSpriteGray ?? _iconSpriteColor;
-                _grayOverlay.type = Image.Type.Filled;
-                _grayOverlay.fillMethod = Image.FillMethod.Vertical;
-                _grayOverlay.fillOrigin = (int)Image.OriginVertical.Top;
-                _grayOverlay.fillAmount = 1f;
-                _grayOverlay.transform.SetSiblingIndex(_icon.transform.GetSiblingIndex() + 1);
+                float plate = IconSize + PlatePadding;
+                float rootWidth = plate;
+                float rootHeight = plate + LabelGap + LabelHeight;
+
+                RectTransform rect = UiKit.CreateAnchoredRect(layerRoot, "WW_ValuableRecordHudPanel",
+                    UiKit.BottomRight, new Vector2(1f, 0f),
+                    new Vector2(-RightMargin, HudGeometry.HudIcon.ReportBottom(true)),
+                    new Vector2(rootWidth, rootHeight));
+                root = rect.gameObject;
+
+                float iconCenterX = rootWidth / 2f;
+                float iconCenterY = LabelHeight + LabelGap + plate / 2f;
+
+                RectTransform slotRect = UiKit.CreateRect(rect, "Slot", Vector2.zero, new Vector2(plate, plate));
+                UiKit.SetAnchorsBottomLeft(slotRect, new Vector2(iconCenterX, iconCenterY),
+                    new Vector2(plate, plate));
+
+                Image icon = UiKit.CreateImage(slotRect, "Icon", Vector2.zero,
+                    new Vector2(IconSize, IconSize), IconTint);
+
+                Image? grayOverlay = null;
+                TextMeshProUGUI? iconFallback = null;
+                Sprite? sprite = AssetCatalog.GetSprite(IconKey);
+                if (sprite != null)
+                {
+                    Sprite? graySprite = AssetCatalog.GetGraySprite(IconKey);
+                    icon.sprite = sprite;
+                    icon.preserveAspect = false;
+
+                    grayOverlay = UiKit.CreateImage(slotRect, "RecordGray", Vector2.zero,
+                        new Vector2(IconSize, IconSize), GrayOverlayTint);
+                    grayOverlay.sprite = graySprite ?? sprite;
+                    grayOverlay.type = Image.Type.Filled;
+                    grayOverlay.fillMethod = Image.FillMethod.Vertical;
+                    grayOverlay.fillOrigin = (int)Image.OriginVertical.Top;
+                    grayOverlay.fillAmount = 1f;
+                    grayOverlay.transform.SetSiblingIndex(icon.transform.GetSiblingIndex() + 1);
+                }
+                else
+                {
+                    icon.enabled = false;
+                    iconFallback = UiKit.CreateText(slotRect, "IconFallback",
+                        Vector2.zero, new Vector2(IconSize, IconSize),
+                        "記録", 26f, IdleLabelColor, TextAlignmentOptions.Center);
+                }
+
+                TextMeshProUGUI keyLabel = UiKit.CreateText(rect, "KeyLabel",
+                    new Vector2(iconCenterX, LabelHeight / 2f),
+                    new Vector2(rootWidth + LabelExtraWidth, LabelHeight),
+                    string.Empty, LabelFontSize, IdleLabelColor, TextAlignmentOptions.Center);
+                UiKit.SetAnchorsBottomLeft(keyLabel.rectTransform,
+                    new Vector2(iconCenterX, LabelHeight / 2f),
+                    new Vector2(rootWidth + LabelExtraWidth, LabelHeight));
+
+                root.SetActive(false);
+                _view = new ViewRefs(root, grayOverlay, iconFallback, keyLabel);
+                _textRefresh.Subscribe(() => Exists, ApplyTexts);
             }
-            else
+            catch
             {
-                _icon.enabled = false;
-                _iconFallback = UiKit.CreateText(_slotRect, "IconFallback",
-                    Vector2.zero, new Vector2(IconSize, IconSize),
-                    "記録", 26f, IdleLabelColor, TextAlignmentOptions.Center);
+                _view = null;
+                if (root != null)
+                {
+                    root.SetActive(false);
+                    UnityEngine.Object.Destroy(root);
+                }
+                throw;
             }
-
-            _keyLabel = UiKit.CreateText(rect, "KeyLabel",
-                new Vector2(iconCenterX, LabelHeight / 2f),
-                new Vector2(rootWidth + LabelExtraWidth, LabelHeight),
-                string.Empty, LabelFontSize, IdleLabelColor, TextAlignmentOptions.Center);
-            UiKit.SetAnchorsBottomLeft(_keyLabel.rectTransform,
-                new Vector2(iconCenterX, LabelHeight / 2f),
-                new Vector2(rootWidth + LabelExtraWidth, LabelHeight));
-
-            _root.SetActive(false);
         }
 
         public void Tick(bool visible, bool recordOn, float holdRatio, bool holdCharging,
                          string keyName, CorpseReportHudPanel.Layout corpseLayout)
         {
-            if (_root == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
             try
             {
-                if (_root.activeSelf != visible) _root.SetActive(visible);
+                if (view.Root.activeSelf != visible) view.Root.SetActive(visible);
                 if (!visible)
                 {
-                    _lastKeyName = null;
+                    view.LastKeyName = null;
                     return;
                 }
 
                 float y = HudGeometry.HudIcon.RecordBottom(
                     corpseLayout == CorpseReportHudPanel.Layout.AboveMiniGauge);
-                if (!Mathf.Approximately(y, _lastY))
+                if (!Mathf.Approximately(y, view.LastY))
                 {
-                    _lastY = y;
-                    ((RectTransform)_root.transform).anchoredPosition = new Vector2(-RightMargin, y);
+                    view.LastY = y;
+                    ((RectTransform)view.Root.transform).anchoredPosition = new Vector2(-RightMargin, y);
                 }
 
                 float ratio = holdCharging ? Mathf.Clamp01(holdRatio) : 0f;
                 float coverage = recordOn ? ratio : 1f - ratio;
-                if (_grayOverlay != null) _grayOverlay.fillAmount = coverage;
-                if (_iconFallback != null)
+                if (view.GrayOverlay != null) view.GrayOverlay.fillAmount = coverage;
+                if (view.IconFallback != null)
                 {
-                    _iconFallback.color = Color.Lerp(ActiveLabelColor, IdleLabelColor, coverage);
+                    view.IconFallback.color = Color.Lerp(ActiveLabelColor, IdleLabelColor, coverage);
                 }
-                if (_keyLabel != null)
-                {
-                    _keyLabel.color = Color.Lerp(ActiveLabelColor, IdleLabelColor, coverage);
-                }
+                view.KeyLabel.color = Color.Lerp(ActiveLabelColor, IdleLabelColor, coverage);
 
-                if (recordOn == _lastOn && keyName == _lastKeyName) return;
-                _lastOn = recordOn;
-                _lastKeyName = keyName;
+                if (recordOn == view.LastOn && keyName == view.LastKeyName) return;
+                view.LastOn = recordOn;
+                view.LastKeyName = keyName;
 
-                if (_keyLabel != null)
-                {
-                    _keyLabel.text = Texts.Format(
-                        recordOn ? TextId.HudValuableRecordOnFormat : TextId.HudValuableRecordOffFormat,
-                        keyName ?? "?");
-                }
+                view.KeyLabel.text = Texts.Format(
+                    recordOn ? TextId.HudValuableRecordOnFormat : TextId.HudValuableRecordOffFormat,
+                    keyName ?? "?");
             }
             catch (Exception e)
             {
@@ -154,22 +178,34 @@ namespace Werewolf.UI
 
         public void Hide()
         {
-            if (_root != null && _root.activeSelf) _root.SetActive(false);
-            _lastKeyName = null;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
+            if (view.Root.activeSelf) view.Root.SetActive(false);
+            view.LastKeyName = null;
+        }
+
+        private void ApplyTexts()
+        {
+            ViewRefs? view = _view;
+            if (view != null) view.LastKeyName = null;
         }
 
         public void Destroy()
         {
-            if (_root != null)
-            {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
-            }
-            _slotRect = null; _icon = null; _grayOverlay = null; _iconFallback = null;
-            _keyLabel = null;
-            _lastY = float.NaN;
-            _lastOn = false;
-            _lastKeyName = null;
+            _textRefresh.Unsubscribe();
+            ViewRefs? view = _view;
+            _view = null;
+            if (view != null && view.Root != null) UnityEngine.Object.Destroy(view.Root);
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+
+            _view = null;
+            return null;
         }
 
     }

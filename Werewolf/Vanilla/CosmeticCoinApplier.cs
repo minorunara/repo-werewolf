@@ -1,7 +1,8 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
-using HarmonyLib;
 using Photon.Pun;
+using System.Diagnostics.CodeAnalysis;
 using Werewolf.Core;
 
 namespace Werewolf.Vanilla
@@ -17,10 +18,7 @@ namespace Werewolf.Vanilla
             FallbackDirect,
         }
 
-        private static AccessTools.FieldRef<MetaManager, List<int>> CosmeticTokensRef =>
-            GameRefs.MetaManager_cosmeticTokens;
-
-        internal static ApplyRun BeginRun(int[] countsByRarity)
+        internal static ApplyRun? BeginRun(int[]? countsByRarity)
         {
             if (countsByRarity == null || countsByRarity.Length != CoinRarity.Count)
             {
@@ -40,7 +38,7 @@ namespace Werewolf.Vanilla
             private int _primaryCount;
             private int _recoveredSaveOnlyCount;
             private int _fallbackDirectCount;
-            private string _firstError;
+            private string? _firstError;
             private bool _finished;
             private bool _success;
 
@@ -67,7 +65,7 @@ namespace Werewolf.Vanilla
 
             internal bool Finished => _finished;
 
-            internal bool TryApplyNext(out byte rarity, out string outcome)
+            internal bool TryApplyNext(out byte rarity, [NotNullWhen(true)] out string? outcome)
             {
                 rarity = 0;
                 outcome = null;
@@ -122,7 +120,7 @@ namespace Werewolf.Vanilla
                         return "error:no_metamanager";
                     }
 
-                    string err = ApplyOne(instance, rarity, out ApplyRoute route);
+                    string? err = ApplyOne(instance, rarity, out ApplyRoute route);
                     if (err != null)
                     {
                         RecordError(rarity, err);
@@ -158,7 +156,7 @@ namespace Werewolf.Vanilla
             }
         }
 
-        private static string ApplyOne(MetaManager instance, byte rarity, out ApplyRoute route)
+        private static string? ApplyOne(MetaManager instance, byte rarity, out ApplyRoute route)
         {
             int countBefore = ReadTokenCount(instance);
 
@@ -187,14 +185,9 @@ namespace Werewolf.Vanilla
                     }
                 }
 
-                if (CosmeticTokensRef == null)
-                {
-                    return "primary(" + primaryError.Message + ") fallback(field_unresolved)";
-                }
-
                 try
                 {
-                    var tokens = CosmeticTokensRef(instance);
+                    var tokens = instance.cosmeticTokens;
                     if (tokens == null)
                     {
                         return "primary(" + primaryError.Message + ") fallback(tokens_null)";
@@ -216,7 +209,7 @@ namespace Werewolf.Vanilla
         {
             try
             {
-                return CosmeticTokensRef != null ? (CosmeticTokensRef(instance)?.Count ?? -1) : -1;
+                return instance.cosmeticTokens?.Count ?? -1;
             }
             catch (Exception e)
             {
@@ -229,9 +222,8 @@ namespace Werewolf.Vanilla
         {
             try
             {
-                return PhotonNetwork.InRoom && PhotonNetwork.LocalPlayer != null
-                    ? PhotonNetwork.LocalPlayer.ActorNumber
-                    : -1;
+                Photon.Realtime.Player? local = PhotonNetwork.LocalPlayer;
+                return PhotonNetwork.InRoom && local != null ? local.ActorNumber : -1;
             }
             catch (Exception e)
             {

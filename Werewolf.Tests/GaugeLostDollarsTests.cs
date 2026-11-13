@@ -47,8 +47,9 @@ namespace Werewolf.Tests
             int[] meta = null;
             foreach (var m in sent)
             {
-                if (m.Code != WWRolesCodes.SyncPerkGauge || m.TargetActors == null) continue;
-                foreach (int a in m.TargetActors)
+                int[] targets = m.ActorTargetsOrNull();
+                if (m.Code != WWRolesCodes.SyncPerkGauge || targets == null) continue;
+                foreach (int a in targets)
                 {
                     if (a == actor) { meta = (int[])m.Payload[5]; break; }
                 }

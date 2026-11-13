@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using HarmonyLib;
 using UnityEngine;
 using Werewolf.Core;
@@ -15,56 +16,56 @@ namespace Werewolf.Game
 
         public void DebugRolesGauge(int pct)
         {
-            if (!GuardRolesDebug("gauge")) return;
-            _roles.DebugAddGaugePct(pct);
+            if (!TryGetRolesDebug("gauge", out RolesSession? roles, out _)) return;
+            roles.DebugAddGaugePct(pct);
             WLog.Line("cmd_gauge", secret: true,
-                ("pct", pct), ("permille", _roles.Gauge.DisplayPermille),
-                ("unlocked", _roles.Gauge.UnlockedFlags));
+                ("pct", pct), ("permille", roles.Gauge.DisplayPermille),
+                ("unlocked", roles.Gauge.UnlockedFlags));
         }
 
         public void DebugRolesBeaconCharge(int count)
         {
-            if (!GuardRolesDebug("beacon")) return;
-            _roles.DebugChargeBeacon(count);
+            if (!TryGetRolesDebug("beacon", out RolesSession? roles, out _)) return;
+            roles.DebugChargeBeacon(count);
             WLog.Line("cmd_beacon", secret: true, ("op", "charge"), ("count", count));
         }
 
         public void DebugRolesBeaconUse()
         {
-            if (!GuardRolesDebug("beacon")) return;
+            if (!TryGetRolesDebug("beacon", out RolesSession? roles, out _)) return;
             WLog.Line("cmd_beacon", secret: true, ("op", "use"), ("actor", LocalActor));
-            _roles.DebugUseBeacon(LocalActor, SessionClock.NowMs());
+            roles.DebugUseBeacon(LocalActor, SessionClock.NowMs());
         }
 
         public void DebugRolesPerkUnlock(PerkId perk)
         {
-            if (!GuardRolesDebug("perk")) return;
-            _roles.DebugUnlockPerk(perk);
+            if (!TryGetRolesDebug("perk", out RolesSession? roles, out _)) return;
+            roles.DebugUnlockPerk(perk);
             WLog.Line("cmd_perk", secret: true,
-                ("perk", perk), ("unlocked", _roles.Gauge.UnlockedFlags));
+                ("perk", perk), ("unlocked", roles.Gauge.UnlockedFlags));
         }
 
         public void DebugRolesInformant()
         {
-            if (!GuardRolesDebug("informant")) return;
-            _roles.DebugForceInformant();
+            if (!TryGetRolesDebug("informant", out RolesSession? roles, out _)) return;
+            roles.DebugForceInformant();
             WLog.Line("cmd_informant", secret: true,
-                ("established", _roles.InformantEstablished));
+                ("established", roles.InformantEstablished));
         }
 
         public void DebugRolesCurse(int? actorNumber)
         {
-            if (!GuardRolesDebug("curse")) return;
+            if (!TryGetRolesDebug("curse", out RolesSession? roles, out GameSession? session)) return;
 
             int target = 0;
             bool found = actorNumber.HasValue;
-            if (found)
+            if (actorNumber.HasValue)
             {
                 target = actorNumber.Value;
             }
             else
             {
-                foreach (var p in _session.Players)
+                foreach (var p in session.Players)
                 {
                     if (p.Role == Role.BlackCat && p.Alive)
                     {
@@ -84,7 +85,7 @@ namespace Werewolf.Game
             ExecuteVotedPlayer(target);
             WLog.Line("cmd_curse", secret: true,
                 ("target", target),
-                ("curseActive", _roles.ActiveCurse != null && !_roles.ActiveCurse.Resolved));
+                ("curseActive", roles.ActiveCurse != null && !roles.ActiveCurse.Resolved));
         }
 
         public void DebugBomberFillGauge()
@@ -94,7 +95,7 @@ namespace Werewolf.Game
                 WLog.Line("cmd_rejected", secret: false, ("name", "bomb"), ("reason", "not_host"));
                 return;
             }
-            ProximityGauge gauge = _bomberFeature?.DebugProximityGauge;
+            ProximityGauge? gauge = Runtime.BomberFeature.DebugProximityGauge;
             if (gauge == null)
             {
                 WLog.Line("cmd_rejected", secret: false, ("name", "bomb"), ("reason", "no_proximity"));
@@ -102,7 +103,7 @@ namespace Werewolf.Game
             }
             int localActor = LocalActor;
             int filled = 0;
-            var players = _session != null ? _session.Players : null;
+            var players = _hostRound?.Session.Players;
             if (players != null)
             {
                 foreach (var p in players)
@@ -117,37 +118,40 @@ namespace Werewolf.Game
 
         public void DebugBomberPlant(int targetActor)
         {
-            if (!GuardBomberDebug("plant")) return;
-            HandleBombPlant(_bomber.BomberActor, targetActor, SessionClock.NowMs());
+            if (!TryGetBomberDebug("plant", out BombSession? bomber)) return;
+            HandleBombPlant(bomber.BomberActor, targetActor, SessionClock.NowMs());
         }
 
         public void DebugBomberDetonate()
         {
-            if (!GuardBomberDebug("detonate")) return;
-            HandleBombDetonate(_bomber.BomberActor, SessionClock.NowMs());
+            if (!TryGetBomberDebug("detonate", out BombSession? bomber)) return;
+            HandleBombDetonate(bomber.BomberActor, SessionClock.NowMs());
         }
 
         public void DebugBomberGrantAmmo(int n)
         {
-            if (!GuardBomberDebug("ammo")) return;
-            _bomber.DebugGrantAmmo(n);
+            if (!TryGetBomberDebug("ammo", out BombSession? bomber)) return;
+            bomber.DebugGrantAmmo(n);
             SendBomberStateIfDirty();
-            WLog.Line("cmd_bomb_ammo", secret: true, ("granted", n), ("ammo", _bomber.Ammo));
+            WLog.Line("cmd_bomb_ammo", secret: true, ("granted", n), ("ammo", bomber.Ammo));
         }
 
-        private bool GuardBomberDebug(string sub)
+        private bool TryGetBomberDebug(
+            string sub,
+            [NotNullWhen(true)] out BombSession? bomber)
         {
+            bomber = _hostRound?.Play?.Bomber;
             if (!Session.IsHost)
             {
                 WLog.Line("cmd_rejected", secret: false, ("name", "bomb"), ("sub", sub), ("reason", "not_host"));
                 return false;
             }
-            if (_bomber == null)
+            if (bomber == null)
             {
                 WLog.Line("cmd_rejected", secret: false, ("name", "bomb"), ("sub", sub), ("reason", "no_bomb_session"));
                 return false;
             }
-            if (_bomber.BomberActor < 0)
+            if (bomber.BomberActor < 0)
             {
                 WLog.Line("cmd_rejected", secret: false, ("name", "bomb"), ("sub", sub), ("reason", "no_bomber"));
                 return false;
@@ -157,13 +161,13 @@ namespace Werewolf.Game
 
         public void DebugScatterDiag()
         {
-            _scatterFeature.DebugScatter.LogDiagnostics();
+            Runtime.ScatterFeature.DebugScatter.LogDiagnostics();
         }
 
         public void DebugScatterWarp()
         {
-            ExtractionScatter scatter = _scatterFeature.DebugScatter;
-            Func<int, bool> isAlive = _session != null
+            ExtractionScatter scatter = Runtime.ScatterFeature.DebugScatter;
+            Func<int, bool> isAlive = _hostRound != null
                 ? IsSessionAliveActor
                 : (Func<int, bool>)Players.IsVanillaAlive;
             bool ok = scatter.WarpScatter(isAlive, warpTruckSlot: true, uniformDebug: true);
@@ -174,20 +178,20 @@ namespace Werewolf.Game
 
         public void DebugToggleSelfEcho()
         {
-            if (_voiceDriver == null)
-            {
-                WLog.Line("cmd_rejected", secret: false,
-                    ("name", "echo"), ("reason", "no_voice_driver"));
-                return;
-            }
-            bool next = !_voiceDriver.IsDebugSelfEchoOn;
-            _voiceDriver.SetDebugSelfEcho(next);
+            bool next = !Runtime.VoiceDriver.IsDebugSelfEchoOn;
+            Runtime.VoiceDriver.SetDebugSelfEcho(next);
             WLog.Line("cmd_echo", secret: false, ("enabled", next ? 1 : 0));
         }
 
-        private bool GuardRolesDebug(string name)
+        private bool TryGetRolesDebug(
+            string name,
+            [NotNullWhen(true)] out RolesSession? roles,
+            [NotNullWhen(true)] out GameSession? session)
         {
-            if (_roles != null && _session != null && Session.IsHost)
+            HostRoundState? round = _hostRound;
+            roles = round?.Play?.Roles;
+            session = round?.Session;
+            if (roles != null && session != null && Session.IsHost)
             {
                 return true;
             }
@@ -198,7 +202,8 @@ namespace Werewolf.Game
 
         public VoteRejectReason HostCastVoteAsActor(int voterActor, int targetActor)
         {
-            if (_meeting == null || !Session.IsHost)
+            MeetingSession? meeting = _hostRound?.Play?.Meeting;
+            if (meeting == null || !Session.IsHost)
             {
                 WLog.Line("vote_proxy_rejected", secret: false,
                     ("voter", voterActor),
@@ -207,7 +212,7 @@ namespace Werewolf.Game
                 return VoteRejectReason.NotVotingStage;
             }
 
-            VoteRejectReason reason = _meeting.CastVote(voterActor, targetActor, SessionClock.NowMs());
+            VoteRejectReason reason = meeting.CastVote(voterActor, targetActor, SessionClock.NowMs());
             WLog.Line("vote_proxy", secret: true,
                 ("voter", voterActor), ("target", targetActor), ("reason", reason));
             return reason;
@@ -229,7 +234,7 @@ namespace Werewolf.Game
         {
             long now = SessionClock.NowMs();
 
-            var meeting = _meeting;
+            MeetingSession? meeting = _hostRound?.Play?.Meeting;
             if (meeting != null)
             {
                 WLog.Line("meetingstatus_host", secret: false,
@@ -266,9 +271,10 @@ namespace Werewolf.Game
             }
 
             var actors = new List<int>();
-            if (_session != null)
+            GameSession? session = _hostRound?.Session;
+            if (session != null)
             {
-                foreach (var p in _session.Players)
+                foreach (var p in session.Players)
                 {
                     if (p.IsBot) actors.Add(p.ActorNumber);
                 }
@@ -290,13 +296,15 @@ namespace Werewolf.Game
 
         public bool DebugSpawnMoneyBag(int valueDollars)
         {
-            bool spawned = SpawnMoneyBagInFront(valueDollars, out _, out string reason);
+            bool spawned = SpawnMoneyBagInFront(valueDollars, out _, out string? reason);
             if (spawned) WLog.Line("cmd_spawnbag", secret: false, ("value", valueDollars));
             else WLog.Line("cmd_spawnbag", secret: false, ("reason", reason));
             return spawned;
         }
 
-        internal bool SpawnMoneyBagInFront(int valueDollars, out GameObject bag, out string reason)
+        internal bool SpawnMoneyBagInFront(int valueDollars,
+            [NotNullWhen(true)] out GameObject? bag,
+            [NotNullWhen(false)] out string? reason)
         {
             bag = null;
             reason = null;
@@ -308,9 +316,9 @@ namespace Werewolf.Game
             return MoneyBagSpawner.TrySpawnInFrontOfLocal(valueDollars, out bag, out reason);
         }
 
-        internal bool HostPlaceScenarioCorpse(int actorNumber, Vector3 groundPos, FakeBodyLook look)
+        internal bool HostPlaceScenarioCorpse(int actorNumber, Vector3 groundPos, FakeBodyLook? look)
         {
-            if (_session == null || !Session.IsHost) return false;
+            if (_hostRound == null || !Session.IsHost) return false;
             HostRecordDeathByActor(actorNumber, asVote: false);
             if (!FakeBodies.SpawnOrMove(actorNumber, groundPos, look)) FakeBodies.SetLook(actorNumber, look);
             WLog.Line("scenario_corpse_placed", secret: false,
@@ -320,17 +328,19 @@ namespace Werewolf.Game
 
         internal void HostGrantBombAmmo(int count)
         {
-            if (_bomber == null || !Session.IsHost) return;
-            _bomber.DebugGrantAmmo(count);
+            BombSession? bomber = _hostRound?.Play?.Bomber;
+            if (bomber == null || !Session.IsHost) return;
+            bomber.DebugGrantAmmo(count);
             SendBomberStateIfDirty();
             WLog.Line("scenario_bomb_ammo_granted", secret: false,
-                ("count", count), ("ammo", _bomber.Ammo));
+                ("count", count), ("ammo", bomber.Ammo));
         }
 
         internal bool HostConveneAsActor(int actorNumber)
         {
-            if (_meeting == null || !Session.IsHost) return false;
-            bool accepted = _meeting.TryConveneByHost(actorNumber, SessionClock.NowMs(), ConveneKind.Button,
+            MeetingSession? meeting = _hostRound?.Play?.Meeting;
+            if (meeting == null || !Session.IsHost) return false;
+            bool accepted = meeting.TryConveneByHost(actorNumber, SessionClock.NowMs(), ConveneKind.Button,
                 withCountdown: true);
             WLog.Line("scenario_convene_as_actor", secret: false,
                 ("actor", actorNumber), ("accepted", accepted));
@@ -339,11 +349,12 @@ namespace Werewolf.Game
 
         internal void HostGrantMeetingRights(int actorNumber, int count)
         {
-            if (_meeting == null || !Session.IsHost) return;
-            _meeting.GrantRights(actorNumber, count);
+            MeetingSession? meeting = _hostRound?.Play?.Meeting;
+            if (meeting == null || !Session.IsHost) return;
+            meeting.GrantRights(actorNumber, count);
             WLog.Line("scenario_meeting_right_granted", secret: false,
                 ("actor", actorNumber), ("count", count),
-                ("remaining", _meeting.RightsRemaining(actorNumber)));
+                ("remaining", meeting.RightsRemaining(actorNumber)));
         }
 
         public int DebugClearFakeBodies()
@@ -355,19 +366,21 @@ namespace Werewolf.Game
 
         public void HostForceExpireTimer()
         {
-            if (_session == null || !Session.IsHost) return;
-            _session.ForceExpireTimer(SessionClock.NowMs());
+            GameSession? session = _hostRound?.Session;
+            if (session == null || !Session.IsHost) return;
+            session.ForceExpireTimer(SessionClock.NowMs());
         }
 
         public void HostNotifyDisclosure(DisclosureKind kind)
         {
-            if (_session == null || !Session.IsHost) return;
-            _session.NotifyDisclosureCondition(kind);
+            GameSession? session = _hostRound?.Session;
+            if (session == null || !Session.IsHost) return;
+            session.NotifyDisclosureCondition(kind);
         }
 
         public void DumpStatus()
         {
-            var session = _session;
+            GameSession? session = _hostRound?.Session;
             if (session == null)
             {
                 WLog.Line("status", secret: false,
@@ -384,7 +397,7 @@ namespace Werewolf.Game
                 ("winner", session.Winner == null ? "none" : session.Winner.WinningTeam.ToString()),
                 ("pendingBots", _reservations.Bots.Count), ("mode", BusMode()));
 
-            var meeting = _meeting;
+            MeetingSession? meeting = _hostRound?.Play?.Meeting;
             if (meeting != null)
             {
                 WLog.Line("status_meeting", secret: false,

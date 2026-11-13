@@ -52,20 +52,10 @@ namespace Werewolf.Tests
                 new ReaderParameters { AssemblyResolver = AuditEnvironment.CreateResolver() });
 
             var byType = new SortedDictionary<string, SortedDictionary<string, SortedSet<string>>>(StringComparer.Ordinal);
-            var gameRefs = new SortedDictionary<string, SortedSet<string>>(StringComparer.Ordinal);
-            const string gameRefsType = "Werewolf.GameRefs";
             foreach (var entry in VanillaBoundaryAuditTests.VanillaRefsByRootType(module))
             {
                 foreach (string reference in entry.Value)
                 {
-                    if (reference.StartsWith(gameRefsType + "::", StringComparison.Ordinal))
-                    {
-                        if (entry.Key != gameRefsType)
-                            Add(gameRefs, reference.Substring(gameRefsType.Length + 2), entry.Key);
-                        continue;
-                    }
-                    if (entry.Key == gameRefsType) continue;
-
                     int sep = reference.IndexOf("::", StringComparison.Ordinal);
                     string type = sep < 0 ? reference : reference.Substring(0, sep);
                     string member = sep < 0 ? TypeOnly : reference.Substring(sep + 2);
@@ -103,7 +93,7 @@ namespace Werewolf.Tests
             sb.Append("# 本体依存目録（自動生成）\n\n");
             sb.Append("`VanillaDependencyLedgerTests` がビルド済み DLL の IL から生成する。手で編集しない（更新は `$env:WEREWOLF_WRITE_LEDGER=1` でテストを実行）。\n");
             sb.Append("本体アップデート後に `git diff DnSpy/clean` で変わったクラスをここで引き、右側の接着モジュール・パッチクラスを読む（プレイブック系統B）。\n\n");
-            sb.Append($"本体の型 {allTypes.Count} 種 ／ 直接参照するメンバー {memberCount} 件 ／ パッチ対象 {patchCount} 件 ／ 文字列参照（GameRefs）{gameRefs.Count} 件\n\n");
+            sb.Append($"本体の型 {allTypes.Count} 種 ／ 直接参照するメンバー {memberCount} 件 ／ パッチ対象 {patchCount} 件\n\n");
 
             foreach (string type in allTypes)
             {
@@ -121,11 +111,7 @@ namespace Werewolf.Tests
                 sb.Append('\n');
             }
 
-            sb.Append("## 文字列参照（GameRefs のハンドル）\n\n");
-            foreach (var h in gameRefs)
-                sb.Append($"- `{h.Key}` ← {string.Join(", ", h.Value.Select(Short))}\n");
-
-            return sb.ToString();
+            return sb.ToString().TrimEnd('\n') + "\n";
         }
 
         private static void Add(SortedDictionary<string, SortedSet<string>> map, string key, string value)

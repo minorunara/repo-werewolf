@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -35,13 +36,13 @@ namespace Werewolf.Game
         private readonly MeetingButton _meetingButton;
 
         private readonly DeathRevealPanel _deathReveal = new DeathRevealPanel();
-        private Coroutine _deathRevealCoroutine;
+        private Coroutine? _deathRevealCoroutine;
         private bool _deathRevealPending;
 
         private int _pendingBeaconAudit = -1;
 
         private readonly ConveneCountdown _conveneCountdown = new ConveneCountdown();
-        private Coroutine _conveneTweenCoroutine;
+        private Coroutine? _conveneTweenCoroutine;
 
         private long _resultCeremonyAtMs;
         private int _pendingCurseCatActor = -1;
@@ -181,7 +182,7 @@ namespace Werewolf.Game
                 long buttonNow = now;
                 long readyAtUnixMs = ComputeMeetingReadyAt();
                 int rightsForPrompt = 0;
-                MeetingSession hostMeeting = _d.HostMeetingSession;
+                MeetingSession? hostMeeting = _d.HostMeetingSession;
                 if (hostMeeting != null) rightsForPrompt = hostMeeting.RightsRemaining(_d.LocalActor);
                 else _d.RoomStateView.TryReadRights(_d.LocalActor, out rightsForPrompt);
                 _meetingButton.Tick(LocalCanConvene(), readyAtUnixMs, buttonNow, rightsForPrompt);
@@ -240,7 +241,7 @@ namespace Werewolf.Game
                         : meetingClient.Kind == ConveneKind.ScatterGuard
                             ? TextId.ConveneCountdownScatterGuardHeader
                             : TextId.ConveneCountdownHeaderFormat;
-                    System.Collections.IEnumerator secondTween = _conveneCountdown.Tick(
+                    System.Collections.IEnumerator? secondTween = _conveneCountdown.Tick(
                         _d.ParticipantIdLabel(meetingClient.CallerActor), remainSec, headerFormat);
                     if (secondTween != null)
                     {
@@ -273,7 +274,7 @@ namespace Werewolf.Game
                 }
                 if (!_d.Chat.MeetingOpeningPosted && meetingClient.VotingUiReady(now))
                 {
-                    List<List<int>> lastGroups = _d.ScatterFeature.ConsumeLastScatterGroups();
+                    List<List<int>>? lastGroups = _d.ScatterFeature.ConsumeLastScatterGroups();
                     _d.Chat.PostMeetingOpening(lastGroups);
                     meetingClient.MarkDiscussionOpen();
                     _d.FeedScenarioSignal(ScenarioSignal.MeetingOpened);
@@ -389,7 +390,7 @@ namespace Werewolf.Game
 
         private void FireResultCeremony()
         {
-            MeetingOutcome result = _d.MeetingClientView.Result;
+            MeetingOutcome? result = _d.MeetingClientView.Result;
             int executedActor = result != null ? result.ExecutedActor : -1;
             _d.PushToast(executedActor == -1
                 ? SessionNotice.ForNoExecution()
@@ -428,7 +429,7 @@ namespace Werewolf.Game
             try
             {
                 bool alive = _d.IsLocalAlive();
-                MeetingPath path = alive ? MeetingPath.FromRecorder(ReplaySampler.Recorder, _d.LocalActor) : null;
+                MeetingPath? path = alive ? MeetingPath.FromRecorder(ReplaySampler.Recorder, _d.LocalActor) : null;
                 _meetingMapOverlay.SetOwnPath(path, _d.IdRoster.IdOf(_d.LocalActor), PlayerHeadColor.HexOfLocal());
                 WLog.Line("meeting_path", secret: false,
                     ("alive", alive ? 1 : 0),
@@ -485,7 +486,7 @@ namespace Werewolf.Game
             if (!votePanel.Exists) return;
 
             IReadOnlyList<WPlayer> roster = _d.HostSession != null
-                ? _d.HostSessionPlayers
+                ? _d.HostSessionPlayers ?? System.Array.Empty<WPlayer>()
                 : _d.Registry.BuildRealPlayers();
             votePanel.BeginMeeting(roster, Players.Resolve, _d.LocalActor);
             _meetingUiActive = true;
@@ -496,7 +497,7 @@ namespace Werewolf.Game
             _d.EnsurePanelBuilt(_deathReveal);
 
             MeetingClientState meetingClient = _d.MeetingClientView;
-            IReadOnlyList<WPlayer> roster = _d.HostSession != null
+            IReadOnlyList<WPlayer>? roster = _d.HostSession != null
                 ? _d.HostSessionPlayers
                 : _d.Registry.BuildRealPlayers();
             var dead = new List<WPlayer>();
@@ -525,7 +526,7 @@ namespace Werewolf.Game
 
             _deathReveal.Show(dead, Players.Resolve, meetingClient.Kind);
 
-            Action onImpact = null;
+            Action? onImpact = null;
             if (dead.Count > 0)
             {
                 onImpact = () => _d.PlaySfx("sfx_death_stamp");
@@ -654,9 +655,6 @@ namespace Werewolf.Game
 
         private bool IsUnannouncedCorpseNear(Vector3 pos)
         {
-            PlayerRegistry registry = _d.Registry;
-            if (registry == null || !registry.Available) return false;
-
             MeetingClientState meetingClient = _d.MeetingClientView;
             foreach (PlayerHandle player in Players.All())
             {

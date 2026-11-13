@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using Werewolf.Core;
@@ -19,9 +20,9 @@ namespace Werewolf.Game
 
         private const long ScatterPlanAfterKillMarginMs = 1000;
 
-        private ExtractionScatter _extractionScatter;
+        private ExtractionScatter? _extractionScatter;
 
-        private List<List<int>> _lastScatterGroups;
+        private List<List<int>>? _lastScatterGroups;
 
         private readonly ScatterGuard _scatterGuard = new ScatterGuard();
 
@@ -36,9 +37,9 @@ namespace Werewolf.Game
 
         internal ExtractionScatter DebugScatter => _extractionScatter ??= new ExtractionScatter();
 
-        internal List<List<int>> ConsumeLastScatterGroups()
+        internal List<List<int>>? ConsumeLastScatterGroups()
         {
-            List<List<int>> groups = _lastScatterGroups;
+            List<List<int>>? groups = _lastScatterGroups;
             _lastScatterGroups = null;
             return groups;
         }
@@ -60,16 +61,16 @@ namespace Werewolf.Game
 
         internal void TryExecuteMeetingScatter()
         {
-            GameSession session = _d.HostSession;
-            if (session == null) return;
+            HostPlayState? play = _d.HostGameplay;
+            if (play == null) return;
             Patches.PlayerSpawnPatch.ArmWarpGrace();
             if (!Session.IsHost) return;
-            if (session.Phase != GamePhase.Play)
+            if (play.Session.Phase != GamePhase.Play)
             {
                 _extractionScatter?.ClearPlan();
                 return;
             }
-            if (Plugin.GameConfig == null || !Plugin.GameConfig.MeetingScatterEnabled) return;
+            if (!play.Config.MeetingScatterEnabled) return;
             ExtractionScatter scatter = _extractionScatter ??= new ExtractionScatter();
             if (scatter.HasPlan)
             {
@@ -94,7 +95,7 @@ namespace Werewolf.Game
                 _scatterGuard.Disarm();
                 return;
             }
-            int guardSec = Plugin.GameConfig != null ? Plugin.GameConfig.ScatterGuardSec : 0;
+            int guardSec = _d.HostGameplay?.Config.ScatterGuardSec ?? 0;
             _scatterGuard.Arm(SessionClock.NowMs(), guardSec);
             if (_scatterGuard.ArmedUntilUnixMs != 0)
             {
@@ -121,10 +122,9 @@ namespace Werewolf.Game
         {
             long now = SessionClock.NowMs();
             if (!_scatterGuard.IsArmed(now)) return;
-            MeetingSession meeting = _d.HostMeetingSession;
-            GameSession session = _d.HostSession;
-            if (meeting == null || session == null || session.Phase != GamePhase.Play) return;
-            if (session.WinLocked) return;
+            HostPlayState? play = _d.HostGameplay;
+            if (play == null || play.Session.Phase != GamePhase.Play) return;
+            if (play.Session.WinLocked) return;
             if (LastRunGate.IsLastRunActive())
             {
                 _scatterGuard.Disarm();
@@ -132,7 +132,7 @@ namespace Werewolf.Game
                 WLog.Line("scatter_guard_skip", secret: false, ("reason", "last_run"));
                 return;
             }
-            if (meeting.TryConveneScatterGuard(victimActor, now))
+            if (play.Meeting.TryConveneScatterGuard(victimActor, now))
             {
                 _scatterGuard.Disarm();
                 WLog.Line("scatter_guard_fired", secret: false, ("victim", victimActor));
@@ -143,16 +143,16 @@ namespace Werewolf.Game
         {
             if (_scatterPlanAtUnixMs == 0 || now < _scatterPlanAtUnixMs) return;
             _scatterPlanAtUnixMs = 0;
-            GameSession session = _d.HostSession;
-            if (!Session.IsHost || session == null) return;
-            if (session.WinLocked) return;
-            if (session.Phase != GamePhase.Meeting)
+            HostPlayState? play = _d.HostGameplay;
+            if (!Session.IsHost || play == null) return;
+            if (play.Session.WinLocked) return;
+            if (play.Session.Phase != GamePhase.Meeting)
             {
                 WLog.Line("scatter_plan_skip", secret: false,
-                    ("reason", "phase"), ("phase", session.Phase));
+                    ("reason", "phase"), ("phase", play.Session.Phase));
                 return;
             }
-            if (Plugin.GameConfig == null || !Plugin.GameConfig.MeetingScatterEnabled) return;
+            if (!play.Config.MeetingScatterEnabled) return;
 
             ExtractionScatter scatter = _extractionScatter ??= new ExtractionScatter();
             if (!scatter.PlanScatter(_d.IsSessionAliveActor, warpTruckSlot: false,
@@ -161,10 +161,10 @@ namespace Werewolf.Game
                 return;
             }
 
-            object[] wire = scatter.BuildGroupsWire();
+            object[]? wire = scatter.BuildGroupsWire();
             if (wire == null) return;
 
-            _d.HostMeetingSession?.EnsureClosingHoldRemaining(now, VotePanel.ScatterRevealHoldRequiredMs);
+            play.Meeting.EnsureClosingHoldRemaining(now, VotePanel.ScatterRevealHoldRequiredMs);
 
             if (_d.ClientBus != null)
             {
@@ -175,11 +175,10 @@ namespace Werewolf.Game
 
         internal void HostScheduleScatterPlanFromResult(int executedActor)
         {
-            if (!Session.IsHost || _d.HostSession == null) return;
-            if (Plugin.GameConfig == null || !Plugin.GameConfig.MeetingScatterEnabled) return;
+            HostPlayState? play = _d.HostGameplay;
+            if (!Session.IsHost || play == null || !play.Config.MeetingScatterEnabled) return;
             if (_scatterAwaitCurse) return;
-            MeetingSession meeting = _d.HostMeetingSession;
-            long ceremonyMs = meeting != null ? meeting.ResultCeremonyDelayMs : 0;
+            long ceremonyMs = play.Meeting.ResultCeremonyDelayMs;
             long delayMs = ceremonyMs + (executedActor == -1
                 ? ScatterPlanNoExecDelayMs
                 : MeetingSession.PostResultKillDelaySec * 1000L + ScatterPlanAfterKillMarginMs);
@@ -200,10 +199,12 @@ namespace Werewolf.Game
                 + RolesSession.CurseKillDelaySec * 1000L + ScatterPlanAfterKillMarginMs;
         }
 
-        private List<int> CollectAliveBotActors()
+        private List<int>? CollectAliveBotActors()
         {
-            List<int> aliveBots = null;
-            foreach (WPlayer p in _d.HostSessionPlayers)
+            List<int>? aliveBots = null;
+            IReadOnlyList<WPlayer>? players = _d.HostGameplay?.Session.Players;
+            if (players == null) return null;
+            foreach (WPlayer p in players)
             {
                 if (p != null && p.IsBot && p.Alive) (aliveBots ??= new List<int>()).Add(p.ActorNumber);
             }
@@ -213,7 +214,7 @@ namespace Werewolf.Game
         private void SendScatterGroups(ExtractionScatter scatter)
         {
             if (_d.ClientBus == null) return;
-            object[] wire = scatter.BuildGroupsWire();
+            object[]? wire = scatter.BuildGroupsWire();
             if (wire == null) return;
             _d.ClientBus.SendToAll(MessageCodes.ScatterGroups, wire);
             WLog.Line("scatter_groups_sent", secret: false, ("players", ((int[])wire[0]).Length));
@@ -221,7 +222,7 @@ namespace Werewolf.Game
 
         internal void HandleScatterGroups(object[] p)
         {
-            List<List<int>> groups = ScatterGroupsWire.FromWire(p);
+            List<List<int>>? groups = ScatterGroupsWire.FromWire(p);
             if (groups == null || groups.Count < 2)
             {
                 WLog.Line("recv_scatter_groups_invalid", secret: false);

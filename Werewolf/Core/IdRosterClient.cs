@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 
 namespace Werewolf.Core
@@ -8,7 +9,7 @@ namespace Werewolf.Core
 
         public bool HasRoster => _idByActor.Count > 0;
 
-        public void Apply(int[] actorsByIdOrder)
+        public void Apply(int[]? actorsByIdOrder)
         {
             if (actorsByIdOrder == null || actorsByIdOrder.Length == 0)
             {

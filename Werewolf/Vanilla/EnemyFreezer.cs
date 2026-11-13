@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using Werewolf.Core;
@@ -25,7 +26,7 @@ namespace Werewolf.Vanilla
 
             int despawned = 0;
             int preserved = 0;
-            List<EnemyParent> enemies = EnemyDirector.instance != null ? EnemyDirector.instance.enemiesSpawned : null;
+            List<EnemyParent>? enemies = EnemyDirector.instance != null ? EnemyDirector.instance.enemiesSpawned : null;
             if (enemies != null)
             {
                 foreach (EnemyParent ep in enemies.ToArray())
@@ -72,7 +73,7 @@ namespace Werewolf.Vanilla
             EnemyDirector director = EnemyDirector.instance;
             if (director == null) return;
 
-            GameRefs.EnemyDirector_despawnedDecreaseTimer(director) += comp;
+            director.despawnedDecreaseTimer += comp;
 
             bool allFirstSpawnUsed = true;
             List<EnemyParent> enemies = director.enemiesSpawned;
@@ -81,8 +82,8 @@ namespace Werewolf.Vanilla
                 foreach (EnemyParent ep in enemies)
                 {
                     if (ep == null) continue;
-                    if (!GameRefs.EnemyParent_firstSpawnPointUsed(ep)) allFirstSpawnUsed = false;
-                    if (!GameRefs.EnemyParent_Spawned(ep) && ep.DespawnedTimer > 0f)
+                    if (!ep.firstSpawnPointUsed) allFirstSpawnUsed = false;
+                    if (!ep.Spawned && ep.DespawnedTimer > 0f)
                     {
                         ep.DespawnedTimer += comp;
                     }
@@ -91,7 +92,7 @@ namespace Werewolf.Vanilla
 
             if (allFirstSpawnUsed && LevelGenerator.Instance != null && LevelGenerator.Instance.Generated)
             {
-                ref float idlePause = ref GameRefs.EnemyDirector_spawnIdlePauseTimer(director);
+                ref float idlePause = ref director.spawnIdlePauseTimer;
                 if (idlePause > 0f) idlePause += comp;
             }
         }

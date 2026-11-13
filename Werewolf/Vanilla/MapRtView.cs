@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using UnityEngine;
 using Werewolf.Core;
@@ -13,7 +14,7 @@ namespace Werewolf.Vanilla
         private static bool _mapToolProbeErrorLogged;
         private static bool _orthoErrorLogged;
 
-        private Camera _cachedCamera;
+        private Camera? _cachedCamera;
 
         private Vector3 _origCamLocalPosition;
         private Quaternion _origCamLocalRotation;
@@ -24,8 +25,8 @@ namespace Werewolf.Vanilla
         private Color _origBackgroundColor;
         private bool _origClearSaved;
 
-        private RenderTexture _overrideRt;
-        private RenderTexture _origTargetTexture;
+        private RenderTexture? _overrideRt;
+        private RenderTexture? _origTargetTexture;
         private bool _targetTextureSaved;
 
         private bool _boundsResolved;
@@ -40,7 +41,7 @@ namespace Werewolf.Vanilla
 
         public bool IsOpen { get; private set; }
 
-        public Camera Camera => _cachedCamera;
+        public Camera? Camera => _cachedCamera;
 
         public bool BoundsResolved => _boundsResolved;
         public Vector2 BoundsCenterXZ => _boundsCenterXZ;
@@ -79,7 +80,7 @@ namespace Werewolf.Vanilla
                 ("rtH", _overrideRt != null ? _overrideRt.height : -1));
         }
 
-        public Texture Tick(float orthoSizeConfig)
+        public Texture? Tick(float orthoSizeConfig)
         {
             if (!IsOpen) return null;
 
@@ -143,7 +144,7 @@ namespace Werewolf.Vanilla
             {
                 MapToolController tool = MapToolController.instance;
                 if (tool == null) return false;
-                return GameRefs.MapToolController_Active(tool);
+                return tool.Active;
             }
             catch (Exception e)
             {
@@ -366,7 +367,7 @@ namespace Werewolf.Vanilla
             if (_cachedCamera != null) return;
             try
             {
-                Camera[] cameras = UnityEngine.Object.FindObjectsOfType<Camera>(true);
+                Camera[] cameras = UnityEngine.Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
                 for (int i = 0; i < cameras.Length; i++)
                 {
                     if (cameras[i] != null && cameras[i].name == DirtFinderCameraName)

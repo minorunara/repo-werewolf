@@ -41,9 +41,9 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void Build_NullPayload_YieldsEmptyArray()
+        public void Build_NullPayload_IsRejected()
         {
-            Assert.Empty(NetPayload.Build(null));
+            Assert.Throws<ArgumentNullException>(() => NetPayload.Build(null!));
         }
 
         [Fact]

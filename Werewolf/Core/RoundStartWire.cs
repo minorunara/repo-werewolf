@@ -1,5 +1,7 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Werewolf.Core
 {
@@ -37,7 +39,7 @@ namespace Werewolf.Core
         public bool DebugMode { get; }
         public int[] ActorsByIdOrder { get; }
 
-        internal static bool IsValidRoster(int[] actors)
+        internal static bool IsValidRoster(int[]? actors)
         {
             if (actors == null || actors.Length == 0) return false;
             var seen = new HashSet<int>();
@@ -91,10 +93,10 @@ namespace Werewolf.Core
         }
 
         public static bool TryReadPreplay(
-            object[] payload,
+            object[]? payload,
             out long revealStartUnixMs,
             out long revealEndUnixMs,
-            out RoundStartPublicData data)
+            [NotNullWhen(true)] out RoundStartPublicData? data)
         {
             revealStartUnixMs = 0;
             revealEndUnixMs = 0;
@@ -114,9 +116,9 @@ namespace Werewolf.Core
         }
 
         public static bool TryReadGameStart(
-            object[] payload,
+            object[]? payload,
             out long roundEndUnixMs,
-            out RoundStartPublicData data)
+            [NotNullWhen(true)] out RoundStartPublicData? data)
         {
             roundEndUnixMs = 0;
             data = null;
@@ -132,7 +134,10 @@ namespace Werewolf.Core
             return true;
         }
 
-        private static bool TryReadPublic(object[] payload, int offset, out RoundStartPublicData data)
+        private static bool TryReadPublic(
+            object[] payload,
+            int offset,
+            [NotNullWhen(true)] out RoundStartPublicData? data)
         {
             data = null;
             if (!(payload[offset] is int roundSeconds)

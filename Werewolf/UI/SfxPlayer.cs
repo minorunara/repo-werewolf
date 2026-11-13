@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using UnityEngine;
 using UnityEngine.Audio;
@@ -7,47 +8,79 @@ namespace Werewolf.UI
 {
     public sealed class SfxPlayer
     {
-        private AudioSource _source;
+        private sealed class AudioRefs
+        {
+            public AudioRefs(AudioSource oneShot, AudioSource stoppable,
+                AudioSource loop, AudioSource conveneCharge)
+            {
+                OneShot = oneShot;
+                Stoppable = stoppable;
+                Loop = loop;
+                ConveneCharge = conveneCharge;
+                All = new[] { oneShot, stoppable, loop, conveneCharge };
+            }
 
-        private AudioSource _stoppableSource;
-        private string _stoppableClipKey;
+            public AudioSource OneShot { get; }
+            public AudioSource Stoppable { get; }
+            public AudioSource Loop { get; }
+            public AudioSource ConveneCharge { get; }
+            public AudioSource[] All { get; }
+        }
 
-        private AudioSource _loopSource;
+        private AudioRefs? _audio;
 
-        private AudioSource _conveneChargeSource;
+        private string? _stoppableClipKey;
 
-        private AudioSource[] _sources = Array.Empty<AudioSource>();
-
-        private string _loopClipKey;
+        private string? _loopClipKey;
 
         private bool _mixerResolved;
 
-        public bool Exists => _source != null;
+        public bool Exists => GetLiveAudioOrNull() != null;
 
-        public bool CanPlay => _source != null && _source.outputAudioMixerGroup != null;
+        public bool CanPlay
+        {
+            get
+            {
+                AudioRefs? audio = GetLiveAudioOrNull();
+                return audio != null && audio.OneShot.outputAudioMixerGroup != null;
+            }
+        }
 
         public void Build(GameObject host)
         {
-            if (_source != null || host == null) return;
+            if (GetLiveAudioOrNull() != null || host == null) return;
 
-            _source = CreateSource(host, loop: false);
-            _stoppableSource = CreateSource(host, loop: false);
-            _loopSource = CreateSource(host, loop: true);
-            _conveneChargeSource = CreateSource(host, loop: true);
-            _sources = new[] { _source, _stoppableSource, _loopSource, _conveneChargeSource };
-
-            TryResolveMixerGroup();
+            var created = new System.Collections.Generic.List<AudioSource>(4);
+            try
+            {
+                AudioSource oneShot = CreateSource(host, loop: false); created.Add(oneShot);
+                AudioSource stoppable = CreateSource(host, loop: false); created.Add(stoppable);
+                AudioSource loop = CreateSource(host, loop: true); created.Add(loop);
+                AudioSource conveneCharge = CreateSource(host, loop: true); created.Add(conveneCharge);
+                _audio = new AudioRefs(oneShot, stoppable, loop, conveneCharge);
+                TryResolveMixerGroup();
+            }
+            catch (Exception e)
+            {
+                foreach (AudioSource source in created)
+                {
+                    if (source != null) UnityEngine.Object.Destroy(source);
+                }
+                _audio = null;
+                WLog.Line("sfx_build_error", secret: false, ("err", e.GetType().Name));
+            }
         }
 
         public void Play(string clipKey, float volumeScale = 1f)
         {
-            if (!MixerReady(_source)) return;
-            AudioClip clip = AssetCatalog.GetClip(clipKey);
+            AudioRefs? audio = GetLiveAudioOrNull();
+            if (audio == null || !MixerReady(audio.OneShot)) return;
+            AudioClip? clip = AssetCatalog.GetClip(clipKey);
             if (clip == null) return;
 
             try
             {
-                _source.PlayOneShot(clip, volumeScale);
+                audio.OneShot.PlayOneShot(clip, volumeScale);
             }
             catch (Exception e)
             {
@@ -57,17 +90,18 @@ namespace Werewolf.UI
 
         public void PlayStoppable(string clipKey, float volumeScale = 1f)
         {
-            if (!MixerReady(_stoppableSource)) return;
-            AudioClip clip = AssetCatalog.GetClip(clipKey);
+            AudioRefs? audio = GetLiveAudioOrNull();
+            if (audio == null || !MixerReady(audio.Stoppable)) return;
+            AudioClip? clip = AssetCatalog.GetClip(clipKey);
             if (clip == null) return;
 
             try
             {
-                _stoppableSource.Stop();
+                audio.Stoppable.Stop();
                 _stoppableClipKey = clipKey;
-                _stoppableSource.clip = clip;
-                _stoppableSource.volume = volumeScale;
-                _stoppableSource.Play();
+                audio.Stoppable.clip = clip;
+                audio.Stoppable.volume = volumeScale;
+                audio.Stoppable.Play();
             }
             catch (Exception e)
             {
@@ -77,15 +111,16 @@ namespace Werewolf.UI
 
         public void PlayLoop(string clipKey, float volume)
         {
-            if (!MixerReady(_loopSource)) return;
-            AudioClip clip = AssetCatalog.GetClip(clipKey);
+            AudioRefs? audio = GetLiveAudioOrNull();
+            if (audio == null || !MixerReady(audio.Loop)) return;
+            AudioClip? clip = AssetCatalog.GetClip(clipKey);
             if (clip == null) return;
 
             try
             {
                 _loopClipKey = clipKey;
-                _loopSource.volume = Mathf.Clamp01(volume);
-                KeepLooping(_loopSource, clip);
+                audio.Loop.volume = Mathf.Clamp01(volume);
+                KeepLooping(audio.Loop, clip);
             }
             catch (Exception e)
             {
@@ -96,20 +131,21 @@ namespace Werewolf.UI
         public void StopLoop(string clipKey)
         {
             if (clipKey != _loopClipKey) return;
-            StopSource(_loopSource, clipKey);
+            StopSource(GetLiveAudioOrNull()?.Loop, clipKey);
         }
 
         public void PlayConveneCharge(float ratio)
         {
-            if (!MixerReady(_conveneChargeSource)) return;
-            AudioClip clip = AssetCatalog.GetConveneChargeClip();
+            AudioRefs? audio = GetLiveAudioOrNull();
+            if (audio == null || !MixerReady(audio.ConveneCharge)) return;
+            AudioClip? clip = AssetCatalog.GetConveneChargeClip();
             if (clip == null) return;
 
             try
             {
-                _conveneChargeSource.pitch = ConveneChargeTone.PitchFor(ratio);
-                _conveneChargeSource.volume = ConveneChargeTone.VolumeFor(ratio);
-                KeepLooping(_conveneChargeSource, clip);
+                audio.ConveneCharge.pitch = ConveneChargeTone.PitchFor(ratio);
+                audio.ConveneCharge.volume = ConveneChargeTone.VolumeFor(ratio);
+                KeepLooping(audio.ConveneCharge, clip);
             }
             catch (Exception e)
             {
@@ -119,29 +155,30 @@ namespace Werewolf.UI
 
         public void StopConveneCharge()
         {
-            if (_conveneChargeSource == null) return;
-            StopSource(_conveneChargeSource, "convene_charge");
-            _conveneChargeSource.pitch = 1f;
-            _conveneChargeSource.volume = 0f;
+            AudioRefs? audio = GetLiveAudioOrNull();
+            if (audio == null) return;
+            StopSource(audio.ConveneCharge, "convene_charge");
+            audio.ConveneCharge.pitch = 1f;
+            audio.ConveneCharge.volume = 0f;
         }
 
-        public void StopStoppable(string clipKey = null)
+        public void StopStoppable(string? clipKey = null)
         {
             if (clipKey != null && clipKey != _stoppableClipKey) return;
-            StopSource(_stoppableSource, clipKey);
+            StopSource(GetLiveAudioOrNull()?.Stoppable, clipKey);
         }
 
         public void Destroy()
         {
-            foreach (AudioSource source in _sources)
+            AudioRefs? audio = _audio;
+            _audio = null;
+            if (audio != null)
             {
-                if (source != null) UnityEngine.Object.Destroy(source);
+                foreach (AudioSource source in audio.All)
+                {
+                    if (source != null) UnityEngine.Object.Destroy(source);
+                }
             }
-            _sources = Array.Empty<AudioSource>();
-            _source = null;
-            _stoppableSource = null;
-            _loopSource = null;
-            _conveneChargeSource = null;
             _stoppableClipKey = null;
             _loopClipKey = null;
             _mixerResolved = false;
@@ -167,7 +204,7 @@ namespace Werewolf.UI
             if (!source.isPlaying) source.Play();
         }
 
-        private static void StopSource(AudioSource source, string key)
+        private static void StopSource(AudioSource? source, string? key)
         {
             if (source == null) return;
             try
@@ -185,21 +222,31 @@ namespace Werewolf.UI
 
         private static AudioSource CreateSource(GameObject host, bool loop)
         {
-            AudioSource source = host.AddComponent<AudioSource>();
-            source.playOnAwake = false;
-            source.loop = loop;
-            source.spatialBlend = 0f;
-            source.dopplerLevel = 0f;
-            source.bypassEffects = false;
-            source.bypassListenerEffects = false;
-            source.bypassReverbZones = false;
-            source.volume = 1f;
-            return source;
+            AudioSource? source = null;
+            try
+            {
+                source = host.AddComponent<AudioSource>();
+                source.playOnAwake = false;
+                source.loop = loop;
+                source.spatialBlend = 0f;
+                source.dopplerLevel = 0f;
+                source.bypassEffects = false;
+                source.bypassListenerEffects = false;
+                source.bypassReverbZones = false;
+                source.volume = 1f;
+                return source;
+            }
+            catch
+            {
+                if (source != null) UnityEngine.Object.Destroy(source);
+                throw;
+            }
         }
 
         private void TryResolveMixerGroup()
         {
-            if (_sources.Length == 0) return;
+            AudioRefs? audio = GetLiveAudioOrNull();
+            if (audio == null) return;
 
             try
             {
@@ -212,13 +259,13 @@ namespace Werewolf.UI
                 for (int i = 0; i < sources.Length; i++)
                 {
                     AudioSource src = sources[i];
-                    if (src == null || Array.IndexOf(_sources, src) >= 0) continue;
+                    if (src == null || Array.IndexOf(audio.All, src) >= 0) continue;
                     AudioMixerGroup group = src.outputAudioMixerGroup;
                     if (group == null) continue;
 
                     if (IsVoiceLikeGroup(group.name)) continue;
 
-                    foreach (AudioSource own in _sources) own.outputAudioMixerGroup = group;
+                    foreach (AudioSource own in audio.All) own.outputAudioMixerGroup = group;
                     _mixerResolved = true;
                     return;
                 }
@@ -230,6 +277,28 @@ namespace Werewolf.UI
                 WLog.Line("sfx_mixer_resolve_error", secret: false, ("err", e.GetType().Name));
                 _mixerResolved = true;
             }
+        }
+
+        private AudioRefs? GetLiveAudioOrNull()
+        {
+            AudioRefs? audio = _audio;
+            if (audio == null) return null;
+            bool alive = true;
+            foreach (AudioSource source in audio.All)
+            {
+                if (source == null) { alive = false; break; }
+            }
+            if (alive) return audio;
+
+            _audio = null;
+            foreach (AudioSource source in audio.All)
+            {
+                if (source != null) UnityEngine.Object.Destroy(source);
+            }
+            _stoppableClipKey = null;
+            _loopClipKey = null;
+            _mixerResolved = false;
+            return null;
         }
 
         private static bool IsVoiceLikeGroup(string name)

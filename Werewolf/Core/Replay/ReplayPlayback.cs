@@ -1,5 +1,7 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Werewolf.Core.Replay
 {
@@ -115,10 +117,10 @@ namespace Werewolf.Core.Replay
         public int ParticipantId;
         public string Name = "";
 
-        public string Color;
-        public ReplayEntityTrack Track;
+        public string? Color;
+        public ReplayEntityTrack Track = null!;
 
-        public ReplayEntityTrack CorpseTrack;
+        public ReplayEntityTrack? CorpseTrack;
 
         public double DeathT = double.PositiveInfinity;
 
@@ -176,7 +178,7 @@ namespace Werewolf.Core.Replay
 
         public const float CorpseSpawnNearMeters = 10f;
 
-        public ReplaySegmentHeader Header { get; private set; }
+        public ReplaySegmentHeader Header { get; private set; } = null!;
         public double Duration { get; private set; }
 
         public List<ReplayPlayerEntry> Players { get; } = new List<ReplayPlayerEntry>();
@@ -222,7 +224,7 @@ namespace Werewolf.Core.Replay
 
         private ReplayPlayback() { }
 
-        public static ReplayPlayback FromRecorder(ReplayRecorder recorder)
+        public static ReplayPlayback? FromRecorder(ReplayRecorder? recorder)
         {
             if (recorder == null) return null;
             IReadOnlyList<ReplayRecorder.Segment> segments = recorder.SegmentsForPlayback;
@@ -301,8 +303,9 @@ namespace Werewolf.Core.Replay
 
         public bool TryGetPos(ReplayEntityTrack tr, double t, out float x, out float y, out float z)
         {
+            if (tr == null) throw new ArgumentNullException(nameof(tr));
             x = y = z = 0f;
-            if (tr == null || tr.Count == 0) return false;
+            if (tr.Count == 0) return false;
 
             bool hold = tr.Kind == ReplayEntityKind.Valuable || tr.Kind == ReplayEntityKind.Item
                 || tr.Kind == ReplayEntityKind.Corpse;
@@ -355,7 +358,8 @@ namespace Werewolf.Core.Replay
 
         public void TrailInto(ReplayEntityTrack tr, double fromT, double toT, List<ReplayTrailPoint> into)
         {
-            if (tr == null || into == null) return;
+            if (tr == null) throw new ArgumentNullException(nameof(tr));
+            if (into == null) throw new ArgumentNullException(nameof(into));
             int start = LastIndexAtOrBefore(tr.T, fromT);
             if (start < 0) start = 0;
             for (int i = start; i < tr.Count; i++)
@@ -421,9 +425,9 @@ namespace Werewolf.Core.Replay
             }
         }
 
-        private ReplayPlayerEntry ResolvePlayer(int actor, int participantId, string name)
+        private ReplayPlayerEntry ResolvePlayer(int actor, int participantId, string? name)
         {
-            if (_playersByActor.TryGetValue(actor, out ReplayPlayerEntry existing)) return existing;
+            if (_playersByActor.TryGetValue(actor, out ReplayPlayerEntry? existing)) return existing;
             var entry = new ReplayPlayerEntry
             {
                 Actor = actor,
@@ -439,7 +443,7 @@ namespace Werewolf.Core.Replay
         private ReplayEntityTrack ResolveTrack(ReplayEntityKind kind, int id)
         {
             long key = ((long)(byte)kind << 32) | (uint)id;
-            if (_tracks.TryGetValue(key, out ReplayEntityTrack track)) return track;
+            if (_tracks.TryGetValue(key, out ReplayEntityTrack? track)) return track;
             track = new ReplayEntityTrack { Kind = kind, Id = id };
             _tracks[key] = track;
             switch (kind)
@@ -546,7 +550,7 @@ namespace Werewolf.Core.Replay
                     break;
 
                 case ReplayEvents.Phase:
-                    if (TryFieldString(ev.Fields, ReplayEvents.PhaseToKey, out string to)
+                    if (TryFieldString(ev.Fields, ReplayEvents.PhaseToKey, out string? to)
                         && !string.Equals(to, "Meeting", StringComparison.Ordinal))
                     {
                         meetings.Close(ev.T, Meetings);
@@ -559,10 +563,10 @@ namespace Werewolf.Core.Replay
 
                 case "ep_state":
                     if (TryField(ev.Fields, "ep", out int epId)
-                        && _epsById.TryGetValue(epId, out ReplayEpEntry ep)
+                        && _epsById.TryGetValue(epId, out ReplayEpEntry? ep)
                         && TryField(ev.Fields, "s", out int state))
                     {
-                        TryFieldString(ev.Fields, "n", out string stateName);
+                        TryFieldString(ev.Fields, "n", out string? stateName);
                         ep.StateT.Add(ev.T);
                         ep.States.Add((byte)state);
                         ep.StateNames.Add(stateName ?? "");
@@ -571,7 +575,7 @@ namespace Werewolf.Core.Replay
 
                 case "chat":
                     if (TryField(ev.Fields, "a", out int chatActor)
-                        && TryFieldString(ev.Fields, "text", out string chatText))
+                        && TryFieldString(ev.Fields, "text", out string? chatText))
                     {
                         string clean = ReplayChatText.SanitizeForRecord(chatText);
                         if (clean.Length > 0) Chats.Add((ev.T, chatActor, clean));
@@ -608,10 +612,10 @@ namespace Werewolf.Core.Replay
             }
         }
 
-        private void ApplyGameOverRoles((string Key, object Value)[] fields)
+        private void ApplyGameOverRoles((string Key, object? Value)[] fields)
         {
-            int[] actors = FieldValue(fields, "actors") as int[];
-            int[] roles = FieldValue(fields, "roles") as int[];
+            int[]? actors = FieldValue(fields, "actors") as int[];
+            int[]? roles = FieldValue(fields, "roles") as int[];
             if (actors == null || roles == null) return;
             for (int i = 0; i < actors.Length && i < roles.Length; i++)
             {
@@ -749,7 +753,7 @@ namespace Werewolf.Core.Replay
         {
             foreach (ReplayPlayerEntry p in Players)
             {
-                ReplayEntityTrack corpse = p.CorpseTrack;
+                ReplayEntityTrack? corpse = p.CorpseTrack;
                 ReplayEntityTrack track = p.Track;
                 if (corpse == null || corpse.Count == 0) continue;
                 if (track == null || track.Count == 0 || double.IsPositiveInfinity(p.DeathT)) continue;
@@ -784,7 +788,7 @@ namespace Werewolf.Core.Replay
         private bool TryGetDeathPos(int actor, double deathT, out float x, out float z)
         {
             x = z = 0f;
-            if (!_playersByActor.TryGetValue(actor, out ReplayPlayerEntry p)) return false;
+            if (!_playersByActor.TryGetValue(actor, out ReplayPlayerEntry? p)) return false;
             ReplayEntityTrack track = p.Track;
             if (track == null || track.Count == 0) return false;
             int idx = LastIndexAtOrBefore(track.T, deathT + DeathMarkPosLookaheadSec);
@@ -845,9 +849,9 @@ namespace Werewolf.Core.Replay
             }
         }
 
-        private static bool TryField((string Key, object Value)[] fields, string key, out int value)
+        private static bool TryField((string Key, object? Value)[] fields, string key, out int value)
         {
-            object raw = FieldValue(fields, key);
+            object? raw = FieldValue(fields, key);
             if (raw is int i)
             {
                 value = i;
@@ -862,7 +866,7 @@ namespace Werewolf.Core.Replay
             return false;
         }
 
-        private static bool TryFieldBool((string Key, object Value)[] fields, string key, out bool value)
+        private static bool TryFieldBool((string Key, object? Value)[] fields, string key, out bool value)
         {
             if (FieldValue(fields, key) is bool b)
             {
@@ -873,13 +877,16 @@ namespace Werewolf.Core.Replay
             return false;
         }
 
-        private static bool TryFieldString((string Key, object Value)[] fields, string key, out string value)
+        private static bool TryFieldString(
+            (string Key, object? Value)[] fields,
+            string key,
+            [NotNullWhen(true)] out string? value)
         {
             value = FieldValue(fields, key) as string;
             return value != null;
         }
 
-        private static object FieldValue((string Key, object Value)[] fields, string key)
+        private static object? FieldValue((string Key, object? Value)[] fields, string key)
             => ReplayRecorder.EventRecord.FieldValue(fields, key);
     }
 }

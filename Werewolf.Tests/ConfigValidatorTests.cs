@@ -1,3 +1,5 @@
+#nullable enable
+using System;
 using System.Linq;
 using Werewolf.Core;
 using Xunit;
@@ -6,6 +8,15 @@ namespace Werewolf.Tests
 {
     public class ConfigValidatorTests
     {
+        [Fact]
+        public void Validate_NullConfig_ThrowsForConfig()
+        {
+            var error = Assert.Throws<ArgumentNullException>(
+                () => ConfigValidator.Validate(null!, playerCount: 5));
+
+            Assert.Equal("config", error.ParamName);
+        }
+
         [Fact]
         public void Validate_DefaultConfig_NoIssues()
         {

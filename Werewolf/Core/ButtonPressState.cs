@@ -1,3 +1,4 @@
+#nullable enable
 namespace Werewolf.Core
 {
     public sealed class ButtonPressState

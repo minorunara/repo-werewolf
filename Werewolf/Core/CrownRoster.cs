@@ -1,3 +1,5 @@
+#nullable enable
+using System;
 using System.Collections.Generic;
 
 namespace Werewolf.Core
@@ -14,9 +16,9 @@ namespace Werewolf.Core
 
         public static void SetWinners(IEnumerable<int> actors)
         {
+            if (actors == null) throw new ArgumentNullException(nameof(actors));
             _winners.Clear();
             Version++;
-            if (actors == null) return;
             foreach (int actor in actors) _winners.Add(actor);
         }
 

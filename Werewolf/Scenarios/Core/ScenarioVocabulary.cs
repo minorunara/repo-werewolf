@@ -1,3 +1,4 @@
+#nullable enable
 namespace Werewolf.Scenarios.Core
 {
     public enum ScenarioSignal : byte

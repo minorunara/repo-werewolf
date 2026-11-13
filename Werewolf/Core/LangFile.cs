@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -5,7 +6,7 @@ namespace Werewolf.Core
 {
     public static class LangFile
     {
-        public static Dictionary<TextId, string> Parse(string content)
+        public static Dictionary<TextId, string> Parse(string? content)
         {
             var result = new Dictionary<TextId, string>();
             if (string.IsNullOrEmpty(content)) return result;

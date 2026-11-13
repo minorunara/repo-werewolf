@@ -1,3 +1,5 @@
+#nullable enable
+using System;
 using Werewolf.Core;
 using Xunit;
 
@@ -5,6 +7,14 @@ namespace Werewolf.Tests
 {
     public class VoteTallyTimelineTests
     {
+        [Fact]
+        public void CeremonyDelayMs_NullCounts_ThrowsForVoteCounts()
+        {
+            var error = Assert.Throws<ArgumentNullException>(() =>
+                VoteTallyTimeline.CeremonyDelayMs(null!));
+
+            Assert.Equal("voteCounts", error.ParamName);
+        }
 
         [Fact]
         public void StepMs_NoVotes_ReturnsZero()

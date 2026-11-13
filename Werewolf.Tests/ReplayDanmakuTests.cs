@@ -28,6 +28,31 @@ namespace Werewolf.Tests
         }
 
         [Fact]
+        public void DriveMethods_RejectMissingRequiredPresentationInputs()
+        {
+            ReplayDanmaku d = Build(new List<(double, int, string)>());
+
+            #nullable enable
+            var stepError = Assert.Throws<ArgumentNullException>(() =>
+                d.Step(0.0, 1.0, 0.1, null!));
+            var seekError = Assert.Throws<ArgumentNullException>(() =>
+                d.RebuildAtSeek(0.0, fast: false, null!));
+            var textError = Assert.Throws<ArgumentNullException>(() =>
+                d.SpawnAdHoc(1, null!, FixedWidth));
+            var widthError = Assert.Throws<ArgumentNullException>(() =>
+                d.SpawnAdHoc(1, "発言", null!));
+            var profileError = Assert.Throws<ArgumentNullException>(() =>
+                ReplayDanmaku.ProfileForClaim(null!, 10));
+            #nullable restore
+
+            Assert.Equal("measureWidth", stepError.ParamName);
+            Assert.Equal("measureWidth", seekError.ParamName);
+            Assert.Equal("text", textError.ParamName);
+            Assert.Equal("measureWidth", widthError.ParamName);
+            Assert.Equal("text", profileError.ParamName);
+        }
+
+        [Fact]
         public void Step_SpawnsOnForwardPass_Once()
         {
             ReplayDanmaku d = Build(new List<(double, int, string)> { (110.0, 1, "こんにちは") });

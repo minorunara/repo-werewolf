@@ -1,4 +1,6 @@
+#nullable enable
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Werewolf.Core;
 
 namespace Werewolf.Scenarios.Core
@@ -6,7 +8,7 @@ namespace Werewolf.Scenarios.Core
     public readonly struct ScenarioEntry
     {
         private ScenarioEntry(ScenarioId id, TextId nameId, TextId? descriptionId,
-                              string iconKey, ScenarioDefinition definition)
+                              string iconKey, ScenarioDefinition? definition)
         {
             Id = id;
             NameId = nameId;
@@ -30,7 +32,7 @@ namespace Werewolf.Scenarios.Core
 
         public string IconKey { get; }
 
-        public ScenarioDefinition Definition { get; }
+        public ScenarioDefinition? Definition { get; }
 
         public bool Implemented => Definition != null;
     }
@@ -67,7 +69,8 @@ namespace Werewolf.Scenarios.Core
         public static bool CanStart(ScenarioId id)
             => TryGet(id, out var entry) && entry.Implemented;
 
-        public static bool TryGetDefinition(ScenarioId id, out ScenarioDefinition definition)
+        public static bool TryGetDefinition(ScenarioId id,
+            [NotNullWhen(true)] out ScenarioDefinition? definition)
         {
             definition = TryGet(id, out var entry) ? entry.Definition : null;
             return definition != null;

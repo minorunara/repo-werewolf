@@ -19,11 +19,15 @@ namespace Werewolf.Scenarios.Game
 
         private const float RightMargin = 24f;
 
-        private const float BottomMargin = 70f;
+        private const float BottomMargin = 150f;
 
         private static readonly Vector2 FallbackPosition = new Vector2(470f, BottomMargin);
 
         private static bool _installed;
+
+        private static RectTransform? _buttonRect;
+
+        private static readonly TextRefresh LabelRefresh = new TextRefresh(nameof(ScenarioMenuEntry));
 
         internal static void TryInstall()
         {
@@ -55,6 +59,30 @@ namespace Werewolf.Scenarios.Game
         private static void Install()
         {
             MenuAPI.AddElementToMainMenu(BuildButton);
+            LabelRefresh.Subscribe(() => _buttonRect != null, RefreshLabel);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void RefreshLabel()
+        {
+            RectTransform? rect = _buttonRect;
+            if (rect == null) return;
+            REPOButton? button = rect.GetComponent<REPOButton>();
+            if (button == null) return;
+            ApplyLabel(button, rect.parent);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ApplyLabel(REPOButton button, Transform parent)
+        {
+            string label = Texts.Get(TextId.ScenarioSelectTitle);
+            button.labelTMP.text = label;
+            ApplyJapaneseCapableFont(button.labelTMP, label);
+
+            Vector2 size = button.GetLabelSize();
+            Vector2 pivot = button.rectTransform.pivot;
+            Vector2 position = ResolveBottomRight(parent, size, pivot);
+            button.rectTransform.localPosition = new Vector3(position.x, position.y, 0f);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -64,12 +92,8 @@ namespace Werewolf.Scenarios.Game
             {
                 string label = Texts.Get(TextId.ScenarioSelectTitle);
                 REPOButton button = MenuAPI.CreateREPOButton(label, ScenarioSelection.RequestOpen, parent);
-                ApplyJapaneseCapableFont(button.labelTMP, label);
-
-                Vector2 size = button.GetLabelSize();
-                Vector2 pivot = button.rectTransform.pivot;
-                Vector2 position = ResolveBottomRight(parent, size, pivot);
-                button.rectTransform.localPosition = new Vector3(position.x, position.y, 0f);
+                _buttonRect = button.rectTransform;
+                ApplyLabel(button, parent);
             }
             catch (Exception e)
             {
@@ -99,7 +123,7 @@ namespace Werewolf.Scenarios.Game
                 TMP_FontAsset current = label.font;
                 if (current != null && current.HasCharacters(text, out uint[] _, searchFallbacks: true)) return;
 
-                TMP_FontAsset replacement = UiKit.ResolveTmpFont();
+                TMP_FontAsset? replacement = UiKit.ResolveTmpFont();
                 if (replacement == null || replacement == current) return;
                 label.font = replacement;
             }

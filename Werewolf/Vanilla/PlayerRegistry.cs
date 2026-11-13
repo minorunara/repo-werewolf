@@ -1,24 +1,11 @@
-using System;
+#nullable enable
 using System.Collections.Generic;
-using HarmonyLib;
 using Werewolf.Core;
 
 namespace Werewolf.Vanilla
 {
     public sealed class PlayerRegistry
     {
-        private AccessTools.FieldRef<PlayerAvatar, bool> _deadSetRef;
-
-        public bool Available { get; private set; }
-
-        public void Initialize()
-        {
-            _deadSetRef = GameRefs.PlayerAvatar_deadSet;
-            Available = _deadSetRef != null;
-            if (!Available)
-                WLog.Line("registry_init_failed", secret: false, ("reason", "field_unresolved"));
-        }
-
         public List<WPlayer> BuildRealPlayers()
         {
             var result = new List<WPlayer>();
@@ -29,7 +16,7 @@ namespace Werewolf.Vanilla
                 return result;
             }
 
-            HashSet<int> currentRoomActors = null;
+            HashSet<int>? currentRoomActors = null;
             if (SemiFunc.IsMultiplayer())
             {
                 Photon.Realtime.Room room = Photon.Pun.PhotonNetwork.CurrentRoom;
@@ -70,8 +57,8 @@ namespace Werewolf.Vanilla
 
         public bool IsDeadSet(PlayerAvatar avatar)
         {
-            if (!Available || _deadSetRef == null || avatar == null) return false;
-            return _deadSetRef(avatar);
+            if (avatar == null) return false;
+            return avatar.deadSet;
         }
     }
 }

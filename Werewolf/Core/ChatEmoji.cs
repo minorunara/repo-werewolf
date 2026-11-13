@@ -1,5 +1,7 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
 namespace Werewolf.Core
@@ -54,7 +56,8 @@ namespace Werewolf.Core
 
         public static IReadOnlyDictionary<TextId, string> Templates => _templates;
 
-        public static bool TryReadSpriteAt(string text, int index, out string key, out int next)
+        public static bool TryReadSpriteAt(string? text, int index,
+            [NotNullWhen(true)] out string? key, out int next)
         {
             key = null;
             next = index;
@@ -74,18 +77,18 @@ namespace Werewolf.Core
             return true;
         }
 
-        public static string Template(TextId id)
-            => _templates.TryGetValue(id, out string template) ? template : null;
+        public static string? Template(TextId id)
+            => _templates.TryGetValue(id, out string? template) ? template : null;
 
         public static string Get(TextId id, bool emoji)
         {
-            if (emoji && _templates.TryGetValue(id, out string template)) return template;
+            if (emoji && _templates.TryGetValue(id, out string? template)) return template;
             return Texts.Get(id);
         }
 
-        public static string Format(TextId id, bool emoji, params object[] args)
+        public static string Format(TextId id, bool emoji, params object[]? args)
         {
-            if (emoji && _templates.TryGetValue(id, out string template))
+            if (emoji && _templates.TryGetValue(id, out string? template))
             {
                 if (args == null || args.Length == 0) return template;
                 try

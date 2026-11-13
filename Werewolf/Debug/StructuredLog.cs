@@ -70,13 +70,13 @@ namespace Werewolf.Debugging
 
         private static bool IsDebugLoggingEnabled()
         {
-            ConfigBindings bindings = Plugin.Bindings;
+            ConfigBindings? bindings = Plugin.Bindings;
             return bindings != null && bindings.DebugLogging.Value;
         }
 
         private static bool IsDebugMode()
         {
-            GameConfig cfg = Plugin.GameConfig;
+            GameConfig? cfg = Plugin.GameConfig;
             return cfg != null && cfg.DebugMode;
         }
 

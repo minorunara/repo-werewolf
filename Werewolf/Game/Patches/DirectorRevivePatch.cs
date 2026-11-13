@@ -1,10 +1,11 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
 
 namespace Werewolf.Game.Patches
 {
-    [HarmonyPatch(typeof(RunManager), "Update")]
+    [HarmonyPatch(typeof(RunManager), nameof(RunManager.Update))]
     internal static class DirectorRevivePatch
     {
         private const int MaxRevives = 10;
@@ -24,7 +25,15 @@ namespace Werewolf.Game.Patches
                     return;
                 }
                 _reviveCount++;
-                __instance.gameObject.AddComponent<WerewolfDirector>();
+                WerewolfDirector director = __instance.gameObject.AddComponent<WerewolfDirector>();
+                if (!director.IsReady)
+                {
+                    _disabled = true;
+                    UnityEngine.Object.Destroy(director);
+                    WLog.Line("director_revive_error", secret: false,
+                        ("err", "initialization_failed"));
+                    return;
+                }
                 WLog.Line("director_revived", secret: false,
                     ("host", "RunManager"), ("count", _reviveCount));
             }

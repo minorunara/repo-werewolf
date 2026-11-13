@@ -19,7 +19,7 @@ namespace Werewolf.Tests
         }
 
         [Theory]
-        [InlineData("Update", "TickRoomLeaveOnTitle")]
+        [InlineData("TickPersistentUiStage", "TickRoomLeaveOnTitle")]
         [InlineData("TickRoomLeaveOnTitle", "CleanupAfterRoomLeave")]
         [InlineData("HandleLocalDisconnected", "CleanupAfterRoomLeave")]
         public void DirectorMethod_CallsRoomLeaveWiring(string callerName, string calleeName)

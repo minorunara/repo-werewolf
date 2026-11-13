@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using TMPro;
 using UnityEngine;
@@ -56,44 +57,84 @@ namespace Werewolf.UI
 
         private sealed class Slot
         {
-            public RectTransform Root;
-            public Image Icon;
-            public Sprite ColorSprite;
-            public Sprite GraySprite;
-            public TextMeshProUGUI Fallback;
+            public Slot(RectTransform root, Image icon, Sprite? colorSprite,
+                Sprite? graySprite, TextMeshProUGUI? fallback)
+            { Root = root; Icon = icon; ColorSprite = colorSprite; GraySprite = graySprite; Fallback = fallback; }
+            public RectTransform Root { get; }
+            public Image Icon { get; }
+            public Sprite? ColorSprite { get; }
+            public Sprite? GraySprite { get; }
+            public TextMeshProUGUI? Fallback { get; }
         }
 
-        private static Sprite _glowSprite;
-        private static Sprite _raySprite;
+        private sealed class BeaconView
+        {
+            public BeaconView(Slot slot, Image? grayOverlay, TextMeshProUGUI cooldown, TextMeshProUGUI charges)
+            { Slot = slot; GrayOverlay = grayOverlay; Cooldown = cooldown; Charges = charges; }
+            public Slot Slot { get; }
+            public Image? GrayOverlay { get; }
+            public TextMeshProUGUI Cooldown { get; }
+            public TextMeshProUGUI Charges { get; }
+        }
 
-        private GameObject _root;
-        private Slot _mainSlot;
-        private Slot[] _perkSlots;
-        private TextMeshProUGUI _jumpCharges;
-        private TextMeshProUGUI _keyLabel;
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, Slot mainSlot, Slot[] perkSlots,
+                TextMeshProUGUI jumpCharges, TextMeshProUGUI keyLabel,
+                RectTransform glowRoot, Image glowBall, Image rayFast, Image raySlow,
+                BeaconView beacon, TextMeshProUGUI beaconKeyLabel)
+            {
+                Root = root; MainSlot = mainSlot; PerkSlots = perkSlots;
+                JumpCharges = jumpCharges; KeyLabel = keyLabel; GlowRoot = glowRoot;
+                GlowBall = glowBall; RayFast = rayFast; RaySlow = raySlow;
+                Beacon = beacon; BeaconKeyLabel = beaconKeyLabel;
+            }
+            public GameObject Root { get; }
+            public Slot MainSlot { get; }
+            public Slot[] PerkSlots { get; }
+            public TextMeshProUGUI JumpCharges { get; }
+            public TextMeshProUGUI KeyLabel { get; }
+            public RectTransform GlowRoot { get; }
+            public Image GlowBall { get; }
+            public Image RayFast { get; }
+            public Image RaySlow { get; }
+            public BeaconView Beacon { get; }
+            public TextMeshProUGUI BeaconKeyLabel { get; }
+        }
 
-        private RectTransform _glowRoot;
+        private static Sprite? _glowSprite;
+        private static Sprite? _raySprite;
+
+        private ViewRefs? _view;
+        private readonly TextRefresh _textRefresh = new TextRefresh(nameof(WolfStatusPanel));
+        private GameObject? _root => _view?.Root;
+        private Slot? _mainSlot => _view?.MainSlot;
+        private Slot[]? _perkSlots => _view?.PerkSlots;
+        private TextMeshProUGUI? _jumpCharges => _view?.JumpCharges;
+        private TextMeshProUGUI? _keyLabel => _view?.KeyLabel;
+
+        private RectTransform? _glowRoot => _view?.GlowRoot;
         private Vector2 _glowCenter;
-        private Image _glowBall;
-        private Image _rayFast;
-        private Image _raySlow;
+        private Image? _glowBall => _view?.GlowBall;
+        private Image? _rayFast => _view?.RayFast;
+        private Image? _raySlow => _view?.RaySlow;
 
-        private Slot _beaconSlot;
-        private Image _beaconGrayOverlay;
-        private TextMeshProUGUI _beaconCooldown;
-        private TextMeshProUGUI _beaconCharges;
-        private TextMeshProUGUI _beaconKeyLabel;
+        private Slot? _beaconSlot => _view?.Beacon.Slot;
+        private Image? _beaconGrayOverlay => _view?.Beacon.GrayOverlay;
+        private TextMeshProUGUI? _beaconCooldown => _view?.Beacon.Cooldown;
+        private TextMeshProUGUI? _beaconCharges => _view?.Beacon.Charges;
+        private TextMeshProUGUI? _beaconKeyLabel => _view?.BeaconKeyLabel;
 
         private WolfStatusState _lastState;
         private bool _hasLastState;
-        private string _lastWolfKeyName;
-        private string _lastBeaconKeyName;
+        private string? _lastWolfKeyName;
+        private string? _lastBeaconKeyName;
 
-        public bool Exists => _root != null;
+        public bool Exists => GetLiveViewOrNull() != null;
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
 
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
@@ -104,10 +145,13 @@ namespace Werewolf.UI
             float rootWidth = HudGeometry.WolfStatus.Width;
             float rootHeight = HudGeometry.WolfStatus.Height;
 
+            GameObject? root = null;
+            try
+            {
             RectTransform rect = UiKit.CreateAnchoredRect(layerRoot, "WW_WolfStatusPanel",
                 UiKit.BottomLeft, Vector2.zero,
                 new Vector2(LeftMargin, BottomMargin), new Vector2(rootWidth, rootHeight));
-            _root = rect.gameObject;
+            root = rect.gameObject;
 
             float perkGridBottom = LabelHeight + LabelGap;
             float iconRowCenterY = perkGridBottom + perkGridHeight / 2f;
@@ -116,25 +160,25 @@ namespace Werewolf.UI
 
             _glowCenter = new Vector2(mainCenterX, iconRowCenterY);
             var glowRootGo = new GameObject("MainGlow", typeof(RectTransform));
-            _glowRoot = (RectTransform)glowRootGo.transform;
-            _glowRoot.SetParent(rect, false);
-            UiKit.SetAnchorsBottomLeft(_glowRoot, _glowCenter, Vector2.zero);
+            RectTransform glowRoot = (RectTransform)glowRootGo.transform;
+            glowRoot.SetParent(rect, false);
+            UiKit.SetAnchorsBottomLeft(glowRoot, _glowCenter, Vector2.zero);
 
-            _glowBall = UiKit.CreateImage(_glowRoot, "GlowBall", Vector2.zero,
+            Image glowBall = UiKit.CreateImage(glowRoot, "GlowBall", Vector2.zero,
                 new Vector2(GlowSizePx, GlowSizePx), GlowColor);
-            _glowBall.sprite = GlowSprite();
-            _raySlow = UiKit.CreateImage(_glowRoot, "RaySlow", Vector2.zero,
+            glowBall.sprite = GlowSprite();
+            Image raySlow = UiKit.CreateImage(glowRoot, "RaySlow", Vector2.zero,
                 new Vector2(RaySizePx * 0.8f, RaySizePx * 0.8f), RaySlowTint);
-            _raySlow.sprite = RaySprite();
-            _rayFast = UiKit.CreateImage(_glowRoot, "RayFast", Vector2.zero,
+            raySlow.sprite = RaySprite();
+            Image rayFast = UiKit.CreateImage(glowRoot, "RayFast", Vector2.zero,
                 new Vector2(RaySizePx, RaySizePx), Color.white);
-            _rayFast.sprite = RaySprite();
+            rayFast.sprite = RaySprite();
 
-            _glowRoot.gameObject.SetActive(false);
+            glowRoot.gameObject.SetActive(false);
 
-            _mainSlot = BuildSlot(rect, "Main", new Vector2(mainCenterX, iconRowCenterY),
+            Slot mainSlot = BuildSlot(rect, "Main", new Vector2(mainCenterX, iconRowCenterY),
                 MainIconSize, "role_werewolf", Texts.Get(TextId.RoleNameWerewolf), fallbackFontSize: 30f);
-            _keyLabel = BuildKeyLabel(rect, "KeyLabel", mainCenterX);
+            TextMeshProUGUI keyLabel = BuildKeyLabel(rect, "KeyLabel", mainCenterX);
 
             string[] iconKeys = { "perk_stamina", "perk_jump", "perk_enemy_ignore", "perk_heal" };
             string[] fallbackLabels =
@@ -144,7 +188,7 @@ namespace Werewolf.UI
                 Texts.Get(TextId.GaugePerkEnemyIgnoreLabel),
                 Texts.Get(TextId.GaugePerkHealLabel),
             };
-            _perkSlots = new Slot[iconKeys.Length];
+            var perkSlots = new Slot[iconKeys.Length];
             float perkGridLeft = mainSlotSize + SlotGap;
             for (int i = 0; i < iconKeys.Length; i++)
             {
@@ -153,21 +197,31 @@ namespace Werewolf.UI
                 float x = perkGridLeft + perkSlotSize / 2f + column * (perkSlotSize + SlotGap);
                 float y = perkGridBottom + perkGridHeight - perkSlotSize / 2f
                     - rowFromTop * (perkSlotSize + SlotGap);
-                _perkSlots[i] = BuildSlot(rect, "Perk" + i, new Vector2(x, y),
+                perkSlots[i] = BuildSlot(rect, "Perk" + i, new Vector2(x, y),
                     PerkIconSize, iconKeys[i], fallbackLabels[i], fallbackFontSize: 14f);
             }
 
-            _jumpCharges = UiKit.CreateText(_perkSlots[1].Root, "JumpCharges",
+            TextMeshProUGUI jumpCharges = UiKit.CreateText(perkSlots[1].Root, "JumpCharges",
                 new Vector2(0f, -PerkIconSize / 4f), new Vector2(PerkIconSize, PerkIconSize / 2f),
                 string.Empty, JumpChargesFontSize, ChargesTextColor, TextAlignmentOptions.Center);
-            _jumpCharges.outlineWidth = 0.25f;
-            _jumpCharges.outlineColor = Color.black;
+            jumpCharges.outlineWidth = 0.25f;
+            jumpCharges.outlineColor = Color.black;
 
             float beaconCenterX = perkGridLeft + perkGridWidth + BeaconGap + mainSlotSize / 2f;
-            BuildBeaconSlot(rect, new Vector2(beaconCenterX, iconRowCenterY));
-            _beaconKeyLabel = BuildKeyLabel(rect, "BeaconKeyLabel", beaconCenterX);
+            BeaconView beacon = BuildBeaconSlot(rect, new Vector2(beaconCenterX, iconRowCenterY));
+            TextMeshProUGUI beaconKeyLabel = BuildKeyLabel(rect, "BeaconKeyLabel", beaconCenterX);
 
-            _root.SetActive(false);
+            root.SetActive(false);
+            _view = new ViewRefs(root, mainSlot, perkSlots, jumpCharges, keyLabel,
+                glowRoot, glowBall, rayFast, raySlow, beacon, beaconKeyLabel);
+            _textRefresh.Subscribe(() => Exists, ApplyTexts);
+            }
+            catch
+            {
+                _view = null;
+                if (root != null) UnityEngine.Object.Destroy(root);
+                throw;
+            }
         }
 
         public void Tick(WolfStatusState state, string wolfKeyName, string beaconKeyName)
@@ -194,8 +248,8 @@ namespace Werewolf.UI
                 _lastWolfKeyName = wolfKeyName;
                 _lastBeaconKeyName = beaconKeyName;
 
-                ApplySlot(_mainSlot, state.Toggle);
-                ApplySlot(_perkSlots[0], state.Stamina);
+                ApplySlot(_mainSlot!, state.Toggle);
+                ApplySlot(_perkSlots![0], state.Stamina);
                 ApplySlot(_perkSlots[1], state.Jump);
                 ApplySlot(_perkSlots[2], state.EnemyIgnore);
                 ApplySlot(_perkSlots[3], state.Heal);
@@ -207,7 +261,7 @@ namespace Werewolf.UI
                         : string.Empty;
                 }
 
-                _keyLabel.text = Texts.Format(TextId.HudWolfToggleFormat, wolfKeyName ?? "?");
+                _keyLabel!.text = Texts.Format(TextId.HudWolfToggleFormat, wolfKeyName ?? "?");
                 _keyLabel.color = LabelColor(state.Toggle);
 
                 ApplyBeacon(state, beaconKeyName);
@@ -225,29 +279,45 @@ namespace Werewolf.UI
             _hasLastState = false;
         }
 
+        private void ApplyTexts()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return;
+            SetFallback(view.MainSlot, TextId.RoleNameWerewolf);
+            SetFallback(view.PerkSlots[0], TextId.GaugePerkStaminaLabel);
+            SetFallback(view.PerkSlots[1], TextId.GaugePerkJumpLabel);
+            SetFallback(view.PerkSlots[2], TextId.GaugePerkEnemyIgnoreLabel);
+            SetFallback(view.PerkSlots[3], TextId.GaugePerkHealLabel);
+            SetFallback(view.Beacon.Slot, TextId.HudBeaconLabel);
+            _hasLastState = false;
+        }
+
+        private static void SetFallback(Slot slot, TextId textId)
+        {
+            if (slot.Fallback != null) slot.Fallback.text = Texts.Get(textId);
+        }
+
         public void Destroy()
         {
-            if (_root != null)
-            {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
-            }
-            _mainSlot = null;
-            _perkSlots = null;
-            _jumpCharges = null;
-            _keyLabel = null;
-            _glowRoot = null;
-            _glowBall = null;
-            _rayFast = null;
-            _raySlow = null;
-            _beaconSlot = null;
-            _beaconGrayOverlay = null;
-            _beaconCooldown = null;
-            _beaconCharges = null;
-            _beaconKeyLabel = null;
+            _textRefresh.Unsubscribe();
+            ViewRefs? view = _view;
+            _view = null;
+            if (view != null && view.Root != null) UnityEngine.Object.Destroy(view.Root);
             _hasLastState = false;
             _lastWolfKeyName = null;
             _lastBeaconKeyName = null;
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+            _view = null;
+            _hasLastState = false;
+            _lastWolfKeyName = null;
+            _lastBeaconKeyName = null;
+            return null;
         }
 
         private void TickGlow(bool active)
@@ -269,13 +339,13 @@ namespace Werewolf.UI
 
             Color color = GlowColor;
             color.a = GlowBaseAlpha + GlowPulseAmplitude * breath;
-            _glowBall.color = color;
+            _glowBall!.color = color;
             _glowBall.rectTransform.localScale = new Vector3(
                 1f + GlowBreathScale * breath + GlowStretchAmplitude * swayX,
                 1f + GlowBreathScale * breath + GlowStretchAmplitude * swayY, 1f);
 
-            _rayFast.rectTransform.localRotation = Quaternion.Euler(0f, 0f, t * RayFastSpinDegPerSec);
-            _raySlow.rectTransform.localRotation = Quaternion.Euler(0f, 0f, t * RaySlowSpinDegPerSec);
+            _rayFast!.rectTransform.localRotation = Quaternion.Euler(0f, 0f, t * RayFastSpinDegPerSec);
+            _raySlow!.rectTransform.localRotation = Quaternion.Euler(0f, 0f, t * RaySlowSpinDegPerSec);
             SetAlpha(_rayFast, RayBaseAlpha + RayFlickerAmplitude * Mathf.PerlinNoise(t * RayFlickerSpeed, 40f));
             SetAlpha(_raySlow, RayBaseAlpha + RayFlickerAmplitude * Mathf.PerlinNoise(t * RayFlickerSpeed, 60f));
         }
@@ -373,7 +443,7 @@ namespace Werewolf.UI
             if (slot.Icon != null && slot.Icon.enabled)
             {
                 slot.Icon.color = tint;
-                Sprite want = visual == WolfPerkVisual.Locked
+                Sprite? want = visual == WolfPerkVisual.Locked
                     ? (slot.GraySprite ?? slot.ColorSprite)
                     : slot.ColorSprite;
                 if (want != null && slot.Icon.sprite != want) slot.Icon.sprite = want;
@@ -391,7 +461,7 @@ namespace Werewolf.UI
                 {
                     bool fullGray = state.BeaconGrayFraction >= 1f;
                     _beaconSlot.Icon.color = fullGray ? LockedIconTint : ReadyIconTint;
-                    Sprite want = fullGray
+                    Sprite? want = fullGray
                         ? (_beaconSlot.GraySprite ?? _beaconSlot.ColorSprite)
                         : _beaconSlot.ColorSprite;
                     if (want != null && _beaconSlot.Icon.sprite != want)
@@ -429,65 +499,67 @@ namespace Werewolf.UI
         private static Slot BuildSlot(RectTransform parent, string name, Vector2 centerPos,
             float iconSize, string spriteKey, string fallbackLabel, float fallbackFontSize)
         {
-            var slot = new Slot();
             float slotSize = iconSize + SlotPadding;
 
-            slot.Root = UiKit.CreateRect(parent, name + "Slot", Vector2.zero,
+            RectTransform root = UiKit.CreateRect(parent, name + "Slot", Vector2.zero,
                 new Vector2(slotSize, slotSize));
-            UiKit.SetAnchorsBottomLeft(slot.Root, centerPos, new Vector2(slotSize, slotSize));
+            UiKit.SetAnchorsBottomLeft(root, centerPos, new Vector2(slotSize, slotSize));
 
-            slot.Icon = UiKit.CreateImage(slot.Root, name + "Icon", Vector2.zero,
+            Image icon = UiKit.CreateImage(root, name + "Icon", Vector2.zero,
                 new Vector2(iconSize, iconSize), LockedIconTint);
-            Sprite sprite = AssetCatalog.GetSprite(spriteKey);
+            Sprite? sprite = AssetCatalog.GetSprite(spriteKey);
+            Sprite? graySprite = null;
+            TextMeshProUGUI? fallback = null;
             if (sprite != null)
             {
-                slot.ColorSprite = sprite;
-                slot.GraySprite = AssetCatalog.GetGraySprite(spriteKey);
-                slot.Icon.sprite = slot.GraySprite ?? sprite;
-                slot.Icon.preserveAspect = true;
+                graySprite = AssetCatalog.GetGraySprite(spriteKey);
+                icon.sprite = graySprite ?? sprite;
+                icon.preserveAspect = true;
             }
             else
             {
-                slot.Icon.enabled = false;
-                slot.Fallback = UiKit.CreateText(slot.Root, name + "Fallback",
+                icon.enabled = false;
+                fallback = UiKit.CreateText(root, name + "Fallback",
                     Vector2.zero, new Vector2(slotSize - 4f, slotSize - 4f),
                     fallbackLabel, fallbackFontSize, LockedIconTint, TextAlignmentOptions.Center);
-                slot.Fallback.enableWordWrapping = true;
+                fallback.textWrappingMode = TextWrappingModes.Normal;
             }
-            return slot;
+            return new Slot(root, icon, sprite, graySprite, fallback);
         }
 
-        private void BuildBeaconSlot(RectTransform parent, Vector2 centerPos)
+        private static BeaconView BuildBeaconSlot(RectTransform parent, Vector2 centerPos)
         {
-            _beaconSlot = BuildSlot(parent, "Beacon", centerPos,
+            Slot beaconSlot = BuildSlot(parent, "Beacon", centerPos,
                 MainIconSize, "perk_beacon", Texts.Get(TextId.HudBeaconLabel),
                 fallbackFontSize: 22f);
 
-            Sprite sprite = AssetCatalog.GetSprite("perk_beacon");
-            if (sprite != null && _beaconSlot.Icon != null)
+            Sprite? sprite = AssetCatalog.GetSprite("perk_beacon");
+            Image? beaconGrayOverlay = null;
+            if (sprite != null)
             {
-                _beaconSlot.Icon.preserveAspect = false;
+                beaconSlot.Icon.preserveAspect = false;
 
-                _beaconGrayOverlay = UiKit.CreateImage(_beaconSlot.Root, "BeaconGray",
+                beaconGrayOverlay = UiKit.CreateImage(beaconSlot.Root, "BeaconGray",
                     Vector2.zero, new Vector2(MainIconSize, MainIconSize), BeaconGrayOverlayTint);
-                _beaconGrayOverlay.sprite = _beaconSlot.GraySprite ?? sprite;
-                _beaconGrayOverlay.type = Image.Type.Filled;
-                _beaconGrayOverlay.fillMethod = Image.FillMethod.Vertical;
-                _beaconGrayOverlay.fillOrigin = (int)Image.OriginVertical.Top;
-                _beaconGrayOverlay.fillAmount = 0f;
+                beaconGrayOverlay.sprite = beaconSlot.GraySprite ?? sprite;
+                beaconGrayOverlay.type = Image.Type.Filled;
+                beaconGrayOverlay.fillMethod = Image.FillMethod.Vertical;
+                beaconGrayOverlay.fillOrigin = (int)Image.OriginVertical.Top;
+                beaconGrayOverlay.fillAmount = 0f;
             }
 
-            _beaconCooldown = UiKit.CreateText(_beaconSlot.Root, "BeaconCooldown",
+            TextMeshProUGUI beaconCooldown = UiKit.CreateText(beaconSlot.Root, "BeaconCooldown",
                 Vector2.zero, new Vector2(MainIconSize, MainIconSize),
                 string.Empty, CooldownFontSize, Color.white, TextAlignmentOptions.Center);
-            _beaconCooldown.outlineWidth = 0.25f;
-            _beaconCooldown.outlineColor = Color.black;
+            beaconCooldown.outlineWidth = 0.25f;
+            beaconCooldown.outlineColor = Color.black;
 
-            _beaconCharges = UiKit.CreateText(_beaconSlot.Root, "BeaconCharges",
+            TextMeshProUGUI beaconCharges = UiKit.CreateText(beaconSlot.Root, "BeaconCharges",
                 new Vector2(0f, -MainIconSize / 4f), new Vector2(MainIconSize, MainIconSize / 2f),
                 string.Empty, ChargesFontSize, ChargesTextColor, TextAlignmentOptions.Center);
-            _beaconCharges.outlineWidth = 0.25f;
-            _beaconCharges.outlineColor = Color.black;
+            beaconCharges.outlineWidth = 0.25f;
+            beaconCharges.outlineColor = Color.black;
+            return new BeaconView(beaconSlot, beaconGrayOverlay, beaconCooldown, beaconCharges);
         }
 
         private static TextMeshProUGUI BuildKeyLabel(RectTransform parent, string name, float centerX)

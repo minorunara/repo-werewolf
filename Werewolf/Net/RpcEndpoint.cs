@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using Photon.Pun;
 using Photon.Realtime;
@@ -8,12 +9,12 @@ namespace Werewolf.Net
 {
     public sealed class RpcEndpoint : MonoBehaviour
     {
-        public static event Action<InboundMessage> OnMessage;
+        public static event Action<InboundMessage>? OnMessage;
 
         private static readonly InboundDropThrottle DropThrottle = new InboundDropThrottle();
 
         [PunRPC]
-        private void WerewolfRpc(byte protocolVersion, byte messageType, object[] payload,
+        private void WerewolfRpc(byte protocolVersion, byte messageType, object?[]? payload,
             PhotonMessageInfo info)
         {
             try
@@ -34,8 +35,8 @@ namespace Werewolf.Net
                 }
 
                 int senderActor = info.Sender.ActorNumber;
-                int masterActor = PhotonNetwork.MasterClient != null
-                    ? PhotonNetwork.MasterClient.ActorNumber : 0;
+                Player? master = PhotonNetwork.MasterClient;
+                int masterActor = master != null ? master.ActorNumber : 0;
                 if (!InboundAuthority.IsAcceptable(messageType, senderActor, masterActor))
                 {
                     long nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -49,7 +50,7 @@ namespace Werewolf.Net
                 }
 
                 if (!RpcProtocol.TryOpen(protocolVersion, messageType, payload,
-                        senderActor, out InboundMessage message, out _))
+                        senderActor, out InboundMessage? message, out _))
                     return;
 
                 int transitMs = unchecked(PhotonNetwork.ServerTimestamp - info.SentServerTimestamp);
@@ -57,8 +58,10 @@ namespace Werewolf.Net
                     secret: MessageCodes.IsSecret(messageType), transitMs: transitMs);
                 OnMessage?.Invoke(message);
             }
-            catch
+            catch (Exception e)
             {
+                WLog.Exception("rpc_endpoint_error", e, secret: false,
+                    ("ver", (int)protocolVersion), ("code", (int)messageType));
             }
         }
     }

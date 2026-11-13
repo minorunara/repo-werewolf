@@ -1,5 +1,7 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Werewolf.Core
 {
@@ -41,9 +43,8 @@ namespace Werewolf.Core
     {
         public static IReadOnlyList<T> Freeze<T>(IEnumerable<T> items)
         {
-            return items == null
-                ? new List<T>().AsReadOnly()
-                : new List<T>(items).AsReadOnly();
+            if (items == null) throw new ArgumentNullException(nameof(items));
+            return new List<T>(items).AsReadOnly();
         }
     }
 
@@ -79,10 +80,10 @@ namespace Werewolf.Core
     {
         public ModDifference(
             ModDifferenceKind kind,
-            string guid,
-            string name,
-            string baselineValue,
-            string participantValue)
+            string? guid,
+            string? name,
+            string? baselineValue,
+            string? participantValue)
         {
             Kind = kind;
             Guid = guid ?? string.Empty;
@@ -120,7 +121,7 @@ namespace Werewolf.Core
             Missing == other.Missing && Extra == other.Extra &&
             Version == other.Version && Content == other.Content;
 
-        public override bool Equals(object obj) => obj is ModDifferenceSummary other && Equals(other);
+        public override bool Equals(object? obj) => obj is ModDifferenceSummary other && Equals(other);
         public override int GetHashCode() => HashCode.Combine(Missing, Extra, Version, Content);
         public static bool operator ==(ModDifferenceSummary left, ModDifferenceSummary right) => left.Equals(right);
         public static bool operator !=(ModDifferenceSummary left, ModDifferenceSummary right) => !left.Equals(right);
@@ -196,9 +197,9 @@ namespace Werewolf.Core
             int epoch,
             int revision,
             int baselineActor,
-            IEnumerable<ModParticipantRecord> records,
-            out ModIntegritySnapshot snapshot,
-            out string error)
+            IEnumerable<ModParticipantRecord?>? records,
+            [NotNullWhen(true)] out ModIntegritySnapshot? snapshot,
+            out string? error)
         {
             snapshot = null;
             error = null;
@@ -210,7 +211,7 @@ namespace Werewolf.Core
             var list = new List<ModParticipantRecord>();
             var actors = new HashSet<int>();
             int baselineCount = 0;
-            foreach (ModParticipantRecord record in records)
+            foreach (ModParticipantRecord? record in records)
             {
                 if (record == null) return Fail("null_record", out error);
                 if (record.Actor <= 0 || !actors.Add(record.Actor)) return Fail("actor", out error);
@@ -251,7 +252,7 @@ namespace Werewolf.Core
             return true;
         }
 
-        public bool TryGetRecord(int actor, out ModParticipantRecord record)
+        public bool TryGetRecord(int actor, [NotNullWhen(true)] out ModParticipantRecord? record)
         {
             for (int i = 0; i < Records.Count; i++)
             {
@@ -265,7 +266,7 @@ namespace Werewolf.Core
             return false;
         }
 
-        private static bool Fail(string value, out string error)
+        private static bool Fail(string value, [NotNullWhen(false)] out string? error)
         {
             error = value;
             return false;
@@ -316,7 +317,7 @@ namespace Werewolf.Core
 
     public sealed class ModParticipantView
     {
-        public ModParticipantView(ModParticipantRecord record, string displayName, bool isLocal, bool isBaseline)
+        public ModParticipantView(ModParticipantRecord record, string? displayName, bool isLocal, bool isBaseline)
         {
             Record = record ?? throw new ArgumentNullException(nameof(record));
             DisplayName = string.IsNullOrEmpty(displayName) ? $"Actor {record.Actor}" : displayName;

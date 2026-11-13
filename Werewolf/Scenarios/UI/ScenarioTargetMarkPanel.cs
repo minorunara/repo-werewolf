@@ -22,7 +22,7 @@ namespace Werewolf.Scenarios.UI
 
         private readonly struct Look
         {
-            public Look(Color color, Func<Sprite> icon, float offsetY, bool hideWhileVisible)
+            public Look(Color color, Func<Sprite?> icon, float offsetY, bool hideWhileVisible)
             {
                 Color = color;
                 Icon = icon;
@@ -32,7 +32,7 @@ namespace Werewolf.Scenarios.UI
 
             public Color Color { get; }
 
-            public Func<Sprite> Icon { get; }
+            public Func<Sprite?> Icon { get; }
 
             public float OffsetY { get; }
 
@@ -59,48 +59,77 @@ namespace Werewolf.Scenarios.UI
         private const float PulseMinAlpha = 0.35f;
         private const float PulseMaxAlpha = 0.85f;
 
-        private GameObject _root;
-        private Image _ring;
-        private Image _icon;
-        private Image _arrow;
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, Image ring, Image icon, Image arrow)
+            {
+                Root = root;
+                Ring = ring;
+                Icon = icon;
+                Arrow = arrow;
+            }
+
+            public GameObject Root { get; }
+            public Image Ring { get; }
+            public Image Icon { get; }
+            public Image Arrow { get; }
+        }
+
+        private ViewRefs? _view;
 
         private ScenarioTargetMarkKind _kind;
 
-        public bool Exists => _root != null;
+        public bool Exists => GetLiveViewOrNull() != null;
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            var go = new GameObject("WW_ScenarioTargetMark", typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(layerRoot, false);
-            UiKit.Stretch(rect);
+            GameObject? partialRoot = null;
+            try
+            {
+                var go = new GameObject("WW_ScenarioTargetMark", typeof(RectTransform));
+                partialRoot = go;
+                var rect = (RectTransform)go.transform;
+                rect.SetParent(layerRoot, false);
+                UiKit.Stretch(rect);
 
-            _ring = UiKit.CreateImage(go.transform, "TargetRing",
-                Vector2.zero, new Vector2(RingSize, RingSize), Color.white);
-            _ring.sprite = UiKit.RingSprite();
+                Image ring = UiKit.CreateImage(go.transform, "TargetRing",
+                    Vector2.zero, new Vector2(RingSize, RingSize), Color.white);
+                ring.sprite = UiKit.RingSprite();
 
-            _icon = UiKit.CreateImage(go.transform, "TargetIcon",
-                Vector2.zero, new Vector2(IconSize, IconSize), Color.white);
+                Image icon = UiKit.CreateImage(go.transform, "TargetIcon",
+                    Vector2.zero, new Vector2(IconSize, IconSize), Color.white);
 
-            _arrow = UiKit.CreateImage(go.transform, "TargetArrow",
-                Vector2.zero, new Vector2(ArrowSize, ArrowSize), Color.white);
-            _arrow.sprite = UiKit.TriangleUpSprite();
+                Image arrow = UiKit.CreateImage(go.transform, "TargetArrow",
+                    Vector2.zero, new Vector2(ArrowSize, ArrowSize), Color.white);
+                arrow.sprite = UiKit.TriangleUpSprite();
 
-            _root = go;
-            _root.SetActive(false);
-            _kind = ScenarioTargetMarkKind.None;
-            ApplyKind(ScenarioTargetMarkKind.BombTarget);
+                go.SetActive(false);
+                Look initialLook = LookOf(ScenarioTargetMarkKind.BombTarget);
+                ring.color = initialLook.Color;
+                arrow.color = initialLook.Color;
+                icon.sprite = initialLook.Icon();
+                _kind = ScenarioTargetMarkKind.BombTarget;
+                _view = new ViewRefs(go, ring, icon, arrow);
+                partialRoot = null;
+            }
+            catch
+            {
+                if (partialRoot != null) UnityEngine.Object.Destroy(partialRoot);
+                _view = null;
+                throw;
+            }
         }
 
         public void Tick(ScenarioTargetMarkKind kind, Vector3? worldPos)
         {
-            if (_root == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
             try
             {
-                Camera cam = Camera.main;
+                Camera? cam = Camera.main;
                 if (kind == ScenarioTargetMarkKind.None || worldPos == null || cam == null)
                 {
                     SetShown(false);
@@ -117,7 +146,7 @@ namespace Werewolf.Scenarios.UI
 
                 ApplyKind(kind);
                 SetShown(true);
-                var canvasRect = (RectTransform)_root.transform;
+                var canvasRect = (RectTransform)view.Root.transform;
                 Vector3 viewport = cam.WorldToViewportPoint(head);
                 bool onScreen = viewport.z > 0f
                                 && viewport.x >= 0f && viewport.x <= 1f
@@ -142,19 +171,16 @@ namespace Werewolf.Scenarios.UI
 
         public void Destroy()
         {
-            if (_root != null)
-            {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
-            }
-            _ring = null;
-            _icon = null;
-            _arrow = null;
+            ViewRefs? view = _view;
+            _view = null;
+            if (view != null && view.Root != null) UnityEngine.Object.Destroy(view.Root);
+            _kind = ScenarioTargetMarkKind.None;
         }
 
         private void SetShown(bool shown)
         {
-            if (_root.activeSelf != shown) _root.SetActive(shown);
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view != null && view.Root.activeSelf != shown) view.Root.SetActive(shown);
         }
 
         private void ApplyKind(ScenarioTargetMarkKind kind)
@@ -163,27 +189,39 @@ namespace Werewolf.Scenarios.UI
             _kind = kind;
 
             Look look = LookOf(kind);
-            _ring.color = look.Color;
-            _arrow.color = look.Color;
-            _icon.sprite = look.Icon();
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
+            view.Ring.color = look.Color;
+            view.Arrow.color = look.Color;
+            view.Icon.sprite = look.Icon();
         }
 
         private void PlaceMark(Vector2 uiPos, float alpha)
         {
-            _ring.rectTransform.anchoredPosition = uiPos;
-            _icon.rectTransform.anchoredPosition = uiPos;
-            _ring.enabled = true;
-            _icon.enabled = _icon.sprite != null;
-            _arrow.enabled = false;
-            SetAlpha(_ring, alpha);
-            SetAlpha(_icon, alpha);
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
+            Image ring = view.Ring;
+            Image icon = view.Icon;
+            Image arrow = view.Arrow;
+            ring.rectTransform.anchoredPosition = uiPos;
+            icon.rectTransform.anchoredPosition = uiPos;
+            ring.enabled = true;
+            icon.enabled = icon.sprite != null;
+            arrow.enabled = false;
+            SetAlpha(ring, alpha);
+            SetAlpha(icon, alpha);
         }
 
         private void PlaceArrow(Vector2 direction, RectTransform canvasRect, float alpha)
         {
-            _ring.enabled = false;
-            _icon.enabled = false;
-            _arrow.enabled = true;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
+            Image ring = view.Ring;
+            Image icon = view.Icon;
+            Image arrow = view.Arrow;
+            ring.enabled = false;
+            icon.enabled = false;
+            arrow.enabled = true;
 
             float halfW = Mathf.Max(1f, canvasRect.rect.width * 0.5f - EdgeMargin);
             float halfH = Mathf.Max(1f, canvasRect.rect.height * 0.5f - EdgeMargin);
@@ -191,10 +229,10 @@ namespace Werewolf.Scenarios.UI
                 halfW / Mathf.Max(Mathf.Abs(direction.x), 0.0001f),
                 halfH / Mathf.Max(Mathf.Abs(direction.y), 0.0001f));
 
-            _arrow.rectTransform.anchoredPosition = direction * scale;
-            _arrow.rectTransform.localEulerAngles = new Vector3(0f, 0f,
+            arrow.rectTransform.anchoredPosition = direction * scale;
+            arrow.rectTransform.localEulerAngles = new Vector3(0f, 0f,
                 Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f);
-            SetAlpha(_arrow, alpha);
+            SetAlpha(arrow, alpha);
         }
 
         private static Vector2 EdgeDirection(Vector3 viewport, RectTransform canvasRect)
@@ -217,6 +255,16 @@ namespace Werewolf.Scenarios.UI
             Color c = image.color;
             c.a = alpha;
             image.color = c;
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+            _view = null;
+            _kind = ScenarioTargetMarkKind.None;
+            return null;
         }
     }
 }

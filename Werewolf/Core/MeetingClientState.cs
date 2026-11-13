@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 
 namespace Werewolf.Core
@@ -40,7 +41,7 @@ namespace Werewolf.Core
 
         public IReadOnlyCollection<int> VotedActors => _voted;
 
-        public MeetingOutcome Result { get; private set; }
+        public MeetingOutcome? Result { get; private set; }
 
         public long MeetingTotalMs { get; private set; }
 
@@ -81,7 +82,7 @@ namespace Werewolf.Core
             return !_announcedDead.Contains(actorNumber);
         }
 
-        public void MarkAllDeadAnnounced(List<int> newlyAnnounced = null)
+        public void MarkAllDeadAnnounced(List<int>? newlyAnnounced = null)
         {
             foreach (var pair in _rows)
             {
@@ -157,7 +158,7 @@ namespace Werewolf.Core
             Result = null;
         }
 
-        public void ApplyPhase(GamePhase phase, List<int> newlyAnnounced = null)
+        public void ApplyPhase(GamePhase phase, List<int>? newlyAnnounced = null)
         {
             if (phase == GamePhase.Play || phase == GamePhase.GameOver)
             {

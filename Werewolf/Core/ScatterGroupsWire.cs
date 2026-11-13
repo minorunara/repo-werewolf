@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -8,7 +9,7 @@ namespace Werewolf.Core
         private const string TruckLabel = "truck";
         private const string TruckFallbackLabel = "truck_fallback";
 
-        public static object[] ToWire(IReadOnlyList<(int actor, string slot)> assignments, Random rng)
+        public static object[]? ToWire(IReadOnlyList<(int actor, string slot)>? assignments, Random rng)
         {
             if (assignments == null || assignments.Count == 0) return null;
             if (rng == null) throw new ArgumentNullException(nameof(rng));
@@ -18,7 +19,7 @@ namespace Werewolf.Core
             foreach ((int actor, string slot) in assignments)
             {
                 string key = slot == TruckFallbackLabel ? TruckLabel : slot;
-                if (!members.TryGetValue(key, out List<int> list))
+                if (!members.TryGetValue(key, out List<int>? list))
                 {
                     list = new List<int>();
                     members[key] = list;
@@ -47,7 +48,7 @@ namespace Werewolf.Core
             return new object[] { actors.ToArray(), groupIds.ToArray() };
         }
 
-        public static int CountGroups(IReadOnlyList<(int actor, string slot)> assignments)
+        public static int CountGroups(IReadOnlyList<(int actor, string slot)>? assignments)
         {
             if (assignments == null) return 0;
             var seen = new HashSet<string>();
@@ -59,7 +60,7 @@ namespace Werewolf.Core
             return seen.Count;
         }
 
-        public static List<List<int>> FromWire(object[] payload)
+        public static List<List<int>>? FromWire(object[]? payload)
         {
             if (payload == null || payload.Length < 2) return null;
             var actors = payload[0] as int[];
@@ -70,7 +71,7 @@ namespace Werewolf.Core
             var byId = new SortedDictionary<byte, List<int>>();
             for (int i = 0; i < actors.Length; i++)
             {
-                if (!byId.TryGetValue(groupIds[i], out List<int> list))
+                if (!byId.TryGetValue(groupIds[i], out List<int>? list))
                 {
                     list = new List<int>();
                     byId[groupIds[i]] = list;
@@ -85,11 +86,12 @@ namespace Werewolf.Core
 
     public static class ScatterGroupsText
     {
-        public static List<string> FormatLines(List<List<int>> groups, Func<int, string> memberLabel,
+        public static List<string> FormatLines(List<List<int>>? groups, Func<int, string> memberLabel,
                                                TextId lineFormat = TextId.NoticeScatterGroupLineFormat)
         {
+            if (memberLabel == null) throw new ArgumentNullException(nameof(memberLabel));
             var lines = new List<string>();
-            if (groups == null || memberLabel == null) return lines;
+            if (groups == null) return lines;
 
             string separator = Texts.Get(TextId.NoticeScatterGroupSeparator);
             for (int g = 0; g < groups.Count; g++)

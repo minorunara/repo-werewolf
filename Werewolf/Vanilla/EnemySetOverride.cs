@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 using UnityEngine;
 using Werewolf.Core;
@@ -8,7 +9,7 @@ namespace Werewolf.Vanilla
     {
         internal static EnemySetCounts Counts { get; private set; } = EnemySetCounts.Untouched;
 
-        private static AnimationCurve[] s_saved;
+        private static AnimationCurve[]? s_saved;
 
         internal static void Arm(EnemySetCounts counts)
         {

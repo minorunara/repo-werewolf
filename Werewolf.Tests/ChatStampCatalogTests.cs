@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Werewolf.Core;
 using Xunit;
@@ -6,6 +7,20 @@ namespace Werewolf.Tests
 {
     public class ChatStampCatalogTests
     {
+        [Fact]
+        public void Definitions_RejectMissingAssetKeys()
+        {
+            #nullable enable
+            var emojiError = Assert.Throws<ArgumentNullException>(() =>
+                new ChatStampDef(1, ChatStampCategory.Guide, null!, TextId.ChatStampGuideVoteSkip));
+            var iconError = Assert.Throws<ArgumentNullException>(() =>
+                new ChatStampCategoryDef(ChatStampCategory.Guide, TextId.ChatStampCategoryGuide, null!));
+            #nullable restore
+
+            Assert.Equal("emoji", emojiError.ParamName);
+            Assert.Equal("iconKey", iconError.ParamName);
+        }
+
         [Fact]
         public void Ids_AreUniqueAndNonZero()
         {

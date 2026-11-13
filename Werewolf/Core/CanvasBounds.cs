@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 
 namespace Werewolf.Core
@@ -26,7 +27,7 @@ namespace Werewolf.Core
 
         public bool Equals(CanvasBounds other) => Width == other.Width && Height == other.Height;
 
-        public override bool Equals(object obj) => obj is CanvasBounds other && Equals(other);
+        public override bool Equals(object? obj) => obj is CanvasBounds other && Equals(other);
 
         public override int GetHashCode() => unchecked(Width.GetHashCode() * 397 ^ Height.GetHashCode());
 

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using TMPro;
@@ -151,105 +152,243 @@ namespace Werewolf.UI
             fallbackPlateColor: new Color(0.08f, 0.08f, 0.10f, 0.55f),
             fallbackTextColor: new Color(0.95f, 0.95f, 0.95f, 0.95f));
 
-        private GameObject _root;
-        private GameObject _viewerRoot;
-        private RawImage _mapImage;
-        private RectTransform _mapImageRect;
-        private RectTransform _markersRoot;
-        private RectTransform _popupRoot;
-        private RectTransform _stampRoot;
-        private RectTransform _danmakuRoot;
+        private sealed class MapView
+        {
+            public MapView(RawImage image, RectTransform imageRect, RectTransform markersRoot,
+                RectTransform popupRoot, RectTransform stampRoot, RectTransform danmakuRoot,
+                RectTransform trailUnderLayer, RectTransform trailLayer, RectTransform epLayer,
+                RectTransform deathMarkLayer, RectTransform cartLayer, RectTransform valuableLayer,
+                RectTransform itemLayer, RectTransform enemyLayer, RectTransform playerLayer,
+                TextMeshProUGUI stampLabel, TextMeshProUGUI stampEpigraphLabel,
+                TextMeshProUGUI danmakuMeasurer)
+            {
+                Image = image;
+                ImageRect = imageRect;
+                MarkersRoot = markersRoot;
+                PopupRoot = popupRoot;
+                StampRoot = stampRoot;
+                DanmakuRoot = danmakuRoot;
+                TrailUnderLayer = trailUnderLayer;
+                TrailLayer = trailLayer;
+                EpLayer = epLayer;
+                DeathMarkLayer = deathMarkLayer;
+                CartLayer = cartLayer;
+                ValuableLayer = valuableLayer;
+                ItemLayer = itemLayer;
+                EnemyLayer = enemyLayer;
+                PlayerLayer = playerLayer;
+                StampLabel = stampLabel;
+                StampEpigraphLabel = stampEpigraphLabel;
+                DanmakuMeasurer = danmakuMeasurer;
+            }
 
-        private RectTransform _trailUnderLayer;
-        private RectTransform _trailLayer;
-        private RectTransform _epLayer;
-        private RectTransform _deathMarkLayer;
-        private RectTransform _cartLayer;
-        private RectTransform _valuableLayer;
-        private RectTransform _itemLayer;
-        private RectTransform _enemyLayer;
-        private RectTransform _playerLayer;
+            public RawImage Image { get; }
+            public RectTransform ImageRect { get; }
+            public RectTransform MarkersRoot { get; }
+            public RectTransform PopupRoot { get; }
+            public RectTransform StampRoot { get; }
+            public RectTransform DanmakuRoot { get; }
+            public RectTransform TrailUnderLayer { get; }
+            public RectTransform TrailLayer { get; }
+            public RectTransform EpLayer { get; }
+            public RectTransform DeathMarkLayer { get; }
+            public RectTransform CartLayer { get; }
+            public RectTransform ValuableLayer { get; }
+            public RectTransform ItemLayer { get; }
+            public RectTransform EnemyLayer { get; }
+            public RectTransform PlayerLayer { get; }
+            public TextMeshProUGUI StampLabel { get; }
+            public TextMeshProUGUI StampEpigraphLabel { get; }
+            public TextMeshProUGUI DanmakuMeasurer { get; }
+        }
+
+        private sealed class ControlsView
+        {
+            public ControlsView(Image playBg, Image playIcon, TextMeshProUGUI playLabel,
+                Image speedBg, Image speedIcon, TextMeshProUGUI speedLabel,
+                Image saveBg, Image saveIcon, TextMeshProUGUI saveLabel,
+                TextMeshProUGUI timeLabel, TextMeshProUGUI statusLabel,
+                RectTransform seekHitRect, RectTransform seekBarRect, Image seekFill,
+                RectTransform seekHandle)
+            {
+                PlayBg = playBg; PlayIcon = playIcon; PlayLabel = playLabel;
+                SpeedBg = speedBg; SpeedIcon = speedIcon; SpeedLabel = speedLabel;
+                SaveBg = saveBg; SaveIcon = saveIcon; SaveLabel = saveLabel;
+                TimeLabel = timeLabel; StatusLabel = statusLabel;
+                SeekHitRect = seekHitRect; SeekBarRect = seekBarRect;
+                SeekFill = seekFill; SeekHandle = seekHandle;
+            }
+
+            public Image PlayBg { get; }
+            public Image PlayIcon { get; }
+            public TextMeshProUGUI PlayLabel { get; }
+            public RectTransform PlayRect => PlayBg.rectTransform;
+            public Image SpeedBg { get; }
+            public Image SpeedIcon { get; }
+            public TextMeshProUGUI SpeedLabel { get; }
+            public RectTransform SpeedRect => SpeedBg.rectTransform;
+            public Image SaveBg { get; }
+            public Image SaveIcon { get; }
+            public TextMeshProUGUI SaveLabel { get; }
+            public RectTransform SaveRect => SaveBg.rectTransform;
+            public TextMeshProUGUI TimeLabel { get; }
+            public TextMeshProUGUI StatusLabel { get; }
+            public RectTransform SeekHitRect { get; }
+            public RectTransform SeekBarRect { get; }
+            public Image SeekFill { get; }
+            public RectTransform SeekHandle { get; }
+        }
+
+        private sealed class GaugeView
+        {
+            public GaugeView(GameObject root, Image lossFill, Image deliveryFill,
+                GameObject deliveryTrack, GameObject? deliveryIcon,
+                TextMeshProUGUI lossText, TextMeshProUGUI deliveredText)
+            {
+                Root = root; LossFill = lossFill; DeliveryFill = deliveryFill;
+                DeliveryTrack = deliveryTrack; DeliveryIcon = deliveryIcon;
+                LossText = lossText; DeliveredText = deliveredText;
+            }
+
+            public GameObject Root { get; }
+            public Image LossFill { get; }
+            public Image DeliveryFill { get; }
+            public GameObject DeliveryTrack { get; }
+            public GameObject? DeliveryIcon { get; }
+            public TextMeshProUGUI LossText { get; }
+            public TextMeshProUGUI DeliveredText { get; }
+        }
+
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, GameObject viewerRoot, MapView map,
+                ControlsView controls, GaugeView gauge)
+            {
+                Root = root; ViewerRoot = viewerRoot; Map = map; Controls = controls; Gauge = gauge;
+            }
+
+            public GameObject Root { get; }
+            public GameObject ViewerRoot { get; }
+            public MapView Map { get; }
+            public ControlsView Controls { get; }
+            public GaugeView Gauge { get; }
+        }
+
+        private ViewRefs? _view;
+        private readonly TextRefresh _textRefresh = new TextRefresh(nameof(ReplayViewerPanel));
+        private GameObject? _root => _view?.Root;
+        private GameObject? _viewerRoot => _view?.ViewerRoot;
+        private RawImage? _mapImage => _view?.Map.Image;
+        private RectTransform? _mapImageRect => _view?.Map.ImageRect;
+        private RectTransform? _markersRoot => _view?.Map.MarkersRoot;
+        private RectTransform? _popupRoot => _view?.Map.PopupRoot;
+        private RectTransform? _stampRoot => _view?.Map.StampRoot;
+        private RectTransform? _danmakuRoot => _view?.Map.DanmakuRoot;
+
+        private RectTransform? _trailUnderLayer => _view?.Map.TrailUnderLayer;
+        private RectTransform? _trailLayer => _view?.Map.TrailLayer;
+        private RectTransform? _epLayer => _view?.Map.EpLayer;
+        private RectTransform? _deathMarkLayer => _view?.Map.DeathMarkLayer;
+        private RectTransform? _cartLayer => _view?.Map.CartLayer;
+        private RectTransform? _valuableLayer => _view?.Map.ValuableLayer;
+        private RectTransform? _itemLayer => _view?.Map.ItemLayer;
+        private RectTransform? _enemyLayer => _view?.Map.EnemyLayer;
+        private RectTransform? _playerLayer => _view?.Map.PlayerLayer;
         private readonly IconToggleButton _toggle = new IconToggleButton();
-        private MapStillCapture.Still _still;
 
-        private Image _playButtonBg;
-        private Image _playButtonIcon;
-        private TextMeshProUGUI _playButtonLabel;
-        private RectTransform _playButtonRect;
-        private Image _speedButtonBg;
-        private Image _speedButtonIcon;
-        private TextMeshProUGUI _speedButtonLabel;
-        private RectTransform _speedButtonRect;
-        private Image _saveButtonBg;
-        private Image _saveButtonIcon;
-        private TextMeshProUGUI _saveButtonLabel;
-        private RectTransform _saveButtonRect;
-        private Sprite _playButtonSprite;
-        private Sprite _pauseButtonSprite;
-        private Sprite _speedButtonSprite;
-        private Sprite _saveButtonSprite;
-        private TextMeshProUGUI _timeLabel;
-        private TextMeshProUGUI _statusLabel;
+        private Image? _playButtonBg => _view?.Controls.PlayBg;
+        private Image? _playButtonIcon => _view?.Controls.PlayIcon;
+        private TextMeshProUGUI? _playButtonLabel => _view?.Controls.PlayLabel;
+        private RectTransform? _playButtonRect => _view?.Controls.PlayRect;
+        private Image? _speedButtonBg => _view?.Controls.SpeedBg;
+        private Image? _speedButtonIcon => _view?.Controls.SpeedIcon;
+        private TextMeshProUGUI? _speedButtonLabel => _view?.Controls.SpeedLabel;
+        private RectTransform? _speedButtonRect => _view?.Controls.SpeedRect;
+        private Image? _saveButtonBg => _view?.Controls.SaveBg;
+        private Image? _saveButtonIcon => _view?.Controls.SaveIcon;
+        private TextMeshProUGUI? _saveButtonLabel => _view?.Controls.SaveLabel;
+        private RectTransform? _saveButtonRect => _view?.Controls.SaveRect;
+        private Sprite? _playButtonSprite;
+        private Sprite? _pauseButtonSprite;
+        private Sprite? _speedButtonSprite;
+        private Sprite? _saveButtonSprite;
+        private TextMeshProUGUI? _timeLabel => _view?.Controls.TimeLabel;
+        private TextMeshProUGUI? _statusLabel => _view?.Controls.StatusLabel;
 
-        private RectTransform _seekHitRect;
-        private RectTransform _seekBarRect;
-        private Image _seekFill;
-        private RectTransform _seekHandle;
+        private RectTransform? _seekHitRect => _view?.Controls.SeekHitRect;
+        private RectTransform? _seekBarRect => _view?.Controls.SeekBarRect;
+        private Image? _seekFill => _view?.Controls.SeekFill;
+        private RectTransform? _seekHandle => _view?.Controls.SeekHandle;
         private readonly List<Image> _seekMeetingShades = new List<Image>();
         private readonly List<Image> _seekDeathTicks = new List<Image>();
         private readonly List<Image> _seekCapBands = new List<Image>();
 
-        private GameObject _gaugeRoot;
-        private Image _gaugeLossFill;
-        private Image _gaugeDeliveryFill;
-        private GameObject _gaugeDeliveryTrack;
-        private GameObject _gaugeDeliveryIcon;
-        private TextMeshProUGUI _gaugeLossText;
-        private TextMeshProUGUI _gaugeDeliveredText;
+        private GameObject? _gaugeRoot => _view?.Gauge.Root;
+        private Image? _gaugeLossFill => _view?.Gauge.LossFill;
+        private Image? _gaugeDeliveryFill => _view?.Gauge.DeliveryFill;
+        private GameObject? _gaugeDeliveryTrack => _view?.Gauge.DeliveryTrack;
+        private GameObject? _gaugeDeliveryIcon => _view?.Gauge.DeliveryIcon;
+        private TextMeshProUGUI? _gaugeLossText => _view?.Gauge.LossText;
+        private TextMeshProUGUI? _gaugeDeliveredText => _view?.Gauge.DeliveredText;
         private int _gaugeShownLoss = -1;
         private int _gaugeShownDelivered = -1;
         private bool _gaugeHasDelivery;
 
-        private Texture _placeholderTex;
+        private Texture? _placeholderTex;
         private bool _placeholderResolved;
 
         private sealed class PlayerMarker
         {
-            public GameObject Root;
-            public RectTransform Rect;
-            public Image Frame;
-            public Image Fill;
-            public TextMeshProUGUI Id;
-            public TextMeshProUGUI Name;
+            public PlayerMarker(GameObject root, RectTransform rect, Image frame, Image fill,
+                TextMeshProUGUI id, TextMeshProUGUI name)
+            {
+                Root = root; Rect = rect; Frame = frame; Fill = fill; Id = id; Name = name;
+            }
+            public GameObject Root { get; }
+            public RectTransform Rect { get; }
+            public Image Frame { get; }
+            public Image Fill { get; }
+            public TextMeshProUGUI Id { get; }
+            public TextMeshProUGUI Name { get; }
         }
 
         private sealed class DotMarker
         {
-            public GameObject Root;
-            public RectTransform Rect;
-            public Image Dot;
-            public TextMeshProUGUI Label;
-            public TextMeshProUGUI Sub;
+            public DotMarker(GameObject root, RectTransform rect, Image dot,
+                TextMeshProUGUI? label = null, TextMeshProUGUI? sub = null)
+            {
+                Root = root; Rect = rect; Dot = dot; Label = label; Sub = sub;
+            }
+            public GameObject Root { get; }
+            public RectTransform Rect { get; }
+            public Image Dot { get; }
+            public TextMeshProUGUI? Label { get; }
+            public TextMeshProUGUI? Sub { get; }
         }
 
         private sealed class CommentView
         {
-            public GameObject Root;
-            public RectTransform Rect;
-            public CanvasGroup Opacity;
-            public Image Accent;
-            public TextMeshProUGUI Meta;
-            public TextMeshProUGUI Body1;
-            public TextMeshProUGUI Body2;
-            public ReplayDanmakuComment Bound;
+            public CommentView(GameObject root, RectTransform rect, CanvasGroup opacity,
+                Image accent, TextMeshProUGUI meta, TextMeshProUGUI body1, TextMeshProUGUI body2)
+            {
+                Root = root; Rect = rect; Opacity = opacity; Accent = accent;
+                Meta = meta; Body1 = body1; Body2 = body2;
+            }
+            public GameObject Root { get; }
+            public RectTransform Rect { get; }
+            public CanvasGroup Opacity { get; }
+            public Image Accent { get; }
+            public TextMeshProUGUI Meta { get; }
+            public TextMeshProUGUI Body1 { get; }
+            public TextMeshProUGUI Body2 { get; }
+            public ReplayDanmakuComment? Bound { get; set; }
         }
 
         private readonly List<CommentView> _danmakuPool = new List<CommentView>();
-        private TextMeshProUGUI _stampLabel;
-        private TextMeshProUGUI _stampEpigraphLabel;
-        private TextMeshProUGUI _danmakuMeasurer;
-        private Material _danmakuOutlineMaterial;
-        private ReplayDanmaku _danmaku;
+        private TextMeshProUGUI? _stampLabel => _view?.Map.StampLabel;
+        private TextMeshProUGUI? _stampEpigraphLabel => _view?.Map.StampEpigraphLabel;
+        private TextMeshProUGUI? _danmakuMeasurer => _view?.Map.DanmakuMeasurer;
+        private Material? _danmakuOutlineMaterial;
         private readonly Dictionary<int, ReplayPlayerEntry> _danmakuPlayers
             = new Dictionary<int, ReplayPlayerEntry>();
         private float _demoChatTimer;
@@ -262,7 +401,7 @@ namespace Werewolf.UI
         private readonly List<DotMarker> _cartPool = new List<DotMarker>();
         private readonly List<DotMarker> _epPool = new List<DotMarker>();
         private readonly List<RectTransform> _deathMarkPool = new List<RectTransform>();
-        private Sprite _deathMarkSprite;
+        private Sprite? _deathMarkSprite;
         private readonly List<Image> _trailPool = new List<Image>();
         private readonly List<Image> _trailUnderPool = new List<Image>();
         private readonly List<TextMeshProUGUI> _popupPool = new List<TextMeshProUGUI>();
@@ -270,11 +409,37 @@ namespace Werewolf.UI
         private readonly List<(int Actor, Vector2 Pos)> _playerHits = new List<(int, Vector2)>();
         private readonly List<ReplayTrailPoint> _trailScratch = new List<ReplayTrailPoint>();
 
-        private bool _viewerOpen;
+        private sealed class ViewerSession
+        {
+            public ViewerSession(bool demo, ReplayPlayback? playback, ReplayClock clock,
+                ReplayDanmaku danmaku, MapStillCapture.Still? still)
+            {
+                if (!demo && playback == null)
+                {
+                    throw new ArgumentException("Recorded replay sessions require playback.", nameof(playback));
+                }
+                Demo = demo;
+                Playback = playback;
+                Clock = clock;
+                Danmaku = danmaku;
+                Still = still;
+            }
+
+            public bool Demo { get; }
+            public ReplayPlayback? Playback { get; }
+            public ReplayClock Clock { get; }
+            public ReplayDanmaku Danmaku { get; }
+            public MapStillCapture.Still? Still { get; }
+        }
+
+        private ViewerSession? _session;
+        private bool _viewerOpen => _session != null;
         private bool _openedReplayThisMatch;
         private KeyCode _labelKey = KeyCode.None;
-        private ReplayPlayback _playback;
-        private ReplayClock _clock;
+        private MapStillCapture.Still? _still => _session?.Still;
+        private ReplayPlayback? _playback => _session?.Playback;
+        private ReplayClock? _clock => _session?.Clock;
+        private ReplayDanmaku? _danmaku => _session?.Danmaku;
         private readonly HashSet<int> _selectedActors = new HashSet<int>();
         private bool _seeking;
         private bool _resumeAfterSeek;
@@ -284,7 +449,7 @@ namespace Werewolf.UI
         private int _demoCount;
         private float _demoPhase;
 
-        public bool Exists => _root != null;
+        public bool Exists => GetLiveViewOrNull() != null;
 
         public bool IsOpen => _viewerOpen;
 
@@ -292,18 +457,21 @@ namespace Werewolf.UI
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            RectTransform rootRect = UiKit.CreateStretched(layerRoot, "WW_ReplayViewer");
-            _root = rootRect.gameObject;
+            GameObject? root = null;
+            try
+            {
+                RectTransform rootRect = UiKit.CreateStretched(layerRoot, "WW_ReplayViewer");
+                root = rootRect.gameObject;
 
             RectTransform toggleRoot = _toggle.Build(rootRect, "ToggleButton", ToggleStyle,
                 "icon_replay_viewer", BuildToggleLabel(KeyCode.None), "icon_replay_viewer_hover");
             UiKit.PinToCorner(toggleRoot, UiKit.BottomLeft, ToggleButtonMargin);
 
-            RectTransform viewerRect = UiKit.CreateStretched(rootRect, "Viewer");
-            _viewerRoot = viewerRect.gameObject;
+                RectTransform viewerRect = UiKit.CreateStretched(rootRect, "Viewer");
+                GameObject viewerRoot = viewerRect.gameObject;
 
             RectTransform mapPanel = UiKit.CreateRect(viewerRect, "MapPanel",
                 new Vector2(0f, MapCenterY), new Vector2(PanelWidth, MapHeight));
@@ -311,55 +479,55 @@ namespace Werewolf.UI
                 new Vector2(PanelWidth + 12f, MapHeight + 12f), PanelFrameColor);
 
             var mapGo = new GameObject("MapImage", typeof(RectTransform));
-            _mapImageRect = (RectTransform)mapGo.transform;
-            _mapImageRect.SetParent(mapPanel, false);
-            _mapImageRect.anchorMin = _mapImageRect.anchorMax = new Vector2(0.5f, 0.5f);
-            _mapImageRect.anchoredPosition = Vector2.zero;
-            _mapImageRect.sizeDelta = new Vector2(PanelWidth, MapHeight);
-            _mapImage = mapGo.AddComponent<RawImage>();
-            _mapImage.color = Color.white;
-            _mapImage.raycastTarget = false;
+                RectTransform mapImageRect = (RectTransform)mapGo.transform;
+                mapImageRect.SetParent(mapPanel, false);
+                mapImageRect.anchorMin = mapImageRect.anchorMax = new Vector2(0.5f, 0.5f);
+                mapImageRect.anchoredPosition = Vector2.zero;
+                mapImageRect.sizeDelta = new Vector2(PanelWidth, MapHeight);
+                RawImage mapImage = mapGo.AddComponent<RawImage>();
+                mapImage.color = Color.white;
+                mapImage.raycastTarget = false;
 
-            _markersRoot = UiKit.CreateRect(mapPanel, "Markers", Vector2.zero, new Vector2(PanelWidth, MapHeight));
-            _markersRoot.gameObject.AddComponent<RectMask2D>();
-            _trailUnderLayer = CreateMarkerLayer("TrailUnders");
-            _trailLayer = CreateMarkerLayer("Trails");
-            _epLayer = CreateMarkerLayer("Eps");
-            _deathMarkLayer = CreateMarkerLayer("DeathMarks");
-            _cartLayer = CreateMarkerLayer("Carts");
-            _valuableLayer = CreateMarkerLayer("Valuables");
-            _itemLayer = CreateMarkerLayer("Items");
-            _enemyLayer = CreateMarkerLayer("Enemies");
-            _playerLayer = CreateMarkerLayer("Players");
+                RectTransform markersRoot = UiKit.CreateRect(mapPanel, "Markers", Vector2.zero, new Vector2(PanelWidth, MapHeight));
+                markersRoot.gameObject.AddComponent<RectMask2D>();
+                RectTransform trailUnderLayer = CreateMarkerLayer(markersRoot, "TrailUnders");
+                RectTransform trailLayer = CreateMarkerLayer(markersRoot, "Trails");
+                RectTransform epLayer = CreateMarkerLayer(markersRoot, "Eps");
+                RectTransform deathMarkLayer = CreateMarkerLayer(markersRoot, "DeathMarks");
+                RectTransform cartLayer = CreateMarkerLayer(markersRoot, "Carts");
+                RectTransform valuableLayer = CreateMarkerLayer(markersRoot, "Valuables");
+                RectTransform itemLayer = CreateMarkerLayer(markersRoot, "Items");
+                RectTransform enemyLayer = CreateMarkerLayer(markersRoot, "Enemies");
+                RectTransform playerLayer = CreateMarkerLayer(markersRoot, "Players");
 
-            _popupRoot = UiKit.CreateRect(mapPanel, "Popups", Vector2.zero, new Vector2(PanelWidth, MapHeight));
-            _popupRoot.gameObject.AddComponent<RectMask2D>();
+                RectTransform popupRoot = UiKit.CreateRect(mapPanel, "Popups", Vector2.zero, new Vector2(PanelWidth, MapHeight));
+                popupRoot.gameObject.AddComponent<RectMask2D>();
 
-            _stampRoot = UiKit.CreateRect(mapPanel, "Stamp", Vector2.zero, new Vector2(PanelWidth, MapHeight));
-            _stampRoot.gameObject.AddComponent<RectMask2D>();
-            _stampLabel = UiKit.CreateText(_stampRoot, "StampLabel", Vector2.zero,
+                RectTransform stampRoot = UiKit.CreateRect(mapPanel, "Stamp", Vector2.zero, new Vector2(PanelWidth, MapHeight));
+                stampRoot.gameObject.AddComponent<RectMask2D>();
+                TextMeshProUGUI stampLabel = UiKit.CreateText(stampRoot, "StampLabel", Vector2.zero,
                 new Vector2(PanelWidth, 240f), "", StampFontSize, StampNoExecutionColor,
                 TextAlignmentOptions.Center);
-            _stampLabel.enableAutoSizing = true;
-            _stampLabel.fontSizeMin = 46f;
-            _stampLabel.fontSizeMax = StampFontSize;
-            _stampLabel.gameObject.SetActive(false);
-            _stampEpigraphLabel = UiKit.CreateText(_stampRoot, "StampEpigraphLabel",
+                stampLabel.enableAutoSizing = true;
+                stampLabel.fontSizeMin = 46f;
+                stampLabel.fontSizeMax = StampFontSize;
+                stampLabel.gameObject.SetActive(false);
+                TextMeshProUGUI stampEpigraphLabel = UiKit.CreateText(stampRoot, "StampEpigraphLabel",
                 new Vector2(0f, StampEpigraphOffsetY), new Vector2(PanelWidth, 100f), "",
                 StampEpigraphFontSize, StampNoExecutionColor, TextAlignmentOptions.Center);
-            _stampEpigraphLabel.fontStyle = FontStyles.Italic;
-            _stampEpigraphLabel.enableAutoSizing = true;
-            _stampEpigraphLabel.fontSizeMin = 24f;
-            _stampEpigraphLabel.fontSizeMax = StampEpigraphFontSize;
-            _stampEpigraphLabel.gameObject.SetActive(false);
+                stampEpigraphLabel.fontStyle = FontStyles.Italic;
+                stampEpigraphLabel.enableAutoSizing = true;
+                stampEpigraphLabel.fontSizeMin = 24f;
+                stampEpigraphLabel.fontSizeMax = StampEpigraphFontSize;
+                stampEpigraphLabel.gameObject.SetActive(false);
 
-            _danmakuRoot = UiKit.CreateRect(mapPanel, "Danmaku", Vector2.zero, new Vector2(PanelWidth, MapHeight));
-            _danmakuRoot.gameObject.AddComponent<RectMask2D>();
-            _danmakuMeasurer = UiKit.CreateText(_danmakuRoot, "Measurer", new Vector2(0f, -10000f),
+                RectTransform danmakuRoot = UiKit.CreateRect(mapPanel, "Danmaku", Vector2.zero, new Vector2(PanelWidth, MapHeight));
+                danmakuRoot.gameObject.AddComponent<RectMask2D>();
+                TextMeshProUGUI danmakuMeasurer = UiKit.CreateText(danmakuRoot, "Measurer", new Vector2(0f, -10000f),
                 new Vector2(10f, 10f), "", DanmakuBodyFontSize, Color.clear, TextAlignmentOptions.Center);
-            BuildDanmakuOutlineMaterial();
+                BuildDanmakuOutlineMaterial(danmakuMeasurer);
 
-            BuildGauge(viewerRect);
+                GaugeView gauge = BuildGauge(viewerRect);
 
             RectTransform bar = UiKit.CreateRect(viewerRect, "ControlBar",
                 new Vector2(0f, BarCenterY), new Vector2(PanelWidth, BarHeight));
@@ -373,89 +541,107 @@ namespace Werewolf.UI
             _deathMarkSprite = AssetCatalog.GetSprite("emoji_cross_mark");
 
             float x = -PanelWidth * 0.5f + PlayButtonWidth * 0.5f + 16f;
-            BuildButton(bar, "PlayButton", new Vector2(x, 0f), new Vector2(PlayButtonWidth, ButtonHeight),
-                out _playButtonBg, out _playButtonIcon, out _playButtonLabel);
-            _playButtonRect = _playButtonBg.rectTransform;
+                BuildButton(bar, "PlayButton", new Vector2(x, 0f), new Vector2(PlayButtonWidth, ButtonHeight),
+                    out Image playButtonBg, out Image playButtonIcon, out TextMeshProUGUI playButtonLabel);
 
             x += PlayButtonWidth * 0.5f + 10f + SpeedButtonWidth * 0.5f;
-            BuildButton(bar, "SpeedButton", new Vector2(x, 0f), new Vector2(SpeedButtonWidth, ButtonHeight),
-                out _speedButtonBg, out _speedButtonIcon, out _speedButtonLabel);
-            _speedButtonRect = _speedButtonBg.rectTransform;
+                BuildButton(bar, "SpeedButton", new Vector2(x, 0f), new Vector2(SpeedButtonWidth, ButtonHeight),
+                    out Image speedButtonBg, out Image speedButtonIcon, out TextMeshProUGUI speedButtonLabel);
 
             float seekCenter = (SeekLeft + SeekRight) * 0.5f;
             float seekWidth = SeekRight - SeekLeft;
-            _seekHitRect = UiKit.CreateRect(bar, "SeekHit",
+                RectTransform seekHitRect = UiKit.CreateRect(bar, "SeekHit",
                 new Vector2(seekCenter, 0f), new Vector2(seekWidth, SeekHitHeight));
-            _seekBarRect = UiKit.CreateRect(_seekHitRect, "SeekBar",
+                RectTransform seekBarRect = UiKit.CreateRect(seekHitRect, "SeekBar",
                 Vector2.zero, new Vector2(seekWidth, SeekBarThickness));
-            UiKit.CreateBackdrop(_seekBarRect, "SeekBg", SeekBgColor);
+                UiKit.CreateBackdrop(seekBarRect, "SeekBg", SeekBgColor);
 
-            _seekFill = UiKit.CreateImage(_seekBarRect, "SeekFill", Vector2.zero,
+                Image seekFill = UiKit.CreateImage(seekBarRect, "SeekFill", Vector2.zero,
                 new Vector2(0f, SeekBarThickness), SeekFillColor);
-            var fillRect = _seekFill.rectTransform;
+                var fillRect = seekFill.rectTransform;
             fillRect.anchorMin = new Vector2(0f, 0.5f);
             fillRect.anchorMax = new Vector2(0f, 0.5f);
             fillRect.pivot = new Vector2(0f, 0.5f);
             fillRect.anchoredPosition = Vector2.zero;
 
-            var handleImg = UiKit.CreateImage(_seekBarRect, "SeekHandle", Vector2.zero,
+                var handleImg = UiKit.CreateImage(seekBarRect, "SeekHandle", Vector2.zero,
                 new Vector2(SeekHandleSize, SeekHandleSize), Color.white);
             handleImg.sprite = UiKit.CircleSprite();
-            _seekHandle = handleImg.rectTransform;
-            _seekHandle.anchorMin = _seekHandle.anchorMax = new Vector2(0f, 0.5f);
+                RectTransform seekHandle = handleImg.rectTransform;
+                seekHandle.anchorMin = seekHandle.anchorMax = new Vector2(0f, 0.5f);
 
-            _timeLabel = UiKit.CreateText(bar, "Time",
+                TextMeshProUGUI timeLabel = UiKit.CreateText(bar, "Time",
                 new Vector2(SeekRight + 16f + TimeLabelWidth * 0.5f, 0f),
                 new Vector2(TimeLabelWidth, ButtonHeight),
                 "", TimeFontSize, new Color(1f, 0.95f, 0.8f, 1f), TextAlignmentOptions.Center);
 
-            BuildButton(bar, "SaveButton",
+                BuildButton(bar, "SaveButton",
                 new Vector2(PanelWidth * 0.5f - SaveButtonWidth * 0.5f - 16f, 0f),
                 new Vector2(SaveButtonWidth, ButtonHeight),
-                out _saveButtonBg, out _saveButtonIcon, out _saveButtonLabel);
-            _saveButtonRect = _saveButtonBg.rectTransform;
+                    out Image saveButtonBg, out Image saveButtonIcon, out TextMeshProUGUI saveButtonLabel);
 
-            _statusLabel = UiKit.CreateText(viewerRect, "Status",
+                TextMeshProUGUI statusLabel = UiKit.CreateText(viewerRect, "Status",
                 new Vector2(0f, StatusCenterY), new Vector2(PanelWidth, 26f),
                 "", StatusFontSize, StatusMutedColor, TextAlignmentOptions.Center);
 
-            _viewerRoot.SetActive(false);
-            _root.SetActive(false);
+                var map = new MapView(mapImage, mapImageRect, markersRoot, popupRoot, stampRoot,
+                    danmakuRoot, trailUnderLayer, trailLayer, epLayer, deathMarkLayer, cartLayer,
+                    valuableLayer, itemLayer, enemyLayer, playerLayer, stampLabel,
+                    stampEpigraphLabel, danmakuMeasurer);
+                var controls = new ControlsView(playButtonBg, playButtonIcon, playButtonLabel,
+                    speedButtonBg, speedButtonIcon, speedButtonLabel, saveButtonBg, saveButtonIcon,
+                    saveButtonLabel, timeLabel, statusLabel, seekHitRect, seekBarRect, seekFill, seekHandle);
+                viewerRoot.SetActive(false);
+                root.SetActive(false);
+                _view = new ViewRefs(root, viewerRoot, map, controls, gauge);
+                _textRefresh.Subscribe(() => Exists, ApplyTexts);
+            }
+            catch
+            {
+                _view = null;
+                ReleaseViewOwnedState();
+                if (root != null)
+                {
+                    root.SetActive(false);
+                    UnityEngine.Object.Destroy(root);
+                }
+                throw;
+            }
         }
 
-        private RectTransform CreateMarkerLayer(string name)
-            => UiKit.CreateRect(_markersRoot, name, Vector2.zero, new Vector2(PanelWidth, MapHeight));
+        private static RectTransform CreateMarkerLayer(RectTransform markersRoot, string name)
+            => UiKit.CreateRect(markersRoot, name, Vector2.zero, new Vector2(PanelWidth, MapHeight));
 
-        private void BuildGauge(RectTransform viewerRect)
+        private static GaugeView BuildGauge(RectTransform viewerRect)
         {
             RectTransform gauge = UiKit.CreateRect(viewerRect, "Gauge",
                 new Vector2(0f, GaugeCenterY), new Vector2(PanelWidth, GaugeHeight));
-            _gaugeRoot = gauge.gameObject;
+            GameObject gaugeRoot = gauge.gameObject;
             UiKit.CreateBackdrop(gauge, "Bg", GaugeBgColor);
 
             var trackSize = new Vector2(GaugeTrackWidth, GaugeTrackHeight);
             Image lossTrack = UiKit.CreateImage(gauge, "LossTrack",
                 new Vector2(0f, GaugeLossRowY), trackSize, GaugeTrackColor);
-            _gaugeLossFill = UiKit.CreateFilledImage(lossTrack.rectTransform, "LossFill",
+            Image gaugeLossFill = UiKit.CreateFilledImage(lossTrack.rectTransform, "LossFill",
                 Vector2.zero, trackSize, GaugeLossColor);
 
             Image deliveryTrack = UiKit.CreateImage(gauge, "DeliveryTrack",
                 new Vector2(0f, GaugeDeliveryRowY), trackSize, GaugeTrackColor);
-            _gaugeDeliveryTrack = deliveryTrack.gameObject;
-            _gaugeDeliveryFill = UiKit.CreateFilledImage(deliveryTrack.rectTransform, "DeliveryFill",
+            GameObject gaugeDeliveryTrack = deliveryTrack.gameObject;
+            Image gaugeDeliveryFill = UiKit.CreateFilledImage(deliveryTrack.rectTransform, "DeliveryFill",
                 Vector2.zero, trackSize, GaugeDeliveryColor);
-            _gaugeDeliveryFill.fillOrigin = (int)Image.OriginHorizontal.Right;
+            gaugeDeliveryFill.fillOrigin = (int)Image.OriginHorizontal.Right;
 
-            _gaugeLossText = UiKit.CreateText(gauge, "LossText",
+            TextMeshProUGUI gaugeLossText = UiKit.CreateText(gauge, "LossText",
                 new Vector2(-GaugeTrackWidth * 0.25f, GaugeTextRowY),
                 new Vector2(GaugeTrackWidth * 0.5f, 22f),
                 "", GaugeTextFontSize, GaugeTextColor, TextAlignmentOptions.Center);
-            _gaugeDeliveredText = UiKit.CreateText(gauge, "DeliveredText",
+            TextMeshProUGUI gaugeDeliveredText = UiKit.CreateText(gauge, "DeliveredText",
                 new Vector2(GaugeTrackWidth * 0.25f, GaugeTextRowY),
                 new Vector2(GaugeTrackWidth * 0.5f, 22f),
                 "", GaugeTextFontSize, GaugeDeliveryColor, TextAlignmentOptions.Center);
 
-            Sprite lossIcon = AssetCatalog.GetSprite("icon_gauge_valuable_loss");
+            Sprite? lossIcon = AssetCatalog.GetSprite("icon_gauge_valuable_loss");
             if (lossIcon != null)
             {
                 Image img = UiKit.CreateImage(gauge, "LossIcon",
@@ -464,7 +650,8 @@ namespace Werewolf.UI
                 img.sprite = lossIcon;
                 img.preserveAspect = true;
             }
-            Sprite deliveryIcon = AssetCatalog.GetSprite("icon_gauge_delivery");
+            Sprite? deliveryIcon = AssetCatalog.GetSprite("icon_gauge_delivery");
+            GameObject? gaugeDeliveryIcon = null;
             if (deliveryIcon != null)
             {
                 Image img = UiKit.CreateImage(gauge, "DeliveryIcon",
@@ -472,13 +659,15 @@ namespace Werewolf.UI
                     new Vector2(GaugeIconSize, GaugeIconSize), Color.white);
                 img.sprite = deliveryIcon;
                 img.preserveAspect = true;
-                _gaugeDeliveryIcon = img.gameObject;
+                gaugeDeliveryIcon = img.gameObject;
             }
 
-            _gaugeRoot.SetActive(false);
+            gaugeRoot.SetActive(false);
+            return new GaugeView(gaugeRoot, gaugeLossFill, gaugeDeliveryFill,
+                gaugeDeliveryTrack, gaugeDeliveryIcon, gaugeLossText, gaugeDeliveredText);
         }
 
-        public void Tick(bool resultVisible, ReplayRecorder recorder,
+        public void Tick(bool resultVisible, ReplayRecorder? recorder,
             float orthoSize, int resolutionPreset, KeyCode toggleKey, bool keysFree,
             Func<Vector2, bool> pointerOnChat, Func<ReplayExportReport> export)
         {
@@ -554,179 +743,113 @@ namespace Werewolf.UI
             WLog.Line("replay_viewer_demo", secret: false, ("count", _demoCount));
         }
 
+        private void ApplyTexts()
+        {
+            _toggle.SetLabel(BuildToggleLabel(_labelKey));
+            _gaugeShownLoss = -1;
+            _gaugeShownDelivered = -1;
+            if (_viewerOpen) UpdateControls();
+        }
+
         public void Destroy()
         {
+            _textRefresh.Unsubscribe();
             if (_viewerOpen) CloseViewer();
-            if (_root != null)
-            {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
-            }
-            _viewerRoot = null;
-            _mapImage = null;
-            _mapImageRect = null;
-            _markersRoot = null;
-            _popupRoot = null;
-            _stampRoot = null;
-            _danmakuRoot = null;
-            _stampLabel = null;
-            _stampEpigraphLabel = null;
-            _danmakuMeasurer = null;
-            _danmakuPool.Clear();
-            _danmaku = null;
-            _danmakuPlayers.Clear();
-            if (_danmakuOutlineMaterial != null)
-            {
-                UnityEngine.Object.Destroy(_danmakuOutlineMaterial);
-                _danmakuOutlineMaterial = null;
-            }
-            _demoChatTimer = 0f;
-            _demoChatSeq = 0;
-            _trailUnderLayer = null;
-            _trailLayer = null;
-            _epLayer = null;
-            _deathMarkLayer = null;
-            _cartLayer = null;
-            _valuableLayer = null;
-            _itemLayer = null;
-            _enemyLayer = null;
-            _playerLayer = null;
-            _toggle.Clear();
-            _playButtonBg = null;
-            _playButtonIcon = null;
-            _playButtonLabel = null;
-            _playButtonRect = null;
-            _speedButtonBg = null;
-            _speedButtonIcon = null;
-            _speedButtonLabel = null;
-            _speedButtonRect = null;
-            _saveButtonBg = null;
-            _saveButtonIcon = null;
-            _saveButtonLabel = null;
-            _saveButtonRect = null;
-            _playButtonSprite = null;
-            _pauseButtonSprite = null;
-            _speedButtonSprite = null;
-            _saveButtonSprite = null;
-            _timeLabel = null;
-            _statusLabel = null;
-            _seekHitRect = null;
-            _seekBarRect = null;
-            _seekFill = null;
-            _seekHandle = null;
-            _seekMeetingShades.Clear();
-            _seekDeathTicks.Clear();
-            _seekCapBands.Clear();
-            _gaugeRoot = null;
-            _gaugeLossFill = null;
-            _gaugeDeliveryFill = null;
-            _gaugeDeliveryTrack = null;
-            _gaugeDeliveryIcon = null;
-            _gaugeLossText = null;
-            _gaugeDeliveredText = null;
+            ViewRefs? view = _view;
+            _view = null;
+            if (view != null && view.Root != null) UnityEngine.Object.Destroy(view.Root);
+            ReleaseViewOwnedState();
             _gaugeShownLoss = -1;
             _gaugeShownDelivered = -1;
             _gaugeHasDelivery = false;
-            _popupPool.Clear();
-            _playerPool.Clear();
-            _enemyPool.Clear();
-            _valuablePool.Clear();
-            _itemPool.Clear();
-            _cartPool.Clear();
-            _epPool.Clear();
-            _deathMarkPool.Clear();
-            _deathMarkSprite = null;
-            _trailPool.Clear();
-            _trailUnderPool.Clear();
-            _playerHits.Clear();
-            _placeholderTex = null;
-            _placeholderResolved = false;
-            _viewerOpen = false;
             _openedReplayThisMatch = false;
             _labelKey = KeyCode.None;
-            _still = null;
-            _playback = null;
-            _clock = null;
-            _selectedActors.Clear();
-            _seeking = false;
-            _resumeAfterSeek = false;
             _saveDone = false;
             _demoCount = 0;
         }
 
-        private void OpenViewer(ReplayRecorder recorder, float orthoSize, int resolutionPreset)
+        private void OpenViewer(ReplayRecorder? recorder, float orthoSize, int resolutionPreset)
         {
-            _playback = DemoActive ? null : ReplayPlayback.FromRecorder(recorder);
-            if (!DemoActive && _playback == null)
+            if (!DemoActive && recorder == null) return;
+            bool demo = DemoActive;
+            ReplayPlayback? playback = demo ? null : ReplayPlayback.FromRecorder(recorder);
+            if (!demo && playback == null)
             {
                 SetStatus(Texts.Get(TextId.ReplayNoData), StatusMutedColor);
                 return;
             }
-            ReplayPace pace = _playback != null ? _playback.BuildPace() : null;
-            _clock = new ReplayClock(_playback != null ? _playback.Duration : 600.0, pace);
-            _clock.Fast = true;
-            bool autoStarted = !DemoActive && !_openedReplayThisMatch;
+            ReplayPace? pace = playback != null ? playback.BuildPace() : null;
+            var clock = new ReplayClock(playback != null ? playback.Duration : 600.0, pace) { Fast = true };
+            bool autoStarted = !demo && !_openedReplayThisMatch;
             if (autoStarted)
             {
-                _openedReplayThisMatch = true;
-                _clock.SetPlaying(true);
+                clock.SetPlaying(true);
             }
-            _danmaku = new ReplayDanmaku(
-                _playback != null ? (IReadOnlyList<(double, int, string)>)_playback.Chats : null,
-                _playback != null ? (IReadOnlyList<(double, int)>)_playback.MeetingResults : null,
+            var danmaku = new ReplayDanmaku(
+                playback != null ? (IReadOnlyList<(double, int, string)>)playback.Chats : null,
+                playback != null ? (IReadOnlyList<(double, int)>)playback.MeetingResults : null,
                 pace,
-                _playback?.GameOver);
-            _danmakuPlayers.Clear();
-            if (_playback != null)
+                playback?.GameOver);
+            MapStillCapture.Still? still = MapStillCapture.GetOrCapture(orthoSize, resolutionPreset);
+            var session = new ViewerSession(demo, playback, clock, danmaku, still);
+            _session = session;
+            try
             {
-                foreach (ReplayPlayerEntry p in _playback.Players) _danmakuPlayers[p.Actor] = p;
+                _danmakuPlayers.Clear();
+                if (playback != null)
+                {
+                    foreach (ReplayPlayerEntry p in playback.Players) _danmakuPlayers[p.Actor] = p;
+                }
+                _demoChatTimer = 0f;
+                _demoChatSeq = 0;
+                _selectedActors.Clear();
+                _seeking = false;
+                _resumeAfterSeek = false;
+                _saveDone = false;
+                _capNoticeShown = false;
+                _gaugeShownLoss = -1;
+                _gaugeShownDelivered = -1;
+                _gaugeHasDelivery = playback != null && playback.DeliveredDollarsAt(playback.Duration) > 0;
+                if (_gaugeDeliveryTrack != null && _gaugeDeliveryTrack.activeSelf != _gaugeHasDelivery)
+                {
+                    _gaugeDeliveryTrack.SetActive(_gaugeHasDelivery);
+                }
+                if (_gaugeDeliveryIcon != null && _gaugeDeliveryIcon.activeSelf != _gaugeHasDelivery)
+                {
+                    _gaugeDeliveryIcon.SetActive(_gaugeHasDelivery);
+                }
+                SetStatus(string.Empty, StatusMutedColor);
+                if (_mapImage != null)
+                {
+                    _mapImage.texture = still != null && still.Texture != null
+                        ? (Texture)still.Texture
+                        : ResolvePlaceholder();
+                }
+                BuildSeekStatics();
+                if (_viewerRoot != null) _viewerRoot.SetActive(true);
+                if (autoStarted) _openedReplayThisMatch = true;
             }
-            _demoChatTimer = 0f;
-            _demoChatSeq = 0;
-            _selectedActors.Clear();
-            _seeking = false;
-            _resumeAfterSeek = false;
-            _saveDone = false;
-            _capNoticeShown = false;
-            _gaugeShownLoss = -1;
-            _gaugeShownDelivered = -1;
-            _gaugeHasDelivery = _playback != null && _playback.DeliveredDollarsAt(_playback.Duration) > 0;
-            if (_gaugeDeliveryTrack != null && _gaugeDeliveryTrack.activeSelf != _gaugeHasDelivery)
+            catch
             {
-                _gaugeDeliveryTrack.SetActive(_gaugeHasDelivery);
+                _session = null;
+                if (_viewerRoot != null) _viewerRoot.SetActive(false);
+                _danmakuPlayers.Clear();
+                _selectedActors.Clear();
+                throw;
             }
-            if (_gaugeDeliveryIcon != null && _gaugeDeliveryIcon.activeSelf != _gaugeHasDelivery)
-            {
-                _gaugeDeliveryIcon.SetActive(_gaugeHasDelivery);
-            }
-            SetStatus(string.Empty, StatusMutedColor);
-            _still = MapStillCapture.GetOrCapture(orthoSize, resolutionPreset);
-            if (_mapImage != null)
-            {
-                _mapImage.texture = _still != null && _still.Texture != null
-                    ? (Texture)_still.Texture
-                    : ResolvePlaceholder();
-            }
-            BuildSeekStatics();
-            _viewerOpen = true;
-            if (_viewerRoot != null) _viewerRoot.SetActive(true);
             WLog.Line("replay_viewer_open", secret: false,
                 ("demo", _demoCount),
                 ("autoStarted", autoStarted),
-                ("duration", _clock.Duration),
-                ("players", _playback != null ? _playback.Players.Count : 0));
+                ("duration", clock.Duration),
+                ("players", playback != null ? playback.Players.Count : 0));
         }
 
         private void CloseViewer()
         {
-            _viewerOpen = false;
             _seeking = false;
             _resumeAfterSeek = false;
             if (_viewerRoot != null) _viewerRoot.SetActive(false);
-            _still = null;
-            _playback = null;
-            _clock = null;
-            _danmaku = null;
+            _session = null;
             _danmakuPlayers.Clear();
             HideDanmakuViews();
             _selectedActors.Clear();
@@ -750,9 +873,9 @@ namespace Werewolf.UI
                 EndSeek();
             }
 
-            SetButtonHover(_playButtonBg, _playButtonRect, mouse);
-            SetButtonHover(_speedButtonBg, _speedButtonRect, mouse);
-            SetButtonHover(_saveButtonBg, _saveButtonRect, mouse);
+            SetButtonHover(_playButtonBg!, _playButtonRect!, mouse);
+            SetButtonHover(_speedButtonBg!, _speedButtonRect!, mouse);
+            SetButtonHover(_saveButtonBg!, _saveButtonRect!, mouse);
 
             if (!Input.GetMouseButtonDown(0)) return;
             if (pointerOnChat != null && pointerOnChat(mouse)) return;
@@ -773,12 +896,12 @@ namespace Werewolf.UI
                 DoSave(export);
                 return;
             }
-            if (HitRect(_seekHitRect, mouse))
+            if (HitRect(_seekHitRect!, mouse))
             {
                 BeginSeek(mouse);
                 return;
             }
-            if (HitRect(_mapImageRect, mouse))
+            if (HitRect(_mapImageRect!, mouse))
             {
                 HandleMapClick(mouse);
             }
@@ -905,16 +1028,16 @@ namespace Werewolf.UI
         {
             if (_clock == null) return;
 
-            SetButtonContent(_playButtonBg, _playButtonIcon, _playButtonLabel,
-                _clock.Playing ? _pauseButtonSprite : _playButtonSprite,
+            SetButtonContent(_playButtonBg!, _playButtonIcon!, _playButtonLabel!,
+                _clock!.Playing ? _pauseButtonSprite : _playButtonSprite,
                 Texts.Get(_clock.Playing ? TextId.ReplayPause : TextId.ReplayPlay));
 
             int speed = (int)_clock.EffectiveSpeed();
-            SetButtonContent(_speedButtonBg, _speedButtonIcon, _speedButtonLabel,
-                _speedButtonSprite,
+            SetButtonContent(_speedButtonBg!, _speedButtonIcon!, _speedButtonLabel!,
+                _speedButtonSprite!,
                 _speedButtonSprite != null ? "×" + speed : Texts.Format(TextId.ReplaySpeedFormat, speed));
 
-            SetButtonContent(_saveButtonBg, _saveButtonIcon, _saveButtonLabel,
+            SetButtonContent(_saveButtonBg!, _saveButtonIcon!, _saveButtonLabel!,
                 DemoActive ? null : _saveButtonSprite,
                 DemoActive ? "-" : Texts.Get(_saveDone ? TextId.ReplaySavedButton : TextId.ReplaySaveButton));
             if (_timeLabel != null)
@@ -1010,7 +1133,7 @@ namespace Werewolf.UI
         }
 
         private static void SetButtonContent(Image bg, Image icon, TextMeshProUGUI label,
-            Sprite sprite, string text)
+            Sprite? sprite, string text)
         {
             if (bg == null || icon == null || label == null) return;
 
@@ -1050,10 +1173,64 @@ namespace Werewolf.UI
             if (bg.color != want) bg.color = want;
         }
 
-        private static bool HitRect(RectTransform rect, Vector2 screenPoint)
+        private static bool HitRect(RectTransform? rect, Vector2 screenPoint)
         {
             return rect != null && rect.gameObject.activeInHierarchy
                 && RectTransformUtility.RectangleContainsScreenPoint(rect, screenPoint, null);
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+
+            _view = null;
+            ReleaseViewOwnedState();
+            return null;
+        }
+
+        private void ReleaseViewOwnedState()
+        {
+            _session = null;
+            _toggle.Clear();
+            _danmakuPool.Clear();
+            _danmakuPlayers.Clear();
+            if (_danmakuOutlineMaterial != null)
+            {
+                UnityEngine.Object.Destroy(_danmakuOutlineMaterial);
+                _danmakuOutlineMaterial = null;
+            }
+            _demoChatTimer = 0f;
+            _demoChatSeq = 0;
+            _playButtonSprite = null;
+            _pauseButtonSprite = null;
+            _speedButtonSprite = null;
+            _saveButtonSprite = null;
+            _seekMeetingShades.Clear();
+            _seekDeathTicks.Clear();
+            _seekCapBands.Clear();
+            _popupPool.Clear();
+            _playerPool.Clear();
+            _enemyPool.Clear();
+            _valuablePool.Clear();
+            _itemPool.Clear();
+            _cartPool.Clear();
+            _epPool.Clear();
+            _deathMarkPool.Clear();
+            _deathMarkSprite = null;
+            _trailPool.Clear();
+            _trailUnderPool.Clear();
+            _playerHits.Clear();
+            _placeholderTex = null;
+            _placeholderResolved = false;
+            _selectedActors.Clear();
+            _seeking = false;
+            _resumeAfterSeek = false;
+            _labelKey = KeyCode.None;
+            _gaugeShownLoss = -1;
+            _gaugeShownDelivered = -1;
+            _gaugeHasDelivery = false;
         }
 
         private void SetStatus(string text, Color color)
@@ -1070,7 +1247,7 @@ namespace Werewolf.UI
             return (total / 60).ToString() + ":" + (total % 60).ToString("00");
         }
 
-        private Texture ResolvePlaceholder()
+        private Texture? ResolvePlaceholder()
         {
             if (_placeholderResolved) return _placeholderTex;
             _placeholderResolved = true;

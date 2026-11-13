@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using UnityEngine;
 using Werewolf.Core;
@@ -10,7 +11,7 @@ namespace Werewolf.Game
     {
         private readonly WerewolfDirector _d;
 
-        private ShamanSense _shamanSense;
+        private ShamanSense? _shamanSense;
         private float _shamanGazeFullSecSnapshot;
         private float _shamanCooldownSecSnapshot;
 
@@ -71,11 +72,11 @@ namespace Werewolf.Game
                 if (delta < 0f) delta = 0f;
                 if (delta > 0.5f) delta = 0.5f;
 
-                EnsureShamanSense();
+                ShamanSense sense = EnsureShamanSense();
 
                 if (!_shamanStartCooldownArmed)
                 {
-                    _shamanSense.BeginCooldown();
+                    sense.BeginCooldown();
                     _shamanStartCooldownArmed = true;
                 }
 
@@ -133,14 +134,14 @@ namespace Werewolf.Game
                     _shamanGazeLock.Reset();
                 }
 
-                ShamanStormTier tier = _shamanSense.TickStorm(nearestDist, suspend,
+                ShamanStormTier tier = sense.TickStorm(nearestDist, suspend,
                     _d.ClientShamanStormWeakMeters, _d.ClientShamanStormMediumMeters,
                     _d.ClientShamanStormStrongMeters);
-                bool ghostFired = _shamanSense.TickGaze(inView, stationary, delta, suspend,
+                bool ghostFired = sense.TickGaze(inView, stationary, delta, suspend,
                     out bool dripFired);
-                SenseArmed = _shamanSense.GazeArmed;
-                SenseCoolingDown = _shamanSense.CoolingDown;
-                GhostVisible = _shamanSense.GhostVisible;
+                SenseArmed = sense.GazeArmed;
+                SenseCoolingDown = sense.CoolingDown;
+                GhostVisible = sense.GhostVisible;
                 StormTier = tier;
 
                 bool lastRunActive = LastRunGate.IsLastRunActive();
@@ -200,8 +201,8 @@ namespace Werewolf.Game
                     ShamanStormTier visualTier = lastRunActive
                         ? ShamanStormTier.None
                         : tier;
-                    _shamanPanel.Tick(visualTier, _shamanSense.GhostVisible,
-                        _shamanSense.GazeArmed, delta);
+                    _shamanPanel.Tick(visualTier, sense.GhostVisible,
+                        sense.GazeArmed, delta);
                 }
 
                 if (tier != ShamanStormTier.None)
@@ -224,7 +225,7 @@ namespace Werewolf.Game
             bestDist = float.MaxValue;
             Vector3? best = null;
 
-            if (_d.Registry != null && _d.Registry.Available)
+            if (_d.Registry != null)
             {
                 foreach (PlayerHandle player in Players.All())
                 {
@@ -263,7 +264,7 @@ namespace Werewolf.Game
             return vp.z > 0f && vp.x >= 0f && vp.x <= 1f && vp.y >= 0f && vp.y <= 1f;
         }
 
-        private void EnsureShamanSense()
+        private ShamanSense EnsureShamanSense()
         {
             float fullSec = _d.ClientShamanGazeFullSec;
             if (fullSec <= 0f) fullSec = 5f;
@@ -277,6 +278,7 @@ namespace Werewolf.Game
                 _shamanGazeFullSecSnapshot = fullSec;
                 _shamanCooldownSecSnapshot = cooldownSec;
             }
+            return _shamanSense;
         }
 
         private void HideShamanUi()

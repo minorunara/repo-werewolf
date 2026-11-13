@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 
 namespace Werewolf.Core
@@ -23,11 +24,11 @@ namespace Werewolf.Core
 
         public long CurseDeadlineUnixMs { get; private set; }
 
-        public int[] CurseCandidates { get; private set; }
+        public int[]? CurseCandidates { get; private set; }
 
-        public MeetingGaugeSnapshot MeetingGauge { get; private set; }
+        public MeetingGaugeSnapshot? MeetingGauge { get; private set; }
 
-        public MeetingGaugeSnapshot PlayGauge { get; private set; }
+        public MeetingGaugeSnapshot? PlayGauge { get; private set; }
 
         public bool WolfMode { get; private set; }
 
@@ -80,7 +81,7 @@ namespace Werewolf.Core
             => GaugeReceived && (localRole == Role.Werewolf || localRole == Role.BlackCat || localRole == Role.Bomber);
 
         public void ApplyGaugeSync(int ratioPermille, byte unlockedFlags, byte beaconCharges,
-                                   byte beaconStatus, long beaconReadyUnixMs, int[] gaugeMeta = null,
+                                   byte beaconStatus, long beaconReadyUnixMs, int[]? gaugeMeta = null,
                                    long nowUnixMs = 0)
         {
             RatioPermille = ratioPermille;
@@ -202,7 +203,7 @@ namespace Werewolf.Core
             return permille > 1000 ? 1000 : (int)permille;
         }
 
-        public static MeetingGaugeSnapshot FromData(int[] data)
+        public static MeetingGaugeSnapshot? FromData(int[]? data)
         {
             if (data == null || data.Length < 7) return null;
             return new MeetingGaugeSnapshot

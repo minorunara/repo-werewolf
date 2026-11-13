@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 using Werewolf.Core;
 
@@ -57,14 +58,14 @@ namespace Werewolf.Scenarios.Core
         private bool _broken;
         private long _brokenExitAtMs;
         private ScenarioBreakKind _brokenKind;
-        private IReadOnlyList<TextId> _brokenLines;
+        private IReadOnlyList<TextId>? _brokenLines;
 
         private bool _abortPending;
 
         private readonly long[] _noticeUntilMs = new long[NoticeKinds.Count];
         private readonly bool[] _deferred = new bool[NoticeKinds.Count];
-        private readonly IReadOnlyList<TextId>[] _noticeLines =
-            new IReadOnlyList<TextId>[NoticeKinds.Count];
+        private readonly IReadOnlyList<TextId>?[] _noticeLines =
+            new IReadOnlyList<TextId>?[NoticeKinds.Count];
         private readonly int[] _noticeArgs = new int[NoticeKinds.Count];
 
         public bool Broken => _broken;
@@ -110,7 +111,7 @@ namespace Werewolf.Scenarios.Core
             return ScenarioInterrupt.None;
         }
 
-        public bool Break(ScenarioBreakKind kind, IReadOnlyList<TextId> lines, long exitAtMs)
+        public bool Break(ScenarioBreakKind kind, IReadOnlyList<TextId>? lines, long exitAtMs)
         {
             if (_broken) return false;
 
@@ -126,7 +127,7 @@ namespace Werewolf.Scenarios.Core
         public void RequestAbort() => _abortPending = true;
 
         public void Notice(ScenarioInterrupt kind, long untilMs,
-                           IReadOnlyList<TextId> lines = null, int arg = 0)
+                           IReadOnlyList<TextId>? lines = null, int arg = 0)
         {
             int i = IndexOfNotice(kind);
             if (i < 0) return;
@@ -136,10 +137,10 @@ namespace Werewolf.Scenarios.Core
         }
 
         public void Raise(ScenarioInterrupt kind, long now,
-                          IReadOnlyList<TextId> lines = null, int arg = 0)
+                          IReadOnlyList<TextId>? lines = null, int arg = 0)
             => Notice(kind, now + NoticeDurationMs(kind), lines, arg);
 
-        public void Defer(ScenarioInterrupt kind, IReadOnlyList<TextId> lines = null, int arg = 0)
+        public void Defer(ScenarioInterrupt kind, IReadOnlyList<TextId>? lines = null, int arg = 0)
         {
             int i = IndexOfNotice(kind);
             if (i < 0) return;
@@ -161,7 +162,8 @@ namespace Werewolf.Scenarios.Core
         public IReadOnlyList<TextId> NoticeLines(ScenarioInterrupt kind)
         {
             int i = IndexOfNotice(kind);
-            return i >= 0 && _noticeLines[i] != null ? _noticeLines[i] : NoLines;
+            IReadOnlyList<TextId>? lines = i >= 0 ? _noticeLines[i] : null;
+            return lines ?? NoLines;
         }
 
         public int NoticeArg(ScenarioInterrupt kind)

@@ -57,67 +57,119 @@ namespace Werewolf.Scenarios.UI
 
         private sealed class Tile
         {
-            public ScenarioId Id;
-            public bool Implemented;
-            public RectTransform Hit;
-            public Image HoverFrame;
-            public Image Icon;
-            public TextMeshProUGUI Name;
-            public TextMeshProUGUI Status;
+            public Tile(ScenarioId id, bool implemented, RectTransform hit, Image hoverFrame,
+                Image icon, TextMeshProUGUI name, TextMeshProUGUI status)
+            {
+                Id = id;
+                Implemented = implemented;
+                Hit = hit;
+                HoverFrame = hoverFrame;
+                Icon = icon;
+                Name = name;
+                Status = status;
+            }
+
+            public readonly ScenarioId Id;
+            public readonly bool Implemented;
+            public readonly RectTransform Hit;
+            public readonly Image HoverFrame;
+            public readonly Image Icon;
+            public readonly TextMeshProUGUI Name;
+            public readonly TextMeshProUGUI Status;
         }
 
-        private GameObject _root;
-        private readonly List<Tile> _tiles = new List<Tile>();
-        private TextMeshProUGUI _descText;
-        private RectTransform _backRect;
-        private Image _backImage;
-        private TextMeshProUGUI _backLabel;
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, List<Tile> tiles, TextMeshProUGUI descText,
+                RectTransform backRect, Image backImage, TextMeshProUGUI backLabel, TextMeshProUGUI titleLabel)
+            {
+                Root = root;
+                Tiles = tiles;
+                DescText = descText;
+                BackRect = backRect;
+                BackImage = backImage;
+                BackLabel = backLabel;
+                TitleLabel = titleLabel;
+            }
+
+            public GameObject Root { get; }
+            public List<Tile> Tiles { get; }
+            public TextMeshProUGUI DescText { get; }
+            public RectTransform BackRect { get; }
+            public Image BackImage { get; }
+            public TextMeshProUGUI BackLabel { get; }
+            public TextMeshProUGUI TitleLabel { get; }
+        }
+
+        private ViewRefs? _view;
+        private readonly TextRefresh _textRefresh = new TextRefresh(nameof(ScenarioSelectPanel));
 
         private bool _open;
         private int _hoverIndex = -1;
-        private Action<ScenarioId> _onStart;
+        private Action<ScenarioId>? _onStart;
+        private Func<ScenarioId, bool>? _isCleared;
 
-        public bool Exists => _root != null;
+        public bool Exists => GetLiveViewOrNull() != null;
 
-        public bool IsOpen => _open;
+        public bool IsOpen
+        {
+            get
+            {
+                GetLiveViewOrNull();
+                return _open;
+            }
+        }
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            var rootGo = new GameObject("WW_ScenarioSelect", typeof(RectTransform));
-            var rootRect = (RectTransform)rootGo.transform;
-            rootRect.SetParent(layerRoot, false);
-            UiKit.Stretch(rootRect);
-            Canvas canvas = rootGo.AddComponent<Canvas>();
-            canvas.overrideSorting = true;
-            canvas.sortingOrder = WerewolfUIManager.ScenarioSelectSortingOrder;
-            rootGo.AddComponent<GraphicRaycaster>();
-            Image dim = rootGo.AddComponent<Image>();
-            dim.color = DimColor;
-            dim.raycastTarget = true;
-            _root = rootGo;
+            GameObject? partialRoot = null;
+            try
+            {
+                var rootGo = new GameObject("WW_ScenarioSelect", typeof(RectTransform));
+                partialRoot = rootGo;
+                var rootRect = (RectTransform)rootGo.transform;
+                rootRect.SetParent(layerRoot, false);
+                UiKit.Stretch(rootRect);
+                Canvas canvas = rootGo.AddComponent<Canvas>();
+                canvas.overrideSorting = true;
+                canvas.sortingOrder = WerewolfUIManager.ScenarioSelectSortingOrder;
+                rootGo.AddComponent<GraphicRaycaster>();
+                Image dim = rootGo.AddComponent<Image>();
+                dim.color = DimColor;
+                dim.raycastTarget = true;
 
-            UiKit.CreateText(rootRect, "Title", new Vector2(0f, TitleY), new Vector2(1400f, 80f),
-                Texts.Get(TextId.ScenarioSelectTitle), TitleFontSize, TitleColor, TextAlignmentOptions.Center);
+                TextMeshProUGUI titleLabel = UiKit.CreateText(rootRect, "Title", new Vector2(0f, TitleY), new Vector2(1400f, 80f),
+                    Texts.Get(TextId.ScenarioSelectTitle), TitleFontSize, TitleColor, TextAlignmentOptions.Center);
 
-            BuildTiles(rootRect);
+                var tiles = new List<Tile>();
+                BuildTiles(rootRect, tiles);
 
-            _descText = UiKit.CreateText(rootRect, "Description", new Vector2(0f, DescY),
-                new Vector2(1400f, 60f), string.Empty, DescFontSize, DescColor, TextAlignmentOptions.Center);
-            _descText.richText = false;
+                TextMeshProUGUI descText = UiKit.CreateText(rootRect, "Description", new Vector2(0f, DescY),
+                    new Vector2(1400f, 60f), string.Empty, DescFontSize, DescColor, TextAlignmentOptions.Center);
+                descText.richText = false;
 
-            _backImage = UiKit.CreateImage(rootRect, "Back", new Vector2(0f, BackY), BackSize, BackPalette.EnabledBg);
-            _backRect = _backImage.rectTransform;
-            _backLabel = UiKit.CreateText(_backRect, "Label", Vector2.zero, BackSize,
-                Texts.Get(TextId.ScenarioBack), 26f, Color.white, TextAlignmentOptions.Center);
-            _backLabel.richText = false;
+                Image backImage = UiKit.CreateImage(rootRect, "Back", new Vector2(0f, BackY), BackSize, BackPalette.EnabledBg);
+                RectTransform backRect = backImage.rectTransform;
+                TextMeshProUGUI backLabel = UiKit.CreateText(backRect, "Label", Vector2.zero, BackSize,
+                    Texts.Get(TextId.ScenarioBack), 26f, Color.white, TextAlignmentOptions.Center);
+                backLabel.richText = false;
 
-            _root.SetActive(false);
+                rootGo.SetActive(false);
+                _view = new ViewRefs(rootGo, tiles, descText, backRect, backImage, backLabel, titleLabel);
+                partialRoot = null;
+                _textRefresh.Subscribe(() => Exists, ApplyTexts);
+            }
+            catch
+            {
+                if (partialRoot != null) UnityEngine.Object.Destroy(partialRoot);
+                throw;
+            }
         }
 
-        private void BuildTiles(Transform parent)
+        private static void BuildTiles(Transform parent, List<Tile> tiles)
         {
             IReadOnlyList<ScenarioEntry> entries = ScenarioCatalog.Entries;
             float left = -TileSpacing * (entries.Count - 1) * 0.5f;
@@ -161,16 +213,7 @@ namespace Werewolf.Scenarios.UI
                     name.color = LockedLabelColor;
                 }
 
-                _tiles.Add(new Tile
-                {
-                    Id = entry.Id,
-                    Implemented = entry.Implemented,
-                    Hit = hit,
-                    HoverFrame = frame,
-                    Icon = icon,
-                    Name = name,
-                    Status = status,
-                });
+                tiles.Add(new Tile(entry.Id, entry.Implemented, hit, frame, icon, name, status));
 
                 if (i == 0) continue;
 
@@ -181,16 +224,18 @@ namespace Werewolf.Scenarios.UI
             }
         }
 
-        public void Open(Func<ScenarioId, bool> isCleared, Action<ScenarioId> onStart)
+        public void Open(Func<ScenarioId, bool>? isCleared, Action<ScenarioId>? onStart)
         {
-            if (_root == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
             _onStart = onStart;
+            _isCleared = isCleared;
             _hoverIndex = -1;
 
             bool recommendationTaken = false;
-            for (int i = 0; i < _tiles.Count; i++)
+            for (int i = 0; i < view.Tiles.Count; i++)
             {
-                Tile tile = _tiles[i];
+                Tile tile = view.Tiles[i];
                 bool cleared = isCleared != null && isCleared(tile.Id);
                 tile.Status.text = tile.Implemented
                     ? (cleared ? Texts.Get(TextId.ScenarioCompleted) : string.Empty)
@@ -204,27 +249,26 @@ namespace Werewolf.Scenarios.UI
                 tile.Name.color = recommended ? TitleColor : NameColor;
             }
 
-            _descText.text = string.Empty;
+            view.DescText.text = string.Empty;
             _open = true;
             PumpHoverSuppression();
-            _root.SetActive(true);
+            view.Root.SetActive(true);
             WLog.Line("scenario_select_open", secret: false);
         }
 
         public void Close(string reason)
         {
-            _suppressUntilFrame = -1;
             if (!_open) return;
-            _open = false;
-            _hoverIndex = -1;
-            _onStart = null;
-            if (_root != null) _root.SetActive(false);
+            ViewRefs? view = GetLiveViewOrNull();
+            ResetOpenState();
+            if (view != null) view.Root.SetActive(false);
             WLog.Line("scenario_select_close", secret: false, ("reason", reason));
         }
 
         public void Tick()
         {
-            if (!_open || _root == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (!_open || view == null) return;
 
             try
             {
@@ -232,10 +276,10 @@ namespace Werewolf.Scenarios.UI
                 PumpHoverSuppression();
 
                 Vector2 mouse = Input.mousePosition;
-                _hoverIndex = HitTest(mouse);
-                UpdateHoverVisuals(mouse);
+                _hoverIndex = HitTest(view, mouse);
+                UpdateHoverVisuals(view, mouse);
 
-                if (NoTextInputsActive() && MenuKeyDown())
+                if (NoTextInputsActive() && BackKeyDown())
                 {
                     Close("menu_key");
                     return;
@@ -243,21 +287,21 @@ namespace Werewolf.Scenarios.UI
 
                 if (!Input.GetMouseButtonDown(0)) return;
 
-                if (Hit(_backRect, mouse))
+                if (Hit(view.BackRect, mouse))
                 {
                     Close("back_button");
                     return;
                 }
 
                 if (_hoverIndex < 0) return;
-                Tile picked = _tiles[_hoverIndex];
+                Tile picked = view.Tiles[_hoverIndex];
                 if (!picked.Implemented)
                 {
                     WLog.Line("scenario_select_locked", secret: false, ("scenario", picked.Id));
                     return;
                 }
 
-                Action<ScenarioId> start = _onStart;
+                Action<ScenarioId>? start = _onStart;
                 ScenarioId id = picked.Id;
                 Close("scenario_start");
                 WLog.Line("scenario_select_pick", secret: false, ("scenario", id));
@@ -269,66 +313,100 @@ namespace Werewolf.Scenarios.UI
             }
         }
 
-        private void UpdateHoverVisuals(Vector2 mouse)
+        private void UpdateHoverVisuals(ViewRefs view, Vector2 mouse)
         {
-            for (int i = 0; i < _tiles.Count; i++)
+            for (int i = 0; i < view.Tiles.Count; i++)
             {
-                _tiles[i].HoverFrame.enabled = i == _hoverIndex && _tiles[i].Implemented;
+                view.Tiles[i].HoverFrame.enabled = i == _hoverIndex && view.Tiles[i].Implemented;
             }
 
             if (_hoverIndex >= 0
-                && ScenarioCatalog.TryGet(_tiles[_hoverIndex].Id, out ScenarioEntry entry))
+                && ScenarioCatalog.TryGet(view.Tiles[_hoverIndex].Id, out ScenarioEntry entry))
             {
-                _descText.text = entry.DescriptionId.HasValue
+                view.DescText.text = entry.DescriptionId.HasValue
                     ? Texts.Get(entry.DescriptionId.Value)
                     : Texts.Get(TextId.ScenarioLocked);
             }
             else
             {
-                _descText.text = string.Empty;
+                view.DescText.text = string.Empty;
             }
 
-            bool backHover = Hit(_backRect, mouse);
+            bool backHover = Hit(view.BackRect, mouse);
             ButtonVisual.Resolve(BackPalette, armed: false, hover: backHover, selected: false, enabled: true,
                 out Color bg, out Color label);
-            _backImage.color = bg;
-            _backLabel.color = label;
+            view.BackImage.color = bg;
+            view.BackLabel.color = label;
         }
 
-        private int HitTest(Vector2 point)
+        private static int HitTest(ViewRefs view, Vector2 point)
         {
-            for (int i = 0; i < _tiles.Count; i++)
+            for (int i = 0; i < view.Tiles.Count; i++)
             {
-                if (Hit(_tiles[i].Hit, point)) return i;
+                if (Hit(view.Tiles[i].Hit, point)) return i;
             }
             return -1;
         }
 
-        private static bool Hit(RectTransform rect, Vector2 point)
+        private static bool Hit(RectTransform? rect, Vector2 point)
             => rect != null && rect.gameObject.activeInHierarchy
                && RectTransformUtility.RectangleContainsScreenPoint(rect, point, null);
 
         private static void PumpHoverSuppression() => _suppressUntilFrame = Time.frameCount + 1;
 
-        private static bool MenuKeyDown()
-            => ScenarioVanillaProbe.InputDown(GameKey.Menu, "select_menu_key");
+        private static bool BackKeyDown()
+            => ScenarioVanillaProbe.InputDown(GameKey.Back, "select_back_key");
 
         private static bool NoTextInputsActive()
             => ScenarioVanillaProbe.NoTextInputsActive("select_text_inputs");
 
         public void Destroy()
         {
-            Close("destroy");
-            if (_root != null)
+            _textRefresh.Unsubscribe();
+            bool wasOpen = _open;
+            ResetOpenState();
+            ViewRefs? view = _view;
+            _view = null;
+            if (view != null && view.Root != null) UnityEngine.Object.Destroy(view.Root);
+            if (wasOpen) WLog.Line("scenario_select_close", secret: false, ("reason", "destroy"));
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+            _view = null;
+            ResetOpenState();
+            return null;
+        }
+
+        private void ResetOpenState()
+        {
+            PumpHoverSuppression();
+            _open = false;
+            _hoverIndex = -1;
+            _onStart = null;
+            _isCleared = null;
+        }
+
+        private void ApplyTexts()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return;
+            view.TitleLabel.text = Texts.Get(TextId.ScenarioSelectTitle);
+            view.BackLabel.text = Texts.Get(TextId.ScenarioBack);
+            for (int i = 0; i < view.Tiles.Count; i++)
             {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
+                Tile tile = view.Tiles[i];
+                if (ScenarioCatalog.TryGet(tile.Id, out ScenarioEntry entry))
+                    tile.Name.text = Texts.Get(entry.NameId);
+                if (!_open) continue;
+                bool cleared = _isCleared != null && _isCleared(tile.Id);
+                tile.Status.text = tile.Implemented
+                    ? (cleared ? Texts.Get(TextId.ScenarioCompleted) : string.Empty)
+                    : Texts.Get(TextId.ScenarioLocked);
             }
-            _tiles.Clear();
-            _descText = null;
-            _backRect = null;
-            _backImage = null;
-            _backLabel = null;
         }
     }
 }

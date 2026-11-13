@@ -1,3 +1,4 @@
+#nullable enable
 using Werewolf.Core;
 using Werewolf.Scenarios.Core;
 using Werewolf.Vanilla;

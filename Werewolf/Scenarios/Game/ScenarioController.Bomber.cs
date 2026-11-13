@@ -28,8 +28,10 @@ namespace Werewolf.Scenarios.Game
 
         private void TickFatalBlast(long now)
         {
-            if (!ScriptRunning) return;
-            if (!_flow.HasEntered(ScenarioMilestone.FatalBlastArmed))
+            if (!TryGetRunningScript(out ScenarioScriptRun? script)) return;
+            ScenarioFlow flow = script.Flow;
+            ScenarioDefinition definition = script.Definition;
+            if (!flow.HasEntered(ScenarioMilestone.FatalBlastArmed))
             {
                 _fatalBlastArmedAtMs = 0;
                 return;
@@ -42,15 +44,17 @@ namespace Werewolf.Scenarios.Game
                 return;
             }
 
-            if (!_definition.Watch.BreakIfFatalBlastSurvived) return;
+            if (!definition.Watch.BreakIfFatalBlastSurvived) return;
             if (now - _fatalBlastArmedAtMs < FatalBlastGraceMs) return;
-            if (!_flow.IsLatched(ScenarioSignal.BombExploded)) return;
+            if (!flow.IsLatched(ScenarioSignal.BombExploded)) return;
             if (_d.IsDeadActorClient(_d.LocalActor)) return;
             Break(ScenarioBreakKind.FatalBlastSurvived, now);
         }
 
         private ScenarioBlastRule CurrentBlastRule
-            => ScriptRunning ? _flow.Current.BlastRule : ScenarioBlastRule.None;
+            => TryGetRunningScript(out ScenarioScriptRun? script)
+                ? script.Flow.Current.BlastRule
+                : ScenarioBlastRule.None;
 
         internal BombDenyReason DeniesDetonation(Vector3? bomberPos, Vector3? targetPos,
                                                  float blastRadiusMeters, bool targetNearTruck,
@@ -164,7 +168,10 @@ namespace Werewolf.Scenarios.Game
             WLog.Line("scenario_kill_participant", secret: false, ("participant", participantId));
         }
 
-        private int CurrentBombTarget => ScriptRunning ? _flow.Current.BombTargetParticipantId : 0;
+        private int CurrentBombTarget
+            => TryGetRunningScript(out ScenarioScriptRun? script)
+                ? script.Flow.Current.BombTargetParticipantId
+                : 0;
 
         private bool LocalNearBombTarget()
         {
@@ -179,7 +186,10 @@ namespace Werewolf.Scenarios.Game
             => TryBombTargetActor(out int actor) && _d.BomberTargetActorClient == actor;
 
         private Vector3? BombTargetMarkPos()
-            => ScriptRunning && _flow.Current.MarkBombTarget ? BotFootPos(CurrentBombTarget) : null;
+            => TryGetRunningScript(out ScenarioScriptRun? script)
+               && script.Flow.Current.MarkBombTarget
+                ? BotFootPos(script.Flow.Current.BombTargetParticipantId)
+                : null;
 
         private bool TryBombTargetActor(out int actor)
         {
@@ -190,7 +200,7 @@ namespace Werewolf.Scenarios.Game
 
         private static float TruckSafeRadius()
         {
-            GameConfig config = Plugin.GameConfig;
+            GameConfig? config = Plugin.GameConfig;
             float r = config != null ? config.BomberTruckSafeRadiusMeters : 0f;
             return r > 0f ? r : GameConfig.DefaultTruckSafeRadiusMeters;
         }

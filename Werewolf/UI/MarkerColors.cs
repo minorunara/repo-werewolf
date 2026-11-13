@@ -1,3 +1,4 @@
+#nullable enable
 using UnityEngine;
 using Werewolf.Core;
 
@@ -18,7 +19,7 @@ namespace Werewolf.UI
             return fallback;
         }
 
-        public static string HexFor(Role? marked)
+        public static string? HexFor(Role? marked)
         {
             if (marked == Core.Role.Werewolf) return WerewolfHex;
             if (marked == Core.Role.Bomber) return BomberHex;

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -25,9 +26,9 @@ namespace Werewolf.Core
         private int _designatedActor = CurseResolution.NoVictim;
         private bool _resolved;
 
-        private readonly HashSet<int> _voters;
+        private readonly HashSet<int>? _voters;
 
-        public CurseSession(int catActor, long resolveAtUnixMs, IEnumerable<int> voterActors = null)
+        public CurseSession(int catActor, long resolveAtUnixMs, IEnumerable<int>? voterActors = null)
         {
             CatActor = catActor;
             ResolveAtUnixMs = resolveAtUnixMs;
@@ -67,7 +68,7 @@ namespace Werewolf.Core
             return true;
         }
 
-        public CurseResolution TryResolve(
+        public CurseResolution? TryResolve(
             long nowUnixMs, IReadOnlyList<WPlayer> players, bool informantEstablished, Random rng)
         {
             if (_resolved || nowUnixMs < ResolveAtUnixMs) return null;
@@ -88,7 +89,7 @@ namespace Werewolf.Core
             }
 
             var candidates = new List<int>();
-            var villagerVoters = _voters != null ? new List<int>() : null;
+            var villagerVoters = new List<int>();
             foreach (var p in players)
             {
                 if (!p.Alive || p.ActorNumber == CatActor) continue;

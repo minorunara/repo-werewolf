@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -22,7 +23,7 @@ namespace Werewolf.Core
     public sealed class Disclosure
     {
         public Disclosure(DisclosureType type, int[] targetActors, Role shownRole,
-                          int[] werewolfActors, byte[] werewolfActorRoles = null)
+                          int[]? werewolfActors, byte[]? werewolfActorRoles = null)
         {
             Type = type;
             TargetActors = targetActors;
@@ -37,9 +38,9 @@ namespace Werewolf.Core
 
         public Role ShownRole { get; }
 
-        public int[] WerewolfActors { get; }
+        public int[]? WerewolfActors { get; }
 
-        public byte[] WerewolfActorRoles { get; }
+        public byte[]? WerewolfActorRoles { get; }
     }
 
     public sealed class DisclosureManager

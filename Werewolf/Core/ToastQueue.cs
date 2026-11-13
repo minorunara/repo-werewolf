@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -33,7 +34,7 @@ namespace Werewolf.Core
             _durationMs = durationSec * 1000L;
         }
 
-        public void Push(string message, long nowUnixMs)
+        public void Push(string? message, long nowUnixMs)
         {
             if (string.IsNullOrEmpty(message)) return;
 

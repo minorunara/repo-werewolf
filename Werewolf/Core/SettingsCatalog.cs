@@ -1,5 +1,7 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
 
@@ -13,14 +15,6 @@ namespace Werewolf.Core
         private const char PairSep = ';';
         private const char KvSep = '=';
 
-        private static string SectionGeneral => Texts.Get(TextId.SettingsSectionGeneral);
-        private static string SectionMeeting => Texts.Get(TextId.SettingsSectionMeeting);
-        private static string SectionRoleAssignment => Texts.Get(TextId.SettingsSectionRoleAssignment);
-        private static string SectionRoles => Texts.Get(TextId.SettingsSectionRoles);
-        private static string SectionBlackCat => Texts.Get(TextId.SettingsSectionBlackCat);
-        private static string SectionBomber => Texts.Get(TextId.SettingsSectionBomber);
-        private static string SectionShaman => Texts.Get(TextId.SettingsSectionShaman);
-        private static string SectionWorldgen => Texts.Get(TextId.SettingsSectionWorldgen);
         private static string SectionStartItemList => Texts.Get(TextId.SettingsSectionStartItemList);
         private static string SectionStartUpgradeList => Texts.Get(TextId.SettingsSectionStartUpgradeList);
 
@@ -130,7 +124,8 @@ namespace Werewolf.Core
             return sb.ToString();
         }
 
-        public static bool TryDecodeBlob(string blob, out IReadOnlyDictionary<string, string> values)
+        public static bool TryDecodeBlob(string? blob,
+            [NotNullWhen(true)] out IReadOnlyDictionary<string, string>? values)
         {
             values = null;
             if (string.IsNullOrEmpty(blob)) return false;
@@ -177,7 +172,7 @@ namespace Werewolf.Core
                 rows.Add(new SettingRow
                 {
                     Section = e.Section,
-                    Label = e.LabelJa,
+                    Label = e.Label,
                     Value = display + e.Unit,
                 });
             }
@@ -199,8 +194,8 @@ namespace Werewolf.Core
         {
             if (!values.TryGetValue(settingId, out var raw)) return;
 
-            List<string> names = null;
-            IReadOnlyDictionary<string, int> map = null;
+            List<string>? names = null;
+            IReadOnlyDictionary<string, int>? map = null;
 
             if (!string.IsNullOrEmpty(raw))
             {
@@ -224,7 +219,7 @@ namespace Werewolf.Core
                 }
             }
 
-            if (names == null)
+            if (names == null || map == null)
             {
                 rows.Add(new SettingRow { Section = section, Label = Texts.Get(TextId.SettingsListEmpty), Value = "" });
                 return;
@@ -260,72 +255,66 @@ namespace Werewolf.Core
             new SettingEntry
             {
                 SettingId = "WerewolfModeEnabled",
-                Section = SectionGeneral,
-                LabelJa = Texts.Get(TextId.SettingsLabelWerewolfModeEnabled),
-                Unit = "",
+                SectionId = TextId.SettingsSectionGeneral,
+                LabelId = TextId.SettingsLabelWerewolfModeEnabled,
                 RawValue = c => c.WerewolfModeEnabled ? "1" : "0",
                 Display = DisplayBoolEnable,
             },
             new SettingEntry
             {
                 SettingId = "RoundSeconds",
-                Section = SectionGeneral,
-                LabelJa = Texts.Get(TextId.SettingsLabelRoundSeconds),
-                Unit = Texts.Get(TextId.SettingsUnitSeconds),
+                SectionId = TextId.SettingsSectionGeneral,
+                LabelId = TextId.SettingsLabelRoundSeconds,
+                UnitId = TextId.SettingsUnitSeconds,
                 RawValue = c => c.RoundSeconds.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "MinimapHideEnabled",
-                Section = SectionGeneral,
-                LabelJa = Texts.Get(TextId.SettingsLabelMinimapHideEnabled),
-                Unit = "",
+                SectionId = TextId.SettingsSectionGeneral,
+                LabelId = TextId.SettingsLabelMinimapHideEnabled,
                 RawValue = c => c.MinimapHideEnabled ? "1" : "0",
                 Display = DisplayBoolEnable,
             },
             new SettingEntry
             {
                 SettingId = "OutfitChangeAllowed",
-                Section = SectionGeneral,
-                LabelJa = Texts.Get(TextId.SettingsLabelOutfitChangeAllowed),
-                Unit = "",
+                SectionId = TextId.SettingsSectionGeneral,
+                LabelId = TextId.SettingsLabelOutfitChangeAllowed,
                 RawValue = c => c.OutfitChangeAllowed ? "1" : "0",
                 Display = DisplayBoolEnable,
             },
             new SettingEntry
             {
                 SettingId = "ValuableMapMode",
-                Section = SectionGeneral,
-                LabelJa = Texts.Get(TextId.SettingsLabelValuableMapMode),
-                Unit = "",
+                SectionId = TextId.SettingsSectionGeneral,
+                LabelId = TextId.SettingsLabelValuableMapMode,
                 RawValue = c => ((int)c.ValuableMapMode).ToString(CultureInfo.InvariantCulture),
                 Display = DisplayValuableMapMode,
             },
             new SettingEntry
             {
                 SettingId = "OrbGaugeEnabled",
-                Section = SectionGeneral,
-                LabelJa = Texts.Get(TextId.SettingsLabelOrbGaugeEnabled),
-                Unit = "",
+                SectionId = TextId.SettingsSectionGeneral,
+                LabelId = TextId.SettingsLabelOrbGaugeEnabled,
                 RawValue = c => c.OrbGaugeEnabled ? "1" : "0",
                 Display = DisplayBoolEnable,
             },
             new SettingEntry
             {
                 SettingId = "NecroVoiceMode",
-                Section = SectionGeneral,
-                LabelJa = Texts.Get(TextId.SettingsLabelNecroVoiceMode),
-                Unit = "",
+                SectionId = TextId.SettingsSectionGeneral,
+                LabelId = TextId.SettingsLabelNecroVoiceMode,
                 RawValue = c => ((byte)c.NecroVoiceMode).ToString(CultureInfo.InvariantCulture),
                 Display = DisplayNecroVoiceMode,
             },
             new SettingEntry
             {
                 SettingId = "GameOverAutoReturnSec",
-                Section = SectionGeneral,
-                LabelJa = Texts.Get(TextId.SettingsLabelGameOverAutoReturnSec),
-                Unit = Texts.Get(TextId.SettingsUnitSeconds),
+                SectionId = TextId.SettingsSectionGeneral,
+                LabelId = TextId.SettingsLabelGameOverAutoReturnSec,
+                UnitId = TextId.SettingsUnitSeconds,
                 RawValue = c => c.GameOverAutoReturnSec.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
@@ -336,90 +325,88 @@ namespace Werewolf.Core
             new SettingEntry
             {
                 SettingId = "MeetingRightsPerPlayer",
-                Section = SectionMeeting,
-                LabelJa = Texts.Get(TextId.SettingsLabelMeetingRightsPerPlayer),
-                Unit = Texts.Get(TextId.SettingsUnitTimes),
+                SectionId = TextId.SettingsSectionMeeting,
+                LabelId = TextId.SettingsLabelMeetingRightsPerPlayer,
+                UnitId = TextId.SettingsUnitTimes,
                 RawValue = c => c.MeetingRightsPerPlayer.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "ConveneSuppressStartSec",
-                Section = SectionMeeting,
-                LabelJa = Texts.Get(TextId.SettingsLabelConveneSuppressStartSec),
-                Unit = Texts.Get(TextId.SettingsUnitSeconds),
+                SectionId = TextId.SettingsSectionMeeting,
+                LabelId = TextId.SettingsLabelConveneSuppressStartSec,
+                UnitId = TextId.SettingsUnitSeconds,
                 RawValue = c => c.ConveneSuppressStartSec.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "ConveneSuppressAfterSec",
-                Section = SectionMeeting,
-                LabelJa = Texts.Get(TextId.SettingsLabelConveneSuppressAfterSec),
-                Unit = Texts.Get(TextId.SettingsUnitSeconds),
+                SectionId = TextId.SettingsSectionMeeting,
+                LabelId = TextId.SettingsLabelConveneSuppressAfterSec,
+                UnitId = TextId.SettingsUnitSeconds,
                 RawValue = c => c.ConveneSuppressAfterSec.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "MeetingCountdownSec",
-                Section = SectionMeeting,
-                LabelJa = Texts.Get(TextId.SettingsLabelMeetingCountdownSec),
-                Unit = Texts.Get(TextId.SettingsUnitSeconds),
+                SectionId = TextId.SettingsSectionMeeting,
+                LabelId = TextId.SettingsLabelMeetingCountdownSec,
+                UnitId = TextId.SettingsUnitSeconds,
                 RawValue = c => c.MeetingCountdownSec.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "MeetingDurationSec",
-                Section = SectionMeeting,
-                LabelJa = Texts.Get(TextId.SettingsLabelMeetingDurationSec),
-                Unit = Texts.Get(TextId.SettingsUnitSeconds),
+                SectionId = TextId.SettingsSectionMeeting,
+                LabelId = TextId.SettingsLabelMeetingDurationSec,
+                UnitId = TextId.SettingsUnitSeconds,
                 RawValue = c => c.MeetingDurationSec.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "VoteTimeCutEnabled",
-                Section = SectionMeeting,
-                LabelJa = Texts.Get(TextId.SettingsLabelVoteTimeCutEnabled),
-                Unit = "",
+                SectionId = TextId.SettingsSectionMeeting,
+                LabelId = TextId.SettingsLabelVoteTimeCutEnabled,
                 RawValue = c => c.VoteTimeCutEnabled ? "1" : "0",
                 Display = DisplayBoolEnable,
             },
             new SettingEntry
             {
                 SettingId = "ResultDisplaySec",
-                Section = SectionMeeting,
-                LabelJa = Texts.Get(TextId.SettingsLabelResultDisplaySec),
-                Unit = Texts.Get(TextId.SettingsUnitSeconds),
+                SectionId = TextId.SettingsSectionMeeting,
+                LabelId = TextId.SettingsLabelResultDisplaySec,
+                UnitId = TextId.SettingsUnitSeconds,
                 RawValue = c => c.ResultDisplaySec.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "MeetingScatterEnabled",
-                Section = SectionMeeting,
-                LabelJa = Texts.Get(TextId.SettingsLabelMeetingScatterEnabled),
-                Unit = "",
+                SectionId = TextId.SettingsSectionMeeting,
+                LabelId = TextId.SettingsLabelMeetingScatterEnabled,
                 RawValue = c => c.MeetingScatterEnabled ? "1" : "0",
                 Display = DisplayBoolEnable,
             },
             new SettingEntry
             {
                 SettingId = "ScatterGuardSec",
-                Section = SectionMeeting,
-                LabelJa = Texts.Get(TextId.SettingsLabelScatterGuardSec),
-                Unit = Texts.Get(TextId.SettingsUnitSeconds),
+                SectionId = TextId.SettingsSectionMeeting,
+                LabelId = TextId.SettingsLabelScatterGuardSec,
+                UnitId = TextId.SettingsUnitSeconds,
                 RawValue = c => c.ScatterGuardSec.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "MeetingEnemyRespawnScalePct",
-                Section = SectionMeeting,
-                LabelJa = Texts.Get(TextId.SettingsLabelMeetingEnemyRespawnScalePct),
-                Unit = Texts.Get(TextId.SettingsUnitPercent),
+                SectionId = TextId.SettingsSectionMeeting,
+                LabelId = TextId.SettingsLabelMeetingEnemyRespawnScalePct,
+                UnitId = TextId.SettingsUnitPercent,
                 RawValue = c => c.MeetingEnemyRespawnScalePct.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
@@ -430,45 +417,45 @@ namespace Werewolf.Core
             new SettingEntry
             {
                 SettingId = "ShamanChancePercent",
-                Section = SectionRoleAssignment,
-                LabelJa = Texts.Get(TextId.SettingsLabelShamanChancePercent),
-                Unit = Texts.Get(TextId.SettingsUnitPercent),
+                SectionId = TextId.SettingsSectionRoleAssignment,
+                LabelId = TextId.SettingsLabelShamanChancePercent,
+                UnitId = TextId.SettingsUnitPercent,
                 RawValue = c => c.ShamanChancePercent.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "WerewolfCount",
-                Section = SectionRoleAssignment,
-                LabelJa = Texts.Get(TextId.SettingsLabelWerewolfCount),
-                Unit = Texts.Get(TextId.SettingsUnitPeople),
+                SectionId = TextId.SettingsSectionRoleAssignment,
+                LabelId = TextId.SettingsLabelWerewolfCount,
+                UnitId = TextId.SettingsUnitPeople,
                 RawValue = c => c.WerewolfCount.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "BlackCatChancePercent",
-                Section = SectionRoleAssignment,
-                LabelJa = Texts.Get(TextId.SettingsLabelBlackCatChancePercent),
-                Unit = Texts.Get(TextId.SettingsUnitPercent),
+                SectionId = TextId.SettingsSectionRoleAssignment,
+                LabelId = TextId.SettingsLabelBlackCatChancePercent,
+                UnitId = TextId.SettingsUnitPercent,
                 RawValue = c => c.BlackCatChancePercent.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "BomberChancePercent",
-                Section = SectionRoleAssignment,
-                LabelJa = Texts.Get(TextId.SettingsLabelBomberChancePercent),
-                Unit = Texts.Get(TextId.SettingsUnitPercent),
+                SectionId = TextId.SettingsSectionRoleAssignment,
+                LabelId = TextId.SettingsLabelBomberChancePercent,
+                UnitId = TextId.SettingsUnitPercent,
                 RawValue = c => c.BomberChancePercent.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "PeacefulVillageChancePercent",
-                Section = SectionRoleAssignment,
-                LabelJa = Texts.Get(TextId.SettingsLabelPeacefulVillageChancePercent),
-                Unit = Texts.Get(TextId.SettingsUnitPercent),
+                SectionId = TextId.SettingsSectionRoleAssignment,
+                LabelId = TextId.SettingsLabelPeacefulVillageChancePercent,
+                UnitId = TextId.SettingsUnitPercent,
                 RawValue = c => c.PeacefulVillageChancePercent.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
@@ -479,45 +466,45 @@ namespace Werewolf.Core
             new SettingEntry
             {
                 SettingId = "ShamanGazeFullSec",
-                Section = SectionShaman,
-                LabelJa = Texts.Get(TextId.SettingsLabelShamanGazeFullSec),
-                Unit = Texts.Get(TextId.SettingsUnitSeconds),
+                SectionId = TextId.SettingsSectionShaman,
+                LabelId = TextId.SettingsLabelShamanGazeFullSec,
+                UnitId = TextId.SettingsUnitSeconds,
                 RawValue = c => c.ShamanGazeFullSec.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "ShamanGhostCooldownSec",
-                Section = SectionShaman,
-                LabelJa = Texts.Get(TextId.SettingsLabelShamanGhostCooldownSec),
-                Unit = Texts.Get(TextId.SettingsUnitSeconds),
+                SectionId = TextId.SettingsSectionShaman,
+                LabelId = TextId.SettingsLabelShamanGhostCooldownSec,
+                UnitId = TextId.SettingsUnitSeconds,
                 RawValue = c => c.ShamanGhostCooldownSec.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "ShamanStormWeakMeters",
-                Section = SectionShaman,
-                LabelJa = Texts.Get(TextId.SettingsLabelShamanStormWeakMeters),
-                Unit = Texts.Get(TextId.SettingsUnitMeters),
+                SectionId = TextId.SettingsSectionShaman,
+                LabelId = TextId.SettingsLabelShamanStormWeakMeters,
+                UnitId = TextId.SettingsUnitMeters,
                 RawValue = c => c.ShamanStormWeakMeters.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "ShamanStormMediumMeters",
-                Section = SectionShaman,
-                LabelJa = Texts.Get(TextId.SettingsLabelShamanStormMediumMeters),
-                Unit = Texts.Get(TextId.SettingsUnitMeters),
+                SectionId = TextId.SettingsSectionShaman,
+                LabelId = TextId.SettingsLabelShamanStormMediumMeters,
+                UnitId = TextId.SettingsUnitMeters,
                 RawValue = c => c.ShamanStormMediumMeters.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "ShamanStormStrongMeters",
-                Section = SectionShaman,
-                LabelJa = Texts.Get(TextId.SettingsLabelShamanStormStrongMeters),
-                Unit = Texts.Get(TextId.SettingsUnitMeters),
+                SectionId = TextId.SettingsSectionShaman,
+                LabelId = TextId.SettingsLabelShamanStormStrongMeters,
+                UnitId = TextId.SettingsUnitMeters,
                 RawValue = c => c.ShamanStormStrongMeters.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
@@ -528,90 +515,89 @@ namespace Werewolf.Core
             new SettingEntry
             {
                 SettingId = "StaminaUnlockPct",
-                Section = SectionRoles,
-                LabelJa = Texts.Get(TextId.SettingsLabelStaminaUnlockPct),
-                Unit = "%",
+                SectionId = TextId.SettingsSectionRoles,
+                LabelId = TextId.SettingsLabelStaminaUnlockPct,
+                UnitLiteral = "%",
                 RawValue = c => c.StaminaUnlockPct.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "JumpUnlockPct",
-                Section = SectionRoles,
-                LabelJa = Texts.Get(TextId.SettingsLabelJumpUnlockPct),
-                Unit = "%",
+                SectionId = TextId.SettingsSectionRoles,
+                LabelId = TextId.SettingsLabelJumpUnlockPct,
+                UnitLiteral = "%",
                 RawValue = c => c.JumpUnlockPct.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "EnemyIgnoreUnlockPct",
-                Section = SectionRoles,
-                LabelJa = Texts.Get(TextId.SettingsLabelEnemyIgnoreUnlockPct),
-                Unit = "%",
+                SectionId = TextId.SettingsSectionRoles,
+                LabelId = TextId.SettingsLabelEnemyIgnoreUnlockPct,
+                UnitLiteral = "%",
                 RawValue = c => c.EnemyIgnoreUnlockPct.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "HealUnlockPct",
-                Section = SectionRoles,
-                LabelJa = Texts.Get(TextId.SettingsLabelHealUnlockPct),
-                Unit = "%",
+                SectionId = TextId.SettingsSectionRoles,
+                LabelId = TextId.SettingsLabelHealUnlockPct,
+                UnitLiteral = "%",
                 RawValue = c => c.HealUnlockPct.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "HealIntervalSec",
-                Section = SectionRoles,
-                LabelJa = Texts.Get(TextId.SettingsLabelHealIntervalSec),
-                Unit = Texts.Get(TextId.SettingsUnitSeconds),
+                SectionId = TextId.SettingsSectionRoles,
+                LabelId = TextId.SettingsLabelHealIntervalSec,
+                UnitId = TextId.SettingsUnitSeconds,
                 RawValue = c => c.HealIntervalSec.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "BeaconChargePct",
-                Section = SectionRoles,
-                LabelJa = Texts.Get(TextId.SettingsLabelBeaconChargePct),
-                Unit = "%",
+                SectionId = TextId.SettingsSectionRoles,
+                LabelId = TextId.SettingsLabelBeaconChargePct,
+                UnitLiteral = "%",
                 RawValue = c => c.BeaconChargePct.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "ExtraJumpCount",
-                Section = SectionRoles,
-                LabelJa = Texts.Get(TextId.SettingsLabelExtraJumpCount),
-                Unit = "",
+                SectionId = TextId.SettingsSectionRoles,
+                LabelId = TextId.SettingsLabelExtraJumpCount,
                 RawValue = c => c.ExtraJumpCount.ToString(CultureInfo.InvariantCulture),
                 Display = DisplayAutoOr(Texts.Get(TextId.SettingsUnitTimes)),
             },
             new SettingEntry
             {
                 SettingId = "BeaconCooldownSec",
-                Section = SectionRoles,
-                LabelJa = Texts.Get(TextId.SettingsLabelBeaconCooldownSec),
-                Unit = Texts.Get(TextId.SettingsUnitSeconds),
+                SectionId = TextId.SettingsSectionRoles,
+                LabelId = TextId.SettingsLabelBeaconCooldownSec,
+                UnitId = TextId.SettingsUnitSeconds,
                 RawValue = c => c.BeaconCooldownSec.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "BeaconSuppressStartSec",
-                Section = SectionRoles,
-                LabelJa = Texts.Get(TextId.SettingsLabelBeaconSuppressStartSec),
-                Unit = Texts.Get(TextId.SettingsUnitSeconds),
+                SectionId = TextId.SettingsSectionRoles,
+                LabelId = TextId.SettingsLabelBeaconSuppressStartSec,
+                UnitId = TextId.SettingsUnitSeconds,
                 RawValue = c => c.BeaconSuppressStartSec.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "BeaconSuppressAfterMeetingSec",
-                Section = SectionRoles,
-                LabelJa = Texts.Get(TextId.SettingsLabelBeaconSuppressAfterMeetingSec),
-                Unit = Texts.Get(TextId.SettingsUnitSeconds),
+                SectionId = TextId.SettingsSectionRoles,
+                LabelId = TextId.SettingsLabelBeaconSuppressAfterMeetingSec,
+                UnitId = TextId.SettingsUnitSeconds,
                 RawValue = c => c.BeaconSuppressAfterMeetingSec.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
@@ -622,36 +608,35 @@ namespace Werewolf.Core
             new SettingEntry
             {
                 SettingId = "BlackCatRevealDelaySec",
-                Section = SectionBlackCat,
-                LabelJa = Texts.Get(TextId.SettingsLabelBlackCatRevealDelaySec),
-                Unit = Texts.Get(TextId.SettingsUnitSeconds),
+                SectionId = TextId.SettingsSectionBlackCat,
+                LabelId = TextId.SettingsLabelBlackCatRevealDelaySec,
+                UnitId = TextId.SettingsUnitSeconds,
                 RawValue = c => c.BlackCatRevealDelaySec.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "BlackCatCurseEnabled",
-                Section = SectionBlackCat,
-                LabelJa = Texts.Get(TextId.SettingsLabelBlackCatCurseEnabled),
-                Unit = "",
+                SectionId = TextId.SettingsSectionBlackCat,
+                LabelId = TextId.SettingsLabelBlackCatCurseEnabled,
                 RawValue = c => c.BlackCatCurseEnabled ? "1" : "0",
                 Display = DisplayBoolEnable,
             },
             new SettingEntry
             {
                 SettingId = "InformantThresholdPct",
-                Section = SectionBlackCat,
-                LabelJa = Texts.Get(TextId.SettingsLabelInformantThresholdPct),
-                Unit = "%",
+                SectionId = TextId.SettingsSectionBlackCat,
+                LabelId = TextId.SettingsLabelInformantThresholdPct,
+                UnitLiteral = "%",
                 RawValue = c => c.InformantThresholdPct.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "CatGaugeSyncIntervalSec",
-                Section = SectionBlackCat,
-                LabelJa = Texts.Get(TextId.SettingsLabelCatGaugeSyncIntervalSec),
-                Unit = Texts.Get(TextId.SettingsUnitSeconds),
+                SectionId = TextId.SettingsSectionBlackCat,
+                LabelId = TextId.SettingsLabelCatGaugeSyncIntervalSec,
+                UnitId = TextId.SettingsUnitSeconds,
                 RawValue = c => c.CatGaugeSyncIntervalSec.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
@@ -662,72 +647,70 @@ namespace Werewolf.Core
             new SettingEntry
             {
                 SettingId = "BomberProximityMeters",
-                Section = SectionBomber,
-                LabelJa = Texts.Get(TextId.SettingsLabelBomberProximityMeters),
-                Unit = Texts.Get(TextId.SettingsUnitMeters),
+                SectionId = TextId.SettingsSectionBomber,
+                LabelId = TextId.SettingsLabelBomberProximityMeters,
+                UnitId = TextId.SettingsUnitMeters,
                 RawValue = c => c.BomberProximityMeters.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "BomberGaugeFullSec",
-                Section = SectionBomber,
-                LabelJa = Texts.Get(TextId.SettingsLabelBomberGaugeFullSec),
-                Unit = Texts.Get(TextId.SettingsUnitSeconds),
+                SectionId = TextId.SettingsSectionBomber,
+                LabelId = TextId.SettingsLabelBomberGaugeFullSec,
+                UnitId = TextId.SettingsUnitSeconds,
                 RawValue = c => c.BomberGaugeFullSec.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "BomberInitialCooldownSec",
-                Section = SectionBomber,
-                LabelJa = Texts.Get(TextId.SettingsLabelBomberInitialCooldownSec),
-                Unit = Texts.Get(TextId.SettingsUnitSeconds),
+                SectionId = TextId.SettingsSectionBomber,
+                LabelId = TextId.SettingsLabelBomberInitialCooldownSec,
+                UnitId = TextId.SettingsUnitSeconds,
                 RawValue = c => c.BomberInitialCooldownSec.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "BomberCooldownSec",
-                Section = SectionBomber,
-                LabelJa = Texts.Get(TextId.SettingsLabelBomberCooldownSec),
-                Unit = Texts.Get(TextId.SettingsUnitSeconds),
+                SectionId = TextId.SettingsSectionBomber,
+                LabelId = TextId.SettingsLabelBomberCooldownSec,
+                UnitId = TextId.SettingsUnitSeconds,
                 RawValue = c => c.BomberCooldownSec.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "BomberBlastRadiusMeters",
-                Section = SectionBomber,
-                LabelJa = Texts.Get(TextId.SettingsLabelBomberBlastRadiusMeters),
-                Unit = Texts.Get(TextId.SettingsUnitMeters),
+                SectionId = TextId.SettingsSectionBomber,
+                LabelId = TextId.SettingsLabelBomberBlastRadiusMeters,
+                UnitId = TextId.SettingsUnitMeters,
                 RawValue = c => c.BomberBlastRadiusMeters.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "BomberBlastPlayerDamage",
-                Section = SectionBomber,
-                LabelJa = Texts.Get(TextId.SettingsLabelBomberBlastPlayerDamage),
-                Unit = "",
+                SectionId = TextId.SettingsSectionBomber,
+                LabelId = TextId.SettingsLabelBomberBlastPlayerDamage,
                 RawValue = c => c.BomberBlastPlayerDamage.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "BomberBlastEnemyDamage",
-                Section = SectionBomber,
-                LabelJa = Texts.Get(TextId.SettingsLabelBomberBlastEnemyDamage),
-                Unit = "",
+                SectionId = TextId.SettingsSectionBomber,
+                LabelId = TextId.SettingsLabelBomberBlastEnemyDamage,
                 RawValue = c => c.BomberBlastEnemyDamage.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "BomberAmmoRefillPct",
-                Section = SectionBomber,
-                LabelJa = Texts.Get(TextId.SettingsLabelBomberAmmoRefillPct),
-                Unit = Texts.Get(TextId.SettingsUnitPercent),
+                SectionId = TextId.SettingsSectionBomber,
+                LabelId = TextId.SettingsLabelBomberAmmoRefillPct,
+                UnitId = TextId.SettingsUnitPercent,
                 RawValue = c => c.BomberAmmoRefillPct.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
@@ -738,63 +721,59 @@ namespace Werewolf.Core
             new SettingEntry
             {
                 SettingId = "StartLevelNumber",
-                Section = SectionWorldgen,
-                LabelJa = Texts.Get(TextId.SettingsLabelStartLevelNumber),
-                Unit = "",
+                SectionId = TextId.SettingsSectionWorldgen,
+                LabelId = TextId.SettingsLabelStartLevelNumber,
                 RawValue = c => c.StartLevelNumber.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "StartMapName",
-                Section = SectionWorldgen,
-                LabelJa = Texts.Get(TextId.SettingsLabelStartMapName),
-                Unit = "",
+                SectionId = TextId.SettingsSectionWorldgen,
+                LabelId = TextId.SettingsLabelStartMapName,
                 RawValue = c => SanitizeMapNameRaw(c.StartMapName),
                 Display = raw => string.IsNullOrEmpty(raw) ? Texts.Get(TextId.SettingsRandom) : raw,
             },
             new SettingEntry
             {
                 SettingId = "StartItemsSpec",
-                Section = SectionWorldgen,
-                LabelJa = Texts.Get(TextId.SettingsLabelStartItemsSpec),
-                Unit = "",
+                SectionId = TextId.SettingsSectionWorldgen,
+                LabelId = TextId.SettingsLabelStartItemsSpec,
                 RawValue = c => c.StartItemsSpec ?? "",
                 Display = DisplayItemsAggregate,
             },
             new SettingEntry
             {
                 SettingId = "StartEnergyPct",
-                Section = SectionWorldgen,
-                LabelJa = Texts.Get(TextId.SettingsLabelStartEnergyPct),
-                Unit = "%",
+                SectionId = TextId.SettingsSectionWorldgen,
+                LabelId = TextId.SettingsLabelStartEnergyPct,
+                UnitLiteral = "%",
                 RawValue = c => c.StartEnergyPct.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "StartUpgradesSpec",
-                Section = SectionWorldgen,
-                LabelJa = Texts.Get(TextId.SettingsLabelStartUpgradesSpec),
-                Unit = "",
+                SectionId = TextId.SettingsSectionWorldgen,
+                LabelId = TextId.SettingsLabelStartUpgradesSpec,
                 RawValue = c => c.StartUpgradesSpec ?? "",
                 Display = DisplayUpgradesAggregate,
             },
             new SettingEntry
             {
                 SettingId = "OrbDropMax",
-                Section = SectionWorldgen,
-                LabelJa = Texts.Get(TextId.SettingsLabelOrbDropMax),
-                Unit = Texts.Get(TextId.SettingsUnitItems),
+                SectionId = TextId.SettingsSectionWorldgen,
+                LabelId = TextId.SettingsLabelOrbDropMax,
+                UnitId = TextId.SettingsUnitItems,
                 RawValue = c => c.OrbDropMax.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw,
             },
             new SettingEntry
             {
                 SettingId = "StartHaulGoalPct",
-                Section = SectionWorldgen,
-                LabelJa = Texts.Get(TextId.SettingsLabelStartHaulGoalPct),
-                Unit = Texts.Get(TextId.SettingsUnitPercent),
+                SectionId = TextId.SettingsSectionWorldgen,
+                LabelId = TextId.SettingsLabelStartHaulGoalPct,
+                UnitId = TextId.SettingsUnitPercent,
                 RawValue = c => c.StartHaulGoalPct.ToString(CultureInfo.InvariantCulture),
                 Display = raw => raw == "0" ? Texts.Get(TextId.SettingsValueVanilla) : raw,
             },
@@ -806,9 +785,8 @@ namespace Werewolf.Core
         private static SettingEntry EnemySetsEntry(string id, TextId label, Func<GameConfig, int> sets) => new SettingEntry
         {
             SettingId = id,
-            Section = SectionWorldgen,
-            LabelJa = Texts.Get(label),
-            Unit = "",
+            SectionId = TextId.SettingsSectionWorldgen,
+            LabelId = label,
             RawValue = c => sets(c).ToString(CultureInfo.InvariantCulture),
             Display = raw => raw == "-1"
                 ? Texts.Get(TextId.SettingsValueVanilla)
@@ -818,23 +796,31 @@ namespace Werewolf.Core
 
     public sealed class SettingEntry
     {
-        public string SettingId;
+        public string SettingId = "";
 
-        public string Section;
+        public TextId SectionId;
 
-        public string LabelJa;
+        public TextId LabelId;
 
-        public string Unit;
+        public TextId? UnitId;
 
-        public Func<GameConfig, string> RawValue;
+        public string UnitLiteral = "";
 
-        public Func<string, string> Display;
+        public string Section => Texts.Get(SectionId);
+
+        public string Label => Texts.Get(LabelId);
+
+        public string Unit => UnitId is TextId id ? Texts.Get(id) : UnitLiteral;
+
+        public Func<GameConfig, string> RawValue = _ => "";
+
+        public Func<string, string> Display = _ => "";
     }
 
     public sealed class SettingRow
     {
-        public string Section;
-        public string Label;
-        public string Value;
+        public string Section = "";
+        public string Label = "";
+        public string Value = "";
     }
 }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using UnityEngine;
 using Werewolf.Core;
 using Werewolf.Net;
@@ -18,7 +19,7 @@ namespace Werewolf.Game
 
         internal long LastMeetingEndUnixMsClient => _roundMirror.LastMeetingEndUnixMs;
 
-        internal INetBus ClientBus => _bus;
+        internal INetBus? ClientBus => _bus;
 
         internal void PlaySfx(string clipKey, float volumeScale = 1f)
         {
@@ -56,11 +57,11 @@ namespace Werewolf.Game
         internal long ClientRoleRevealStartUnixMs => _roundMirror.RoleRevealStartUnixMs;
         internal long ClientRoleRevealEndUnixMs => _roundMirror.RoleRevealEndUnixMs;
 
-        internal bool RoleRevealVisible => _roleRevealFeature.CinematicVisible;
+        internal bool RoleRevealVisible => Runtime.RoleRevealFeature.CinematicVisible;
 
-        internal int[] KnownWerewolves => _roundMirror.KnownWerewolves;
+        internal int[]? KnownWerewolves => _roundMirror.KnownWerewolves;
 
-        internal byte[] KnownTeammateRoles => _roundMirror.KnownTeammateRoles;
+        internal byte[]? KnownTeammateRoles => _roundMirror.KnownTeammateRoles;
 
         internal int ClientWerewolfCount => _roundMirror.WerewolfCount;
 
@@ -73,34 +74,34 @@ namespace Werewolf.Game
 
         internal bool IsBlackCatCurseEnabledForClient()
         {
-            string blob = ResolveLobbySettingsBlob();
+            string? blob = ResolveLobbySettingsBlob();
             if (SettingsCatalog.TryDecodeBlob(blob, out var values)
                 && values.TryGetValue("BlackCatCurseEnabled", out string raw))
                 return raw == "1";
             return true;
         }
 
-        internal void MaybeShowTutorial(TutorialId id) => _tutorialFeature?.MaybeShowTutorial(id);
+        internal void MaybeShowTutorial(TutorialId id) => Runtime.TutorialFeature.MaybeShowTutorial(id);
 
-        internal void FeedScenarioSignal(ScenarioSignal signal) => _scenarioFeature?.FeedSignal(signal);
+        internal void FeedScenarioSignal(ScenarioSignal signal) => Runtime.ScenarioFeature.FeedSignal(signal);
 
         internal bool LocalNearCorpseBody
-            => _meetingClientFeature != null && _meetingClientFeature.LocalIsNearCorpseBody;
+            => Runtime.MeetingClientFeature.LocalIsNearCorpseBody;
 
-        internal ScenarioShamanSample ShamanSenseSample
-            => _shamanFeature != null
-                ? new ScenarioShamanSample(_shamanFeature.SenseArmed, _shamanFeature.SenseCoolingDown,
-                    _shamanFeature.GhostVisible, _shamanFeature.StormTier)
-                : default;
+        internal ScenarioShamanSample ShamanSenseSample => new ScenarioShamanSample(
+            Runtime.ShamanFeature.SenseArmed,
+            Runtime.ShamanFeature.SenseCoolingDown,
+            Runtime.ShamanFeature.GhostVisible,
+            Runtime.ShamanFeature.StormTier);
 
-        internal ScenarioFlow ScenarioFlowView => _scenarioFeature?.Flow;
+        internal ScenarioFlow? ScenarioFlowView => Runtime.ScenarioFeature.Flow;
 
         internal bool ScenarioGuidePending
         {
             get
             {
                 if (!ClientScenarioSession) return false;
-                ScenarioFlow flow = _scenarioFeature?.Flow;
+                ScenarioFlow? flow = Runtime.ScenarioFeature.Flow;
                 return flow != null && !flow.Finished;
             }
         }
@@ -110,53 +111,55 @@ namespace Werewolf.Game
             get
             {
                 if (!ClientScenarioSession) return false;
-                ScenarioFlow flow = _scenarioFeature?.Flow;
+                ScenarioFlow? flow = Runtime.ScenarioFeature.Flow;
                 return flow != null && flow.ChatLogExplanationPending;
             }
         }
 
-        internal int BomberTargetActorClient => _bomberFeature != null ? _bomberFeature.TargetActorClient : -1;
+        internal int BomberTargetActorClient => Runtime.BomberFeature.TargetActorClient;
 
         internal bool ScenarioWrongBombTarget(int targetActor)
-            => _scenarioFeature != null && _scenarioFeature.IsWrongBombTarget(targetActor);
+            => Runtime.ScenarioFeature.IsWrongBombTarget(targetActor);
 
         internal bool ScenarioBombAlreadyOnTarget
-            => _scenarioFeature != null && _scenarioFeature.BombOnBombTarget();
+            => Runtime.ScenarioFeature.BombOnBombTarget();
 
-        internal bool MeetingChatLogOpen => _chatFeature != null && _chatFeature.IsMeetingPanelOpen;
+        internal bool MeetingChatLogOpen => Runtime.ChatFeature.IsMeetingPanelOpen;
 
-        internal bool MeetingMapOpen => _meetingClientFeature != null && _meetingClientFeature.MapOverlayOpen;
+        internal bool MeetingMapOpen => Runtime.MeetingClientFeature.MapOverlayOpen;
 
-        internal bool MeetingActiveClient => _meetingClient != null && _meetingClient.MeetingActive;
+        internal bool MeetingActiveClient => _meetingClient.MeetingActive;
 
         internal bool ScenarioGuideContainsPointer(UnityEngine.Vector2 p)
-            => _scenarioFeature != null && _scenarioFeature.GuideContainsPointer(p);
+            => Runtime.ScenarioFeature.GuideContainsPointer(p);
 
-        internal bool EnsureUiCreated() => _uiManager != null && _uiManager.EnsureCreated(gameObject);
+        internal bool EnsureUiCreated() => Runtime.UiManager.EnsureCreated(gameObject);
 
-        internal Transform GetUiLayerRoot(string layerName) => _uiManager.GetLayerRoot(layerName);
+        internal Transform? GetUiLayerRoot(string layerName) => Runtime.UiManager.GetLayerRoot(layerName);
 
-        internal WerewolfUIManager UiManagerView => _uiManager;
+        internal WerewolfUIManager UiManagerView => Runtime.UiManager;
 
-        internal MeetingChatController Chat => _chatFeature;
+        internal MeetingChatController Chat => Runtime.ChatFeature;
 
-        internal IReadOnlyList<WPlayer> HostSessionPlayers => _session?.Players;
+        internal IReadOnlyList<WPlayer>? HostSessionPlayers => _hostRound?.Session.Players;
 
-        internal GameSession HostSession => _session;
+        internal GameSession? HostSession => _hostRound?.Session;
 
-        internal RolesSession HostRolesSession => _roles;
+        internal GameConfig? HostRoundConfig => _hostRound?.Config;
 
-        internal MeetingSession HostMeetingSession => _meeting;
+        internal HostPlayState? HostGameplay => _hostRound?.Play;
 
-        internal MeetingGaugePanel GaugePanelView => _rolesClientFeature.GaugePanel;
+        internal MeetingSession? HostMeetingSession => _hostRound?.Play?.Meeting;
 
-        internal CorpseReportHudPanel.Layout CorpseReportHudLayout => _rolesClientFeature.CorpseReportHudLayout;
+        internal MeetingGaugePanel GaugePanelView => Runtime.RolesClientFeature.GaugePanel;
+
+        internal CorpseReportHudPanel.Layout CorpseReportHudLayout => Runtime.RolesClientFeature.CorpseReportHudLayout;
 
         internal void PlayShamanHauntingRipple(ShamanStormTier tier)
-            => _rolesClientFeature?.PlayShamanHauntingRipple(tier);
+            => Runtime.RolesClientFeature.PlayShamanHauntingRipple(tier);
 
         internal void ClearShamanHauntingRipples()
-            => _rolesClientFeature?.ClearShamanHauntingRipples();
+            => Runtime.RolesClientFeature.ClearShamanHauntingRipples();
 
         internal bool ClientDebugSession => _cfgMirror.DebugSession;
 
@@ -167,49 +170,49 @@ namespace Werewolf.Game
         internal bool ScenarioForcesInvincible => ScenarioRun.InvincibilityForced;
 
         internal bool ScenarioCheckmateArmed
-            => _scenarioFeature == null || _scenarioFeature.CheckmateArmed;
+            => Runtime.ScenarioFeature.CheckmateArmed;
 
         internal bool MeetingButtonNear =>
-            _meetingClientFeature != null && _meetingClientFeature.MeetingButtonNear;
+            Runtime.MeetingClientFeature.MeetingButtonNear;
 
         internal bool MeetingButtonUsesGrab =>
-            _meetingClientFeature != null && _meetingClientFeature.MeetingButtonUsesGrab;
+            Runtime.MeetingClientFeature.MeetingButtonUsesGrab;
 
-        internal bool ScatterGuardArmed(long now) => _scatterFeature.IsClientGuardArmed(now);
+        internal bool ScatterGuardArmed(long now) => Runtime.ScatterFeature.IsClientGuardArmed(now);
 
-        internal void PushToast(SessionNotice notice) => _rolesClientFeature?.PushToast(notice);
+        internal void PushToast(SessionNotice notice) => Runtime.RolesClientFeature.PushToast(notice);
 
         internal void PushRawToast(string message, string clipKey = NoticeSfx.DefaultClipKey,
             string logKind = "bomber", bool playSfx = true)
-            => _rolesClientFeature?.PushRawToast(message, clipKey, logKind, playSfx);
+            => Runtime.RolesClientFeature.PushRawToast(message, clipKey, logKind, playSfx);
 
-        public void ShowDeadlineBanner() => _rolesClientFeature?.ShowDeadlineBanner();
+        public void ShowDeadlineBanner() => Runtime.RolesClientFeature.ShowDeadlineBanner();
 
-        public void ShowDiscussionImpact() => _rolesClientFeature?.ShowDiscussionImpact();
+        public void ShowDiscussionImpact() => Runtime.RolesClientFeature.ShowDiscussionImpact();
 
-        internal void HideDiscussionImpact() => _rolesClientFeature?.HideDiscussionImpact();
+        internal void HideDiscussionImpact() => Runtime.RolesClientFeature.HideDiscussionImpact();
 
         internal bool LocalValuableDiscoverSuppressed =>
-            _rolesClientFeature != null && _rolesClientFeature.LocalValuableDiscoverSuppressed;
+            Runtime.RolesClientFeature.LocalValuableDiscoverSuppressed;
 
-        internal VotePanel VotePanelView => _votePanel;
+        internal VotePanel VotePanelView => Runtime.VotePanel;
 
         internal bool MeetingUiActive =>
-            _meetingClientFeature != null && _meetingClientFeature.MeetingUiActive;
+            Runtime.MeetingClientFeature.MeetingUiActive;
 
-        internal bool WinCeremonyActive => _winCeremonyFeature.WinCeremonyActive;
+        internal bool WinCeremonyActive => Runtime.WinCeremonyFeature.WinCeremonyActive;
 
-        internal MeetingScatterController ScatterFeature => _scatterFeature;
+        internal MeetingScatterController ScatterFeature => Runtime.ScatterFeature;
 
-        internal RolesClientController RolesClientFeature => _rolesClientFeature;
+        internal RolesClientController RolesClientFeature => Runtime.RolesClientFeature;
 
-        internal MeetingClientController MeetingFeature => _meetingClientFeature;
+        internal MeetingClientController MeetingFeature => Runtime.MeetingClientFeature;
 
-        internal MovementFreezer MovementFreezerView => _movementFreezer;
+        internal MovementFreezer MovementFreezerView => Runtime.MovementFreezer;
 
-        internal EnemyFreezer EnemyFreezerView => _enemyFreezer;
+        internal EnemyFreezer EnemyFreezerView => Runtime.EnemyFreezer;
 
-        internal TruckWarper TruckWarperView => _truckWarper;
+        internal TruckWarper TruckWarperView => Runtime.TruckWarper;
 
         internal ManualOverlay ManualOverlayView => _manualOverlay;
 
@@ -221,46 +224,42 @@ namespace Werewolf.Game
             _sfxPlayer.PlayStoppable(clipKey, volumeScale);
         }
 
-        internal void StopStoppableSfx(string clipKey = null) => _sfxPlayer.StopStoppable(clipKey);
+        internal void StopStoppableSfx(string? clipKey = null) => _sfxPlayer.StopStoppable(clipKey);
 
         internal string ParticipantIdLabel(int actor)
             => ParticipantLabel.Format(IdRoster.IdOf(actor), ResolveDisplayName(actor));
 
-        public void HostRequestCheckmateScan() => _winCeremonyFeature?.RequestCheckmateScan();
+        public void HostRequestCheckmateScan() => Runtime.WinCeremonyFeature.RequestCheckmateScan();
 
-        public bool DebugForceCheckmate() =>
-            _winCeremonyFeature != null && _winCeremonyFeature.DebugForceCheckmate();
+        public bool DebugForceCheckmate() => Runtime.WinCeremonyFeature.DebugForceCheckmate();
 
         internal ResultScreen ResultScreenView => _resultScreen;
 
         internal ResultSequence ResultSequenceView => _resultSequence;
 
-        internal string LobbyBlobMirror => _lobbySettingsFeature.BlobMirror;
+        internal string? LobbyBlobMirror => Runtime.LobbySettingsFeature.BlobMirror;
 
         internal RoomState RoomStateView => _roomState;
 
-        internal string ResolveLobbySettingsBlob() => _lobbySettingsFeature.ResolveLobbySettingsBlob();
+        internal string? ResolveLobbySettingsBlob() => Runtime.LobbySettingsFeature.ResolveLobbySettingsBlob();
 
-        internal void HostRecordExtractionDone() => _resultFlowFeature?.HostRecordExtractionDone();
+        internal void HostRecordExtractionDone() => Runtime.ResultFlowFeature.HostRecordExtractionDone();
 
-        internal bool IsChatLogWindowOpenClient => _chatFeature != null && _chatFeature.IsWindowOpen;
+        internal bool IsChatLogWindowOpenClient => Runtime.ChatFeature.IsWindowOpen;
 
         public void RecordMeetingChatClient(int speakerActor, string message)
-            => _chatFeature?.RecordChat(speakerActor, message);
+            => Runtime.ChatFeature.RecordChat(speakerActor, message);
 
         public void RecordReplayChatClient(int speakerActor, string message)
-            => _chatFeature?.RecordReplayChat(speakerActor, message);
+            => Runtime.ChatFeature.RecordReplayChat(speakerActor, message);
 
-        internal bool TryInterceptLobbyStart(LobbyStartPage lobbyPage) =>
-            _modIntegrityFeature == null || _modIntegrityFeature.TryInterceptLobbyStart(lobbyPage);
+        internal bool TryInterceptLobbyStart(LobbyStartPage? lobbyPage) =>
+            Runtime.ModIntegrityFeature.TryInterceptLobbyStart(lobbyPage);
 
-        internal bool TryGetModIntegrityStatus(int actor, out ModParticipantRecord record)
-        {
-            if (_modIntegrityFeature != null) return _modIntegrityFeature.TryGetStatus(actor, out record);
-            record = null;
-            return false;
-        }
+        internal bool TryGetModIntegrityStatus(int actor,
+            [NotNullWhen(true)] out ModParticipantRecord? record)
+            => Runtime.ModIntegrityFeature.TryGetStatus(actor, out record);
 
-        internal int ModIntegrityRevision => _modIntegrityFeature?.Revision ?? -1;
+        internal int ModIntegrityRevision => Runtime.ModIntegrityFeature.Revision;
     }
 }

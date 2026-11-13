@@ -1,3 +1,4 @@
+#nullable enable
 namespace Werewolf.Core
 {
     public sealed class HudModel
@@ -31,7 +32,8 @@ namespace Werewolf.Core
                 return HudState.Hidden;
             }
 
-            bool showGauge = input.RolesClient != null && input.RolesClient.CanShowHud(input.LocalRole);
+            RolesClientState? rolesClient = input.RolesClient;
+            bool showGauge = rolesClient != null && rolesClient.CanShowHud(input.LocalRole);
 
             long timerRemainingMs = meetingWindow
                 ? _frozenRemainingMs
@@ -49,7 +51,7 @@ namespace Werewolf.Core
                 bellMarkSec: rungMarkSec,
                 bellVolumeScale: rungMarkSec > 0 ? BellSchedule.VolumeScaleFor(rungMarkSec) : 0f,
                 showGauge: showGauge,
-                gaugeRatioPermille: showGauge ? input.RolesClient.RatioPermille : 0,
+                gaugeRatioPermille: showGauge ? rolesClient!.RatioPermille : 0,
                 showRights: input.NearMeetingButton,
                 rightsRemaining: input.RightsRemaining,
                 showTestPlay: input.DebugSession,
@@ -73,7 +75,7 @@ namespace Werewolf.Core
 
         public long RoundEndUnixMs { get; }
 
-        public RolesClientState RolesClient { get; }
+        public RolesClientState? RolesClient { get; }
 
         public bool NearMeetingButton { get; }
 
@@ -95,7 +97,7 @@ namespace Werewolf.Core
             GamePhase phase,
             Role? localRole,
             long roundEndUnixMs,
-            RolesClientState rolesClient,
+            RolesClientState? rolesClient,
             bool nearMeetingButton,
             int rightsRemaining,
             long nowUnixMs,

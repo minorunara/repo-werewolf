@@ -1,7 +1,9 @@
+#nullable enable
 using ExitGames.Client.Photon;
 using Photon.Pun;
 using Photon.Realtime;
 using Werewolf.Core;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Werewolf.Vanilla
 {
@@ -55,8 +57,8 @@ namespace Werewolf.Vanilla
         {
             if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
 
-            Room room = PhotonNetwork.CurrentRoom;
-            Player player = room?.GetPlayer(actorNumber);
+            Room? room = PhotonNetwork.CurrentRoom;
+            Player? player = room?.GetPlayer(actorNumber);
             if (player != null)
             {
                 var props = new Hashtable { [KeyIsAlive] = (byte)(alive ? 1 : 0) };
@@ -130,10 +132,10 @@ namespace Werewolf.Vanilla
                 ("bomberPossible", config.BomberPossible(playerCount) ? 1 : 0));
         }
 
-        public bool TryReadBombPack(out int[] packed)
+        public bool TryReadBombPack([NotNullWhen(true)] out int[]? packed)
         {
             packed = null;
-            Room room = PhotonNetwork.CurrentRoom;
+            Room? room = PhotonNetwork.CurrentRoom;
             if (room != null && room.CustomProperties.TryGetValue(KeyBomb, out object value)
                 && value is int[] arr && arr.Length == RoomStateKeys.BombIndex.Length)
             {
@@ -143,10 +145,10 @@ namespace Werewolf.Vanilla
             return false;
         }
 
-        public bool TryReadShamanPack(out int[] packed)
+        public bool TryReadShamanPack([NotNullWhen(true)] out int[]? packed)
         {
             packed = null;
-            Room room = PhotonNetwork.CurrentRoom;
+            Room? room = PhotonNetwork.CurrentRoom;
             if (room != null && room.CustomProperties.TryGetValue(KeyShaman, out object value)
                 && value is int[] arr && arr.Length == RoomStateKeys.ShamanIndex.Length)
             {
@@ -268,8 +270,8 @@ namespace Werewolf.Vanilla
         {
             if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
 
-            Room room = PhotonNetwork.CurrentRoom;
-            Player player = room?.GetPlayer(actorNumber);
+            Room? room = PhotonNetwork.CurrentRoom;
+            Player? player = room?.GetPlayer(actorNumber);
             if (player != null)
             {
                 var props = new Hashtable { [KeyRights] = RoomStateKeys.EncodeRights(remaining) };
@@ -282,7 +284,7 @@ namespace Werewolf.Vanilla
         public bool TryReadRights(int actorNumber, out int remaining)
         {
             remaining = 0;
-            Player player = PhotonNetwork.CurrentRoom?.GetPlayer(actorNumber);
+            Player? player = PhotonNetwork.CurrentRoom?.GetPlayer(actorNumber);
             if (player != null && player.CustomProperties.TryGetValue(KeyRights, out object value) && value is byte b)
             {
                 remaining = RoomStateKeys.DecodeRights(b);
@@ -298,10 +300,10 @@ namespace Werewolf.Vanilla
                 ("key", "cfgshared"), ("blobLen", blob?.Length ?? 0));
         }
 
-        public bool TryReadSharedSettings(out string blob)
+        public bool TryReadSharedSettings([NotNullWhen(true)] out string? blob)
         {
             blob = null;
-            Room room = PhotonNetwork.CurrentRoom;
+            Room? room = PhotonNetwork.CurrentRoom;
             if (room != null && room.CustomProperties.TryGetValue(KeyCfgShared, out object value) && value is string s)
             {
                 blob = s;

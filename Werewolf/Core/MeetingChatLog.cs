@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -24,7 +25,7 @@ namespace Werewolf.Core
     public readonly struct ChatLogEntry
     {
         public ChatLogEntry(int actor, string name, string text, ChatSpeaker speaker, ChatEntryKind kind,
-                            string title = null, string icon = null)
+                            string? title = null, string? icon = null)
         {
             Actor = actor;
             Name = name;
@@ -93,13 +94,13 @@ namespace Werewolf.Core
 
         public long DroppedTotal { get; private set; }
 
-        public bool Append(int actor, string name, string text, ChatSpeaker speaker)
+        public bool Append(int actor, string? name, string? text, ChatSpeaker speaker)
             => AppendCore(actor, name, text, speaker, ChatEntryKind.Message);
 
-        public bool AppendVote(int actor, string name, string text)
+        public bool AppendVote(int actor, string? name, string? text)
             => AppendCore(actor, name, text, ChatSpeaker.Alive, ChatEntryKind.Vote);
 
-        public bool AppendSystem(string name, string title, string text, string icon = null,
+        public bool AppendSystem(string? name, string? title, string? text, string? icon = null,
                                  bool section = false)
         {
             bool added = AppendCore(SystemActor, name, text, ChatSpeaker.Alive, ChatEntryKind.System, title, icon);
@@ -107,8 +108,8 @@ namespace Werewolf.Core
             return added;
         }
 
-        private bool AppendCore(int actor, string name, string text, ChatSpeaker speaker, ChatEntryKind kind,
-                                string title = null, string icon = null)
+        private bool AppendCore(int actor, string? name, string? text, ChatSpeaker speaker, ChatEntryKind kind,
+                                string? title = null, string? icon = null)
         {
             bool system = kind == ChatEntryKind.System;
             string body = system
@@ -164,13 +165,13 @@ namespace Werewolf.Core
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-        public static string Sanitize(string raw, int maxLength)
+        public static string Sanitize(string? raw, int maxLength)
             => SanitizeCore(raw, maxLength, keepLineBreaks: false);
 
-        public static string SanitizeMultiline(string raw, int maxLength)
+        public static string SanitizeMultiline(string? raw, int maxLength)
             => SanitizeCore(raw, maxLength, keepLineBreaks: true);
 
-        private static string SanitizeCore(string raw, int maxLength, bool keepLineBreaks)
+        private static string SanitizeCore(string? raw, int maxLength, bool keepLineBreaks)
         {
             if (string.IsNullOrEmpty(raw)) return string.Empty;
 

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using UnityEngine;
@@ -5,7 +6,7 @@ using Werewolf.Core;
 
 namespace Werewolf.Game.Patches
 {
-    [HarmonyPatch(typeof(PlayerAvatar), "SpawnRPC")]
+    [HarmonyPatch(typeof(PlayerAvatar), nameof(PlayerAvatar.SpawnRPC))]
     internal static class PlayerSpawnPatch
     {
         internal static volatile bool MeetingActive;
@@ -47,7 +48,7 @@ namespace Werewolf.Game.Patches
                 pc.rb.rotation = pc.transform.rotation;
                 if (!pc.rb.isKinematic)
                 {
-                    pc.rb.velocity = Vector3.zero;
+                    pc.rb.linearVelocity = Vector3.zero;
                     pc.rb.angularVelocity = Vector3.zero;
                 }
             }

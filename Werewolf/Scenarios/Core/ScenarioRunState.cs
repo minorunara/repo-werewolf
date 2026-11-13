@@ -1,3 +1,4 @@
+#nullable enable
 namespace Werewolf.Scenarios.Core
 {
     public static class ScenarioRunState
@@ -6,7 +7,7 @@ namespace Werewolf.Scenarios.Core
 
         public static ScenarioId Scenario { get; internal set; }
 
-        public static ScenarioDefinition Definition
+        public static ScenarioDefinition? Definition
             => Active && ScenarioCatalog.TryGetDefinition(Scenario, out var definition)
                 ? definition
                 : null;

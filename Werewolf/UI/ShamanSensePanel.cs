@@ -1,3 +1,4 @@
+#nullable enable
 using UnityEngine;
 using UnityEngine.UI;
 using Werewolf.Core;
@@ -42,91 +43,140 @@ namespace Werewolf.UI
         private const float RippleMaxAlpha = 0.38f;
         private static readonly Color RippleColor = new Color(0.72f, 0.86f, 1f);
 
-        private GameObject _root;
-        private RawImage _stormImage;
-        private RawImage _vignetteImage;
-        private Texture2D _vignetteTexture;
-        private RawImage _rippleImage;
-        private Texture2D _rippleTexture;
-        private float _rippleRemainingSec;
-        private float _tranceFade;
-        private Texture2D[] _noiseTextures;
-        private int _noiseFrame;
-        private float _noiseClock;
+        private sealed class ViewRefs
+        {
+            public ViewRefs(
+                GameObject root,
+                RawImage stormImage,
+                RawImage vignetteImage,
+                RawImage rippleImage,
+                Texture2D vignetteTexture,
+                Texture2D rippleTexture,
+                Texture2D[] noiseTextures)
+            {
+                Root = root;
+                StormImage = stormImage;
+                VignetteImage = vignetteImage;
+                RippleImage = rippleImage;
+                VignetteTexture = vignetteTexture;
+                RippleTexture = rippleTexture;
+                NoiseTextures = noiseTextures;
+            }
 
-        public bool Exists => _root != null;
+            public GameObject Root { get; }
+            public RawImage StormImage { get; }
+            public RawImage VignetteImage { get; }
+            public RawImage RippleImage { get; }
+            public Texture2D VignetteTexture { get; }
+            public Texture2D RippleTexture { get; }
+            public Texture2D[] NoiseTextures { get; }
+            public float RippleRemainingSec { get; set; }
+            public float TranceFade { get; set; }
+            public int NoiseFrame { get; set; }
+            public float NoiseClock { get; set; }
+        }
+
+        private ViewRefs? _view;
+
+        public bool Exists => GetLiveViewOrNull() != null;
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
 
-            if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
+            GameObject? root = null;
+            Texture2D? vignetteTexture = null;
+            Texture2D? rippleTexture = null;
+            Texture2D[]? noiseTextures = null;
+            try
+            {
+                if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            var go = new GameObject("WW_ShamanSense", typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(layerRoot, false);
-            UiKit.Stretch(rect);
-            _root = go;
+                root = new GameObject("WW_ShamanSense", typeof(RectTransform));
+                var rect = (RectTransform)root.transform;
+                rect.SetParent(layerRoot, false);
+                UiKit.Stretch(rect);
 
-            var group = go.AddComponent<CanvasGroup>();
-            group.blocksRaycasts = false;
-            group.interactable = false;
+                var group = root.AddComponent<CanvasGroup>();
+                group.blocksRaycasts = false;
+                group.interactable = false;
 
-            var vignetteGo = new GameObject("Vignette", typeof(RectTransform));
-            var vignetteRect = (RectTransform)vignetteGo.transform;
-            vignetteRect.SetParent(rect, false);
-            UiKit.Stretch(vignetteRect);
-            _vignetteImage = vignetteGo.AddComponent<RawImage>();
-            _vignetteImage.raycastTarget = false;
-            _vignetteImage.texture = EnsureVignetteTexture();
-            _vignetteImage.color = new Color(1f, 1f, 1f, 0f);
-            _vignetteImage.enabled = false;
+                var vignetteGo = new GameObject("Vignette", typeof(RectTransform));
+                var vignetteRect = (RectTransform)vignetteGo.transform;
+                vignetteRect.SetParent(rect, false);
+                UiKit.Stretch(vignetteRect);
+                RawImage vignetteImage = vignetteGo.AddComponent<RawImage>();
+                vignetteImage.raycastTarget = false;
+                vignetteTexture = CreateVignetteTexture();
+                vignetteImage.texture = vignetteTexture;
+                vignetteImage.color = new Color(1f, 1f, 1f, 0f);
+                vignetteImage.enabled = false;
 
-            var rippleGo = new GameObject("DripRipple", typeof(RectTransform));
-            var rippleRect = (RectTransform)rippleGo.transform;
-            rippleRect.SetParent(rect, false);
-            rippleRect.anchorMin = new Vector2(0.5f, 0.5f);
-            rippleRect.anchorMax = new Vector2(0.5f, 0.5f);
-            rippleRect.pivot = new Vector2(0.5f, 0.5f);
-            rippleRect.anchoredPosition = Vector2.zero;
-            rippleRect.sizeDelta = new Vector2(RippleStartSize, RippleStartSize);
-            _rippleImage = rippleGo.AddComponent<RawImage>();
-            _rippleImage.raycastTarget = false;
-            _rippleImage.texture = EnsureRippleTexture();
-            _rippleImage.color = new Color(RippleColor.r, RippleColor.g, RippleColor.b, 0f);
-            _rippleImage.enabled = false;
+                var rippleGo = new GameObject("DripRipple", typeof(RectTransform));
+                var rippleRect = (RectTransform)rippleGo.transform;
+                rippleRect.SetParent(rect, false);
+                rippleRect.anchorMin = new Vector2(0.5f, 0.5f);
+                rippleRect.anchorMax = new Vector2(0.5f, 0.5f);
+                rippleRect.pivot = new Vector2(0.5f, 0.5f);
+                rippleRect.anchoredPosition = Vector2.zero;
+                rippleRect.sizeDelta = new Vector2(RippleStartSize, RippleStartSize);
+                RawImage rippleImage = rippleGo.AddComponent<RawImage>();
+                rippleImage.raycastTarget = false;
+                rippleTexture = CreateRippleTexture();
+                rippleImage.texture = rippleTexture;
+                rippleImage.color = new Color(RippleColor.r, RippleColor.g, RippleColor.b, 0f);
+                rippleImage.enabled = false;
 
-            var stormGo = new GameObject("Storm", typeof(RectTransform));
-            var stormRect = (RectTransform)stormGo.transform;
-            stormRect.SetParent(rect, false);
-            UiKit.Stretch(stormRect);
-            _stormImage = stormGo.AddComponent<RawImage>();
-            _stormImage.raycastTarget = false;
-            _stormImage.texture = EnsureNoiseTextures()[0];
-            _stormImage.uvRect = new Rect(0f, 0f, NoiseTilesX, NoiseTilesY);
-            _stormImage.color = new Color(1f, 1f, 1f, 0f);
-            _stormImage.enabled = false;
+                var stormGo = new GameObject("Storm", typeof(RectTransform));
+                var stormRect = (RectTransform)stormGo.transform;
+                stormRect.SetParent(rect, false);
+                UiKit.Stretch(stormRect);
+                RawImage stormImage = stormGo.AddComponent<RawImage>();
+                stormImage.raycastTarget = false;
+                noiseTextures = CreateNoiseTextures();
+                stormImage.texture = noiseTextures[0];
+                stormImage.uvRect = new Rect(0f, 0f, NoiseTilesX, NoiseTilesY);
+                stormImage.color = new Color(1f, 1f, 1f, 0f);
+                stormImage.enabled = false;
 
-            _root.SetActive(false);
+                root.SetActive(false);
+                _view = new ViewRefs(root, stormImage, vignetteImage, rippleImage,
+                    vignetteTexture, rippleTexture, noiseTextures);
+            }
+            catch
+            {
+                _view = null;
+                if (root != null)
+                {
+                    root.SetActive(false);
+                    Object.Destroy(root);
+                }
+                DestroyTexture(vignetteTexture);
+                DestroyTexture(rippleTexture);
+                DestroyTextures(noiseTextures);
+                throw;
+            }
         }
 
         public void PlayDripRipple()
         {
-            if (_root == null || _rippleImage == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
 
-            _rippleRemainingSec = RippleDurationSec;
-            _rippleImage.rectTransform.sizeDelta = new Vector2(RippleStartSize, RippleStartSize);
-            _rippleImage.color = new Color(RippleColor.r, RippleColor.g, RippleColor.b, 0f);
-            _rippleImage.enabled = true;
-            if (!_root.activeSelf) _root.SetActive(true);
+            view.RippleRemainingSec = RippleDurationSec;
+            view.RippleImage.rectTransform.sizeDelta = new Vector2(RippleStartSize, RippleStartSize);
+            view.RippleImage.color = new Color(RippleColor.r, RippleColor.g, RippleColor.b, 0f);
+            view.RippleImage.enabled = true;
+            if (!view.Root.activeSelf) view.Root.SetActive(true);
         }
 
         public void Tick(ShamanStormTier tier, bool ghostBurst, bool gazeArmed, float deltaSeconds)
         {
-            if (_root == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
 
             float alpha = ghostBurst ? GhostBurstAlpha : StormAlpha(tier);
-            TickDripRipple(deltaSeconds);
+            TickDripRipple(view, deltaSeconds);
 
             if (gazeArmed)
             {
@@ -135,110 +185,78 @@ namespace Werewolf.UI
                     1f / TranceFadeInSec,
                     1f / TranceFadeOutSec,
                     PostProcessRefreshSec,
-                    _root);
+                    view.Root);
             }
 
             float fadeRate = gazeArmed ? 1f / TranceFadeInSec : 1f / TranceFadeOutSec;
-            _tranceFade = Mathf.MoveTowards(_tranceFade, gazeArmed ? 1f : 0f,
+            view.TranceFade = Mathf.MoveTowards(view.TranceFade, gazeArmed ? 1f : 0f,
                 fadeRate * deltaSeconds);
 
-            if (alpha <= 0f && _tranceFade <= 0f && _rippleRemainingSec <= 0f)
+            if (alpha <= 0f && view.TranceFade <= 0f && view.RippleRemainingSec <= 0f)
             {
-                if (_root.activeSelf) _root.SetActive(false);
+                if (view.Root.activeSelf) view.Root.SetActive(false);
                 return;
             }
-            if (!_root.activeSelf) _root.SetActive(true);
+            if (!view.Root.activeSelf) view.Root.SetActive(true);
 
-            float vignetteAlpha = _tranceFade * VignetteMaxAlpha;
-            _vignetteImage.enabled = vignetteAlpha > 0f;
-            _vignetteImage.color = new Color(1f, 1f, 1f, vignetteAlpha);
+            float vignetteAlpha = view.TranceFade * VignetteMaxAlpha;
+            view.VignetteImage.enabled = vignetteAlpha > 0f;
+            view.VignetteImage.color = new Color(1f, 1f, 1f, vignetteAlpha);
 
-            _stormImage.enabled = alpha > 0f;
+            view.StormImage.enabled = alpha > 0f;
             if (alpha > 0f)
             {
-                _stormImage.color = new Color(1f, 1f, 1f, alpha);
-                _noiseClock += deltaSeconds;
-                if (_noiseClock >= NoiseFrameSec)
+                view.StormImage.color = new Color(1f, 1f, 1f, alpha);
+                view.NoiseClock += deltaSeconds;
+                if (view.NoiseClock >= NoiseFrameSec)
                 {
-                    _noiseClock = 0f;
-                    _noiseFrame = (_noiseFrame + 1) % NoiseFrames;
-                    _stormImage.texture = EnsureNoiseTextures()[_noiseFrame];
-                    Vector2 offset = NoiseFrameOffsets[_noiseFrame];
-                    _stormImage.uvRect = new Rect(
+                    view.NoiseClock = 0f;
+                    view.NoiseFrame = (view.NoiseFrame + 1) % NoiseFrames;
+                    view.StormImage.texture = view.NoiseTextures[view.NoiseFrame];
+                    Vector2 offset = NoiseFrameOffsets[view.NoiseFrame];
+                    view.StormImage.uvRect = new Rect(
                         offset.x, offset.y, NoiseTilesX, NoiseTilesY);
                 }
             }
         }
 
-        private void TickDripRipple(float deltaSeconds)
+        private static void TickDripRipple(ViewRefs view, float deltaSeconds)
         {
-            if (_rippleImage == null || _rippleRemainingSec <= 0f) return;
+            if (view.RippleRemainingSec <= 0f) return;
 
-            _rippleRemainingSec = Mathf.Max(0f, _rippleRemainingSec - deltaSeconds);
-            float t = 1f - _rippleRemainingSec / RippleDurationSec;
+            view.RippleRemainingSec = Mathf.Max(0f, view.RippleRemainingSec - deltaSeconds);
+            float t = 1f - view.RippleRemainingSec / RippleDurationSec;
             float eased = 1f - (1f - t) * (1f - t);
             float size = Mathf.Lerp(RippleStartSize, RippleEndSize, eased);
-            _rippleImage.rectTransform.sizeDelta = new Vector2(size, size);
+            view.RippleImage.rectTransform.sizeDelta = new Vector2(size, size);
 
             float fadeIn = Mathf.Clamp01(t / 0.08f);
             float fadeOut = 1f - Mathf.SmoothStep(0f, 1f, t);
             float rippleAlpha = RippleMaxAlpha * fadeIn * fadeOut;
-            _rippleImage.color = new Color(
+            view.RippleImage.color = new Color(
                 RippleColor.r, RippleColor.g, RippleColor.b, rippleAlpha);
 
-            if (_rippleRemainingSec <= 0f)
+            if (view.RippleRemainingSec <= 0f)
             {
-                _rippleImage.enabled = false;
+                view.RippleImage.enabled = false;
             }
         }
 
         public void Hide()
         {
-            if (_root != null && _root.activeSelf) _root.SetActive(false);
-            _tranceFade = 0f;
-            _rippleRemainingSec = 0f;
-            if (_rippleImage != null)
-            {
-                _rippleImage.color = new Color(RippleColor.r, RippleColor.g, RippleColor.b, 0f);
-                _rippleImage.enabled = false;
-            }
-            if (_vignetteImage != null)
-            {
-                _vignetteImage.color = new Color(1f, 1f, 1f, 0f);
-                _vignetteImage.enabled = false;
-            }
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
+            if (view.Root.activeSelf) view.Root.SetActive(false);
+            ResetAnimation(view);
         }
 
         public void Destroy()
         {
-            if (_root != null)
-            {
-                Object.Destroy(_root);
-                _root = null;
-            }
-            _stormImage = null;
-            _vignetteImage = null;
-            _rippleImage = null;
-            _tranceFade = 0f;
-            _rippleRemainingSec = 0f;
-            if (_vignetteTexture != null)
-            {
-                Object.Destroy(_vignetteTexture);
-                _vignetteTexture = null;
-            }
-            if (_rippleTexture != null)
-            {
-                Object.Destroy(_rippleTexture);
-                _rippleTexture = null;
-            }
-            if (_noiseTextures != null)
-            {
-                foreach (var tex in _noiseTextures)
-                {
-                    if (tex != null) Object.Destroy(tex);
-                }
-                _noiseTextures = null;
-            }
+            ViewRefs? view = _view;
+            _view = null;
+            if (view == null) return;
+            if (view.Root != null) Object.Destroy(view.Root);
+            DestroyOwnedTextures(view);
         }
 
         private static float StormAlpha(ShamanStormTier tier)
@@ -252,89 +270,159 @@ namespace Werewolf.UI
             }
         }
 
-        private Texture2D EnsureVignetteTexture()
+        private static Texture2D CreateVignetteTexture()
         {
-            if (_vignetteTexture != null) return _vignetteTexture;
-            var tex = new Texture2D(VignetteSize, VignetteSize, TextureFormat.RGBA32, false);
-            tex.wrapMode = TextureWrapMode.Clamp;
-            tex.filterMode = FilterMode.Bilinear;
-            var pixels = new Color32[VignetteSize * VignetteSize];
-            const float inner = 0.55f;
-            const float outer = 1.25f;
-            for (int y = 0; y < VignetteSize; y++)
+            Texture2D? tex = null;
+            try
             {
-                float dy = (y / (float)(VignetteSize - 1)) * 2f - 1f;
-                for (int x = 0; x < VignetteSize; x++)
+                tex = new Texture2D(VignetteSize, VignetteSize, TextureFormat.RGBA32, false);
+                tex.wrapMode = TextureWrapMode.Clamp;
+                tex.filterMode = FilterMode.Bilinear;
+                var pixels = new Color32[VignetteSize * VignetteSize];
+                const float inner = 0.55f;
+                const float outer = 1.25f;
+                for (int y = 0; y < VignetteSize; y++)
                 {
-                    float dx = (x / (float)(VignetteSize - 1)) * 2f - 1f;
-                    float d = Mathf.Sqrt(dx * dx + dy * dy);
-                    float t = Mathf.Clamp01((d - inner) / (outer - inner));
-                    t = t * t * (3f - 2f * t);
-                    pixels[y * VignetteSize + x] = new Color32(0, 0, 0, (byte)(t * 255f));
-                }
-            }
-            tex.SetPixels32(pixels);
-            tex.Apply(false, false);
-            tex.name = "WW_ShamanVignette";
-            _vignetteTexture = tex;
-            return tex;
-        }
-
-        private Texture2D EnsureRippleTexture()
-        {
-            if (_rippleTexture != null) return _rippleTexture;
-
-            var tex = new Texture2D(
-                RippleTextureSize, RippleTextureSize, TextureFormat.RGBA32, false);
-            tex.wrapMode = TextureWrapMode.Clamp;
-            tex.filterMode = FilterMode.Bilinear;
-            var pixels = new Color32[RippleTextureSize * RippleTextureSize];
-
-            for (int y = 0; y < RippleTextureSize; y++)
-            {
-                float dy = y / (float)(RippleTextureSize - 1) * 2f - 1f;
-                for (int x = 0; x < RippleTextureSize; x++)
-                {
-                    float dx = x / (float)(RippleTextureSize - 1) * 2f - 1f;
-                    float distance = Mathf.Sqrt(dx * dx + dy * dy);
-                    float outer = Mathf.Clamp01(
-                        1f - Mathf.Abs(distance - 0.78f) / 0.025f);
-                    float inner = Mathf.Clamp01(
-                        1f - Mathf.Abs(distance - 0.61f) / 0.018f) * 0.45f;
-                    byte ringAlpha = (byte)(Mathf.Clamp01(outer + inner) * 255f);
-                    pixels[y * RippleTextureSize + x] =
-                        new Color32(255, 255, 255, ringAlpha);
-                }
-            }
-
-            tex.SetPixels32(pixels);
-            tex.Apply(false, false);
-            tex.name = "WW_ShamanDripRipple";
-            _rippleTexture = tex;
-            return tex;
-        }
-
-        private Texture2D[] EnsureNoiseTextures()
-        {
-            if (_noiseTextures != null) return _noiseTextures;
-            _noiseTextures = new Texture2D[NoiseFrames];
-            for (int f = 0; f < NoiseFrames; f++)
-            {
-                var tex = new Texture2D(NoiseSize, NoiseSize, TextureFormat.RGBA32, false);
-                tex.wrapMode = TextureWrapMode.Repeat;
-                tex.filterMode = FilterMode.Point;
-                var pixels = new Color32[NoiseSize * NoiseSize];
-                for (int i = 0; i < pixels.Length; i++)
-                {
-                    byte v = (byte)Random.Range(0, 256);
-                    pixels[i] = new Color32(v, v, v, 255);
+                    float dy = (y / (float)(VignetteSize - 1)) * 2f - 1f;
+                    for (int x = 0; x < VignetteSize; x++)
+                    {
+                        float dx = (x / (float)(VignetteSize - 1)) * 2f - 1f;
+                        float d = Mathf.Sqrt(dx * dx + dy * dy);
+                        float t = Mathf.Clamp01((d - inner) / (outer - inner));
+                        t = t * t * (3f - 2f * t);
+                        pixels[y * VignetteSize + x] =
+                            new Color32(0, 0, 0, (byte)(t * 255f));
+                    }
                 }
                 tex.SetPixels32(pixels);
                 tex.Apply(false, false);
-                tex.name = "WW_ShamanNoise_" + f;
-                _noiseTextures[f] = tex;
+                tex.name = "WW_ShamanVignette";
+                return tex;
             }
-            return _noiseTextures;
+            catch
+            {
+                DestroyTexture(tex);
+                throw;
+            }
+        }
+
+        private static Texture2D CreateRippleTexture()
+        {
+            Texture2D? tex = null;
+            try
+            {
+                tex = new Texture2D(
+                    RippleTextureSize, RippleTextureSize, TextureFormat.RGBA32, false);
+                tex.wrapMode = TextureWrapMode.Clamp;
+                tex.filterMode = FilterMode.Bilinear;
+                var pixels = new Color32[RippleTextureSize * RippleTextureSize];
+
+                for (int y = 0; y < RippleTextureSize; y++)
+                {
+                    float dy = y / (float)(RippleTextureSize - 1) * 2f - 1f;
+                    for (int x = 0; x < RippleTextureSize; x++)
+                    {
+                        float dx = x / (float)(RippleTextureSize - 1) * 2f - 1f;
+                        float distance = Mathf.Sqrt(dx * dx + dy * dy);
+                        float outer = Mathf.Clamp01(
+                            1f - Mathf.Abs(distance - 0.78f) / 0.025f);
+                        float inner = Mathf.Clamp01(
+                            1f - Mathf.Abs(distance - 0.61f) / 0.018f) * 0.45f;
+                        byte ringAlpha = (byte)(Mathf.Clamp01(outer + inner) * 255f);
+                        pixels[y * RippleTextureSize + x] =
+                            new Color32(255, 255, 255, ringAlpha);
+                    }
+                }
+
+                tex.SetPixels32(pixels);
+                tex.Apply(false, false);
+                tex.name = "WW_ShamanDripRipple";
+                return tex;
+            }
+            catch
+            {
+                DestroyTexture(tex);
+                throw;
+            }
+        }
+
+        private static Texture2D[] CreateNoiseTextures()
+        {
+            var textures = new Texture2D[NoiseFrames];
+            try
+            {
+                for (int f = 0; f < NoiseFrames; f++)
+                {
+                    Texture2D? tex = null;
+                    try
+                    {
+                        tex = new Texture2D(
+                            NoiseSize, NoiseSize, TextureFormat.RGBA32, false);
+                        tex.wrapMode = TextureWrapMode.Repeat;
+                        tex.filterMode = FilterMode.Point;
+                        var pixels = new Color32[NoiseSize * NoiseSize];
+                        for (int i = 0; i < pixels.Length; i++)
+                        {
+                            byte v = (byte)Random.Range(0, 256);
+                            pixels[i] = new Color32(v, v, v, 255);
+                        }
+                        tex.SetPixels32(pixels);
+                        tex.Apply(false, false);
+                        tex.name = "WW_ShamanNoise_" + f;
+                        textures[f] = tex;
+                        tex = null;
+                    }
+                    finally
+                    {
+                        DestroyTexture(tex);
+                    }
+                }
+                return textures;
+            }
+            catch
+            {
+                DestroyTextures(textures);
+                throw;
+            }
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+
+            _view = null;
+            DestroyOwnedTextures(view);
+            return null;
+        }
+
+        private static void ResetAnimation(ViewRefs view)
+        {
+            view.TranceFade = 0f;
+            view.RippleRemainingSec = 0f;
+            view.RippleImage.color = new Color(RippleColor.r, RippleColor.g, RippleColor.b, 0f);
+            view.RippleImage.enabled = false;
+            view.VignetteImage.color = new Color(1f, 1f, 1f, 0f);
+            view.VignetteImage.enabled = false;
+        }
+
+        private static void DestroyOwnedTextures(ViewRefs view)
+        {
+            DestroyTexture(view.VignetteTexture);
+            DestroyTexture(view.RippleTexture);
+            DestroyTextures(view.NoiseTextures);
+        }
+
+        private static void DestroyTextures(Texture2D[]? textures)
+        {
+            if (textures == null) return;
+            foreach (Texture2D tex in textures) DestroyTexture(tex);
+        }
+
+        private static void DestroyTexture(Texture2D? texture)
+        {
+            if (texture != null) Object.Destroy(texture);
         }
     }
 }

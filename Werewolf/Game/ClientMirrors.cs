@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 using Werewolf.Core;
 
@@ -21,9 +22,9 @@ namespace Werewolf.Game
         internal int? HealIntervalSec;
         internal bool? OutfitChangeAllowed;
 
-        internal int[] BombPack;
+        internal int[]? BombPack;
 
-        internal int[] ShamanPack;
+        internal int[]? ShamanPack;
 
         internal void Reset()
         {
@@ -46,13 +47,13 @@ namespace Werewolf.Game
     {
         internal Role? LocalRole;
 
-        internal int[] KnownWerewolves;
+        internal int[]? KnownWerewolves;
 
-        internal byte[] KnownTeammateRoles;
+        internal byte[]? KnownTeammateRoles;
 
         internal readonly Dictionary<int, DeathCause> DeathMirror = new Dictionary<int, DeathCause>();
 
-        internal Dictionary<int, string> DisplayNameCache;
+        internal Dictionary<int, string>? DisplayNameCache;
 
         internal long RoundEndUnixMs;
 

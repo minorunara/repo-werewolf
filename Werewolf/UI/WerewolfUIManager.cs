@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using TMPro;
@@ -39,7 +40,7 @@ namespace Werewolf.UI
         internal const int ScenarioSelectSortingOrder = 10003;
         internal const int CursorSortingOrder = 10004;
 
-        private GameObject _canvasRoot;
+        private GameObject? _canvasRoot;
         private readonly Dictionary<string, GameObject> _layers = new Dictionary<string, GameObject>();
 
         public bool Exists => _canvasRoot != null;
@@ -77,7 +78,7 @@ namespace Werewolf.UI
             }
         }
 
-        public Transform GetLayerRoot(string layerName)
+        public Transform? GetLayerRoot(string layerName)
         {
             if (_canvasRoot == null || string.IsNullOrEmpty(layerName)) return null;
             if (_layers.TryGetValue(layerName, out GameObject existing) && existing != null)
@@ -130,9 +131,9 @@ namespace Werewolf.UI
 
     internal static class UiKit
     {
-        private static TMP_FontAsset _cachedTmpFont;
+        private static TMP_FontAsset? _cachedTmpFont;
         private static bool _tmpFontResolved;
-        private static Sprite _whiteSprite;
+        private static Sprite? _whiteSprite;
 
         private const float CursorKeepAliveSeconds = 0.2f;
 
@@ -328,7 +329,7 @@ namespace Werewolf.UI
             return image;
         }
 
-        private static Sprite _ringSprite;
+        private static Sprite? _ringSprite;
 
         internal static Sprite RingSprite()
         {
@@ -370,7 +371,7 @@ namespace Werewolf.UI
             return image;
         }
 
-        private static Sprite _roundedSprite;
+        private static Sprite? _roundedSprite;
 
         internal static Sprite RoundedRectSprite()
         {
@@ -400,7 +401,7 @@ namespace Werewolf.UI
             return _roundedSprite;
         }
 
-        private static Sprite _bubbleTailSprite;
+        private static Sprite? _bubbleTailSprite;
 
         internal static Sprite BubbleTailSprite()
         {
@@ -425,7 +426,7 @@ namespace Werewolf.UI
             return _bubbleTailSprite;
         }
 
-        private static Sprite _circleSprite;
+        private static Sprite? _circleSprite;
 
         internal static Sprite CircleSprite()
         {
@@ -451,7 +452,7 @@ namespace Werewolf.UI
             return _circleSprite;
         }
 
-        private static Sprite _triangleUpSprite;
+        private static Sprite? _triangleUpSprite;
 
         internal static Sprite TriangleUpSprite()
         {
@@ -497,19 +498,19 @@ namespace Werewolf.UI
             label.color = color;
             label.alignment = alignment;
             label.raycastTarget = false;
-            label.enableWordWrapping = false;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
             label.overflowMode = TextOverflowModes.Overflow;
             label.spriteAsset = EmojiSprites.Asset;
             label.textPreprocessor = EmojiSprites.Preprocessor;
             return label;
         }
 
-        internal static TMP_FontAsset ResolveTmpFont()
+        internal static TMP_FontAsset? ResolveTmpFont()
         {
             if (_tmpFontResolved) return _cachedTmpFont;
             try
             {
-                TMP_FontAsset chatFont = UiText.ChatFontOrNull;
+                TMP_FontAsset? chatFont = UiText.ChatFontOrNull;
                 if (chatFont != null)
                 {
                     _cachedTmpFont = chatFont;
@@ -521,7 +522,7 @@ namespace Werewolf.UI
             {
                 WLog.Line("ui_font_error", secret: false, ("src", "chatui"), ("err", e.Message));
             }
-            TMP_FontAsset fallback = TMP_Settings.defaultFontAsset;
+            TMP_FontAsset? fallback = TMP_Settings.defaultFontAsset;
             return fallback;
         }
     }

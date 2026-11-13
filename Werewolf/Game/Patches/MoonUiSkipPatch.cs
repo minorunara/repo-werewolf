@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
@@ -11,15 +12,14 @@ namespace Werewolf.Game.Patches
         {
             try
             {
-                WerewolfDirector director = WerewolfDirector.Instance;
+                WerewolfDirector? director = WerewolfDirector.Instance;
                 if (director == null || !director.IsWerewolfRoundExpected()) return true;
 
                 RunManager rm = RunManager.instance;
                 if (rm == null || !SemiFunc.RunIsLevel()) return true;
-                if (GameRefs.RunManager_moonLevelChanged == null) return true;
-                if (!GameRefs.RunManager_moonLevelChanged(rm)) return true;
+                if (!rm.moonLevelChanged) return true;
 
-                GameRefs.RunManager_moonLevelChanged(rm) = false;
+                rm.moonLevelChanged = false;
                 WLog.Line("moon_ui_skipped", secret: false);
                 return false;
             }

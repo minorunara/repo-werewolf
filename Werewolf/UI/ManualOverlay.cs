@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using TMPro;
 using UnityEngine;
@@ -53,16 +54,38 @@ namespace Werewolf.UI
         private static readonly Color FooterColor = new Color(1f, 1f, 1f, 0.85f);
         private static readonly Color HintColor = new Color(1f, 1f, 1f, 0.6f);
 
-        private GameObject _root;
-        private GameObject _panel;
-        private RectTransform _panelRect;
-        private TextMeshProUGUI _titleText;
-        private Image _pageImage;
-        private RectTransform _bodyRect;
-        private TextMeshProUGUI _footerText;
-        private TextMeshProUGUI _hintText;
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, GameObject panel, RectTransform panelRect,
+                TextMeshProUGUI titleText, Image pageImage, RectTransform bodyRect,
+                TextMeshProUGUI footerText, TextMeshProUGUI hintText, RectTransform iconContainer)
+            {
+                Root = root; Panel = panel; PanelRect = panelRect; TitleText = titleText;
+                PageImage = pageImage; BodyRect = bodyRect; FooterText = footerText;
+                HintText = hintText; IconContainer = iconContainer;
+            }
+            public GameObject Root { get; }
+            public GameObject Panel { get; }
+            public RectTransform PanelRect { get; }
+            public TextMeshProUGUI TitleText { get; }
+            public Image PageImage { get; }
+            public RectTransform BodyRect { get; }
+            public TextMeshProUGUI FooterText { get; }
+            public TextMeshProUGUI HintText { get; }
+            public RectTransform IconContainer { get; }
+        }
 
-        private RectTransform _iconContainer;
+        private ViewRefs? _view;
+        private readonly TextRefresh _textRefresh = new TextRefresh(nameof(ManualOverlay));
+        private GameObject? _root => _view?.Root;
+        private GameObject? _panel => _view?.Panel;
+        private RectTransform? _panelRect => _view?.PanelRect;
+        private TextMeshProUGUI? _titleText => _view?.TitleText;
+        private Image? _pageImage => _view?.PageImage;
+        private RectTransform? _bodyRect => _view?.BodyRect;
+        private TextMeshProUGUI? _footerText => _view?.FooterText;
+        private TextMeshProUGUI? _hintText => _view?.HintText;
+        private RectTransform? _iconContainer => _view?.IconContainer;
         private readonly IconToggleButton _toggle = new IconToggleButton();
 
         private bool _open;
@@ -74,10 +97,10 @@ namespace Werewolf.UI
         private bool _lobbyLayout;
 
         private static bool _escSuppressErrorLogged;
-        private static bool _menuKeyErrorLogged;
+        private static bool _backKeyErrorLogged;
         private static bool _textInputErrorLogged;
 
-        public bool Exists => _root != null;
+        public bool Exists => GetLiveViewOrNull() != null;
 
         public bool IsOpen => _open;
 
@@ -89,44 +112,60 @@ namespace Werewolf.UI
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
 
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
+            GameObject? root = null;
+            try
+            {
             RectTransform rootRect = UiKit.CreateStretched(layerRoot, "WW_ManualOverlay");
-            _root = rootRect.gameObject;
-            Canvas canvas = _root.AddComponent<Canvas>();
+            root = rootRect.gameObject;
+            Canvas canvas = root.AddComponent<Canvas>();
             canvas.overrideSorting = true;
             canvas.sortingOrder = WerewolfUIManager.ManualSortingOrder;
 
             RectTransform panelRect = UiKit.CreateRect(rootRect, "ManualPanel", Vector2.zero, new Vector2(PanelWidth, PanelHeight));
-            _panel = panelRect.gameObject;
-            _panelRect = panelRect;
+            GameObject panel = panelRect.gameObject;
 
             UiKit.CreateImage(panelRect, "PanelBg", Vector2.zero, new Vector2(PanelWidth + 12f, PanelHeight + 12f), PanelFrameColor);
 
-            _titleText = UiKit.CreateText(panelRect, "Title", new Vector2(0f, 330f),
+            TextMeshProUGUI titleText = UiKit.CreateText(panelRect, "Title", new Vector2(0f, 330f),
                 new Vector2(1000f, 60f), "", TitleFontSize, TitleColor, TextAlignmentOptions.Center);
 
-            _pageImage = UiKit.CreateImage(panelRect, "PageImage",
+            Image pageImage = UiKit.CreateImage(panelRect, "PageImage",
                 new Vector2(0f, ImageTopY - ImageDefaultHeight * 0.5f),
                 new Vector2(ImageFrameWidth, ImageDefaultHeight), Color.white);
-            _pageImage.preserveAspect = true;
-            _pageImage.enabled = false;
+            pageImage.preserveAspect = true;
+            pageImage.enabled = false;
 
-            _bodyRect = UiKit.CreateRect(panelRect, "BodyArea", BodyPosNoImage, BodySizeNoImage);
+            RectTransform bodyRect = UiKit.CreateRect(panelRect, "BodyArea", BodyPosNoImage, BodySizeNoImage);
 
-            _footerText = UiKit.CreateText(panelRect, "Footer", new Vector2(0f, -335f),
+            TextMeshProUGUI footerText = UiKit.CreateText(panelRect, "Footer", new Vector2(0f, -335f),
                 new Vector2(400f, 30f), "", FooterFontSize, FooterColor, TextAlignmentOptions.Center);
 
-            _hintText = UiKit.CreateText(panelRect, "NavHint", new Vector2(0f, -364f),
+            TextMeshProUGUI hintText = UiKit.CreateText(panelRect, "NavHint", new Vector2(0f, -364f),
                 new Vector2(1000f, 26f), "", HintFontSize, HintColor, TextAlignmentOptions.Center);
 
-            _panel.SetActive(false);
+            panel.SetActive(false);
 
-            _iconContainer = _toggle.Build(rootRect, "ToggleButton", ToggleStyle,
+            RectTransform iconContainer = _toggle.Build(rootRect, "ToggleButton", ToggleStyle,
                 "manual_icon", Texts.Format(TextId.ManualToggleLabelFormat, "-"));
-            ApplyIconOffset(force: true);
+            UiKit.PinToCorner(iconContainer, UiKit.TopLeft,
+                new Vector2(IconLeftMargin + _positionOffset.x, IconTopMargin + _positionOffset.y));
+            _appliedOffset = _positionOffset;
+            _offsetApplied = true;
+            _view = new ViewRefs(root, panel, panelRect, titleText, pageImage, bodyRect,
+                footerText, hintText, iconContainer);
+            _textRefresh.Subscribe(() => Exists, ApplyTexts);
+            }
+            catch
+            {
+                _view = null;
+                _toggle.Clear();
+                if (root != null) UnityEngine.Object.Destroy(root);
+                throw;
+            }
         }
 
         public void Tick(KeyCode key, bool available, bool suppressed, bool lobbyMenu)
@@ -179,7 +218,7 @@ namespace Werewolf.UI
                 {
                     SuppressEscMenu();
 
-                    if (textFree && MenuKeyDown())
+                    if (textFree && BackKeyDown())
                     {
                         CloseInternal();
                         return;
@@ -218,30 +257,42 @@ namespace Werewolf.UI
 
         public void Destroy()
         {
+            _textRefresh.Unsubscribe();
             _open = false;
-            if (_root != null)
-            {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
-            }
-            _panel = null;
-            _panelRect = null;
-            _titleText = null;
-            _pageImage = null;
-            _bodyRect = null;
-            _footerText = null;
-            _hintText = null;
-            _iconContainer = null;
+            ViewRefs? view = _view;
+            _view = null;
+            if (view != null && view.Root != null) UnityEngine.Object.Destroy(view.Root);
             _toggle.Clear();
             _lastLabelKey = KeyCode.None;
             _offsetApplied = false;
             _lobbyLayout = false;
         }
 
+        private void ApplyTexts()
+        {
+            _toggle.SetLabel(Texts.Format(TextId.ManualToggleLabelFormat, FormatKey(_lastLabelKey)));
+            if (_lastLabelKey != KeyCode.None && _hintText != null) _hintText.text = BuildNavHintText(_lastLabelKey);
+            if (_open) ShowPage(ManualCatalog.ClampIndex(_pageIndex));
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+            _view = null;
+            _open = false;
+            _toggle.Clear();
+            _lastLabelKey = KeyCode.None;
+            _offsetApplied = false;
+            _lobbyLayout = false;
+            return null;
+        }
+
         private void OpenInternal()
         {
             _open = true;
-            _panel.SetActive(true);
+            _panel!.SetActive(true);
             ShowPage(ManualCatalog.ClampIndex(_pageIndex));
             WLog.Line("manual_open", secret: false, ("page", _pageIndex + 1));
         }
@@ -258,33 +309,33 @@ namespace Werewolf.UI
             _pageIndex = index;
             ManualPage page = ManualCatalog.Pages[index];
 
-            _titleText.text = Texts.Get(page.TitleId);
+            _titleText!.text = Texts.Get(page.TitleId);
             ManualSection section = ManualCatalog.Sections[ManualCatalog.SectionIndexForPage(index)];
-            _footerText.text = Texts.Format(TextId.ManualPageFooterFormat,
+            _footerText!.text = Texts.Format(TextId.ManualPageFooterFormat,
                 Texts.Get(section.TitleId), index + 1, ManualCatalog.PageCount);
 
-            Sprite sprite = page.ImageKey != null ? AssetCatalog.GetSprite(page.ImageKey) : null;
+            Sprite? sprite = page.ImageKey != null ? AssetCatalog.GetSprite(page.ImageKey) : null;
             bool hasImage = sprite != null;
             Vector2 bodySize;
             if (hasImage)
             {
                 float imageHeight = page.ImageHeight > 0f ? page.ImageHeight : ImageDefaultHeight;
                 float imageWidth = page.ImageWidth > 0f ? page.ImageWidth : ImageFrameWidth;
-                _pageImage.sprite = sprite;
+                _pageImage!.sprite = sprite;
                 _pageImage.enabled = true;
                 _pageImage.rectTransform.sizeDelta = new Vector2(imageWidth, imageHeight);
                 _pageImage.rectTransform.anchoredPosition = new Vector2(0f, ImageTopY - imageHeight * 0.5f);
                 float bodyTop = ImageTopY - imageHeight - ImageBodyGap;
                 bodySize = new Vector2(BodyWidth, bodyTop - BodyBottomY);
-                _bodyRect.anchoredPosition = new Vector2(0f, (bodyTop + BodyBottomY) * 0.5f);
+                _bodyRect!.anchoredPosition = new Vector2(0f, (bodyTop + BodyBottomY) * 0.5f);
                 _bodyRect.sizeDelta = bodySize;
             }
             else
             {
-                _pageImage.sprite = null;
+                _pageImage!.sprite = null;
                 _pageImage.enabled = false;
                 bodySize = BodySizeNoImage;
-                _bodyRect.anchoredPosition = BodyPosNoImage;
+                _bodyRect!.anchoredPosition = BodyPosNoImage;
                 _bodyRect.sizeDelta = bodySize;
             }
 
@@ -293,7 +344,7 @@ namespace Werewolf.UI
 
         private void RebuildBlocks(ManualPage page, Vector2 areaSize)
         {
-            for (int i = _bodyRect.childCount - 1; i >= 0; i--)
+            for (int i = _bodyRect!.childCount - 1; i >= 0; i--)
             {
                 UnityEngine.Object.DestroyImmediate(_bodyRect.GetChild(i).gameObject);
             }
@@ -304,7 +355,7 @@ namespace Werewolf.UI
             {
                 if (block.IconKey != null)
                 {
-                    Sprite icon = AssetCatalog.GetSprite(block.IconKey);
+                    Sprite? icon = AssetCatalog.GetSprite(block.IconKey);
                     if (icon != null)
                     {
                         Image img = UiKit.CreateImage(_bodyRect, "BlockIcon", Vector2.zero,
@@ -320,7 +371,7 @@ namespace Werewolf.UI
                 TextMeshProUGUI label = UiKit.CreateText(_bodyRect, "BlockText", Vector2.zero,
                     new Vector2(width, BlockLineHeightFallback), body, BodyFontSize, BodyColor,
                     TextAlignmentOptions.TopLeft);
-                label.enableWordWrapping = true;
+                label.textWrappingMode = TextWrappingModes.Normal;
                 float height = MeasureTextHeight(label, body, width);
                 label.rectTransform.sizeDelta = new Vector2(width, height);
                 PlaceTopLeft(label.rectTransform, areaSize, 0f, y, width, height);
@@ -389,17 +440,17 @@ namespace Werewolf.UI
             }
         }
 
-        private static bool MenuKeyDown()
+        private static bool BackKeyDown()
         {
             try
             {
-                return Inputs.Down(GameKey.Menu);
+                return Inputs.Down(GameKey.Back);
             }
             catch (Exception e)
             {
-                if (!_menuKeyErrorLogged)
+                if (!_backKeyErrorLogged)
                 {
-                    _menuKeyErrorLogged = true;
+                    _backKeyErrorLogged = true;
                     WLog.Line("manual_menu_key_error", secret: false, ("err", e.Message));
                 }
                 return false;

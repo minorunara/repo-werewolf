@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using UnityEngine;
 using UnityEngine.UI;
@@ -35,7 +36,7 @@ namespace Werewolf.UI
 
         public static TallyChipStrip Create(RectTransform parent, Vector2 bandLeft)
         {
-            Sprite sprite = AssetCatalog.GetSprite("icon_vote_slip");
+            Sprite? sprite = AssetCatalog.GetSprite("icon_vote_slip");
             Color baseColor = sprite != null ? Color.white : new Color(1f, 0.9f, 0.6f, 0.9f);
             var chips = new Image[VoteTallyTimeline.MaxChips];
             for (int i = 0; i < chips.Length; i++)

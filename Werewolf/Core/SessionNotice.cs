@@ -1,3 +1,4 @@
+#nullable enable
 namespace Werewolf.Core
 {
     public enum NoticeKind : byte
@@ -36,7 +37,7 @@ namespace Werewolf.Core
 
         public NoticeKind Kind { get; }
 
-        public string ActorName { get; private set; }
+        public string? ActorName { get; private set; }
 
         public ConveneRejectReason DenyReason { get; private set; } = ConveneRejectReason.None;
 

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -7,9 +8,10 @@ namespace Werewolf.Core
     {
         public static int[] Order(IReadOnlyList<float> hues, float startHue = 0f)
         {
-            int count = hues?.Count ?? 0;
+            if (hues == null) throw new ArgumentNullException(nameof(hues));
+            if (hues.Count == 0) return Array.Empty<int>();
+            int count = hues.Count;
             var order = new int[count];
-            if (count == 0) return order;
 
             var used = new bool[count];
             int first = 0;

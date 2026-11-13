@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -17,15 +18,15 @@ namespace Werewolf.Core
     {
         public int LevelsCompleted;
 
-        public string ForcedLevelName;
+        public string? ForcedLevelName;
 
-        public IReadOnlyDictionary<string, int> Items;
+        public IReadOnlyDictionary<string, int> Items = new Dictionary<string, int>();
 
         public int PowerCrystals;
 
         public int ChargeTotal;
 
-        public IReadOnlyDictionary<string, int> Upgrades;
+        public IReadOnlyDictionary<string, int> Upgrades = new Dictionary<string, int>();
 
         public int OrbDropMax;
 
@@ -71,7 +72,7 @@ namespace Werewolf.Core
             };
         }
 
-        private static string ResolveForcedLevelName(string mapName, IReadOnlyList<string> playableLevelNames)
+        private static string? ResolveForcedLevelName(string? mapName, IReadOnlyList<string> playableLevelNames)
         {
             if (string.IsNullOrWhiteSpace(mapName)) return null;
 
@@ -130,10 +131,11 @@ namespace Werewolf.Core
         public static IReadOnlyList<(string Name, int Delta)> Compute(
             IReadOnlyDictionary<string, int> targets, Func<string, int> currentStage)
         {
+            if (targets == null) throw new ArgumentNullException(nameof(targets));
             if (currentStage == null) throw new ArgumentNullException(nameof(currentStage));
 
             var result = new List<(string Name, int Delta)>();
-            if (targets == null || targets.Count == 0) return result;
+            if (targets.Count == 0) return result;
 
             var names = new List<string>(targets.Keys);
             names.Sort(StringComparer.Ordinal);
@@ -170,10 +172,10 @@ namespace Werewolf.Core
 
         private static readonly char[] ForbiddenNameChars = { EntrySep, KvSep, '|', ';', '=' };
 
-        public static string Encode(IReadOnlyDictionary<string, int> map)
+        public static string Encode(IReadOnlyDictionary<string, int>? map)
             => Encode(map, null);
 
-        public static string Encode(IReadOnlyDictionary<string, int> map, ICollection<string> skippedNames)
+        public static string Encode(IReadOnlyDictionary<string, int>? map, ICollection<string>? skippedNames)
         {
             if (map == null || map.Count == 0) return "";
 
@@ -203,7 +205,7 @@ namespace Werewolf.Core
             return sb.ToString();
         }
 
-        public static IReadOnlyDictionary<string, int> Decode(string spec)
+        public static IReadOnlyDictionary<string, int> Decode(string? spec)
         {
             var result = new Dictionary<string, int>();
             if (string.IsNullOrWhiteSpace(spec)) return result;
@@ -229,7 +231,7 @@ namespace Werewolf.Core
     public static class WorldgenSaveGuard
     {
         public static bool ShouldDelete(bool leaveGame, bool active,
-            string markedSaveFileName, string currentSaveFileName)
+            string? markedSaveFileName, string? currentSaveFileName)
         {
             if (!leaveGame) return false;
             if (!active) return false;

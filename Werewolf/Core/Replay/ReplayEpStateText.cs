@@ -1,8 +1,9 @@
+#nullable enable
 namespace Werewolf.Core.Replay
 {
     public static class ReplayEpStateText
     {
-        public static string Label(string stateName)
+        public static string Label(string? stateName)
         {
             switch (stateName)
             {

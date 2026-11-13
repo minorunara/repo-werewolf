@@ -1,37 +1,31 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
-using HarmonyLib;
 using UnityEngine;
 using Werewolf.Core;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Werewolf.Vanilla
 {
     public sealed class TruckWarper
     {
-        private static AccessTools.FieldRef<PlayerAvatar, PlayerDeathHead> DeathHeadRef =>
-            GameRefs.PlayerAvatar_playerDeathHead;
-        private static AccessTools.FieldRef<PlayerDeathHead, PhysGrabObject> HeadGrabObjectRef =>
-            GameRefs.PlayerDeathHead_physGrabObject;
-        private static AccessTools.FieldRef<PlayerAvatar, bool> IsTumblingRef =>
-            GameRefs.PlayerAvatar_isTumbling;
-
         private static bool _deathHeadProbeErrorLogged;
 
-        private static PhysGrabObject TumbleGrabObject(PlayerAvatar avatar)
+        private static PhysGrabObject? TumbleGrabObject(PlayerAvatar avatar)
         {
-            PlayerTumble tumble = GameRefs.PlayerAvatar_tumble(avatar);
-            return tumble != null ? GameRefs.PlayerTumble_physGrabObject(tumble) : null;
+            PlayerTumble tumble = avatar.tumble;
+            return tumble != null ? tumble.physGrabObject : null;
         }
 
-        internal static bool TryGetDeathHeadPosition(PlayerAvatar avatar, out Vector3 pos)
+        internal static bool TryGetDeathHeadPosition(PlayerAvatar? avatar, out Vector3 pos)
         {
             pos = default;
             try
             {
                 if (avatar == null) return false;
-                PlayerDeathHead head = DeathHeadRef(avatar);
+                PlayerDeathHead head = avatar.playerDeathHead;
                 if (head == null || !head.gameObject.activeInHierarchy) return false;
-                PhysGrabObject grab = HeadGrabObjectRef(head);
+                PhysGrabObject grab = head.physGrabObject;
                 pos = grab != null ? grab.transform.position : head.transform.position;
                 return true;
             }
@@ -61,14 +55,14 @@ namespace Werewolf.Vanilla
 
         private readonly RewarpGate _rewarpGate = new RewarpGate(RewarpSustainMs, RewarpCooldownMs);
 
-        public static bool IsTumbling(PlayerAvatar avatar) => avatar != null && IsTumblingRef(avatar);
+        public static bool IsTumbling(PlayerAvatar avatar) => avatar != null && avatar.isTumbling;
 
         public static SpawnPoint[] ResolveTruckSpawnPoints() =>
-            UnityEngine.Object.FindObjectsOfType<SpawnPoint>();
+            UnityEngine.Object.FindObjectsByType<SpawnPoint>(FindObjectsSortMode.None);
 
         public static bool TryNearestTruckSpawn(Vector3 pos, out Vector3 spawnPos, out Quaternion spawnRot, out float sqr)
         {
-            if (!TryNearestTruckSpawnPoint(pos, out SpawnPoint nearest, out sqr))
+            if (!TryNearestTruckSpawnPoint(pos, out SpawnPoint? nearest, out sqr))
             {
                 spawnPos = default;
                 spawnRot = Quaternion.identity;
@@ -85,7 +79,8 @@ namespace Werewolf.Vanilla
             if (local != null) WarpAliveAvatar(local, pos, rot);
         }
 
-        private static bool TryNearestTruckSpawnPoint(Vector3 pos, out SpawnPoint nearest, out float sqr)
+        private static bool TryNearestTruckSpawnPoint(Vector3 pos,
+            [NotNullWhen(true)] out SpawnPoint? nearest, out float sqr)
         {
             nearest = null;
             sqr = float.MaxValue;
@@ -127,7 +122,7 @@ namespace Werewolf.Vanilla
             }
             Shuffle(spawns);
 
-            List<PlayerAvatar> players = GameDirector.instance != null ? GameDirector.instance.PlayerList : null;
+            List<PlayerAvatar>? players = GameDirector.instance != null ? GameDirector.instance.PlayerList : null;
             if (players == null || players.Count == 0)
             {
                 WLog.Line("truck_warp_error", secret: false, ("reason", "no_players"));
@@ -184,10 +179,10 @@ namespace Werewolf.Vanilla
                     }
                     else
                     {
-                        PlayerDeathHead head = DeathHeadRef(avatar);
+                        PlayerDeathHead head = avatar.playerDeathHead;
                         if (head != null)
                         {
-                            PhysGrabObject grab = HeadGrabObjectRef(head);
+                            PhysGrabObject grab = head.physGrabObject;
                             if (grab != null)
                             {
                                 grab.Teleport(pos, rot);
@@ -214,13 +209,13 @@ namespace Werewolf.Vanilla
             avatar.Spawn(pos, rot);
             if (IsTumbling(avatar))
             {
-                PhysGrabObject tumbleGrab = TumbleGrabObject(avatar);
+                PhysGrabObject? tumbleGrab = TumbleGrabObject(avatar);
                 if (tumbleGrab != null)
                 {
                     tumbleGrab.Teleport(pos + Vector3.up * TumbleDropHeight, rot);
                     if (tumbleGrab.rb != null && !tumbleGrab.rb.isKinematic)
                     {
-                        tumbleGrab.rb.velocity = Vector3.zero;
+                        tumbleGrab.rb.linearVelocity = Vector3.zero;
                         tumbleGrab.rb.angularVelocity = Vector3.zero;
                     }
                     WLog.Line("truck_warp_tumble", secret: false,
@@ -251,9 +246,9 @@ namespace Werewolf.Vanilla
                     }
                     else
                     {
-                        PlayerDeathHead head = DeathHeadRef(avatar);
+                        PlayerDeathHead head = avatar.playerDeathHead;
                         if (head == null) continue;
-                        PhysGrabObject grab = HeadGrabObjectRef(head);
+                        PhysGrabObject grab = head.physGrabObject;
                         if (grab == null) continue;
                         current = grab.transform.position;
                     }
@@ -272,8 +267,8 @@ namespace Werewolf.Vanilla
                     }
                     else
                     {
-                        PlayerDeathHead head = DeathHeadRef(avatar);
-                        PhysGrabObject grab = head != null ? HeadGrabObjectRef(head) : null;
+                        PlayerDeathHead head = avatar.playerDeathHead;
+                        PhysGrabObject? grab = head != null ? head.physGrabObject : null;
                         grab?.Teleport(a.pos, a.rot);
                     }
 

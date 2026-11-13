@@ -33,6 +33,62 @@ namespace Werewolf.Tests
         }
 
         [Fact]
+        public void ConfigEntryFields_AreAllInitializedByBindPath()
+        {
+            var dllPath = Meta("Werewolf.ModDllPath");
+            Assert.True(File.Exists(dllPath), $"MOD DLL が見つからない: {dllPath}");
+
+            using var module = ModuleDefinition.ReadModule(dllPath);
+            var bindings = module.GetType(BindingsTypeName);
+            Assert.NotNull(bindings);
+
+            var guarded = new HashSet<string>(
+                bindings.Fields
+                    .Where(f => !f.IsStatic && f.FieldType.FullName.Contains("ConfigEntry"))
+                    .Select(f => f.Name),
+                StringComparer.Ordinal);
+            var methodsBySignature = bindings.Methods.ToDictionary(m => m.FullName, StringComparer.Ordinal);
+            var constructorPath = new HashSet<MethodDefinition>();
+            var pending = new Stack<MethodDefinition>(bindings.Methods.Where(m => m.Name == ".ctor"));
+            while (pending.Count > 0)
+            {
+                MethodDefinition method = pending.Pop();
+                if (!constructorPath.Add(method) || !method.HasBody) continue;
+                foreach (Instruction ins in method.Body.Instructions)
+                {
+                    if ((ins.OpCode == OpCodes.Call || ins.OpCode == OpCodes.Callvirt)
+                        && ins.Operand is MethodReference called
+                        && called.DeclaringType.FullName == BindingsTypeName
+                        && methodsBySignature.TryGetValue(called.FullName, out MethodDefinition next))
+                    {
+                        pending.Push(next);
+                    }
+                }
+            }
+
+            var initialized = new HashSet<string>(StringComparer.Ordinal);
+            foreach (MethodDefinition method in constructorPath)
+            {
+                foreach (Instruction ins in method.Body.Instructions)
+                {
+                    if (ins.OpCode == OpCodes.Stfld && ins.Operand is FieldReference field
+                        && field.DeclaringType.FullName == BindingsTypeName
+                        && guarded.Contains(field.Name))
+                    {
+                        initialized.Add(field.Name);
+                    }
+                }
+            }
+
+            var missing = guarded.Except(initialized, StringComparer.Ordinal)
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToList();
+            Assert.True(missing.Count == 0,
+                "CS8618を例外化したConfigEntryフィールドにBind経路からの初期化がない:\n  - "
+                + string.Join("\n  - ", missing));
+        }
+
+        [Fact]
         public void ConfigEntryFields_AreWrittenOnlyFromBindPath()
         {
             var dllPath = Meta("Werewolf.ModDllPath");

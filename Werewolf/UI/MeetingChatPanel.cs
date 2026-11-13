@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using TMPro;
@@ -67,14 +68,32 @@ namespace Werewolf.UI
         private static readonly Color ScrollbarBgColor = new Color(0.1f, 0.1f, 0.14f, 0.9f);
         private static readonly Color ScrollbarHandleColor = new Color(0.55f, 0.55f, 0.65f, 0.95f);
 
-        private GameObject _root;
-        private GameObject _panel;
-        private RectTransform _panelRect;
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, GameObject panel, RectTransform panelRect,
+                RectTransform scrollRect, TextMeshProUGUI? footerHint)
+            {
+                Root = root; Panel = panel; PanelRect = panelRect;
+                ScrollRect = scrollRect; FooterHint = footerHint;
+            }
+            public GameObject Root { get; }
+            public GameObject Panel { get; }
+            public RectTransform PanelRect { get; }
+            public RectTransform ScrollRect { get; }
+            public TextMeshProUGUI? FooterHint { get; }
+        }
+
+        private ViewRefs? _builtView;
+        private readonly TextRefresh _textRefresh = new TextRefresh(nameof(MeetingChatPanel));
+        private GameObject? _root => _builtView?.Root;
+        private GameObject? _panel => _builtView?.Panel;
+        private RectTransform? _panelRect => _builtView?.PanelRect;
         private readonly IconToggleButton _toggle = new IconToggleButton();
         private KeyCode _labelKey = KeyCode.None;
-        private RectTransform _scrollRect;
-        private TextMeshProUGUI _footerHint;
-        private GameObject _emptyHint;
+        private RectTransform? _scrollRect => _builtView?.ScrollRect;
+        private TextMeshProUGUI? _footerHint => _builtView?.FooterHint;
+        private GameObject? _emptyHint;
+        private TextMeshProUGUI? _emptyHintText;
 
         private readonly ChatLayout _layout = new ChatLayout(new ChatLayoutMetrics(
             ChatRowFactory.SpeakerRowWidth, ChatRowFactory.SpeakerRowHeight,
@@ -96,19 +115,19 @@ namespace Werewolf.UI
         private static float StampBarInset
             => FeatureFlags.ChatStamps ? ChatStampTray.BarHeight : 0f;
 
-        private Func<ChatLogEntry, ChatBlockSize> _measureFn;
-        private Func<int, GameObject> _createBlockFn;
+        private Func<ChatLogEntry, ChatBlockSize>? _measureFn;
+        private Func<int, GameObject?>? _createBlockFn;
 
         private int _renderedVersion = int.MinValue;
         private bool _renderedLocalDead;
         private bool _scrollToBottomPending;
 
-        private MeetingChatLog _log;
+        private MeetingChatLog? _log;
         private bool _hasRenderState;
 
         private bool _open = true;
 
-        public bool Exists => _root != null;
+        public bool Exists => GetLiveViewOrNull() != null;
 
         public bool IsOpen => _open;
 
@@ -128,10 +147,13 @@ namespace Werewolf.UI
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
 
+            GameObject? root = null;
+            try
+            {
             RectTransform containerRect = UiKit.CreateStretched(layerRoot, "WW_MeetingChatRoot");
-            _root = containerRect.gameObject;
+            root = containerRect.gameObject;
 
             RectTransform rootRect = UiKit.CreateAnchoredRect(containerRect, "WW_MeetingChatPanel",
                 new Vector2(1f, 0.5f), new Vector2(1f, 0.5f),
@@ -145,8 +167,6 @@ namespace Werewolf.UI
                 subCanvas.sortingOrder = WerewolfUIManager.PanelSortingOrder;
             }
             panelGo.AddComponent<GraphicRaycaster>();
-            _panel = panelGo;
-            _panelRect = rootRect;
 
             UiKit.CreateBackdrop(rootRect, "Bg", PanelBgColor);
 
@@ -160,7 +180,6 @@ namespace Werewolf.UI
             ScrollRect scroll = UiKit.CreateScrollArea(rootRect, "Scroll", ScrollSensitivity,
                 out RectTransform scrollRect, out RectTransform viewportRect,
                 out RectTransform contentRect);
-            _scrollRect = scrollRect;
             scrollRect.offsetMin = new Vector2(0f, StampBarInset);
             scrollRect.offsetMax = new Vector2(0f, -HeaderHeight);
             viewportRect.offsetMax = new Vector2(-ScrollbarWidth, 0f);
@@ -172,15 +191,16 @@ namespace Werewolf.UI
             _speakerFilter.Attach(title, viewportRect);
             if (FeatureFlags.ChatStamps) _stampTray.Build(rootRect, PanelWidth, PanelHeight, HeaderHeight);
 
+            TextMeshProUGUI? footerHint = null;
             if (_surface == ChatPanelSurface.Meeting)
             {
-                _footerHint = UiKit.CreateText(rootRect, "DeadHint",
+                footerHint = UiKit.CreateText(rootRect, "DeadHint",
                     new Vector2(0f, -PanelHeight * 0.5f + FooterHeight * 0.5f),
                     new Vector2(PanelWidth - 12f, FooterHeight),
                     Texts.Get(TextId.ChatLogDeadHint),
                     HintFontSize, HintTextColor, TextAlignmentOptions.Center);
-                _footerHint.enableWordWrapping = true;
-                _footerHint.gameObject.SetActive(false);
+                footerHint.textWrappingMode = TextWrappingModes.Normal;
+                footerHint.gameObject.SetActive(false);
             }
 
             _rows.Build(containerRect);
@@ -188,7 +208,24 @@ namespace Werewolf.UI
             _createBlockFn = CreateBlockObject;
 
             BuildToggleButton(containerRect);
-            _panel.SetActive(_open);
+            panelGo.SetActive(_open);
+            _builtView = new ViewRefs(root, panelGo, rootRect, scrollRect, footerHint);
+            _textRefresh.Subscribe(() => Exists, ApplyTexts);
+            }
+            catch
+            {
+                _builtView = null;
+                _toggle.Clear();
+                _nav.Clear();
+                _speakerFilter.Clear();
+                _stampTray.Clear();
+                _view.Detach();
+                _rows.Detach();
+                _measureFn = null;
+                _createBlockFn = null;
+                if (root != null) UnityEngine.Object.Destroy(root);
+                throw;
+            }
         }
 
         public void EnsureTopSibling()
@@ -326,7 +363,7 @@ namespace Werewolf.UI
             if (sections == null || sections.Count == 0) return false;
             long seq = sections[sections.Count - 1];
 
-            GameObject row = null;
+            GameObject? row = null;
             for (int i = _layout.Count - 1; i >= 0; i--)
             {
                 ChatLayoutBlock block = _layout[i];
@@ -339,7 +376,7 @@ namespace Werewolf.UI
             var label = row.GetComponentInChildren<TextMeshProUGUI>();
             if (label == null || !TryGetLineWorldRect(label, lineIndex, out Rect world)) return false;
 
-            RectTransform viewport = _view.Viewport;
+            RectTransform? viewport = _view.Viewport;
             if (viewport != null)
             {
                 viewport.GetWorldCorners(_cornerScratch);
@@ -422,7 +459,7 @@ namespace Werewolf.UI
                 if (stickToBottom) _scrollToBottomPending = true;
             }
 
-            _layout.Sync(log, _measureFn);
+            _layout.Sync(log, _measureFn!);
             if (!_open) return;
 
             bool layoutChanged = _layout.Version != _renderedVersion;
@@ -471,7 +508,7 @@ namespace Werewolf.UI
             {
                 var size = new Vector2(ContentWidth - SidePadding * 2f, ChatRowFactory.SpeakerRowHeight);
                 RectTransform block = _rows.CreateBlock("Empty", size, -SidePadding, 0f);
-                UiKit.CreateText(block, "Text", Vector2.zero, size,
+                _emptyHintText = UiKit.CreateText(block, "Text", Vector2.zero, size,
                     Texts.Get(TextId.ChatLogEmpty), HintFontSize, HintTextColor, TextAlignmentOptions.Center);
                 _emptyHint = block.gameObject;
             }
@@ -479,16 +516,17 @@ namespace Werewolf.UI
             {
                 UnityEngine.Object.Destroy(_emptyHint);
                 _emptyHint = null;
+                _emptyHintText = null;
             }
         }
 
         private void SyncVirtualization()
         {
             if (!_open || !_hasRenderState) return;
-            _view.Sync(_layout, _createBlockFn);
+            _view.Sync(_layout, _createBlockFn!);
         }
 
-        private GameObject CreateBlockObject(int index)
+        private GameObject? CreateBlockObject(int index)
         {
             if (_log == null) return null;
             ChatLayoutBlock block = _layout[index];
@@ -529,13 +567,27 @@ namespace Werewolf.UI
             _view.ResetScrollPosition();
         }
 
+        private void ApplyTexts()
+        {
+            ViewRefs? built = _builtView;
+            if (built == null) return;
+            _speakerFilter.SetNormalTitle(Texts.Get(TitleTextId));
+            if (built.FooterHint != null) built.FooterHint.text = Texts.Get(TextId.ChatLogDeadHint);
+            _toggle.SetLabel(Texts.Format(ToggleLabelFormatId, _labelKey == KeyCode.None ? "L" : FormatKey(_labelKey)));
+            if (_emptyHintText != null) _emptyHintText.text = Texts.Get(TextId.ChatLogEmpty);
+            _stampTray.ApplyTexts();
+        }
+
         public void Destroy()
         {
+            _textRefresh.Unsubscribe();
+            ViewRefs? built = _builtView;
+            _builtView = null;
             try
             {
                 ClearLiveBlocks();
                 if (_emptyHint != null) UnityEngine.Object.Destroy(_emptyHint);
-                if (_root != null) UnityEngine.Object.Destroy(_root);
+                if (built != null && built.Root != null) UnityEngine.Object.Destroy(built.Root);
             }
             catch (Exception e)
             {
@@ -544,25 +596,47 @@ namespace Werewolf.UI
             _layout.Reset();
             _renderedVersion = int.MinValue;
             _emptyHint = null;
+            _emptyHintText = null;
             _measureFn = null;
             _createBlockFn = null;
             _log = null;
             _hasRenderState = false;
             _open = true;
-            _root = null;
-            _panel = null;
-            _panelRect = null;
             _toggle.Clear();
             _nav.Clear();
             _speakerFilter.Clear();
             _stampTray.Clear();
             _labelKey = KeyCode.None;
-            _scrollRect = null;
-            _footerHint = null;
             _renderedLocalDead = false;
             ResetView();
             _view.Detach();
             _rows.Detach();
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _builtView;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+
+            _builtView = null;
+            _layout.Reset();
+            _renderedVersion = int.MinValue;
+            _emptyHint = null;
+            _emptyHintText = null;
+            _measureFn = null;
+            _createBlockFn = null;
+            _log = null;
+            _hasRenderState = false;
+            _toggle.Clear();
+            _nav.Clear();
+            _speakerFilter.Clear();
+            _stampTray.Clear();
+            _view.Detach();
+            _rows.Detach();
+            _labelKey = KeyCode.None;
+            _renderedLocalDead = false;
+            return null;
         }
     }
 }

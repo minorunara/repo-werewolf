@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 
 namespace Werewolf.Core
@@ -65,7 +66,7 @@ namespace Werewolf.Core
         public const int AttemptTokenLifetimeMs = 5000;
 
         public static LobbyStartDecision Evaluate(
-            ModIntegritySnapshot snapshot,
+            ModIntegritySnapshot? snapshot,
             bool baselineReady,
             int playerCount,
             int werewolfCount,

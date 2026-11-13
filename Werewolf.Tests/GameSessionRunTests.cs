@@ -61,8 +61,7 @@ namespace Werewolf.Tests
             session.Tick(Now + DelaySec * 1000L + 100);
 
             var reveal = Assert.Single(_sent, m => m.Code == 161);
-            Assert.Equal(MessageTarget.Actors, reveal.Target);
-            Assert.Equal(new[] { 2 }, reveal.TargetActors);
+            Assert.Equal(new[] { 2 }, reveal.ActorTargetsOrNull());
             Assert.Equal((byte)Role.BlackCat, Assert.Single(reveal.Payload));
         }
 
@@ -80,7 +79,7 @@ namespace Werewolf.Tests
             session.Tick(Now + DelaySec * 1000L + 10_001);
 
             var reveal = Assert.Single(_sent, m => m.Code == 161);
-            Assert.Equal(new[] { 2 }, reveal.TargetActors);
+            Assert.Equal(new[] { 2 }, reveal.ActorTargetsOrNull());
         }
 
         [Fact]
@@ -92,7 +91,7 @@ namespace Werewolf.Tests
 
             var msg = Assert.Single(_sent);
             Assert.Equal(161, msg.Code);
-            Assert.Equal(MessageTarget.Actors, msg.Target);
+            Assert.NotNull(msg.ActorTargetsOrNull());
         }
 
         [Fact]
@@ -110,7 +109,7 @@ namespace Werewolf.Tests
             Assert.Equal(new[] { 161, 169, 172 }, _sent.Select(m => (int)m.Code).ToArray());
 
             var gameOver = _sent.Single(m => m.Code == 169);
-            Assert.Equal(MessageTarget.All, gameOver.Target);
+            Assert.True(gameOver.IsAllDestination());
             Assert.Equal((byte)Team.Werewolves, Assert.IsType<byte>(gameOver.Payload[0]));
             var actors = Assert.IsType<int[]>(gameOver.Payload[1]);
             var roles = Assert.IsType<byte[]>(gameOver.Payload[2]);
@@ -146,7 +145,7 @@ namespace Werewolf.Tests
             session.RecordDeath(3, Now + 1000);
 
             var died = Assert.Single(_sent, m => m.Code == 168);
-            Assert.Equal(MessageTarget.All, died.Target);
+            Assert.True(died.IsAllDestination());
             Assert.Equal(3, Assert.IsType<int>(died.Payload[0]));
             Assert.Equal((byte)DeathCause.Other, Assert.IsType<byte>(died.Payload[1]));
 
@@ -478,7 +477,7 @@ namespace Werewolf.Tests
             session.NotifyDisclosureCondition(DisclosureKind.BlackCatSeesWerewolves);
 
             var reveal = Assert.Single(_sent, m => m.Code == 162);
-            Assert.Equal(new[] { 2 }, reveal.TargetActors);
+            Assert.Equal(new[] { 2 }, reveal.ActorTargetsOrNull());
             Assert.Equal(new[] { 1 }, Assert.IsType<int[]>(reveal.Payload[0]));
         }
     }

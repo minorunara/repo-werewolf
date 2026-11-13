@@ -17,16 +17,23 @@ namespace Werewolf.Scenarios.Game
 
         private void TickCue(long now)
         {
-            bool onPage = _flow != null && !_flow.Finished;
-            int page = onPage ? _flow.Index : -1;
-            ScenarioCue cue = onPage ? _flow.Current.Cue : ScenarioCue.None;
+            ScenarioScriptRun? script = _script;
+            ScenarioFlow? flow = script?.Flow;
+            ScenarioDefinition? definition = script?.Definition;
+            int page = -1;
+            ScenarioCue cue = ScenarioCue.None;
+            if (flow != null && !flow.Finished)
+            {
+                page = flow.Index;
+                cue = flow.Current.Cue;
+            }
 
             if (page != _cuePage)
             {
                 _cuePage = page;
                 _cueIndex = 0;
-                _cueNextAtMs = now + (_definition != null ? _definition.Timing.StartDelayMs(cue) : 0L);
-                if (onPage) RunEntryAction(_flow.Current, now);
+                _cueNextAtMs = now + (definition != null ? definition.Timing.StartDelayMs(cue) : 0L);
+                if (flow != null && !flow.Finished) RunEntryAction(flow.Current, now);
             }
 
             switch (cue)
@@ -129,15 +136,17 @@ namespace Werewolf.Scenarios.Game
 
         private void TickChatScript(long now)
         {
-            if (_definition == null) return;
+            if (!TryGetRunningScript(out ScenarioScriptRun? run)) return;
+            ScenarioFlow flow = run.Flow;
+            ScenarioDefinition definition = run.Definition;
 
-            var script = _definition.MeetingScript(_flow.Current.MeetingIndex).ChatScript;
+            var script = definition.MeetingScript(flow.Current.MeetingIndex).ChatScript;
             if (_cueIndex >= script.Count || now < _cueNextAtMs) return;
 
-            ScenarioCast cast = _definition.Cast;
+            ScenarioCast cast = definition.Cast;
             ScenarioChatLine line = script[_cueIndex];
             string text = Texts.Get(line.Text);
-            string name = cast.TryGetBot(line.ParticipantId, out var bot) ? bot.Name : null;
+            string? name = cast.TryGetBot(line.ParticipantId, out var bot) ? bot.Name : null;
             int actor = cast.ActorOf(line.ParticipantId, _d.LocalActor);
 
             bool posted = _d.Chat.PostScenarioChat(actor, name, text);
@@ -148,19 +157,21 @@ namespace Werewolf.Scenarios.Game
             }
 
             _cueIndex++;
-            _cueNextAtMs = now + _definition.Timing.ChatDelayMs(text);
+            _cueNextAtMs = now + definition.Timing.ChatDelayMs(text);
 
             if (_cueIndex >= script.Count) FeedSignal(ScenarioSignal.ChatScriptDone);
         }
 
         private void TickBotVotes(long now)
         {
-            if (_definition == null) return;
+            if (!TryGetRunningScript(out ScenarioScriptRun? run)) return;
+            ScenarioFlow flow = run.Flow;
+            ScenarioDefinition definition = run.Definition;
 
-            var votes = _definition.MeetingScript(_flow.Current.MeetingIndex).BotVotes;
+            var votes = definition.MeetingScript(flow.Current.MeetingIndex).BotVotes;
             if (_cueIndex >= votes.Count || now < _cueNextAtMs) return;
 
-            ScenarioCast cast = _definition.Cast;
+            ScenarioCast cast = definition.Cast;
             ScenarioVote vote = votes[_cueIndex];
             VoteRejectReason reason = _d.HostCastVoteAsActor(
                 cast.ActorOf(vote.VoterParticipantId, _d.LocalActor),
@@ -174,7 +185,7 @@ namespace Werewolf.Scenarios.Game
             }
 
             _cueIndex++;
-            _cueNextAtMs = now + _definition.Timing.BotVoteIntervalMs;
+            _cueNextAtMs = now + definition.Timing.BotVoteIntervalMs;
         }
 
         private void ResetCue()

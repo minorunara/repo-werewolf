@@ -1,8 +1,9 @@
+#nullable enable
 namespace Werewolf.Core
 {
     public sealed class ManualBlock
     {
-        public string IconKey;
+        public string? IconKey;
 
         public TextId BodyId;
 
@@ -19,18 +20,18 @@ namespace Werewolf.Core
 
         public ManualBlock[] Blocks;
 
-        public string ImageKey;
+        public string? ImageKey;
 
         public float ImageHeight;
 
         public float ImageWidth;
 
-        public ManualPage(TextId titleId, TextId bodyId, string imageKey = null, float imageHeight = 0f, float imageWidth = 0f)
+        public ManualPage(TextId titleId, TextId bodyId, string? imageKey = null, float imageHeight = 0f, float imageWidth = 0f)
             : this(titleId, new[] { ManualBlock.Text(bodyId) }, imageKey, imageHeight, imageWidth)
         {
         }
 
-        public ManualPage(TextId titleId, ManualBlock[] blocks, string imageKey = null, float imageHeight = 0f, float imageWidth = 0f)
+        public ManualPage(TextId titleId, ManualBlock[] blocks, string? imageKey = null, float imageHeight = 0f, float imageWidth = 0f)
         {
             TitleId = titleId;
             Blocks = blocks;

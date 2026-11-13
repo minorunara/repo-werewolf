@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using Werewolf.Core;
 using Werewolf.Scenarios.Core;
@@ -22,15 +23,12 @@ namespace Werewolf.Vanilla
 
             try
             {
-                if (GameRefs.RoundDirector_haulGoal == null
-                    || GameRefs.RoundDirector_haulGoalMax == null) return false;
-
-                int total = GameRefs.RoundDirector_haulGoalMax(director);
+                int total = director.haulGoalMax;
                 int goal = ScenarioSafetyRules.ResolveHaulGoal(total, PctOfTotal);
                 if (goal < 0) return false;
 
-                int before = GameRefs.RoundDirector_haulGoal(director);
-                GameRefs.RoundDirector_haulGoal(director) = goal;
+                int before = director.haulGoal;
+                director.haulGoal = goal;
                 WLog.Line("haul_goal_overridden", secret: false,
                     ("pct", PctOfTotal), ("total", total), ("from", before), ("to", goal));
                 return true;

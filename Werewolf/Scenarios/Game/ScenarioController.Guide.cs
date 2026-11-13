@@ -26,7 +26,7 @@ namespace Werewolf.Scenarios.Game
         private ScenarioNeed _prevUnmet;
         private long _advanceSwallowUntilMs;
 
-        private string _shownLine;
+        private string? _shownLine;
 
         private const long NeedClearedSwallowMs = 250L;
 
@@ -41,15 +41,15 @@ namespace Werewolf.Scenarios.Game
             bool keysFree = InputGate.KeysFree;
             bool advanceKey = ReadAdvanceKey(keysFree);
 
-            if (_flow == null || !_d.ClientScenarioSession || _d.RoleRevealVisible)
+            ScenarioScriptRun? script = _script;
+            if (script == null || !_d.ClientScenarioSession || _d.RoleRevealVisible)
             {
                 HideGuide();
                 return;
             }
+            ScenarioFlow flow = script.Flow;
 
-            _guide.PlayHud = _definition != null
-                ? ScenarioGuideLayout.PlayHudOf(_definition.Cast.PlayerRole)
-                : ScenarioPlayHud.None;
+            _guide.PlayHud = ScenarioGuideLayout.PlayHudOf(script.Definition.Cast.PlayerRole);
 
             if (TickDecodeIntro(keysFree)) return;
 
@@ -60,7 +60,7 @@ namespace Werewolf.Scenarios.Game
 
             _interrupt.StartDeferred(now);
 
-            ScenarioPage page = _flow.Current;
+            ScenarioPage page = flow.Current;
             ScenarioNeed rawUnmet = UnmetNeed(page);
 
             ScenarioInterrupt interrupt = ResolveInterrupt(now, page, rawUnmet);
@@ -101,7 +101,7 @@ namespace Werewolf.Scenarios.Game
 
         private void NoteGuideLine()
         {
-            string line = _guide.ShownLine;
+            string? line = _guide.ShownLine;
             if (line == _shownLine) return;
 
             _shownLine = line;
@@ -125,15 +125,23 @@ namespace Werewolf.Scenarios.Game
         }
 
         private bool ShowsMapAside(ScenarioPage page, ScenarioNeed unmet)
-            => unmet == ScenarioNeed.None
-               && !_flow.Finished
-               && page.Cue == ScenarioCue.ChatScript
-               && _definition != null && _definition.Notices.MapAside.Count > 0
-               && _d.MeetingMapOpen;
+        {
+            ScenarioScriptRun? script = _script;
+            ScenarioFlow? flow = script?.Flow;
+            ScenarioDefinition? definition = script?.Definition;
+            return unmet == ScenarioNeed.None
+                   && flow != null && !flow.Finished
+                   && page.Cue == ScenarioCue.ChatScript
+                   && definition != null && definition.Notices.MapAside.Count > 0
+                   && _d.MeetingMapOpen;
+        }
 
         private ScenarioHighlight ShowGuide(ScenarioInterrupt interrupt, ScenarioPage page,
                                             ScenarioNeed unmet)
         {
+            ScenarioScriptRun? script = _script;
+            ScenarioFlow? flow = script?.Flow;
+            ScenarioDefinition? definition = script?.Definition;
             switch (interrupt)
             {
                 case ScenarioInterrupt.Broken:
@@ -147,7 +155,7 @@ namespace Werewolf.Scenarios.Game
                     return ScenarioHighlight.None;
 
                 case ScenarioInterrupt.MapAside:
-                    _guide.ShowPage(JoinLines(_definition.Notices.MapAside),
+                    _guide.ShowPage(JoinLines(definition?.Notices.MapAside),
                         ScenarioAnchor.BottomLeft, FontScale, ScenarioGuideHint.ActionOnly);
                     return ScenarioHighlight.None;
             }
@@ -164,7 +172,7 @@ namespace Werewolf.Scenarios.Game
                 return ScenarioHighlight.None;
             }
 
-            if (_flow.Finished)
+            if (flow == null || flow.Finished)
             {
                 _guide.Hide();
                 return ScenarioHighlight.None;
@@ -180,7 +188,7 @@ namespace Werewolf.Scenarios.Game
             if (page.HasText)
             {
                 _guide.ShowPage(JoinLines(page.Lines), page.Anchor, FontScale,
-                    _flow.AdvancesOnInput ? ScenarioGuideHint.Advance : ScenarioGuideHint.ActionOnly);
+                    flow.AdvancesOnInput ? ScenarioGuideHint.Advance : ScenarioGuideHint.ActionOnly);
                 return page.Highlight;
             }
 
@@ -191,22 +199,25 @@ namespace Werewolf.Scenarios.Game
         private void HandleGuideInput(long now, ScenarioInterrupt interrupt, ScenarioNeed unmet,
                                       bool keysFree, bool advance)
         {
+            ScenarioFlow? flow = _script?.Flow;
+            if (flow == null) return;
+
             if (interrupt == ScenarioInterrupt.Broken) return;
 
             if (advance && now < _advanceSwallowUntilMs)
             {
-                WLog.Line("scenario_advance_swallowed", secret: false, ("page", _flow.Index));
+                WLog.Line("scenario_advance_swallowed", secret: false, ("page", flow.Index));
                 advance = false;
             }
 
-            bool menuKey = keysFree && InputDown(GameKey.Menu);
+            bool backKey = keysFree && InputDown(GameKey.Back);
 
             if (interrupt == ScenarioInterrupt.AbortConfirm)
             {
-                if (menuKey)
+                if (backKey)
                 {
                     _interrupt.Dismiss(ScenarioInterrupt.AbortConfirm);
-                    ScenarioRun.ExitToTitle("player_abort", completed: _flow.Finished);
+                    ScenarioRun.ExitToTitle("player_abort", completed: flow.Finished);
                 }
                 else if (advance)
                 {
@@ -215,7 +226,7 @@ namespace Werewolf.Scenarios.Game
                 return;
             }
 
-            if (menuKey)
+            if (backKey)
             {
                 _interrupt.RequestAbort();
                 return;
@@ -270,7 +281,7 @@ namespace Werewolf.Scenarios.Game
             _highlight.Hide();
         }
 
-        private bool TryScreenRect(RectTransform rect, out Rect screenRect)
+        private bool TryScreenRect(RectTransform? rect, out Rect screenRect)
         {
             screenRect = default;
             if (rect == null || !rect.gameObject.activeInHierarchy) return false;
@@ -280,7 +291,7 @@ namespace Werewolf.Scenarios.Game
             return screenRect.width > 1f && screenRect.height > 1f;
         }
 
-        private string JoinLines(IReadOnlyList<TextId> ids, object arg = null)
+        private string JoinLines(IReadOnlyList<TextId>? ids, object? arg = null)
         {
             if (ids == null || ids.Count == 0) return string.Empty;
             if (ids.Count == 1) return ResolveLine(ids[0], arg);
@@ -294,12 +305,12 @@ namespace Werewolf.Scenarios.Game
             return sb.ToString();
         }
 
-        private string ResolveLine(TextId id, object arg = null)
+        private string ResolveLine(TextId id, object? arg = null)
             => ReplaceModKeyTags(ResolveHintLine(id, arg));
 
-        private string ResolveHintLine(TextId id, object arg)
+        private string ResolveHintLine(TextId id, object? arg)
         {
-            ScenarioKeyHint hint = _definition != null ? _definition.Notices.KeyHint : default;
+            ScenarioKeyHint hint = _script != null ? _script.Definition.Notices.KeyHint : default;
             if (!hint.HasValue) return Resolve(id, arg);
 
             bool grab = _d.MeetingButtonUsesGrab;
@@ -314,7 +325,7 @@ namespace Werewolf.Scenarios.Game
             return Resolve(id, arg);
         }
 
-        private static string Resolve(TextId id, object arg)
+        private static string Resolve(TextId id, object? arg)
             => arg == null ? Texts.Get(id) : Texts.Format(id, arg);
 
         private static string ReplaceModKeyTags(string text)
@@ -330,7 +341,7 @@ namespace Werewolf.Scenarios.Game
         }
 
         private static string ReplaceModKeyTag(
-            string text, string tag, BepInEx.Configuration.ConfigEntry<KeyCode> key)
+            string text, string tag, BepInEx.Configuration.ConfigEntry<KeyCode>? key)
         {
             string name = key != null ? key.Value.ToString() : "?";
             return text.Replace(tag, ScenarioGuidePanel.KeyPrefix + name + ScenarioGuidePanel.KeySuffix);
@@ -338,7 +349,8 @@ namespace Werewolf.Scenarios.Game
 
         private ScenarioNeed UnmetNeed(ScenarioPage page)
         {
-            if (_flow.Finished || page.Need == ScenarioNeed.None) return ScenarioNeed.None;
+            ScenarioFlow? flow = _script?.Flow;
+            if (flow == null || flow.Finished || page.Need == ScenarioNeed.None) return ScenarioNeed.None;
             return ScenarioNeedRules.Unmet(page.Need, ReadNeedSample());
         }
 

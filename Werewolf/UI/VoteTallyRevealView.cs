@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using TMPro;
@@ -17,8 +18,8 @@ namespace Werewolf.UI
         private const int NotRendered = -1;
 
         private readonly List<VoteRow> _rows;
-        private readonly Func<RectTransform> _resolvePanelRoot;
-        private readonly Action<string, float> _playSfx;
+        private readonly Func<RectTransform?> _resolvePanelRoot;
+        private readonly Action<string, float>? _playSfx;
         private int _lastPageTurnIndex = -1;
         private long _lastPageTurnAtMs;
 
@@ -31,11 +32,11 @@ namespace Werewolf.UI
         private int _skipLanded;
         private readonly Dictionary<int, int> _finalByActor = new Dictionary<int, int>();
         private readonly Dictionary<int, int> _landedByActor = new Dictionary<int, int>();
-        private TextMeshProUGUI _skipCountLabel;
-        private TallyChipStrip _skipChips;
+        private TextMeshProUGUI? _skipCountLabel;
+        private TallyChipStrip? _skipChips;
 
-        public VoteTallyRevealView(List<VoteRow> rows, Func<RectTransform> resolvePanelRoot,
-            Action<string, float> playSfx)
+        public VoteTallyRevealView(List<VoteRow> rows, Func<RectTransform?> resolvePanelRoot,
+            Action<string, float>? playSfx)
         {
             _rows = rows;
             _resolvePanelRoot = resolvePanelRoot;
@@ -166,7 +167,7 @@ namespace Werewolf.UI
         private void EnsureSkipChips()
         {
             if (_skipChips != null || _skipFinal <= 0) return;
-            RectTransform root = _resolvePanelRoot();
+            RectTransform? root = _resolvePanelRoot();
             if (root == null) return;
             _skipChips = TallyChipStrip.Create(root, SkipChipsBandLeft);
         }

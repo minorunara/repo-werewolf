@@ -9,10 +9,10 @@ namespace Werewolf
 {
     internal static class WorldgenItemBindings
     {
-        private static ConfigFile _config;
-        private static ConfigBindings _bindings;
+        private static ConfigFile? _config;
+        private static ConfigBindings? _bindings;
 
-        private static Dictionary<string, ConfigEntry<int>> _entries;
+        private static Dictionary<string, ConfigEntry<int>>? _entries;
 
         private static bool _initialized;
         private static bool _failed;
@@ -64,7 +64,8 @@ namespace Werewolf
 
         internal static void TryInitialize()
         {
-            if (_initialized || _failed || _config == null) return;
+            ConfigFile? config = _config;
+            if (_initialized || _failed || config == null) return;
             try
             {
                 var catalog = GameItemDatabase.Instance.ItemMaxAmounts;
@@ -78,7 +79,7 @@ namespace Werewolf
                         var defaultAmount = DefaultAmounts.TryGetValue(pair.Key, out var amount)
                             ? Math.Min(amount, pair.Value)
                             : 0;
-                        entries[pair.Key] = _config.Bind(
+                        entries[pair.Key] = config.Bind(
                             ConfigBindings.SecLoadoutItems, pair.Key, defaultAmount,
                             new ConfigDescription(
                                 $"Amount brought to the truck at werewolf session start (0 = none, max = {pair.Value}) / " +

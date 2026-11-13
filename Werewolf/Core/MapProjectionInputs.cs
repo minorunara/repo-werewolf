@@ -1,3 +1,4 @@
+#nullable enable
 namespace Werewolf.Core
 {
     public struct MapProjectionInputs

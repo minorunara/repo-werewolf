@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -59,7 +60,7 @@ namespace Werewolf.Core
         }
 
         private static bool RollPeaceful(GameConfig config, Random rng,
-            IReadOnlyDictionary<int, Role> forcedRoles, bool forcePeaceful)
+            IReadOnlyDictionary<int, Role>? forcedRoles, bool forcePeaceful)
         {
             if (HasForcedWolfSide(forcedRoles)) return false;
             if (forcePeaceful) return true;
@@ -69,7 +70,7 @@ namespace Werewolf.Core
             return chance >= 100 || rng.Next(100) < chance;
         }
 
-        private static bool HasForcedWolfSide(IReadOnlyDictionary<int, Role> forcedRoles)
+        private static bool HasForcedWolfSide(IReadOnlyDictionary<int, Role>? forcedRoles)
         {
             if (forcedRoles == null) return false;
             foreach (var pair in forcedRoles)
@@ -81,7 +82,7 @@ namespace Werewolf.Core
 
         public static RoleAssignResult Assign(
             IReadOnlyList<WPlayer> players, GameConfig config, Random rng,
-            IReadOnlyDictionary<int, Role> forcedRoles = null, bool forcePeaceful = false)
+            IReadOnlyDictionary<int, Role>? forcedRoles = null, bool forcePeaceful = false)
         {
             if (players == null) throw new ArgumentNullException(nameof(players));
             if (config == null) throw new ArgumentNullException(nameof(config));

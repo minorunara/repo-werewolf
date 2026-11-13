@@ -1,15 +1,12 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
-using HarmonyLib;
 using Werewolf.Core;
 
 namespace Werewolf.Vanilla
 {
     public sealed class EnemyIgnoreRoster
     {
-        private static AccessTools.FieldRef<EnemyDirector, List<string>> DebugNoVision =>
-            GameRefs.EnemyDirector_debugNoVision;
-
         private readonly HashSet<string> _added = new HashSet<string>();
 
         public void SetIgnored(string steamId, bool ignored)
@@ -22,7 +19,7 @@ namespace Werewolf.Vanilla
                 return;
             }
 
-            List<string> list = DebugNoVision(director);
+            List<string> list = director.debugNoVision;
             if (ignored)
             {
                 if (!list.Contains(steamId)) list.Add(steamId);
@@ -42,7 +39,7 @@ namespace Werewolf.Vanilla
             var director = EnemyDirector.instance;
             if (director != null)
             {
-                List<string> list = DebugNoVision(director);
+                List<string> list = director.debugNoVision;
                 foreach (string steamId in _added)
                 {
                     list.Remove(steamId);

@@ -140,10 +140,20 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void 文言整形は空入力に耐える()
+        public void 文言整形は組なしを空行列として扱う()
         {
             Assert.Empty(ScatterGroupsText.FormatLines(null, a => "x"));
-            Assert.Empty(ScatterGroupsText.FormatLines(new List<List<int>>(), null));
+        }
+
+        [Fact]
+        public void 文言整形は名前解決関数の欠損を拒否する()
+        {
+            #nullable enable
+            var error = Assert.Throws<ArgumentNullException>(() =>
+                ScatterGroupsText.FormatLines(new List<List<int>>(), null!));
+            #nullable restore
+
+            Assert.Equal("memberLabel", error.ParamName);
         }
     }
 }

@@ -1,3 +1,4 @@
+#nullable enable
 using Werewolf.Core;
 using static Werewolf.Core.HudGeometry;
 

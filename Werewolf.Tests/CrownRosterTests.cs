@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using Werewolf.Core;
 using Xunit;
@@ -41,13 +42,14 @@ namespace Werewolf.Tests
         }
 
         [Fact]
-        public void SetWinners_nullは空名簿への置換として扱う()
+        public void SetWinners_NullRoster_ThrowsWithoutClearingCurrentRoster()
         {
             CrownRoster.SetWinners(new[] { 1 });
-            CrownRoster.SetWinners(null);
+            var error = Assert.Throws<ArgumentNullException>(() => CrownRoster.SetWinners(null!));
 
-            Assert.False(CrownRoster.HasWinners);
-            Assert.False(CrownRoster.IsWinner(1));
+            Assert.Equal("actors", error.ParamName);
+            Assert.True(CrownRoster.HasWinners);
+            Assert.True(CrownRoster.IsWinner(1));
         }
 
         [Fact]

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -20,29 +21,81 @@ namespace Werewolf.UI
     {
         private sealed class RowSlot
         {
-            public RectTransform Rect;
-            public Image Background;
-            public TextMeshProUGUI Label;
-            public int Actor;
+            public RowSlot(RectTransform rect, Image background, TextMeshProUGUI label)
+            {
+                Rect = rect; Background = background; Label = label;
+            }
+            public RectTransform Rect { get; }
+            public Image Background { get; }
+            public TextMeshProUGUI Label { get; }
+            public int Actor { get; set; } = -1;
         }
 
         private const float RowHeight = 44f;
         private const float RowStep = 46f;
+        private sealed class RowsView
+        {
+            public RowsView(RectTransform content, ScrollRect scroll) { Content = content; Scroll = scroll; }
+            public RectTransform Content { get; }
+            public ScrollRect Scroll { get; }
+        }
+        private sealed class DetailView
+        {
+            public DetailView(TextMeshProUGUI text, RectTransform viewport, RectTransform content, ScrollRect scroll)
+            { Text = text; Viewport = viewport; Content = content; Scroll = scroll; }
+            public TextMeshProUGUI Text { get; }
+            public RectTransform Viewport { get; }
+            public RectTransform Content { get; }
+            public ScrollRect Scroll { get; }
+        }
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, RectTransform panelRect, RowsView rows, DetailView detail,
+                RectTransform filterNeedsRect, RectTransform filterMatchRect,
+                RectTransform filterAllRect, RectTransform closeRect,
+                TextMeshProUGUI filterNeedsLabel, TextMeshProUGUI filterMatchLabel,
+                TextMeshProUGUI filterAllLabel, TextMeshProUGUI closeLabel,
+                TextMeshProUGUI titleLabel)
+            {
+                Root = root; PanelRect = panelRect; Rows = rows; Detail = detail;
+                FilterNeedsRect = filterNeedsRect; FilterMatchRect = filterMatchRect;
+                FilterAllRect = filterAllRect; CloseRect = closeRect;
+                FilterNeedsLabel = filterNeedsLabel; FilterMatchLabel = filterMatchLabel;
+                FilterAllLabel = filterAllLabel; CloseLabel = closeLabel;
+                TitleLabel = titleLabel;
+            }
+            public GameObject Root { get; }
+            public RectTransform PanelRect { get; }
+            public RowsView Rows { get; }
+            public DetailView Detail { get; }
+            public RectTransform FilterNeedsRect { get; }
+            public RectTransform FilterMatchRect { get; }
+            public RectTransform FilterAllRect { get; }
+            public RectTransform CloseRect { get; }
+            public TextMeshProUGUI FilterNeedsLabel { get; }
+            public TextMeshProUGUI FilterMatchLabel { get; }
+            public TextMeshProUGUI FilterAllLabel { get; }
+            public TextMeshProUGUI CloseLabel { get; }
+            public TextMeshProUGUI TitleLabel { get; }
+        }
+
         private readonly List<RowSlot> _rowPool = new List<RowSlot>(100);
         private readonly List<ModParticipantView> _allRows = new List<ModParticipantView>(100);
         private readonly Dictionary<int, ModParticipantView> _byActor = new Dictionary<int, ModParticipantView>();
-        private GameObject _root;
-        private RectTransform _panelRect;
-        private RectTransform _content;
-        private ScrollRect _rowScroll;
-        private TextMeshProUGUI _detailText;
-        private RectTransform _detailViewport;
-        private RectTransform _detailContent;
-        private ScrollRect _detailScroll;
-        private RectTransform _filterNeedsRect;
-        private RectTransform _filterMatchRect;
-        private RectTransform _filterAllRect;
-        private RectTransform _closeRect;
+        private ViewRefs? _view;
+        private readonly TextRefresh _textRefresh = new TextRefresh(nameof(ModIntegrityPanel));
+        private GameObject? _root => _view?.Root;
+        private RectTransform? _panelRect => _view?.PanelRect;
+        private RectTransform? _content => _view?.Rows.Content;
+        private ScrollRect? _rowScroll => _view?.Rows.Scroll;
+        private TextMeshProUGUI? _detailText => _view?.Detail.Text;
+        private RectTransform? _detailViewport => _view?.Detail.Viewport;
+        private RectTransform? _detailContent => _view?.Detail.Content;
+        private ScrollRect? _detailScroll => _view?.Detail.Scroll;
+        private RectTransform? _filterNeedsRect => _view?.FilterNeedsRect;
+        private RectTransform? _filterMatchRect => _view?.FilterMatchRect;
+        private RectTransform? _filterAllRect => _view?.FilterAllRect;
+        private RectTransform? _closeRect => _view?.CloseRect;
         private readonly List<ModParticipantView> _visibleRows = new List<ModParticipantView>(100);
         private ModIntegrityPanelFilter _filter;
         private int _selectedActor = -1;
@@ -51,17 +104,21 @@ namespace Werewolf.UI
         private int _lastRenderedDetailRevision = -1;
 
         public string LayerName => WerewolfUIManager.ModIntegrityLayer;
-        public bool Exists => _root != null;
+        public bool Exists => GetLiveViewOrNull() != null;
         public bool Visible => _root != null && _root.activeSelf;
-        public Action<int> OnDetailRequested;
-        public Action OnClosed;
+        public Action<int>? OnDetailRequested;
+        public Action? OnClosed;
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
+            GameObject? partialRoot = null;
+            try
+            {
             var rootGo = new GameObject("WW_ModIntegrityPanel", typeof(RectTransform));
+            partialRoot = rootGo;
             var rootRect = (RectTransform)rootGo.transform;
             rootRect.SetParent(layerRoot, false);
             UiKit.Stretch(rootRect);
@@ -69,29 +126,38 @@ namespace Werewolf.UI
             canvas.overrideSorting = true;
             canvas.sortingOrder = WerewolfUIManager.PanelSortingOrder;
             rootGo.AddComponent<GraphicRaycaster>();
-            _root = rootGo;
 
             Image dim = rootGo.AddComponent<Image>();
             dim.color = new Color(0f, 0f, 0f, 0.62f);
             dim.raycastTarget = true;
 
-            _panelRect = UiKit.CreateRect(rootRect, "Panel", Vector2.zero, new Vector2(1480f, 850f));
-            UiKit.CreateImage(_panelRect, "Bg", Vector2.zero, _panelRect.sizeDelta, new Color(0.025f, 0.03f, 0.055f, 0.98f));
-            UiKit.CreateText(_panelRect, "Title", new Vector2(0f, 392f), new Vector2(900f, 50f),
+            RectTransform panelRect = UiKit.CreateRect(rootRect, "Panel", Vector2.zero, new Vector2(1480f, 850f));
+            UiKit.CreateImage(panelRect, "Bg", Vector2.zero, panelRect.sizeDelta, new Color(0.025f, 0.03f, 0.055f, 0.98f));
+            TextMeshProUGUI titleLabel = UiKit.CreateText(panelRect, "Title", new Vector2(0f, 392f), new Vector2(900f, 50f),
                 Texts.Get(TextId.ModIntegrityPanelTitle), 34f, new Color(1f, 0.9f, 0.58f), TextAlignmentOptions.Center);
 
-            _filterNeedsRect = BuildButton(_panelRect, "FilterNeeds", new Vector2(-600f, 335f), new Vector2(170f, 46f), Texts.Get(TextId.ModIntegrityFilterNeedsReview));
-            _filterMatchRect = BuildButton(_panelRect, "FilterMatch", new Vector2(-410f, 335f), new Vector2(150f, 46f), Texts.Get(TextId.ModIntegrityFilterMatch));
-            _filterAllRect = BuildButton(_panelRect, "FilterAll", new Vector2(-245f, 335f), new Vector2(150f, 46f), Texts.Get(TextId.ModIntegrityFilterAll));
-            _closeRect = BuildButton(_panelRect, "Close", new Vector2(650f, 392f), new Vector2(120f, 44f), Texts.Get(TextId.ModIntegrityButtonClose));
+            RectTransform filterNeedsRect = BuildButton(panelRect, "FilterNeeds", new Vector2(-600f, 335f), new Vector2(170f, 46f), Texts.Get(TextId.ModIntegrityFilterNeedsReview), out TextMeshProUGUI filterNeedsLabel);
+            RectTransform filterMatchRect = BuildButton(panelRect, "FilterMatch", new Vector2(-410f, 335f), new Vector2(150f, 46f), Texts.Get(TextId.ModIntegrityFilterMatch), out TextMeshProUGUI filterMatchLabel);
+            RectTransform filterAllRect = BuildButton(panelRect, "FilterAll", new Vector2(-245f, 335f), new Vector2(150f, 46f), Texts.Get(TextId.ModIntegrityFilterAll), out TextMeshProUGUI filterAllLabel);
+            RectTransform closeRect = BuildButton(panelRect, "Close", new Vector2(650f, 392f), new Vector2(120f, 44f), Texts.Get(TextId.ModIntegrityButtonClose), out TextMeshProUGUI closeLabel);
 
-            BuildRowsArea(_panelRect);
-            BuildDetailArea(_panelRect);
+            RowsView rows = BuildRowsArea(panelRect);
+            DetailView detail = BuildDetailArea(panelRect);
 
-            TextMeshProUGUI footer = UiKit.CreateText(_panelRect, "Disclaimer", new Vector2(0f, -398f), new Vector2(1400f, 36f),
-                Texts.Get(TextId.ModIntegrityDisclaimer), 18f, new Color(0.74f, 0.74f, 0.8f), TextAlignmentOptions.Center);
-            footer.richText = false;
-            _root.SetActive(false);
+            rootGo.SetActive(false);
+            _view = new ViewRefs(rootGo, panelRect, rows, detail, filterNeedsRect,
+                filterMatchRect, filterAllRect, closeRect,
+                filterNeedsLabel, filterMatchLabel, filterAllLabel, closeLabel,
+                titleLabel);
+            _textRefresh.Subscribe(() => Exists, ApplyTexts);
+            }
+            catch
+            {
+                _view = null;
+                _rowPool.Clear();
+                if (partialRoot != null) UnityEngine.Object.Destroy(partialRoot);
+                throw;
+            }
         }
 
         public void SetRows(IReadOnlyList<ModParticipantView> rows)
@@ -150,10 +216,10 @@ namespace Werewolf.UI
             Vector2 mouse = Input.mousePosition;
             bool clicked = Input.GetMouseButtonDown(0);
 
-            if (clicked && Hit(_closeRect, mouse)) { Close(); return; }
-            if (clicked && Hit(_filterNeedsRect, mouse)) { SetFilter(ModIntegrityPanelFilter.NeedsReview); return; }
-            if (clicked && Hit(_filterMatchRect, mouse)) { SetFilter(ModIntegrityPanelFilter.Match); return; }
-            if (clicked && Hit(_filterAllRect, mouse)) { SetFilter(ModIntegrityPanelFilter.All); return; }
+            if (clicked && Hit(_closeRect!, mouse)) { Close(); return; }
+            if (clicked && Hit(_filterNeedsRect!, mouse)) { SetFilter(ModIntegrityPanelFilter.NeedsReview); return; }
+            if (clicked && Hit(_filterMatchRect!, mouse)) { SetFilter(ModIntegrityPanelFilter.Match); return; }
+            if (clicked && Hit(_filterAllRect!, mouse)) { SetFilter(ModIntegrityPanelFilter.All); return; }
 
             if (clicked)
             {
@@ -168,7 +234,7 @@ namespace Werewolf.UI
                 }
             }
 
-            RenderDetail(clientState, clicked && Hit(_detailViewport, mouse));
+            RenderDetail(clientState, clicked && Hit(_detailViewport!, mouse));
         }
 
         public void SetDetailTimedOut(int actor)
@@ -177,17 +243,30 @@ namespace Werewolf.UI
             _lastRenderedDetailActor = -1;
         }
 
+        private void ApplyTexts()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return;
+            view.TitleLabel.text = Texts.Get(TextId.ModIntegrityPanelTitle);
+            view.FilterNeedsLabel.text = Texts.Get(TextId.ModIntegrityFilterNeedsReview);
+            view.FilterMatchLabel.text = Texts.Get(TextId.ModIntegrityFilterMatch);
+            view.FilterAllLabel.text = Texts.Get(TextId.ModIntegrityFilterAll);
+            view.CloseLabel.text = Texts.Get(TextId.ModIntegrityButtonClose);
+
+            float scrollPos = _rowScroll != null ? _rowScroll.verticalNormalizedPosition : 1f;
+            ApplyFilter();
+            if (_rowScroll != null) _rowScroll.verticalNormalizedPosition = scrollPos;
+            RefreshSelectedSummary();
+            _lastRenderedDetailActor = -1;
+            _lastRenderedDetailRevision = -1;
+        }
+
         public void Destroy()
         {
-            if (_root != null) UnityEngine.Object.Destroy(_root);
-            _root = null;
-            _panelRect = null;
-            _content = null;
-            _rowScroll = null;
-            _detailText = null;
-            _detailViewport = null;
-            _detailContent = null;
-            _detailScroll = null;
+            _textRefresh.Unsubscribe();
+            ViewRefs? view = _view;
+            _view = null;
+            if (view != null && view.Root != null) UnityEngine.Object.Destroy(view.Root);
             _rowPool.Clear();
             _allRows.Clear();
             _visibleRows.Clear();
@@ -195,7 +274,7 @@ namespace Werewolf.UI
             _selectedActor = -1;
         }
 
-        private void BuildRowsArea(RectTransform parent)
+        private RowsView BuildRowsArea(RectTransform parent)
         {
             RectTransform area = UiKit.CreateRect(parent, "RowsArea", new Vector2(-385f, -25f), new Vector2(680f, 680f));
             UiKit.CreateImage(area, "Bg", Vector2.zero, area.sizeDelta, new Color(0.055f, 0.065f, 0.095f, 0.96f));
@@ -210,12 +289,12 @@ namespace Werewolf.UI
             Image scrollImage = scrollGo.AddComponent<Image>();
             scrollImage.color = new Color(0f, 0f, 0f, 0.001f);
             scrollImage.raycastTarget = true;
-            _rowScroll = scrollGo.AddComponent<ScrollRect>();
-            _rowScroll.horizontal = false;
-            _rowScroll.vertical = true;
-            _rowScroll.inertia = false;
-            _rowScroll.movementType = ScrollRect.MovementType.Clamped;
-            _rowScroll.scrollSensitivity = RowStep;
+            ScrollRect rowScroll = scrollGo.AddComponent<ScrollRect>();
+            rowScroll.horizontal = false;
+            rowScroll.vertical = true;
+            rowScroll.inertia = false;
+            rowScroll.movementType = ScrollRect.MovementType.Clamped;
+            rowScroll.scrollSensitivity = RowStep;
 
             var viewportGo = new GameObject("Viewport", typeof(RectTransform));
             var viewport = (RectTransform)viewportGo.transform;
@@ -225,32 +304,33 @@ namespace Werewolf.UI
             Image vpImage = viewportGo.AddComponent<Image>();
             vpImage.color = new Color(0f, 0f, 0f, 0.001f);
             vpImage.raycastTarget = true;
-            _rowScroll.viewport = viewport;
+            rowScroll.viewport = viewport;
 
             var contentGo = new GameObject("Content", typeof(RectTransform));
-            _content = (RectTransform)contentGo.transform;
-            _content.SetParent(viewport, false);
-            _content.anchorMin = new Vector2(0f, 1f);
-            _content.anchorMax = new Vector2(1f, 1f);
-            _content.pivot = new Vector2(0.5f, 1f);
-            _content.anchoredPosition = Vector2.zero;
-            _content.sizeDelta = new Vector2(0f, 100 * RowStep);
-            _rowScroll.content = _content;
+            RectTransform content = (RectTransform)contentGo.transform;
+            content.SetParent(viewport, false);
+            content.anchorMin = new Vector2(0f, 1f);
+            content.anchorMax = new Vector2(1f, 1f);
+            content.pivot = new Vector2(0.5f, 1f);
+            content.anchoredPosition = Vector2.zero;
+            content.sizeDelta = new Vector2(0f, 100 * RowStep);
+            rowScroll.content = content;
 
             for (int i = 0; i < 100; i++)
             {
-                RectTransform rowRect = UiKit.CreateRect(_content, $"Row_{i}", new Vector2(0f, -RowHeight * 0.5f - i * RowStep), new Vector2(630f, RowHeight));
+                RectTransform rowRect = UiKit.CreateRect(content, $"Row_{i}", new Vector2(0f, -RowHeight * 0.5f - i * RowStep), new Vector2(630f, RowHeight));
                 rowRect.anchorMin = rowRect.anchorMax = new Vector2(0.5f, 1f);
                 rowRect.pivot = new Vector2(0.5f, 0.5f);
                 Image bg = UiKit.CreateImage(rowRect, "Bg", Vector2.zero, rowRect.sizeDelta, new Color(0.1f, 0.11f, 0.15f, 0.96f));
                 TextMeshProUGUI label = UiKit.CreateText(rowRect, "Label", Vector2.zero, new Vector2(610f, RowHeight), string.Empty, 20f, Color.white, TextAlignmentOptions.Left);
                 label.richText = false;
                 rowRect.gameObject.SetActive(false);
-                _rowPool.Add(new RowSlot { Rect = rowRect, Background = bg, Label = label, Actor = -1 });
+                _rowPool.Add(new RowSlot(rowRect, bg, label));
             }
+            return new RowsView(content, rowScroll);
         }
 
-        private void BuildDetailArea(RectTransform parent)
+        private static DetailView BuildDetailArea(RectTransform parent)
         {
             RectTransform area = UiKit.CreateRect(parent, "DetailArea", new Vector2(370f, -25f), new Vector2(720f, 680f));
             UiKit.CreateImage(area, "Bg", Vector2.zero, area.sizeDelta, new Color(0.045f, 0.05f, 0.08f, 0.98f));
@@ -265,49 +345,65 @@ namespace Werewolf.UI
             Image scrollImage = scrollGo.AddComponent<Image>();
             scrollImage.color = new Color(0f, 0f, 0f, 0.001f);
             scrollImage.raycastTarget = true;
-            _detailScroll = scrollGo.AddComponent<ScrollRect>();
-            _detailScroll.horizontal = false;
-            _detailScroll.vertical = true;
-            _detailScroll.inertia = false;
-            _detailScroll.movementType = ScrollRect.MovementType.Clamped;
-            _detailScroll.scrollSensitivity = 42f;
+            ScrollRect detailScroll = scrollGo.AddComponent<ScrollRect>();
+            detailScroll.horizontal = false;
+            detailScroll.vertical = true;
+            detailScroll.inertia = false;
+            detailScroll.movementType = ScrollRect.MovementType.Clamped;
+            detailScroll.scrollSensitivity = 42f;
 
             var viewportGo = new GameObject("Viewport", typeof(RectTransform));
-            _detailViewport = (RectTransform)viewportGo.transform;
-            _detailViewport.SetParent(scrollRect, false);
-            UiKit.Stretch(_detailViewport);
+            RectTransform detailViewport = (RectTransform)viewportGo.transform;
+            detailViewport.SetParent(scrollRect, false);
+            UiKit.Stretch(detailViewport);
             viewportGo.AddComponent<RectMask2D>();
             Image image = viewportGo.AddComponent<Image>();
             image.color = new Color(0f, 0f, 0f, 0.001f);
             image.raycastTarget = true;
-            _detailScroll.viewport = _detailViewport;
+            detailScroll.viewport = detailViewport;
 
             var contentGo = new GameObject("Content", typeof(RectTransform));
-            _detailContent = (RectTransform)contentGo.transform;
-            _detailContent.SetParent(_detailViewport, false);
-            _detailContent.anchorMin = new Vector2(0f, 1f);
-            _detailContent.anchorMax = new Vector2(1f, 1f);
-            _detailContent.pivot = new Vector2(0.5f, 1f);
-            _detailContent.anchoredPosition = Vector2.zero;
-            _detailContent.sizeDelta = new Vector2(0f, 610f);
-            _detailScroll.content = _detailContent;
+            RectTransform detailContent = (RectTransform)contentGo.transform;
+            detailContent.SetParent(detailViewport, false);
+            detailContent.anchorMin = new Vector2(0f, 1f);
+            detailContent.anchorMax = new Vector2(1f, 1f);
+            detailContent.pivot = new Vector2(0.5f, 1f);
+            detailContent.anchoredPosition = Vector2.zero;
+            detailContent.sizeDelta = new Vector2(0f, 610f);
+            detailScroll.content = detailContent;
 
-            _detailText = UiKit.CreateText(_detailContent, "Detail", Vector2.zero, new Vector2(650f, 610f), string.Empty, 20f, Color.white, TextAlignmentOptions.TopLeft);
-            RectTransform textRect = _detailText.rectTransform;
+            TextMeshProUGUI detailText = UiKit.CreateText(detailContent, "Detail", Vector2.zero, new Vector2(650f, 610f), string.Empty, 20f, Color.white, TextAlignmentOptions.TopLeft);
+            RectTransform textRect = detailText.rectTransform;
             textRect.anchorMin = new Vector2(0.5f, 1f);
             textRect.anchorMax = new Vector2(0.5f, 1f);
             textRect.pivot = new Vector2(0.5f, 1f);
             textRect.anchoredPosition = Vector2.zero;
-            _detailText.richText = false;
-            _detailText.enableWordWrapping = true;
-            _detailText.overflowMode = TextOverflowModes.Overflow;
+            detailText.richText = false;
+            detailText.textWrappingMode = TextWrappingModes.Normal;
+            detailText.overflowMode = TextOverflowModes.Overflow;
+            return new DetailView(detailText, detailViewport, detailContent, detailScroll);
         }
 
-        private RectTransform BuildButton(Transform parent, string name, Vector2 position, Vector2 size, string text)
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+            _view = null;
+            _rowPool.Clear();
+            _allRows.Clear();
+            _visibleRows.Clear();
+            _byActor.Clear();
+            _selectedActor = -1;
+            return null;
+        }
+
+        private RectTransform BuildButton(Transform parent, string name, Vector2 position, Vector2 size, string text,
+            out TextMeshProUGUI label)
         {
             Image bg = UiKit.CreateImage(parent, name, position, size, new Color(0.18f, 0.2f, 0.28f, 0.98f));
             bg.raycastTarget = false;
-            TextMeshProUGUI label = UiKit.CreateText(bg.rectTransform, "Label", Vector2.zero, size, text, 20f, Color.white, TextAlignmentOptions.Center);
+            label = UiKit.CreateText(bg.rectTransform, "Label", Vector2.zero, size, text, 20f, Color.white, TextAlignmentOptions.Center);
             label.richText = false;
             return bg.rectTransform;
         }
@@ -405,7 +501,7 @@ namespace Werewolf.UI
                 return;
             }
 
-            if (state != null && state.TryGetDetail(_selectedActor, out ModIntegrityDetail detail))
+            if (state != null && state.TryGetDetail(_selectedActor, out ModIntegrityDetail? detail))
             {
                 if (_lastRenderedDetailActor == detail.Actor && _lastRenderedDetailRevision == detail.Revision) return;
                 var text = new StringBuilder();

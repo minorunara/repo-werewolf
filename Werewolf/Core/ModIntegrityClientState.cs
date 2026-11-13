@@ -1,5 +1,7 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Werewolf.Core
 {
@@ -13,19 +15,19 @@ namespace Werewolf.Core
         private sealed class DetailAssembly
         {
             public int ChunkCount;
-            public IReadOnlyList<ModDifference>[] Chunks;
+            public IReadOnlyList<ModDifference>?[] Chunks = Array.Empty<IReadOnlyList<ModDifference>?>();
             public int Received;
         }
 
         private readonly Dictionary<int, ModIntegrityDetail> _details = new Dictionary<int, ModIntegrityDetail>();
         private int _detailRequestActor = -1;
         private long _detailRequestStartedUnixMs;
-        private DetailAssembly _detailAssembly;
+        private DetailAssembly? _detailAssembly;
 
-        public ModIntegritySnapshot Current { get; private set; }
+        public ModIntegritySnapshot? Current { get; private set; }
         public int PendingDetailActor => _detailRequestActor;
 
-        public bool TryApplySnapshot(ModIntegritySnapshot snapshot, int expectedMasterActor)
+        public bool TryApplySnapshot(ModIntegritySnapshot? snapshot, int expectedMasterActor)
         {
             if (snapshot == null || expectedMasterActor <= 0 || snapshot.BaselineActor != expectedMasterActor)
                 return false;
@@ -44,7 +46,7 @@ namespace Werewolf.Core
         public bool BeginDetailRequest(int actor, long nowUnixMs)
         {
             if (Current == null || actor <= 0) return false;
-            if (!Current.TryGetRecord(actor, out ModParticipantRecord record) ||
+            if (!Current.TryGetRecord(actor, out ModParticipantRecord? record) ||
                 record.Status != ModIntegrityStatus.Difference)
                 return false;
             if (_details.ContainsKey(actor)) return false;
@@ -56,7 +58,7 @@ namespace Werewolf.Core
             return true;
         }
 
-        public bool TryApplyDetailChunk(ModIntegrityDetailChunk chunk, out bool completed)
+        public bool TryApplyDetailChunk(ModIntegrityDetailChunk? chunk, out bool completed)
         {
             completed = false;
             if (Current == null || chunk == null) return false;
@@ -75,7 +77,7 @@ namespace Werewolf.Core
                 _detailAssembly = new DetailAssembly
                 {
                     ChunkCount = chunk.ChunkCount,
-                    Chunks = new IReadOnlyList<ModDifference>[chunk.ChunkCount],
+                    Chunks = new IReadOnlyList<ModDifference>?[chunk.ChunkCount],
                 };
             }
             else if (_detailAssembly.ChunkCount != chunk.ChunkCount)
@@ -84,7 +86,7 @@ namespace Werewolf.Core
                 return false;
             }
 
-            IReadOnlyList<ModDifference> existing = _detailAssembly.Chunks[chunk.ChunkIndex];
+            IReadOnlyList<ModDifference>? existing = _detailAssembly.Chunks[chunk.ChunkIndex];
             if (existing != null)
             {
                 if (SameDifferences(existing, chunk.Differences)) return true;
@@ -99,7 +101,7 @@ namespace Werewolf.Core
             var all = new List<ModDifference>();
             for (int i = 0; i < _detailAssembly.Chunks.Length; i++)
             {
-                IReadOnlyList<ModDifference> part = _detailAssembly.Chunks[i];
+                IReadOnlyList<ModDifference>? part = _detailAssembly.Chunks[i];
                 if (part == null)
                 {
                     AbandonDetailRequest();
@@ -135,7 +137,7 @@ namespace Werewolf.Core
             return true;
         }
 
-        public bool TryGetDetail(int actor, out ModIntegrityDetail detail)
+        public bool TryGetDetail(int actor, [NotNullWhen(true)] out ModIntegrityDetail? detail)
         {
             return _details.TryGetValue(actor, out detail);
         }
@@ -162,8 +164,8 @@ namespace Werewolf.Core
         }
 
         private static bool SameDifferences(
-            IReadOnlyList<ModDifference> left,
-            IReadOnlyList<ModDifference> right)
+            IReadOnlyList<ModDifference>? left,
+            IReadOnlyList<ModDifference>? right)
         {
             if (left == null || right == null || left.Count != right.Count) return false;
             for (int i = 0; i < left.Count; i++)

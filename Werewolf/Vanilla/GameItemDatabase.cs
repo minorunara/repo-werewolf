@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -17,14 +18,15 @@ namespace Werewolf.Vanilla
                 try
                 {
                     var stats = StatsManager.instance;
-                    if (stats != null && stats.itemDictionary != null && stats.itemDictionary.Count > 0)
+                    if (stats == null) return result;
+                    if (stats.itemDictionary != null && stats.itemDictionary.Count > 0)
                     {
                         foreach (var pair in stats.itemDictionary)
                             AddIfBringable(result, pair.Key, pair.Value);
                     }
                     else
                     {
-                        foreach (var item in Resources.FindObjectsOfTypeAll<Item>())
+                        foreach (var item in Resources.LoadAll<Item>(stats.folderPath))
                             AddIfBringable(result, item != null ? item.name : null, item);
                     }
                 }
@@ -65,7 +67,7 @@ namespace Werewolf.Vanilla
             }
         }
 
-        private static void AddIfBringable(Dictionary<string, int> catalog, string name, Item item)
+        private static void AddIfBringable(Dictionary<string, int> catalog, string? name, Item? item)
         {
             if (item == null || string.IsNullOrEmpty(name)) return;
             if (item.disabled) return;

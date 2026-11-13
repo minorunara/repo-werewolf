@@ -9,8 +9,8 @@ namespace Werewolf
 {
     internal static class WorldgenMapBinding
     {
-        private static ConfigFile _config;
-        private static ConfigBindings _bindings;
+        private static ConfigFile? _config;
+        private static ConfigBindings? _bindings;
 
         private static bool _initialized;
         private static bool _failed;
@@ -23,7 +23,9 @@ namespace Werewolf
 
         internal static void TryInitialize()
         {
-            if (_initialized || _failed || _config == null || _bindings == null) return;
+            ConfigFile? config = _config;
+            ConfigBindings? bindings = _bindings;
+            if (_initialized || _failed || config == null || bindings == null) return;
             try
             {
                 var levels = GameItemDatabase.Instance.PlayableLevelNames;
@@ -35,18 +37,18 @@ namespace Werewolf
                     if (!values.Contains(name)) values.Add(name);
                 }
 
-                var previous = _bindings.StartMapName;
+                var previous = bindings.StartMapName;
                 var oldValue = previous.Value ?? "";
-                _config.Remove(previous.Definition);
+                config.Remove(previous.Definition);
 
-                var entry = _config.Bind(
+                var entry = config.Bind(
                     ConfigBindings.SecStage, "StartMapName", "",
                     new ConfigDescription(
                         "Map type name for the werewolf session. Empty = random (vanilla default selection) / " +
                         "人狼セッションの開始マップ種別名。空 = ランダム（バニラ既定の選択）",
                         new AcceptableValueList<string>(values.ToArray())));
                 entry.Value = oldValue;
-                _bindings.StartMapName = entry;
+                bindings.StartMapName = entry;
 
                 _initialized = true;
                 if (!string.Equals(entry.Value, oldValue, StringComparison.Ordinal))

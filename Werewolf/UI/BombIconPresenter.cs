@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -24,49 +25,76 @@ namespace Werewolf.UI
         private static readonly Color RadialFullColor = new Color(0.35f, 0.95f, 0.35f, 0.65f);
         private static readonly Color RadialOutlineColor = new Color(1f, 1f, 1f, 0.95f);
 
-        private GameObject _root;
-        private readonly Dictionary<int, Image> _radialOutlines = new Dictionary<int, Image>();
-        private readonly Dictionary<int, Image> _radials = new Dictionary<int, Image>();
-        private readonly Dictionary<int, Image> _bombIcons = new Dictionary<int, Image>();
-        private Image _plantFlightIcon;
-        private int _plantFlightTarget = -1;
-        private float _plantFlightStartedAt;
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root)
+            {
+                Root = root;
+                RadialOutlines = new Dictionary<int, Image>();
+                Radials = new Dictionary<int, Image>();
+                BombIcons = new Dictionary<int, Image>();
+            }
 
-        public bool Exists => _root != null;
+            public GameObject Root { get; }
+            public Dictionary<int, Image> RadialOutlines { get; }
+            public Dictionary<int, Image> Radials { get; }
+            public Dictionary<int, Image> BombIcons { get; }
+            public Image? PlantFlightIcon { get; set; }
+            public int PlantFlightTarget { get; set; } = -1;
+            public float PlantFlightStartedAt { get; set; }
+        }
 
-        private RectTransform RootRect => (RectTransform)_root.transform;
+        private ViewRefs? _view;
+
+        public bool Exists => GetLiveViewOrNull() != null;
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
-            if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
-            var go = new GameObject("WW_BombIconPresenter", typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(layerRoot, false);
-            UiKit.Stretch(rect);
-            _root = go;
-            _root.SetActive(false);
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
+
+            GameObject? root = null;
+            try
+            {
+                if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
+                root = new GameObject("WW_BombIconPresenter", typeof(RectTransform));
+                var rect = (RectTransform)root.transform;
+                rect.SetParent(layerRoot, false);
+                UiKit.Stretch(rect);
+                root.SetActive(false);
+                _view = new ViewRefs(root);
+            }
+            catch
+            {
+                _view = null;
+                if (root != null)
+                {
+                    root.SetActive(false);
+                    UnityEngine.Object.Destroy(root);
+                }
+                throw;
+            }
         }
 
         public void Tick(bool visible,
-            IReadOnlyDictionary<int, float> radialTargets,
-            IReadOnlyCollection<int> bombIconActors,
-            Func<int, Vector3?> resolveWorldPos)
+            IReadOnlyDictionary<int, float>? radialTargets,
+            IReadOnlyCollection<int>? bombIconActors,
+            Func<int, Vector3?>? resolveWorldPos)
         {
-            if (_root == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
             try
             {
-                if (_root.activeSelf != visible) _root.SetActive(visible);
+                if (view.Root.activeSelf != visible) view.Root.SetActive(visible);
                 if (!visible)
                 {
-                    HideAll();
+                    HideAll(view);
                     return;
                 }
 
                 Camera cam = Camera.main;
                 if (cam == null)
                 {
-                    HideAll();
+                    HideAll(view);
                     return;
                 }
 
@@ -75,43 +103,43 @@ namespace Werewolf.UI
                     foreach (var kv in radialTargets)
                     {
                         Vector3? anchor = resolveWorldPos != null ? resolveWorldPos(kv.Key) : null;
-                        Image img = EnsureRadial(kv.Key);
+                        Image img = EnsureRadial(view, kv.Key);
                         if (anchor != null && !OverheadVision.BodyVisibleFromCamera(anchor.Value, cam))
                             img.enabled = false;
                         else
-                            PlaceOrHide(img, anchor, cam);
+                            PlaceOrHide(view, img, anchor, cam);
                         if (img.enabled)
                         {
                             float ratio = Mathf.Clamp01(kv.Value);
                             img.fillAmount = ratio;
                             img.color = ratio >= 1f ? RadialFullColor : RadialChargingColor;
-                            Image outline = EnsureRadialOutline(kv.Key, img);
+                            Image outline = EnsureRadialOutline(view, kv.Key, img);
                             outline.rectTransform.anchoredPosition = img.rectTransform.anchoredPosition;
                             outline.fillAmount = ratio;
                             outline.enabled = true;
                         }
-                        else if (_radialOutlines.TryGetValue(kv.Key, out Image hiddenOutline)
+                        else if (view.RadialOutlines.TryGetValue(kv.Key, out Image hiddenOutline)
                             && hiddenOutline != null)
                         {
                             hiddenOutline.enabled = false;
                         }
                     }
                     var toRemove = new List<int>();
-                    foreach (var actor in _radials.Keys)
+                    foreach (var actor in view.Radials.Keys)
                     {
                         if (!radialTargets.ContainsKey(actor)) toRemove.Add(actor);
                     }
                     foreach (int actor in toRemove)
                     {
-                        if (_radials[actor] != null) _radials[actor].enabled = false;
-                        if (_radialOutlines.TryGetValue(actor, out Image outline) && outline != null)
+                        if (view.Radials[actor] != null) view.Radials[actor].enabled = false;
+                        if (view.RadialOutlines.TryGetValue(actor, out Image outline) && outline != null)
                             outline.enabled = false;
                     }
                 }
                 else
                 {
-                    foreach (var img in _radials.Values) if (img != null) img.enabled = false;
-                    foreach (var img in _radialOutlines.Values) if (img != null) img.enabled = false;
+                    foreach (var img in view.Radials.Values) if (img != null) img.enabled = false;
+                    foreach (var img in view.RadialOutlines.Values) if (img != null) img.enabled = false;
                 }
 
                 if (bombIconActors != null && bombIconActors.Count > 0)
@@ -119,30 +147,31 @@ namespace Werewolf.UI
                     foreach (int actor in bombIconActors)
                     {
                         Vector3? anchor = resolveWorldPos != null ? resolveWorldPos(actor) : null;
-                        Image img = EnsureBombIcon(actor);
-                        if (actor == _plantFlightTarget)
+                        Image img = EnsureBombIcon(view, actor);
+                        if (actor == view.PlantFlightTarget)
                             img.enabled = false;
                         else if (anchor != null && !OverheadVision.BodyVisibleFromCamera(anchor.Value, cam))
                             img.enabled = false;
                         else
-                            PlaceOrHide(img, anchor, cam, verticalOffsetPx: BombIconVerticalOffsetPx);
+                            PlaceOrHide(view, img, anchor, cam,
+                                verticalOffsetPx: BombIconVerticalOffsetPx);
                     }
                     var toRemove = new List<int>();
-                    foreach (var actor in _bombIcons.Keys)
+                    foreach (var actor in view.BombIcons.Keys)
                     {
                         if (!ContainsActor(bombIconActors, actor)) toRemove.Add(actor);
                     }
                     foreach (int actor in toRemove)
                     {
-                        if (_bombIcons[actor] != null) _bombIcons[actor].enabled = false;
+                        if (view.BombIcons[actor] != null) view.BombIcons[actor].enabled = false;
                     }
                 }
                 else
                 {
-                    foreach (var img in _bombIcons.Values) if (img != null) img.enabled = false;
+                    foreach (var img in view.BombIcons.Values) if (img != null) img.enabled = false;
                 }
 
-                TickPlantFlight(cam, resolveWorldPos);
+                TickPlantFlight(view, cam, resolveWorldPos);
             }
             catch (Exception e)
             {
@@ -152,31 +181,30 @@ namespace Werewolf.UI
 
         public void Hide()
         {
-            if (_root != null && _root.activeSelf) _root.SetActive(false);
-            EndPlantFlight();
-            HideAll();
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
+            if (view.Root.activeSelf) view.Root.SetActive(false);
+            EndPlantFlight(view);
+            HideAll(view);
         }
 
         public void Destroy()
         {
-            if (_root != null)
-            {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
-            }
-            _radials.Clear();
-            _radialOutlines.Clear();
-            _bombIcons.Clear();
-            _plantFlightIcon = null;
-            _plantFlightTarget = -1;
+            ViewRefs? view = _view;
+            _view = null;
+            if (view == null) return;
+            ResetViewState(view);
+            if (view.Root != null) UnityEngine.Object.Destroy(view.Root);
         }
 
         public void BeginPlantFlight(int targetActor)
         {
             if (targetActor == -1) return;
-            _plantFlightTarget = targetActor;
-            _plantFlightStartedAt = Time.unscaledTime;
-            if (_plantFlightIcon != null) _plantFlightIcon.enabled = true;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
+            view.PlantFlightTarget = targetActor;
+            view.PlantFlightStartedAt = Time.unscaledTime;
+            if (view.PlantFlightIcon != null) view.PlantFlightIcon.enabled = true;
         }
 
         private static bool ContainsActor(IReadOnlyCollection<int> set, int actor)
@@ -185,33 +213,33 @@ namespace Werewolf.UI
             return false;
         }
 
-        private Image EnsureRadial(int actor)
+        private static Image EnsureRadial(ViewRefs view, int actor)
         {
-            if (_radials.TryGetValue(actor, out Image cached) && cached != null)
+            if (view.Radials.TryGetValue(actor, out Image cached) && cached != null)
             {
                 if (!cached.enabled) cached.enabled = true;
                 return cached;
             }
-            Image img = UiKit.CreateRadialImage(_root.transform, "Radial_" + actor,
+            Image img = UiKit.CreateRadialImage(view.Root.transform, "Radial_" + actor,
                 Vector2.zero, new Vector2(RadialSize, RadialSize),
                 RadialChargingColor);
-            _radials[actor] = img;
+            view.Radials[actor] = img;
             return img;
         }
 
-        private Image EnsureRadialOutline(int actor, Image coloredRadial)
+        private static Image EnsureRadialOutline(ViewRefs view, int actor, Image coloredRadial)
         {
-            if (_radialOutlines.TryGetValue(actor, out Image cached) && cached != null)
+            if (view.RadialOutlines.TryGetValue(actor, out Image cached) && cached != null)
             {
                 PlaceOutlineDirectlyBehind(cached, coloredRadial);
                 return cached;
             }
 
-            Image img = UiKit.CreateRadialImage(_root.transform, "RadialOutline_" + actor,
+            Image img = UiKit.CreateRadialImage(view.Root.transform, "RadialOutline_" + actor,
                 Vector2.zero, new Vector2(RadialOutlineSize, RadialOutlineSize),
                 RadialOutlineColor);
             PlaceOutlineDirectlyBehind(img, coloredRadial);
-            _radialOutlines[actor] = img;
+            view.RadialOutlines[actor] = img;
             return img;
         }
 
@@ -230,86 +258,95 @@ namespace Werewolf.UI
             }
         }
 
-        private Image EnsureBombIcon(int actor)
+        private static Image EnsureBombIcon(ViewRefs view, int actor)
         {
-            if (_bombIcons.TryGetValue(actor, out Image cached) && cached != null)
+            if (view.BombIcons.TryGetValue(actor, out Image cached) && cached != null)
             {
                 if (!cached.enabled) cached.enabled = true;
                 return cached;
             }
-            Image img = UiKit.CreateImage(_root.transform, "BombIcon_" + actor,
+            Image img = UiKit.CreateImage(view.Root.transform, "BombIcon_" + actor,
                 Vector2.zero, new Vector2(BombIconSize, BombIconSize), Color.white);
-            Sprite sprite = AssetCatalog.GetBombIcon();
+            Sprite? sprite = AssetCatalog.GetBombIcon();
             if (sprite != null)
             {
                 img.sprite = sprite;
                 img.preserveAspect = true;
             }
-            _bombIcons[actor] = img;
+            view.BombIcons[actor] = img;
             return img;
         }
 
-        private Image EnsurePlantFlightIcon()
+        private static Image EnsurePlantFlightIcon(ViewRefs view)
         {
-            if (_plantFlightIcon != null) return _plantFlightIcon;
-            _plantFlightIcon = UiKit.CreateImage(_root.transform, "BombPlantFlight",
+            if (view.PlantFlightIcon != null) return view.PlantFlightIcon;
+            Image icon = UiKit.CreateImage(view.Root.transform, "BombPlantFlight",
                 Vector2.zero, new Vector2(BombIconSize, BombIconSize), Color.white);
-            Sprite sprite = AssetCatalog.GetBombIcon();
+            Sprite? sprite = AssetCatalog.GetBombIcon();
             if (sprite != null)
             {
-                _plantFlightIcon.sprite = sprite;
-                _plantFlightIcon.preserveAspect = true;
+                icon.sprite = sprite;
+                icon.preserveAspect = true;
             }
-            return _plantFlightIcon;
+            view.PlantFlightIcon = icon;
+            return icon;
         }
 
-        private void TickPlantFlight(Camera cam, Func<int, Vector3?> resolveWorldPos)
+        private static void TickPlantFlight(
+            ViewRefs view, Camera cam, Func<int, Vector3?>? resolveWorldPos)
         {
-            if (_plantFlightTarget == -1)
+            if (view.PlantFlightTarget == -1)
             {
-                if (_plantFlightIcon != null) _plantFlightIcon.enabled = false;
+                if (view.PlantFlightIcon != null) view.PlantFlightIcon.enabled = false;
                 return;
             }
 
-            float t = Mathf.Clamp01((Time.unscaledTime - _plantFlightStartedAt) / PlantFlightSeconds);
-            Vector3? target = resolveWorldPos != null ? resolveWorldPos(_plantFlightTarget) : null;
+            float t = Mathf.Clamp01(
+                (Time.unscaledTime - view.PlantFlightStartedAt) / PlantFlightSeconds);
+            Vector3? target = resolveWorldPos != null
+                ? resolveWorldPos(view.PlantFlightTarget)
+                : null;
             if (target == null)
             {
-                EndPlantFlight();
+                EndPlantFlight(view);
                 return;
             }
 
+            RectTransform rootRect = (RectTransform)view.Root.transform;
             Vector2 startUi = OverheadProjection.ViewportToUi(
-                new Vector2(PlantThrowOriginScreenX, PlantThrowOriginScreenY), RootRect);
+                new Vector2(PlantThrowOriginScreenX, PlantThrowOriginScreenY), rootRect);
             Vector3 endViewport = cam.WorldToViewportPoint(target.Value + Vector3.up * HeadOffsetY);
             if (endViewport.z <= 0f)
             {
-                EndPlantFlight();
+                EndPlantFlight(view);
                 return;
             }
 
-            Vector2 uiPos = Vector2.Lerp(startUi, OverheadProjection.ViewportToUi(endViewport, RootRect), t);
+            Vector2 uiPos = Vector2.Lerp(
+                startUi, OverheadProjection.ViewportToUi(endViewport, rootRect), t);
             uiPos.y += BombIconVerticalOffsetPx * t;
             uiPos.y += PlantArcHeightPx * 4f * t * (1f - t);
-            Image icon = EnsurePlantFlightIcon();
+            Image icon = EnsurePlantFlightIcon(view);
             icon.enabled = true;
             icon.rectTransform.anchoredPosition = uiPos;
             icon.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -360f * t);
 
-            if (t >= 1f) EndPlantFlight();
+            if (t >= 1f) EndPlantFlight(view);
         }
 
-        private void EndPlantFlight()
+        private static void EndPlantFlight(ViewRefs view)
         {
-            _plantFlightTarget = -1;
-            if (_plantFlightIcon != null)
+            view.PlantFlightTarget = -1;
+            view.PlantFlightStartedAt = 0f;
+            if (view.PlantFlightIcon != null)
             {
-                _plantFlightIcon.enabled = false;
-                _plantFlightIcon.rectTransform.localRotation = Quaternion.identity;
+                view.PlantFlightIcon.enabled = false;
+                view.PlantFlightIcon.rectTransform.localRotation = Quaternion.identity;
             }
         }
 
-        private void PlaceOrHide(Image img, Vector3? anchorPos, Camera cam, float verticalOffsetPx = 0f)
+        private static void PlaceOrHide(
+            ViewRefs view, Image img, Vector3? anchorPos, Camera cam, float verticalOffsetPx = 0f)
         {
             if (img == null) return;
             if (anchorPos == null)
@@ -318,7 +355,8 @@ namespace Werewolf.UI
                 return;
             }
             Vector3 world = anchorPos.Value + Vector3.up * HeadOffsetY;
-            if (!OverheadProjection.TryProject(cam, world, RootRect, out Vector2 uiPos))
+            if (!OverheadProjection.TryProject(
+                    cam, world, (RectTransform)view.Root.transform, out Vector2 uiPos))
             {
                 img.enabled = false;
                 return;
@@ -328,12 +366,33 @@ namespace Werewolf.UI
             img.rectTransform.anchoredPosition = uiPos;
         }
 
-        private void HideAll()
+        private static void HideAll(ViewRefs view)
         {
-            foreach (var img in _radials.Values) if (img != null) img.enabled = false;
-            foreach (var img in _radialOutlines.Values) if (img != null) img.enabled = false;
-            foreach (var img in _bombIcons.Values) if (img != null) img.enabled = false;
-            if (_plantFlightIcon != null) _plantFlightIcon.enabled = false;
+            foreach (var img in view.Radials.Values) if (img != null) img.enabled = false;
+            foreach (var img in view.RadialOutlines.Values) if (img != null) img.enabled = false;
+            foreach (var img in view.BombIcons.Values) if (img != null) img.enabled = false;
+            if (view.PlantFlightIcon != null) view.PlantFlightIcon.enabled = false;
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+
+            _view = null;
+            ResetViewState(view);
+            return null;
+        }
+
+        private static void ResetViewState(ViewRefs view)
+        {
+            view.Radials.Clear();
+            view.RadialOutlines.Clear();
+            view.BombIcons.Clear();
+            view.PlantFlightIcon = null;
+            view.PlantFlightTarget = -1;
+            view.PlantFlightStartedAt = 0f;
         }
     }
 }

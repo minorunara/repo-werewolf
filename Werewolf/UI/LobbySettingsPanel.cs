@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using TMPro;
@@ -42,25 +43,50 @@ namespace Werewolf.UI
         private static readonly Color LabelTextColor = new Color(0.9f, 0.9f, 0.95f, 1f);
         private static readonly Color HintTextColor = new Color(0.95f, 0.95f, 0.98f, 1f);
 
-        private GameObject _root;
-        private GameObject _hintRoot;
-        private Canvas _subCanvas;
-        private RectTransform _hintRect;
-        private RectTransform _content;
-        private ScrollRect _scrollRect;
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, GameObject hintRoot, Canvas subCanvas,
+                RectTransform hintRect, RectTransform content, ScrollRect scrollRect,
+                TextMeshProUGUI footerLabel, TextMeshProUGUI miniHintLabel)
+            {
+                Root = root; HintRoot = hintRoot; SubCanvas = subCanvas;
+                HintRect = hintRect; Content = content; ScrollRect = scrollRect;
+                FooterLabel = footerLabel; MiniHintLabel = miniHintLabel;
+            }
+            public GameObject Root { get; }
+            public GameObject HintRoot { get; }
+            public Canvas SubCanvas { get; }
+            public RectTransform HintRect { get; }
+            public RectTransform Content { get; }
+            public ScrollRect ScrollRect { get; }
+            public TextMeshProUGUI FooterLabel { get; }
+            public TextMeshProUGUI MiniHintLabel { get; }
+        }
+
+        private ViewRefs? _view;
+        private readonly TextRefresh _textRefresh = new TextRefresh(nameof(LobbySettingsPanel));
+        private GameObject? _root => _view?.Root;
+        private GameObject? _hintRoot => _view?.HintRoot;
+        private Canvas? _subCanvas => _view?.SubCanvas;
+        private RectTransform? _hintRect => _view?.HintRect;
+        private RectTransform? _content => _view?.Content;
+        private ScrollRect? _scrollRect => _view?.ScrollRect;
         private readonly List<GameObject> _rowObjects = new List<GameObject>();
         private bool _elevated;
         private bool _hintAtTop;
+        private string _keyName = "?";
 
-        public bool Exists => _root != null;
+        public bool Exists => GetLiveViewOrNull() != null;
         public bool Visible => _root != null && _root.activeSelf;
 
         public void Build(Transform layerRoot, string toggleKeyName)
         {
-            if (_root != null || layerRoot == null) return;
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
 
             if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
+            GameObject? root = null;
+            GameObject? hintRoot = null;
             try
             {
                 var rootGo = new GameObject("WW_LobbySettingsPanel", typeof(RectTransform));
@@ -74,8 +100,7 @@ namespace Werewolf.UI
                 subCanvas.overrideSorting = true;
                 subCanvas.sortingOrder = WerewolfUIManager.PanelSortingOrder;
                 rootGo.AddComponent<GraphicRaycaster>();
-                _root = rootGo;
-                _subCanvas = subCanvas;
+                root = rootGo;
 
                 var bgGo = new GameObject("Bg", typeof(RectTransform));
                 var bgRect = (RectTransform)bgGo.transform;
@@ -101,7 +126,6 @@ namespace Werewolf.UI
                 var scrollBgImg = scrollGo.AddComponent<Image>();
                 scrollBgImg.color = new Color(0f, 0f, 0f, 0.001f);
                 scrollBgImg.raycastTarget = true;
-                _scrollRect = scroll;
 
                 var viewportGo = new GameObject("Viewport", typeof(RectTransform));
                 var viewportRect = (RectTransform)viewportGo.transform;
@@ -125,7 +149,6 @@ namespace Werewolf.UI
                 contentRect.anchoredPosition = Vector2.zero;
                 contentRect.sizeDelta = new Vector2(0f, PanelHeight);
                 scroll.content = contentRect;
-                _content = contentRect;
 
                 var sbGo = new GameObject("Scrollbar", typeof(RectTransform));
                 var sbRect = (RectTransform)sbGo.transform;
@@ -171,7 +194,8 @@ namespace Werewolf.UI
                 footerRect.pivot = new Vector2(0.5f, 0f);
                 footerRect.anchoredPosition = Vector2.zero;
                 footerRect.sizeDelta = new Vector2(0f, FooterHeight);
-                UiKit.CreateText(footerRect, "ToggleHintFooter",
+                _keyName = keyName;
+                TextMeshProUGUI footerLabel = UiKit.CreateText(footerRect, "ToggleHintFooter",
                     new Vector2(0f, FooterHeight * 0.5f), new Vector2(RowWidth, 40f),
                     Texts.Format(TextId.LobbySettingsFooterHintFormat, keyName), HintFontSize, HintTextColor,
                     TextAlignmentOptions.Right);
@@ -184,20 +208,24 @@ namespace Werewolf.UI
                 hintRect.pivot = new Vector2(1f, 1f);
                 hintRect.anchoredPosition = Vector2.zero;
                 hintRect.sizeDelta = HintSize;
-                UiKit.CreateText(hintRect, "ToggleHintLabel",
+                TextMeshProUGUI miniHintLabel = UiKit.CreateText(hintRect, "ToggleHintLabel",
                     Vector2.zero, HintSize,
                     Texts.Format(TextId.LobbySettingsMiniHintFormat, keyName), HintFontSize, HintTextColor, TextAlignmentOptions.Right);
-                _hintRoot = hintGo;
-                _hintRect = hintRect;
+                hintRoot = hintGo;
 
-                _root.SetActive(false);
-                _hintRoot.SetActive(false);
+                rootGo.SetActive(false);
+                hintGo.SetActive(false);
+                _view = new ViewRefs(rootGo, hintGo, subCanvas, hintRect, contentRect, scroll,
+                    footerLabel, miniHintLabel);
+                _textRefresh.Subscribe(() => Exists, ApplyTexts);
                 WLog.Line("lobby_settings_panel_built", secret: false);
             }
             catch (Exception e)
             {
                 WLog.Line("lobby_settings_panel_error", secret: false, ("reason", "build_failed"), ("err", e.Message));
-                Destroy();
+                _view = null;
+                if (root != null) UnityEngine.Object.Destroy(root);
+                if (hintRoot != null) UnityEngine.Object.Destroy(hintRoot);
             }
         }
 
@@ -212,7 +240,7 @@ namespace Werewolf.UI
             }
 
             float totalHeight = TopPadding;
-            string s = null;
+            string? s = null;
             for (int i = 0; i < rows.Count; i++)
             {
                 var r = rows[i];
@@ -230,7 +258,7 @@ namespace Werewolf.UI
 
             float topEdge = totalHeight * 0.5f;
             float cursor = topEdge - TopPadding;
-            string lastSection = null;
+            string? lastSection = null;
 
             for (int i = 0; i < rows.Count; i++)
             {
@@ -285,25 +313,38 @@ namespace Werewolf.UI
                 ("visible", view.Panel), ("hint", view.Hint), ("elevated", view.Elevated));
         }
 
+        private void ApplyTexts()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return;
+            view.FooterLabel.text = Texts.Format(TextId.LobbySettingsFooterHintFormat, _keyName);
+            view.MiniHintLabel.text = Texts.Format(TextId.LobbySettingsMiniHintFormat, _keyName);
+        }
+
         public void Destroy()
         {
+            _textRefresh.Unsubscribe();
             ClearRows();
-            if (_root != null)
-            {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
-            }
-            if (_hintRoot != null)
-            {
-                UnityEngine.Object.Destroy(_hintRoot);
-                _hintRoot = null;
-            }
-            _content = null;
-            _scrollRect = null;
-            _subCanvas = null;
-            _hintRect = null;
+            ViewRefs? view = _view;
+            _view = null;
+            if (view != null && view.Root != null) UnityEngine.Object.Destroy(view.Root);
+            if (view != null && view.HintRoot != null) UnityEngine.Object.Destroy(view.HintRoot);
             _elevated = false;
             _hintAtTop = false;
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null && view.HintRoot != null) return view;
+            _view = null;
+            ClearRows();
+            if (view.Root != null) UnityEngine.Object.Destroy(view.Root);
+            if (view.HintRoot != null) UnityEngine.Object.Destroy(view.HintRoot);
+            _elevated = false;
+            _hintAtTop = false;
+            return null;
         }
 
         private void ClearRows()

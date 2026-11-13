@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Text;
 
@@ -8,14 +9,14 @@ namespace Werewolf.Core.Replay
         public const string Prefix = "repo_werewolf_replay_";
         public const string Extension = ".jsonl";
 
-        public static string FileName(ReplaySegmentHeader header)
+        public static string FileName(ReplaySegmentHeader? header)
         {
             string stamp = FormatStamp(header?.StartedAtIso);
             string level = SanitizeLevel(header?.LevelName);
             return Prefix + stamp + "_" + level + Extension;
         }
 
-        public static string FormatStamp(string startedAtIso)
+        public static string FormatStamp(string? startedAtIso)
         {
             if (string.IsNullOrEmpty(startedAtIso)) return "unknown";
             var digits = new StringBuilder(14);
@@ -30,7 +31,7 @@ namespace Werewolf.Core.Replay
             return digits.ToString();
         }
 
-        public static string SanitizeLevel(string levelName)
+        public static string SanitizeLevel(string? levelName)
         {
             string name = levelName ?? "";
             const string vanillaPrefix = "Level - ";

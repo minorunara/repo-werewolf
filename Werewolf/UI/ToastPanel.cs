@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -20,61 +21,98 @@ namespace Werewolf.UI
         private const float SlotSpacing = 16f;
         private const float FontSize = 44f;
 
-        private GameObject _root;
-        private readonly List<Slot> _slots = new List<Slot>(SlotCount);
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, List<Slot> slots)
+            {
+                Root = root;
+                Slots = slots;
+            }
 
-        public bool Exists => _root != null;
+            public GameObject Root { get; }
+            public List<Slot> Slots { get; }
+        }
+
+        private ViewRefs? _view;
+
+        public bool Exists => GetLiveViewOrNull() != null;
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
 
-            if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
-
-            RectTransform rect = UiKit.CreateAnchoredRect(layerRoot, "WW_ToastPanel",
-                UiKit.TopRight, new Vector2(1f, 1f),
-                new Vector2(-RightMargin, -TopMargin),
-                new Vector2(SlotWidth, SlotCount * SlotHeight + (SlotCount - 1) * SlotSpacing));
-            _root = rect.gameObject;
-
-            for (int i = 0; i < SlotCount; i++)
+            GameObject? root = null;
+            try
             {
-                _slots.Add(BuildSlot(rect, i));
+                if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
+
+                RectTransform rect = UiKit.CreateAnchoredRect(layerRoot, "WW_ToastPanel",
+                    UiKit.TopRight, new Vector2(1f, 1f),
+                    new Vector2(-RightMargin, -TopMargin),
+                    new Vector2(SlotWidth, SlotCount * SlotHeight + (SlotCount - 1) * SlotSpacing));
+                root = rect.gameObject;
+                var slots = new List<Slot>(SlotCount);
+                for (int i = 0; i < SlotCount; i++)
+                {
+                    slots.Add(BuildSlot(rect, i));
+                }
+
+                _view = new ViewRefs(root, slots);
+            }
+            catch
+            {
+                _view = null;
+                if (root != null)
+                {
+                    root.SetActive(false);
+                    UnityEngine.Object.Destroy(root);
+                }
+                throw;
             }
         }
 
         public void Tick(ToastQueue queue, long nowUnixMs)
         {
-            if (_root == null || queue == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null || queue == null) return;
 
             IReadOnlyList<ToastEntry> visible = queue.Visible(nowUnixMs);
-            int count = visible != null ? visible.Count : 0;
-            for (int i = 0; i < _slots.Count; i++)
+            int count = visible.Count;
+            for (int i = 0; i < view.Slots.Count; i++)
             {
                 if (i < count)
                 {
-                    _slots[i].Show(visible[i].Message);
+                    view.Slots[i].Show(visible[i].Message);
                 }
                 else
                 {
-                    _slots[i].Hide();
+                    view.Slots[i].Hide();
                 }
             }
         }
 
         public void Hide()
         {
-            for (int i = 0; i < _slots.Count; i++) _slots[i].Hide();
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
+            for (int i = 0; i < view.Slots.Count; i++) view.Slots[i].Hide();
         }
 
         public void Destroy()
         {
-            if (_root != null)
-            {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
-            }
-            _slots.Clear();
+            ViewRefs? view = _view;
+            _view = null;
+            if (view != null && view.Root != null) UnityEngine.Object.Destroy(view.Root);
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+
+            _view = null;
+            return null;
         }
 
         private static Slot BuildSlot(Transform parent, int index)
@@ -100,7 +138,7 @@ namespace Werewolf.UI
             tRect.anchorMax = Vector2.one;
             tRect.offsetMin = new Vector2(10f, 3f);
             tRect.offsetMax = new Vector2(-10f, -3f);
-            text.enableWordWrapping = false;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
             text.overflowMode = TextOverflowModes.Ellipsis;
 
             bg.gameObject.SetActive(false);

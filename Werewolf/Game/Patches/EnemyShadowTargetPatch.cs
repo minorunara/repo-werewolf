@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using HarmonyLib;
@@ -7,30 +8,30 @@ namespace Werewolf.Game.Patches
 {
     internal static class EnemyShadowTargetFilter
     {
-        internal static bool IsIgnored(PlayerAvatar player)
+        internal static bool IsIgnored(PlayerAvatar? player)
         {
             if (player == null || EnemyDirector.instance == null) return false;
             string steamId = SemiFunc.PlayerGetSteamID(player);
             if (string.IsNullOrEmpty(steamId)) return false;
-            return GameRefs.EnemyDirector_debugNoVision(EnemyDirector.instance).Contains(steamId);
+            return EnemyDirector.instance.debugNoVision.Contains(steamId);
         }
 
-        internal static PlayerAvatar PickEligible()
+        internal static PlayerAvatar? PickEligible()
         {
             var candidates = new List<PlayerAvatar>();
             foreach (PlayerAvatar p in SemiFunc.PlayerGetList())
             {
-                if (p != null && !GameRefs.PlayerAvatar_isDisabled(p) && !IsIgnored(p)) candidates.Add(p);
+                if (p != null && !p.isDisabled && !IsIgnored(p)) candidates.Add(p);
             }
             if (candidates.Count == 0) return null;
             return candidates[UnityEngine.Random.Range(0, candidates.Count)];
         }
     }
 
-    [HarmonyPatch(typeof(EnemyShadow), "UpdatePlayerTarget")]
+    [HarmonyPatch(typeof(EnemyShadow), nameof(EnemyShadow.UpdatePlayerTarget))]
     internal static class EnemyShadowUpdatePlayerTargetPatch
     {
-        private static void Prefix(ref PlayerAvatar _player)
+        private static void Prefix(ref PlayerAvatar? _player)
         {
             try
             {
@@ -44,7 +45,7 @@ namespace Werewolf.Game.Patches
         }
     }
 
-    [HarmonyPatch(typeof(EnemyShadow), "GetAnnoyed")]
+    [HarmonyPatch(typeof(EnemyShadow), nameof(EnemyShadow.GetAnnoyed))]
     internal static class EnemyShadowGetAnnoyedPatch
     {
         private static bool Prefix(PlayerAvatar _nearbyPlayer)
@@ -61,16 +62,16 @@ namespace Werewolf.Game.Patches
         }
     }
 
-    [HarmonyPatch(typeof(EnemyShadow), "StateFollow")]
+    [HarmonyPatch(typeof(EnemyShadow), nameof(EnemyShadow.StateFollow))]
     internal static class EnemyShadowStateFollowPatch
     {
         private static void Prefix(EnemyShadow __instance)
         {
             try
             {
-                PlayerAvatar target = GameRefs.EnemyShadow_playerTarget(__instance);
+                PlayerAvatar? target = __instance.playerTarget;
                 if (target == null || !EnemyShadowTargetFilter.IsIgnored(target)) return;
-                GameRefs.EnemyShadow_UpdatePlayerTarget.Invoke(__instance, new object[] { target });
+                __instance.UpdatePlayerTarget(target);
                 WLog.Line("loom_follow_cut", secret: true);
             }
             catch (Exception e)

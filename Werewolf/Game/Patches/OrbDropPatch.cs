@@ -1,10 +1,11 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
 
 namespace Werewolf.Game.Patches
 {
-    [HarmonyPatch(typeof(EnemyHealth), "Awake")]
+    [HarmonyPatch(typeof(EnemyHealth), nameof(EnemyHealth.Awake))]
     internal static class OrbDropPatch
     {
         private static bool _errorLogged;
@@ -14,7 +15,7 @@ namespace Werewolf.Game.Patches
             try
             {
                 if (__instance == null) return;
-                var config = Plugin.GameConfig;
+                GameConfig? config = WerewolfDirector.Instance?.HostRoundConfig ?? Plugin.GameConfig;
                 if (config == null) return;
                 if (config.OrbDropMax == 3) return;
                 if (!config.WerewolfModeEnabled) return;

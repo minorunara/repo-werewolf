@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
@@ -11,7 +12,7 @@ namespace Werewolf.Game.Patches
         {
             try
             {
-                WerewolfDirector dir = WerewolfDirector.Instance;
+                WerewolfDirector? dir = WerewolfDirector.Instance;
                 if (dir == null) return true;
 
                 bool overridden = CombatRules.OverrideSavingGrace(dir.ClientPhase, savingGrace);

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections;
 using UnityEngine;
@@ -43,7 +44,7 @@ namespace Werewolf.UI
             for (int i = 0; i < curve.length; i++) curve.SmoothTangents(i, 0f);
         }
 
-        public static IEnumerator Scale(Transform target, Vector3 from, Vector3 to, float duration, AnimationCurve curve = null)
+        public static IEnumerator Scale(Transform target, Vector3 from, Vector3 to, float duration, AnimationCurve? curve = null)
         {
             if (target == null)
             {
@@ -73,10 +74,10 @@ namespace Werewolf.UI
             if (target != null) target.localScale = to;
         }
 
-        public static IEnumerator Scale(Transform target, float from, float to, float duration, AnimationCurve curve = null)
+        public static IEnumerator Scale(Transform target, float from, float to, float duration, AnimationCurve? curve = null)
             => Scale(target, Vector3.one * from, Vector3.one * to, duration, curve);
 
-        public static IEnumerator Fade(CanvasGroup group, float from, float to, float duration, AnimationCurve curve = null)
+        public static IEnumerator Fade(CanvasGroup group, float from, float to, float duration, AnimationCurve? curve = null)
         {
             if (group == null)
             {
@@ -106,7 +107,7 @@ namespace Werewolf.UI
             if (group != null) group.alpha = to;
         }
 
-        public static IEnumerator Move(RectTransform target, Vector2 from, Vector2 to, float duration, AnimationCurve curve = null)
+        public static IEnumerator Move(RectTransform target, Vector2 from, Vector2 to, float duration, AnimationCurve? curve = null)
         {
             if (target == null)
             {

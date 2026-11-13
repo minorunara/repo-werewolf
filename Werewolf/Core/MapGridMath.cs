@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -32,19 +33,19 @@ namespace Werewolf.Core
 
         public float RectTop;
 
-        public float[] VerticalLineX;
+        public float[] VerticalLineX = Array.Empty<float>();
 
-        public float[] HorizontalLineY;
+        public float[] HorizontalLineY = Array.Empty<float>();
 
-        public string[] ColumnLabels;
+        public string[] ColumnLabels = Array.Empty<string>();
 
-        public float[] ColumnLabelX;
+        public float[] ColumnLabelX = Array.Empty<float>();
 
         public float ColumnLabelY;
 
-        public string[] RowLabels;
+        public string[] RowLabels = Array.Empty<string>();
 
-        public float[] RowLabelY;
+        public float[] RowLabelY = Array.Empty<float>();
 
         public float RowLabelX;
     }
@@ -81,7 +82,8 @@ namespace Werewolf.Core
         public static MapGridCellRange? RangeFromModuleCenters(
             IReadOnlyList<(float X, float Z)> centers, int levelWidth, int levelHeight)
         {
-            if (centers == null || levelWidth <= 0 || levelHeight <= 0) return null;
+            if (centers == null) throw new ArgumentNullException(nameof(centers));
+            if (levelWidth <= 0 || levelHeight <= 0) return null;
             const float m = ModuleSizeWorld;
             int offsetCols = levelWidth / 2;
             bool has = false;
@@ -134,7 +136,7 @@ namespace Werewolf.Core
             return new MapGridCellRange(colMin, colMax, rowMin, rowMax);
         }
 
-        public static MapGridLayout Compute(
+        public static MapGridLayout? Compute(
             int levelWidth, MapGridCellRange range,
             float mapScale, float originMiniX, float originMiniZ,
             float camMiniX, float camMiniZ,

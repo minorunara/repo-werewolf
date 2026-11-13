@@ -1,16 +1,13 @@
-using System;
-using HarmonyLib;
-using Werewolf.Core;
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
 using Werewolf.Scenarios.Core;
 
 namespace Werewolf.Scenarios.Vanilla
 {
     internal static class ScenarioWorld
     {
-        private static AccessTools.FieldRef<StatsManager, string> SaveFileCurrentRef =>
-            GameRefs.StatsManager_saveFileCurrent;
-
-        public static bool CheckStart(ScenarioEnvironmentSpec environment, out string rejectReason)
+        public static bool CheckStart(ScenarioEnvironmentSpec environment,
+            [NotNullWhen(false)] out string? rejectReason)
         {
             RunManager run = RunManager.instance;
             GameManager game = GameManager.instance;
@@ -29,7 +26,7 @@ namespace Werewolf.Scenarios.Vanilla
             return true;
         }
 
-        public static void StartRunLevel(out bool saveCleared)
+        public static void StartRunLevel()
         {
             RunManager run = RunManager.instance;
             GameManager game = GameManager.instance;
@@ -37,7 +34,7 @@ namespace Werewolf.Scenarios.Vanilla
             run.ResetProgress();
             game.SetConnectRandom(false);
             game.SetLobbyType(GameManager.LobbyTypes.Private);
-            saveCleared = TryClearSaveFileName(stats);
+            stats.saveFileCurrent = "";
             run.ChangeLevel(true, false, RunManager.ChangeLevelType.RunLevel);
         }
 
@@ -63,20 +60,5 @@ namespace Werewolf.Scenarios.Vanilla
             return true;
         }
 
-        private static bool TryClearSaveFileName(StatsManager stats)
-        {
-            try
-            {
-                if (SaveFileCurrentRef == null) return false;
-                SaveFileCurrentRef(stats) = "";
-                return true;
-            }
-            catch (Exception e)
-            {
-                WLog.Line("scenario_field_error", secret: false,
-                    ("type", nameof(StatsManager)), ("field", "saveFileCurrent"), ("err", e.Message));
-                return false;
-            }
-        }
     }
 }

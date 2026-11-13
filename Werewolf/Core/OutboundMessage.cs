@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 
 #if !NET5_0_OR_GREATER
@@ -9,16 +10,49 @@ namespace System.Runtime.CompilerServices
 
 namespace Werewolf.Core
 {
-    public enum MessageTarget
+    public abstract record MessageDestination
     {
-        All = 0,
+        private MessageDestination() { }
 
-        Actors = 1,
+        public sealed record AllDestination : MessageDestination;
 
-        Master = 2,
+        public sealed record MasterDestination : MessageDestination;
+
+        public sealed record ActorsDestination : MessageDestination
+        {
+            public ActorsDestination(int[] actors)
+            {
+                Actors = actors != null
+                    ? (int[])actors.Clone()
+                    : throw new ArgumentNullException(nameof(actors));
+            }
+
+            public int[] Actors { get; }
+        }
     }
 
-    public sealed record OutboundMessage(byte Code, object[] Payload, MessageTarget Target, int[] TargetActors);
+    public sealed record OutboundMessage
+    {
+        private OutboundMessage(byte code, object[] payload, MessageDestination destination)
+        {
+            Code = code;
+            Payload = payload ?? throw new ArgumentNullException(nameof(payload));
+            Destination = destination ?? throw new ArgumentNullException(nameof(destination));
+        }
+
+        public byte Code { get; }
+        public object[] Payload { get; }
+        public MessageDestination Destination { get; }
+
+        public static OutboundMessage ToAll(byte code, object[] payload)
+            => new OutboundMessage(code, payload, new MessageDestination.AllDestination());
+
+        public static OutboundMessage ToMaster(byte code, object[] payload)
+            => new OutboundMessage(code, payload, new MessageDestination.MasterDestination());
+
+        public static OutboundMessage ToActors(byte code, object[] payload, int[] actors)
+            => new OutboundMessage(code, payload, new MessageDestination.ActorsDestination(actors));
+    }
 
     public static class WWEventCodes
     {

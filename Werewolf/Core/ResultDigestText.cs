@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -7,15 +8,15 @@ namespace Werewolf.Core
     public static class ResultDigestText
     {
         public static List<string> FormatLines(
-            IReadOnlyList<DigestEntry> entries, Func<int, string> resolveName)
+            IReadOnlyList<DigestEntry?>? entries, Func<int, string?>? resolveName)
         {
             var lines = new List<string>();
             if (entries == null) return lines;
 
-            foreach (DigestEntry e in entries)
+            foreach (DigestEntry? e in entries)
             {
                 if (e == null) continue;
-                string body = FormatBody(e, resolveName);
+                string? body = FormatBody(e, resolveName);
                 if (body == null) continue;
                 lines.Add(FormatTime(e.AtSec) + "  " + body);
             }
@@ -35,7 +36,7 @@ namespace Werewolf.Core
             return m.ToString("00") + ":" + s.ToString("00");
         }
 
-        private static string FormatBody(DigestEntry e, Func<int, string> resolveName)
+        private static string? FormatBody(DigestEntry e, Func<int, string?>? resolveName)
         {
             switch (e.Kind)
             {
@@ -91,7 +92,7 @@ namespace Werewolf.Core
             if (e.ArgA == TeamCodes.VoidMatch) return Texts.Get(TextId.ResultBannerVoid);
 
             string team = OutcomeText((byte)e.ArgA);
-            string reason = ReasonText(e.ArgB);
+            string? reason = ReasonText(e.ArgB);
             return reason == null ? team : Texts.Format(TextId.DigestMatchEndFormat, team, reason);
         }
 
@@ -108,7 +109,7 @@ namespace Werewolf.Core
             }
         }
 
-        public static string ReasonText(int reason)
+        public static string? ReasonText(int reason)
         {
             switch (reason)
             {
@@ -123,7 +124,7 @@ namespace Werewolf.Core
             }
         }
 
-        public static string EpigraphText(int reason)
+        public static string? EpigraphText(int reason)
         {
             switch (reason)
             {
@@ -139,9 +140,9 @@ namespace Werewolf.Core
             }
         }
 
-        private static string Name(int actor, Func<int, string> resolveName)
+        private static string Name(int actor, Func<int, string?>? resolveName)
         {
-            string name = resolveName != null ? resolveName(actor) : null;
+            string? name = resolveName != null ? resolveName(actor) : null;
             return string.IsNullOrEmpty(name) ? "Actor" + actor : name;
         }
     }

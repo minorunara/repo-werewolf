@@ -1,18 +1,13 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
 
 namespace Werewolf.Game.Patches
 {
-    [HarmonyPatch(typeof(PlayerCrown), "FetchLogic")]
+    [HarmonyPatch(typeof(PlayerCrown), nameof(PlayerCrown.FetchLogic))]
     internal static class PlayerCrownPatch
     {
-        private static AccessTools.FieldRef<PlayerCrown, PlayerAvatar> PlayerAvatarRef =>
-            GameRefs.PlayerCrown_playerAvatar;
-
-        private static AccessTools.FieldRef<PlayerCrown, bool> ActiveRef =>
-            GameRefs.PlayerCrown_active;
-
         private static bool _errorLogged;
 
         private static int _loggedVersion = -1;
@@ -25,13 +20,13 @@ namespace Werewolf.Game.Patches
             {
                 if (!CrownRoster.HasWinners) return;
 
-                PlayerAvatar avatar = PlayerAvatarRef(__instance);
+                PlayerAvatar avatar = __instance.playerAvatar;
                 if (avatar == null) return;
 
                 int actor = ResolveActor(avatar);
                 if (!CrownRoster.IsWinner(actor)) return;
 
-                ActiveRef(__instance) = true;
+                __instance.active = true;
                 if (__instance.crownMesh != null && !__instance.crownMesh.gameObject.activeSelf)
                 {
                     __instance.crownMesh.gameObject.SetActive(true);

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using TMPro;
 using UnityEngine;
@@ -58,25 +59,25 @@ namespace Werewolf.UI
         private const float BadgeInset = 14f;
         private static readonly Color BadgeColor = new Color(0.86f, 0.16f, 0.12f, 1f);
 
-        private RectTransform _container;
-        private Image _icon;
-        private RectTransform _iconRect;
-        private TextMeshProUGUI _label;
-        private RectTransform _labelRect;
-        private Sprite _sprite;
-        private Sprite _hoverSprite;
-        private Outline _hoverOutline;
+        private RectTransform? _container;
+        private Image? _icon;
+        private RectTransform? _iconRect;
+        private TextMeshProUGUI? _label;
+        private RectTransform? _labelRect;
+        private Sprite? _sprite;
+        private Sprite? _hoverSprite;
+        private Outline? _hoverOutline;
         private bool _hovering;
-        private Image _badge;
+        private Image? _badge;
 
         private bool _alphaSampleErrorLogged;
 
-        public RectTransform Container => _container;
+        public RectTransform? Container => _container;
 
         public bool HasIcon => _sprite != null;
 
         public RectTransform Build(Transform parent, string name, IconToggleStyle style,
-                                   string spriteKey, string initialLabel, string hoverSpriteKey = null)
+                                   string spriteKey, string initialLabel, string? hoverSpriteKey = null)
         {
             float width = HudGeometry.IconToggle.Width(style.IconSize, style.LabelWidth);
             float height = HudGeometry.IconToggle.Height(style.IconSize, style.LabelHeight);

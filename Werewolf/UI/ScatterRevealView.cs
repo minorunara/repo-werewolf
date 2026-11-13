@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using TMPro;
@@ -19,7 +20,7 @@ namespace Werewolf.UI
             ScatterIntroMs + ScatterShuffleMs + ScatterFadeMs + ScatterSettledReadMs;
 
         private readonly List<VoteRow> _rows;
-        private readonly Func<RectTransform> _resolvePanelRoot;
+        private readonly Func<RectTransform?> _resolvePanelRoot;
         private readonly Color _sloganTextColor;
 
         private bool _scatterActive;
@@ -30,12 +31,13 @@ namespace Werewolf.UI
         private readonly Dictionary<int, char> _scatterLetterByActor = new Dictionary<int, char>();
         private char[] _scatterLetters = Array.Empty<char>();
         private readonly System.Random _scatterRng = new System.Random();
-        private Action<float> _scatterPumpMusic;
-        private Action _scatterStopMusic;
-        private Action _scatterPlayJingle;
-        private GameObject _scatterSloganRoot;
+        private Action<float>? _scatterPumpMusic;
+        private Action? _scatterStopMusic;
+        private Action? _scatterPlayJingle;
+        private GameObject? _scatterSloganRoot;
+        private TextMeshProUGUI? _scatterSloganLabel;
 
-        public ScatterRevealView(List<VoteRow> rows, Func<RectTransform> resolvePanelRoot, Color sloganTextColor)
+        public ScatterRevealView(List<VoteRow> rows, Func<RectTransform?> resolvePanelRoot, Color sloganTextColor)
         {
             _rows = rows;
             _resolvePanelRoot = resolvePanelRoot;
@@ -166,19 +168,33 @@ namespace Werewolf.UI
             if (_scatterSloganRoot != null) _scatterSloganRoot.SetActive(false);
         }
 
+        public void ApplyTexts()
+        {
+            if (_scatterSloganLabel != null) _scatterSloganLabel.text = Texts.Get(TextId.NoticeScatterSlogan);
+            if (!_scatterActive) return;
+            _scatterNextSwapUnixMs = 0;
+            if (!_scatterSettled) return;
+            foreach (VoteRow row in _rows)
+            {
+                if (_scatterLetterByActor.TryGetValue(row.ActorNumber, out char letter))
+                    row.SetScatterBadge(Texts.Format(TextId.VoteScatterBadgeFormat, letter), settled: true);
+            }
+        }
+
         public void OnPanelDestroy()
         {
             _scatterSloganRoot = null;
+            _scatterSloganLabel = null;
         }
 
         private void EnsureSloganBuilt()
         {
-            RectTransform rootRect = _resolvePanelRoot();
+            RectTransform? rootRect = _resolvePanelRoot();
             if (_scatterSloganRoot != null || rootRect == null) return;
             RectTransform slogan = UiKit.CreateRect(rootRect, "ScatterSlogan",
                 new Vector2(0f, 284f), new Vector2(520f, 32f));
             _scatterSloganRoot = slogan.gameObject;
-            UiKit.CreateText(slogan, "Label", Vector2.zero, new Vector2(520f, 32f),
+            _scatterSloganLabel = UiKit.CreateText(slogan, "Label", Vector2.zero, new Vector2(520f, 32f),
                 Texts.Get(TextId.NoticeScatterSlogan), 24f, _sloganTextColor, TextAlignmentOptions.Center);
             _scatterSloganRoot.SetActive(false);
         }

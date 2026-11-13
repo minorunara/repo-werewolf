@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -47,23 +48,23 @@ namespace Werewolf.Core
 
         public const int CurseKillDelaySec = 2;
 
-        public event Action<OutboundMessage> OnSend;
+        public event Action<OutboundMessage>? OnSend;
 
-        public event Action OnInformantEstablished;
+        public event Action? OnInformantEstablished;
 
-        public event Action<int> OnCurseKill;
+        public event Action<int>? OnCurseKill;
 
-        public event Action<int> OnCurseSealed;
+        public event Action<int>? OnCurseSealed;
 
-        public event Action<int, bool> OnEnemyIgnoreChanged;
+        public event Action<int, bool>? OnEnemyIgnoreChanged;
 
-        public event Action<PerkId> OnPerkUnlocked;
+        public event Action<PerkId>? OnPerkUnlocked;
 
-        public event Action<int> OnBeaconTriggered;
+        public event Action<int>? OnBeaconTriggered;
 
-        public event Action<float> OnGaugePctChanged;
+        public event Action<float>? OnGaugePctChanged;
 
-        public CurseSession ActiveCurse { get; private set; }
+        public CurseSession? ActiveCurse { get; private set; }
 
         public bool InformantEstablished { get; private set; }
 
@@ -189,7 +190,7 @@ namespace Werewolf.Core
         {
             var sender = FindPlayer(senderActor);
             if (sender == null || sender.Role != Role.Werewolf || !sender.Alive
-                || !_beacons.TryGetValue(senderActor, out BeaconState beacon))
+                || !_beacons.TryGetValue(senderActor, out BeaconState? beacon))
             {
                 WLog.Line("role_action_dropped", secret: true,
                     ("sender", senderActor), ("reason", "not_alive_werewolf"), ("action", "beacon"));
@@ -243,21 +244,19 @@ namespace Werewolf.Core
 
             int beaconUses = _beaconUsesSinceAudit;
             _beaconUsesSinceAudit = 0;
-            Send(new OutboundMessage(
+            Send(OutboundMessage.ToAll(
                 WWRolesCodes.BeaconAudit,
-                new object[] { (byte)(beaconUses > byte.MaxValue ? byte.MaxValue : beaconUses) },
-                MessageTarget.All, null));
+                new object[] { (byte)(beaconUses > byte.MaxValue ? byte.MaxValue : beaconUses) }));
             WLog.Line("beacon_audit_sent", secret: false, ("uses", beaconUses));
 
-            Send(new OutboundMessage(
+            Send(OutboundMessage.ToAll(
                 WWRolesCodes.RoleState,
                 new object[]
                 {
                     RoleStateSubtype.MeetingGauge,
                     BuildMeetingGaugeData(extractedDollars, haulGoalDollars, checkmateLossDollars),
                     0L,
-                },
-                MessageTarget.All, null));
+                }));
             WLog.Line("meeting_gauge_sent", secret: false, ("permille", _gauge.DisplayPermille));
 
             ForceCatSync(nowUnixMs);
@@ -298,7 +297,7 @@ namespace Werewolf.Core
         }
 
         public bool TryStartCurse(int executedActor, long nowUnixMs, out long holdExtensionMs,
-                                  int[] voterActors = null)
+                                  int[]? voterActors = null)
         {
             holdExtensionMs = 0;
 
@@ -315,18 +314,17 @@ namespace Werewolf.Core
 
             if (voterActors != null && !executed.IsBot)
             {
-                Send(new OutboundMessage(
+                Send(OutboundMessage.ToActors(
                     WWRolesCodes.CurseCandidates,
                     new object[] { voterActors },
-                    MessageTarget.Actors, new[] { executedActor }));
+                    new[] { executedActor }));
                 WLog.Line("curse_candidates_sent", secret: true,
                     ("catActor", executedActor), ("count", voterActors.Length));
             }
 
-            Send(new OutboundMessage(
+            Send(OutboundMessage.ToAll(
                 WWRolesCodes.RoleState,
-                new object[] { RoleStateSubtype.CurseStarted, new[] { executedActor }, resolveAt },
-                MessageTarget.All, null));
+                new object[] { RoleStateSubtype.CurseStarted, new[] { executedActor }, resolveAt }));
             WLog.Line("curse_started", secret: false,
                 ("catActor", executedActor), ("resolveAt", resolveAt),
                 ("restricted", voterActors != null));
@@ -362,10 +360,9 @@ namespace Werewolf.Core
                 OnCurseKill?.Invoke(resolution.VictimActor);
             }
 
-            Send(new OutboundMessage(
+            Send(OutboundMessage.ToAll(
                 WWRolesCodes.RoleState,
-                new object[] { RoleStateSubtype.CurseResolved, new[] { resolution.VictimActor }, 0L },
-                MessageTarget.All, null));
+                new object[] { RoleStateSubtype.CurseResolved, new[] { resolution.VictimActor }, 0L }));
         }
 
         public void DebugAddGaugePct(int pct)
@@ -392,7 +389,7 @@ namespace Werewolf.Core
 
         public void DebugUseBeacon(int actorNumber, long nowUnixMs)
         {
-            if (_beacons.TryGetValue(actorNumber, out BeaconState beacon))
+            if (_beacons.TryGetValue(actorNumber, out BeaconState? beacon))
             {
                 beacon.DebugClearRestrictions();
             }
@@ -464,13 +461,13 @@ namespace Werewolf.Core
         {
             byte charges = 0;
             long readyUnixMs = 0;
-            if (_beacons.TryGetValue(actorNumber, out BeaconState beacon))
+            if (_beacons.TryGetValue(actorNumber, out BeaconState? beacon))
             {
                 charges = (byte)(beacon.Charges > byte.MaxValue ? byte.MaxValue : beacon.Charges);
                 readyUnixMs = beacon.ReadyUnixMs;
             }
 
-            Send(new OutboundMessage(
+            Send(OutboundMessage.ToActors(
                 WWRolesCodes.SyncPerkGauge,
                 new object[]
                 {
@@ -493,10 +490,10 @@ namespace Werewolf.Core
                         _config.HealUnlockPct,
                     },
                 },
-                MessageTarget.Actors, new[] { actorNumber }));
+                new[] { actorNumber }));
         }
 
-        private WPlayer FindPlayer(int actorNumber)
+        private WPlayer? FindPlayer(int actorNumber)
         {
             foreach (var p in _session.Players)
             {

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections;
 using TMPro;
@@ -30,233 +31,382 @@ namespace Werewolf.UI
         private static readonly Color BackdropColor = new Color(0f, 0f, 0f, 0.85f);
         private static readonly Color TitleColor = new Color(0.85f, 0.08f, 0.08f, 1f);
 
-        private GameObject _root;
-        private CanvasGroup _group;
-        private RectTransform _gaugeRect;
-        private Image _fillImage;
-        private Image _deliveryFill;
-        private GameObject _deliveryTrack;
-        private Image _quotaLine;
-        private Image _checkmateLine;
-        private TextMeshProUGUI _lossText;
-        private RectTransform _stampRect;
-        private CanvasGroup _stampGroup;
-        private Image _iconImage;
-        private TextMeshProUGUI _titleText;
-        private TextMeshProUGUI _titleTextBack;
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, CanvasGroup group, Image fillImage,
+                Image deliveryFill, GameObject deliveryTrack, Image quotaLine,
+                Image checkmateLine, TextMeshProUGUI lossText, RectTransform stampRect,
+                CanvasGroup stampGroup, Image iconImage,
+                TextMeshProUGUI titleFront, TextMeshProUGUI titleBack)
+            {
+                Root = root;
+                Group = group;
+                FillImage = fillImage;
+                DeliveryFill = deliveryFill;
+                DeliveryTrack = deliveryTrack;
+                QuotaLine = quotaLine;
+                CheckmateLine = checkmateLine;
+                LossText = lossText;
+                StampRect = stampRect;
+                StampGroup = stampGroup;
+                IconImage = iconImage;
+                TitleFront = titleFront;
+                TitleBack = titleBack;
+            }
 
-        private readonly GaugeReveal _reveal = new GaugeReveal();
-        private MeetingGaugeSnapshot _snapshot;
-        private int _finalPermille;
-        private int _finalLoss;
+            public GameObject Root { get; }
+            public CanvasGroup Group { get; }
+            public Image FillImage { get; }
+            public Image DeliveryFill { get; }
+            public GameObject DeliveryTrack { get; }
+            public Image QuotaLine { get; }
+            public Image CheckmateLine { get; }
+            public TextMeshProUGUI LossText { get; }
+            public RectTransform StampRect { get; }
+            public CanvasGroup StampGroup { get; }
+            public Image IconImage { get; }
+            public TextMeshProUGUI TitleFront { get; }
+            public TextMeshProUGUI TitleBack { get; }
+            public int RunGeneration { get; set; }
+        }
 
-        public bool Exists => _root != null;
+        private sealed class PreparedContent
+        {
+            public PreparedContent(MeetingGaugeSnapshot snapshot, int fromPermille,
+                int fromLoss, int finalPermille, int finalLoss)
+            {
+                Snapshot = snapshot;
+                FromPermille = fromPermille;
+                FromLoss = fromLoss;
+                FinalPermille = finalPermille;
+                FinalLoss = finalLoss;
+                Reveal = new GaugeReveal();
+            }
 
-        public bool Visible => _root != null && _root.activeSelf;
+            public MeetingGaugeSnapshot Snapshot { get; }
+            public int FromPermille { get; }
+            public int FromLoss { get; }
+            public int FinalPermille { get; }
+            public int FinalLoss { get; }
+            public GaugeReveal Reveal { get; }
+        }
+
+        private ViewRefs? _view;
+        private readonly TextRefresh _textRefresh = new TextRefresh(nameof(CheckmateRevealPanel));
+        private PreparedContent? _prepared;
+
+        public bool Exists => GetLiveViewOrNull() != null;
+
+        public bool Visible
+        {
+            get
+            {
+                ViewRefs? view = GetLiveViewOrNull();
+                return view != null && view.Root.activeSelf;
+            }
+        }
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
 
-            RectTransform rect = RevealPanelKit.BuildFullscreenRoot(
-                layerRoot, "WW_CheckmateReveal", BackdropColor, out _group);
-            _root = rect.gameObject;
-
-            _gaugeRect = UiKit.CreateRect(rect, "Gauge", GaugePos,
-                new Vector2(HudGeometry.MeetingGauge.Width, HudGeometry.MeetingGauge.Height));
-            _gaugeRect.localScale = Vector3.one * GaugeScale;
-
-            Image track = UiKit.CreateImage(_gaugeRect, "Track", Vector2.zero, TrackSize, TrackBgColor);
-            _fillImage = UiKit.CreateFilledImage(track.rectTransform, "Fill", Vector2.zero, TrackSize, FillColor);
-
-            Image deliveryTrack = UiKit.CreateImage(_gaugeRect, "DeliveryTrack",
-                new Vector2(0f, -TrackSize.y), TrackSize, TrackBgColor);
-            _deliveryTrack = deliveryTrack.gameObject;
-            _deliveryFill = UiKit.CreateFilledImage(deliveryTrack.rectTransform, "DeliveryFill",
-                Vector2.zero, TrackSize, DeliveryFillColor);
-            _deliveryFill.fillOrigin = (int)Image.OriginHorizontal.Right;
-
-            _quotaLine = UiKit.CreateImage(_gaugeRect, "QuotaLine",
-                new Vector2(0f, -TrackSize.y / 2f),
-                new Vector2(QuotaLineWidth, TrackSize.y * 2f + 8f), QuotaLineColor);
-            _checkmateLine = UiKit.CreateImage(_gaugeRect, "CheckmateLine",
-                new Vector2(0f, -TrackSize.y / 2f),
-                new Vector2(QuotaLineWidth, TrackSize.y * 2f + 8f), CheckmateLineColor);
-
-            Sprite gaugeIcon = AssetCatalog.GetSprite("icon_gauge_valuable_loss");
-            if (gaugeIcon != null)
+            GameObject? root = null;
+            try
             {
-                Image iconImg = UiKit.CreateImage(_gaugeRect, "GaugeIcon",
-                    new Vector2(-TrackSize.x / 2f, 0f), new Vector2(128f, 128f), Color.white);
-                iconImg.sprite = gaugeIcon;
-                iconImg.preserveAspect = true;
+                RevealPanelKit.FullscreenRoot shell = RevealPanelKit.BuildFullscreenRoot(
+                    layerRoot, "WW_CheckmateReveal", BackdropColor);
+                RectTransform rect = shell.Rect;
+                root = rect.gameObject;
+
+                RectTransform gaugeRect = UiKit.CreateRect(rect, "Gauge", GaugePos,
+                    new Vector2(HudGeometry.MeetingGauge.Width, HudGeometry.MeetingGauge.Height));
+                gaugeRect.localScale = Vector3.one * GaugeScale;
+                Image track = UiKit.CreateImage(
+                    gaugeRect, "Track", Vector2.zero, TrackSize, TrackBgColor);
+                Image fillImage = UiKit.CreateFilledImage(
+                    track.rectTransform, "Fill", Vector2.zero, TrackSize, FillColor);
+
+                Image deliveryTrackImage = UiKit.CreateImage(gaugeRect, "DeliveryTrack",
+                    new Vector2(0f, -TrackSize.y), TrackSize, TrackBgColor);
+                GameObject deliveryTrack = deliveryTrackImage.gameObject;
+                Image deliveryFill = UiKit.CreateFilledImage(
+                    deliveryTrackImage.rectTransform, "DeliveryFill",
+                    Vector2.zero, TrackSize, DeliveryFillColor);
+                deliveryFill.fillOrigin = (int)Image.OriginHorizontal.Right;
+
+                Image quotaLine = UiKit.CreateImage(gaugeRect, "QuotaLine",
+                    new Vector2(0f, -TrackSize.y / 2f),
+                    new Vector2(QuotaLineWidth, TrackSize.y * 2f + 8f), QuotaLineColor);
+                Image checkmateLine = UiKit.CreateImage(gaugeRect, "CheckmateLine",
+                    new Vector2(0f, -TrackSize.y / 2f),
+                    new Vector2(QuotaLineWidth, TrackSize.y * 2f + 8f), CheckmateLineColor);
+
+                Sprite? gaugeIcon = AssetCatalog.GetSprite("icon_gauge_valuable_loss");
+                if (gaugeIcon != null)
+                {
+                    Image iconImg = UiKit.CreateImage(gaugeRect, "GaugeIcon",
+                        new Vector2(-TrackSize.x / 2f, 0f), new Vector2(128f, 128f), Color.white);
+                    iconImg.sprite = gaugeIcon;
+                    iconImg.preserveAspect = true;
+                }
+
+                TextMeshProUGUI lossText = UiKit.CreateText(gaugeRect, "LossText",
+                    new Vector2(0f, HudGeometry.CheckmateReveal.LossTextOffsetY),
+                    new Vector2(TrackSize.x, HudGeometry.CheckmateReveal.LossTextHeight),
+                    "", 44f, Color.white, TextAlignmentOptions.Center);
+
+                RectTransform stampRect = UiKit.CreateRect(
+                    rect, "Stamp", Vector2.zero, new Vector2(1400f, 800f));
+                CanvasGroup stampGroup = stampRect.gameObject.AddComponent<CanvasGroup>();
+                stampGroup.alpha = 0f;
+                stampGroup.blocksRaycasts = false;
+                stampGroup.interactable = false;
+                Image iconImage = UiKit.CreateImage(stampRect, "Icon", IconPos, IconSize, Color.white);
+                iconImage.enabled = false;
+                TextMeshProUGUI titleFront = RevealPanelKit.CreateStampTitle(stampRect, TitlePos,
+                    new Vector2(1400f, HudGeometry.CheckmateReveal.TitleHeight),
+                    Texts.Get(TextId.CheckmateTitle), 96f, TitleColor, Color.black, 0.12f,
+                    out TextMeshProUGUI titleBack);
+
+                root.SetActive(false);
+                _view = new ViewRefs(root, shell.Group, fillImage, deliveryFill,
+                    deliveryTrack, quotaLine, checkmateLine, lossText,
+                    stampRect, stampGroup, iconImage, titleFront, titleBack);
+                _textRefresh.Subscribe(() => Exists, ApplyTexts);
             }
-
-            _lossText = UiKit.CreateText(_gaugeRect, "LossText",
-                new Vector2(0f, HudGeometry.CheckmateReveal.LossTextOffsetY),
-                new Vector2(TrackSize.x, HudGeometry.CheckmateReveal.LossTextHeight),
-                "", 44f, Color.white, TextAlignmentOptions.Center);
-
-            _stampRect = UiKit.CreateRect(rect, "Stamp", Vector2.zero, new Vector2(1400f, 800f));
-            _stampGroup = _stampRect.gameObject.AddComponent<CanvasGroup>();
-            _stampGroup.alpha = 0f;
-            _stampGroup.blocksRaycasts = false;
-            _stampGroup.interactable = false;
-
-            _iconImage = UiKit.CreateImage(_stampRect, "Icon", IconPos, IconSize, Color.white);
-            _iconImage.enabled = false;
-
-            _titleText = RevealPanelKit.CreateStampTitle(_stampRect, TitlePos,
-                new Vector2(1400f, HudGeometry.CheckmateReveal.TitleHeight), Texts.Get(TextId.CheckmateTitle), 96f,
-                TitleColor, Color.black, 0.12f, out _titleTextBack);
-
-            _root.SetActive(false);
+            catch
+            {
+                _view = null;
+                if (root != null)
+                {
+                    root.SetActive(false);
+                    UnityEngine.Object.Destroy(root);
+                }
+                throw;
+            }
         }
 
         public void Show(MeetingGaugeSnapshot snapshot, int fromPermille, int fromLoss)
         {
-            if (_root == null || snapshot == null) return;
-            _snapshot = snapshot;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null || snapshot == null) return;
 
-            _finalPermille = Clamp(snapshot.RatioPermille);
-            _finalLoss = snapshot.LostDollars >= 0
-                ? snapshot.LostDollars
-                : (int)((long)snapshot.BaseDollars * _finalPermille + 500) / 1000;
-            if (_finalLoss > snapshot.BaseDollars) _finalLoss = snapshot.BaseDollars;
-            if (fromPermille > _finalPermille) fromPermille = _finalPermille;
-            if (fromLoss > _finalLoss) fromLoss = _finalLoss;
-
-            RenderLoss(fromPermille, fromLoss);
-
-            int delivery = snapshot.DeliveryPermille();
-            bool showDelivery = delivery >= 0;
-            if (_deliveryTrack.activeSelf != showDelivery) _deliveryTrack.SetActive(showDelivery);
-            if (showDelivery && _deliveryFill != null) _deliveryFill.fillAmount = delivery / 1000f;
-
-            int quota = snapshot.QuotaPermille();
-            bool showQuota = showDelivery && quota >= 0;
-            if (_quotaLine != null)
+            InvalidateRun(view);
+            ClearPrepared();
+            try
             {
-                _quotaLine.gameObject.SetActive(showQuota);
+                int finalPermille = Clamp(snapshot.RatioPermille);
+                int finalLoss = snapshot.LostDollars >= 0
+                    ? snapshot.LostDollars
+                    : (int)((long)snapshot.BaseDollars * finalPermille + 500) / 1000;
+                if (finalLoss > snapshot.BaseDollars) finalLoss = snapshot.BaseDollars;
+                if (fromPermille > finalPermille) fromPermille = finalPermille;
+                if (fromLoss > finalLoss) fromLoss = finalLoss;
+
+                RenderLoss(view, snapshot, fromPermille, fromLoss);
+
+                int delivery = snapshot.DeliveryPermille();
+                bool showDelivery = delivery >= 0;
+                if (view.DeliveryTrack.activeSelf != showDelivery)
+                    view.DeliveryTrack.SetActive(showDelivery);
+                if (showDelivery) view.DeliveryFill.fillAmount = delivery / 1000f;
+
+                int quota = snapshot.QuotaPermille();
+                bool showQuota = showDelivery && quota >= 0;
+                view.QuotaLine.gameObject.SetActive(showQuota);
                 if (showQuota)
                 {
-                    _quotaLine.rectTransform.anchoredPosition = new Vector2(
+                    view.QuotaLine.rectTransform.anchoredPosition = new Vector2(
                         TrackSize.x / 2f - TrackSize.x * quota / 1000f, -TrackSize.y / 2f);
                 }
-            }
 
-            int checkmate = snapshot.CheckmateLinePermille();
-            if (_checkmateLine != null)
-            {
-                _checkmateLine.gameObject.SetActive(checkmate >= 0);
+                int checkmate = snapshot.CheckmateLinePermille();
+                view.CheckmateLine.gameObject.SetActive(checkmate >= 0);
                 if (checkmate >= 0)
                 {
-                    _checkmateLine.rectTransform.anchoredPosition = new Vector2(
+                    view.CheckmateLine.rectTransform.anchoredPosition = new Vector2(
                         -TrackSize.x / 2f + TrackSize.x * checkmate / 1000f, -TrackSize.y / 2f);
                 }
+
+                RevealPanelKit.SetIcon(view.IconImage,
+                    AssetCatalog.GetSprite("img_taxman_foreclosure")
+                    ?? AssetCatalog.GetSprite("img_taxman_death"));
+                view.StampGroup.alpha = 0f;
+                view.StampRect.localScale = Vector3.one;
+                view.Root.SetActive(false);
+
+                _prepared = new PreparedContent(
+                    snapshot, fromPermille, fromLoss, finalPermille, finalLoss);
             }
-
-            RevealPanelKit.SetIcon(_iconImage,
-                AssetCatalog.GetSprite("img_taxman_foreclosure")
-                ?? AssetCatalog.GetSprite("img_taxman_death"));
-
-            _stampGroup.alpha = 0f;
-            _stampRect.localScale = Vector3.one;
-            _reveal.Stop();
-
-            _pendingFromPermille = fromPermille;
-            _pendingFromLoss = fromLoss;
+            catch (Exception e)
+            {
+                _prepared = null;
+                view.Root.SetActive(false);
+                WLog.Line("checkmate_reveal_prepare_error", secret: false, ("err", e.Message));
+            }
         }
 
-        private int _pendingFromPermille;
-        private int _pendingFromLoss;
-
-        public IEnumerator Play(Action onBreak, Action onStamp, Action onDone = null)
+        public IEnumerator Play(Action? onBreak, Action? onStamp, Action? onDone = null)
 
         {
-            if (_root == null || _snapshot == null)
+            ViewRefs? view = GetLiveViewOrNull();
+            PreparedContent? prepared = _prepared;
+            if (view == null || prepared == null)
             {
-                WLog.Line("checkmate_reveal_skip", secret: false, ("reason", "not_built"));
+                WLog.Line("checkmate_reveal_skip", secret: false,
+                    ("reason", view == null ? "not_built" : "not_prepared"));
                 yield break;
             }
 
-            _group.alpha = 0f;
-            _root.SetActive(true);
+            int generation = NextRun(view);
+            view.Group.alpha = 0f;
+            view.Root.SetActive(true);
             WLog.Line("checkmate_reveal_show", secret: false,
-                ("from", _pendingFromPermille), ("to", _finalPermille));
+                ("from", prepared.FromPermille), ("to", prepared.FinalPermille));
 
-            yield return UiTween.Fade(_group, 0f, 1f, CheckmateCeremony.BackdropFadeSec, UiTween.EaseIn());
+            yield return RunGuarded(view, prepared, generation,
+                UiTween.Fade(view.Group, 0f, 1f,
+                    CheckmateCeremony.BackdropFadeSec, UiTween.EaseIn()));
+            if (!IsCurrentRun(view, prepared, generation)) yield break;
 
-            _reveal.Start(_pendingFromPermille, _finalPermille, _pendingFromLoss, _finalLoss, NowMs());
+            prepared.Reveal.Start(prepared.FromPermille, prepared.FinalPermille,
+                prepared.FromLoss, prepared.FinalLoss, NowMs());
             bool breakPlayed = false;
-            while (!_reveal.Done(NowMs()))
+            while (IsCurrentRun(view, prepared, generation) && !prepared.Reveal.Done(NowMs()))
             {
                 long now = NowMs();
-                if (!breakPlayed && _reveal.GrowthStarted(now))
+                if (!breakPlayed && prepared.Reveal.GrowthStarted(now))
                 {
                     breakPlayed = true;
                     RevealPanelKit.InvokeCallback(onBreak, "checkmate_break_sfx_error");
+                    if (!IsCurrentRun(view, prepared, generation)) yield break;
                 }
-                RenderLoss(_reveal.CurrentPermille(now), _reveal.CurrentLoss(now));
+                RenderLoss(view, prepared.Snapshot,
+                    prepared.Reveal.CurrentPermille(now), prepared.Reveal.CurrentLoss(now));
                 yield return null;
             }
-            _reveal.Stop();
-            RenderLoss(_finalPermille, _finalLoss);
+            if (!IsCurrentRun(view, prepared, generation)) yield break;
+            prepared.Reveal.Stop();
+            RenderLoss(view, prepared.Snapshot, prepared.FinalPermille, prepared.FinalLoss);
 
-            yield return UiTween.Hold(CheckmateCeremony.PostRevealPauseSec);
+            yield return RunGuarded(view, prepared, generation,
+                UiTween.Hold(CheckmateCeremony.PostRevealPauseSec));
+            if (!IsCurrentRun(view, prepared, generation)) yield break;
 
-            yield return RevealPanelKit.StampEntrance(
-                _stampRect, _stampGroup, CheckmateCeremony.StampEntranceSec);
+            yield return RunGuarded(view, prepared, generation,
+                RevealPanelKit.StampEntrance(
+                    view.StampRect, view.StampGroup, CheckmateCeremony.StampEntranceSec));
+            if (!IsCurrentRun(view, prepared, generation)) yield break;
 
             RevealPanelKit.InvokeCallback(onStamp, "checkmate_stamp_sfx_error");
+            if (!IsCurrentRun(view, prepared, generation)) yield break;
 
-            yield return UiTween.Hold(CheckmateCeremony.StampHoldSec);
+            yield return RunGuarded(
+                view, prepared, generation, UiTween.Hold(CheckmateCeremony.StampHoldSec));
+            if (!IsCurrentRun(view, prepared, generation)) yield break;
             RevealPanelKit.InvokeCallback(onDone, "checkmate_done_callback_error");
             WLog.Line("checkmate_reveal_hold_end", secret: false);
         }
 
         public void HideNow()
         {
-            _reveal.Stop();
-            _snapshot = null;
-            if (_root == null) return;
-            _group.alpha = 0f;
-            _stampGroup.alpha = 0f;
-            _stampRect.localScale = Vector3.one;
-            _root.SetActive(false);
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view != null) HideCurrent(view);
+            else ClearPrepared();
+        }
+
+        private void ApplyTexts()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return;
+            string title = Texts.Get(TextId.CheckmateTitle);
+            view.TitleFront.text = title;
+            view.TitleBack.text = title;
         }
 
         public void Destroy()
         {
-            _reveal.Stop();
-            _snapshot = null;
-            if (_root != null)
-            {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
-            }
-            _group = null;
-            _gaugeRect = null;
-            _fillImage = null;
-            _deliveryFill = null;
-            _deliveryTrack = null;
-            _quotaLine = null;
-            _checkmateLine = null;
-            _lossText = null;
-            _stampRect = null;
-            _stampGroup = null;
-            _iconImage = null;
-            _titleText = null;
-            _titleTextBack = null;
+            _textRefresh.Unsubscribe();
+            ViewRefs? view = _view;
+            _view = null;
+            if (view != null) InvalidateRun(view);
+            ClearPrepared();
+            if (view != null && view.Root != null) UnityEngine.Object.Destroy(view.Root);
         }
 
-        private void RenderLoss(int permille, int lossDollars)
+        private IEnumerator RunGuarded(
+            ViewRefs view, PreparedContent prepared, int generation, IEnumerator routine)
         {
-            if (_fillImage != null) _fillImage.fillAmount = permille / 1000f;
-            if (_lossText != null && _snapshot != null)
+            while (IsCurrentRun(view, prepared, generation))
             {
-                _lossText.text = Texts.Format(TextId.GaugeLossOverBaseFormat, lossDollars, _snapshot.BaseDollars);
+                bool moved;
+                try { moved = routine.MoveNext(); }
+                catch (Exception e)
+                {
+                    WLog.Line("checkmate_reveal_tween_error", secret: false, ("err", e.Message));
+                    if (IsCurrentRun(view, prepared, generation)) HideCurrent(view);
+                    yield break;
+                }
+                if (!moved || !IsCurrentRun(view, prepared, generation)) yield break;
+                yield return routine.Current;
             }
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+
+            _view = null;
+            InvalidateRun(view);
+            ClearPrepared();
+            return null;
+        }
+
+        private int NextRun(ViewRefs view)
+        {
+            InvalidateRun(view);
+            return view.RunGeneration;
+        }
+
+        private static void InvalidateRun(ViewRefs view)
+        {
+            unchecked { view.RunGeneration++; }
+        }
+
+        private bool IsCurrentRun(ViewRefs view, PreparedContent prepared, int generation)
+        {
+            return ReferenceEquals(_view, view)
+                && ReferenceEquals(_prepared, prepared)
+                && view.Root != null
+                && view.RunGeneration == generation;
+        }
+
+        private void HideCurrent(ViewRefs view)
+        {
+            InvalidateRun(view);
+            ClearPrepared();
+            if (view.Root == null) return;
+            view.Group.alpha = 0f;
+            view.StampGroup.alpha = 0f;
+            view.StampRect.localScale = Vector3.one;
+            view.Root.SetActive(false);
+        }
+
+        private void ClearPrepared()
+        {
+            PreparedContent? prepared = _prepared;
+            _prepared = null;
+            prepared?.Reveal.Stop();
+        }
+
+        private static void RenderLoss(
+            ViewRefs view, MeetingGaugeSnapshot snapshot, int permille, int lossDollars)
+        {
+            view.FillImage.fillAmount = permille / 1000f;
+            view.LossText.text = Texts.Format(
+                TextId.GaugeLossOverBaseFormat, lossDollars, snapshot.BaseDollars);
         }
 
         private static int Clamp(int permille)

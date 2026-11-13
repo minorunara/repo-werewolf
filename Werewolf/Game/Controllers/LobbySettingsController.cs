@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using UnityEngine;
 using Werewolf.Core;
@@ -15,25 +16,38 @@ namespace Werewolf.Game
         private readonly SharedSettingsPublishPolicy _publish = new SharedSettingsPublishPolicy();
         private long _panelTickAtMs;
 
-        private string _lastPanelBlob;
+        private string? _lastPanelBlob;
         private bool _lastPanelModeEnabled;
 
         private bool _lobbyPanelUserHidden;
 
-        private string _debugInjectedBlob;
+        private string? _debugInjectedBlob;
 
-        private string _lobbyBlobMirror;
+        private string? _lobbyBlobMirror;
 
-        private string _matchBlob;
+        private string? _matchBlob;
 
         private bool _matchPanelUserHidden;
+
+        private bool _panelRowsStale;
+        private readonly TextRefresh _textRefresh = new TextRefresh(nameof(LobbySettingsController));
 
         internal LobbySettingsController(WerewolfDirector director)
         {
             _d = director;
+            _textRefresh.Subscribe(() =>
+            {
+                _panelRowsStale = true;
+                _panelTickAtMs = 0;
+            });
         }
 
-        internal string BlobMirror => _lobbyBlobMirror;
+        internal void Dispose()
+        {
+            _textRefresh.Unsubscribe();
+        }
+
+        internal string? BlobMirror => _lobbyBlobMirror;
 
         internal bool IsPanelVisible => _lobbySettingsPanel.Visible;
 
@@ -71,13 +85,15 @@ namespace Werewolf.Game
 
                 GameConfig snapshot = Plugin.Bindings.Snapshot();
                 string blob = SettingsCatalog.EncodeBlob(snapshot);
-                if (!_publish.Claim(Session.RoomId, blob)) return;
-
-                _d.RoomStateView.PublishSharedSettings(blob);
+                string? roomId = Session.RoomId;
+                if (roomId != null && _publish.Claim(roomId, blob))
+                {
+                    _d.RoomStateView.PublishSharedSettings(blob);
+                }
             }
             else if (string.IsNullOrEmpty(_lobbyBlobMirror))
             {
-                if (_d.RoomStateView.TryReadSharedSettings(out string recovered) && !string.IsNullOrEmpty(recovered))
+                if (_d.RoomStateView.TryReadSharedSettings(out string? recovered) && !string.IsNullOrEmpty(recovered))
                 {
                     UpdateBlobMirror(recovered);
                 }
@@ -86,7 +102,7 @@ namespace Werewolf.Game
             UpdatePanelRows(ResolveLobbySettingsBlob());
         }
 
-        internal string ResolveLobbySettingsBlob()
+        internal string? ResolveLobbySettingsBlob()
         {
             if (!string.IsNullOrEmpty(_debugInjectedBlob)) return _debugInjectedBlob;
             if (Session.IsHost && !Session.IsRoleUnsettled)
@@ -98,9 +114,15 @@ namespace Werewolf.Game
             return _lobbyBlobMirror;
         }
 
-        private void UpdatePanelRows(string blob)
+        private void UpdatePanelRows(string? blob)
         {
-            if (string.Equals(blob, _lastPanelBlob, StringComparison.Ordinal)) return;
+            if (!_lobbySettingsPanel.Exists && !string.IsNullOrEmpty(_lastPanelBlob))
+            {
+                _lastPanelBlob = null;
+                _lastPanelModeEnabled = false;
+            }
+            if (!_panelRowsStale && string.Equals(blob, _lastPanelBlob, StringComparison.Ordinal)) return;
+            _panelRowsStale = false;
 
             _lastPanelBlob = blob;
             _lastPanelModeEnabled = false;
@@ -121,12 +143,18 @@ namespace Werewolf.Game
                 if (!_d.EnsureUiCreated()) return;
                 if (!_lobbySettingsPanel.Exists)
                 {
-                    Transform layer = _d.GetUiLayerRoot(WerewolfUIManager.LobbyLayer);
+                    Transform? layer = _d.GetUiLayerRoot(WerewolfUIManager.LobbyLayer);
                     if (layer == null) return;
                     string keyName = Plugin.LobbySettingsPanelKey != null
                         ? Plugin.LobbySettingsPanelKey.Value.ToString()
                         : "F7";
                     _lobbySettingsPanel.Build(layer, keyName);
+                }
+                if (!_lobbySettingsPanel.Exists)
+                {
+                    _lastPanelBlob = null;
+                    _lastPanelModeEnabled = false;
+                    return;
                 }
                 _lobbySettingsPanel.SetRows(SettingsCatalog.BuildRows(values));
             }
@@ -182,7 +210,7 @@ namespace Werewolf.Game
             _lobbySettingsPanel.SetVisibility(view);
         }
 
-        internal void UpdateBlobMirror(string blob)
+        internal void UpdateBlobMirror(string? blob)
         {
             if (SettingsCatalog.TryDecodeBlob(blob, out _))
             {
@@ -199,10 +227,11 @@ namespace Werewolf.Game
 
         internal void NotePublishedBlob(string blob)
         {
-            _publish.Claim(Session.RoomId, blob);
+            string? roomId = Session.RoomId;
+            if (roomId != null) _publish.Claim(roomId, blob);
         }
 
-        internal void NoteMatchBlob(string blob)
+        internal void NoteMatchBlob(string? blob)
         {
             if (string.IsNullOrEmpty(blob)) return;
             _matchBlob = blob;
@@ -231,6 +260,7 @@ namespace Werewolf.Game
             _lobbyBlobMirror = null;
             _lobbySettingsPanel.SetVisibility(SettingsPanelView.Hidden);
             _lastPanelBlob = null;
+            _panelRowsStale = false;
             _lastPanelModeEnabled = false;
             _lobbyPanelUserHidden = false;
             _debugInjectedBlob = null;

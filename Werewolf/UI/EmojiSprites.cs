@@ -1,5 +1,7 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using TMPro;
 using UnityEngine;
@@ -19,22 +21,22 @@ namespace Werewolf.UI
 
         private const int ProbeIntervalFrames = 30;
 
-        private static TMP_SpriteAsset _asset;
+        private static TMP_SpriteAsset? _asset;
         private static bool _attempted;
 
-        private static TMP_SpriteAsset _vanilla;
-        private static Dictionary<string, TMP_SpriteCharacter> _vanillaCharacters;
-        private static Dictionary<string, Sprite> _vanillaSprites;
+        private static TMP_SpriteAsset? _vanilla;
+        private static Dictionary<string, TMP_SpriteCharacter>? _vanillaCharacters;
+        private static Dictionary<string, Sprite?>? _vanillaSprites;
         private static int _vanillaProbeFrame = -ProbeIntervalFrames;
 
         private static readonly ITextPreprocessor _preprocessor = new SubstitutePreprocessor();
 
-        public static TMP_SpriteAsset Asset
+        public static TMP_SpriteAsset? Asset
         {
             get
             {
-                TMP_SpriteAsset own = Build();
-                TMP_SpriteAsset vanilla = ResolveVanilla(own);
+                TMP_SpriteAsset? own = Build();
+                TMP_SpriteAsset? vanilla = ResolveVanilla(own);
                 return own != null ? own : vanilla;
             }
         }
@@ -47,18 +49,20 @@ namespace Werewolf.UI
 
         public static string Substitute(string text)
         {
-            if (string.IsNullOrEmpty(text)) return text;
-            TMP_SpriteAsset own = Build();
+            if (string.IsNullOrEmpty(text)) return text ?? string.Empty;
+            TMP_SpriteAsset? own = Build();
             bool vanilla = ResolveVanilla(own) != null;
+            Dictionary<string, TMP_SpriteCharacter>? vanillaCharacters = _vanillaCharacters;
             if (own == null && !vanilla) return text;
 
-            StringBuilder sb = null;
+            StringBuilder? sb = null;
             int copied = 0;
             for (int i = 0; i < text.Length; i++)
             {
-                if (vanilla && VanillaEmojiToken.TryReadAt(text, i, out string name, out int next))
+                if (vanilla && vanillaCharacters != null
+                    && VanillaEmojiToken.TryReadAt(text, i, out string? name, out int next))
                 {
-                    if (_vanillaCharacters.ContainsKey(name))
+                    if (vanillaCharacters.ContainsKey(name))
                     {
                         if (sb == null) sb = new StringBuilder(text.Length + 32);
                         sb.Append(text, copied, i - copied);
@@ -70,7 +74,7 @@ namespace Werewolf.UI
                 }
 
                 if (own == null) continue;
-                if (!ChatEmoji.TryReadSpriteAt(text, i, out string key, out int after)) continue;
+                if (!ChatEmoji.TryReadSpriteAt(text, i, out string? key, out int after)) continue;
 
                 if (sb == null) sb = new StringBuilder(text.Length + 32);
                 sb.Append(text, copied, i - copied);
@@ -84,24 +88,26 @@ namespace Werewolf.UI
             return sb.ToString();
         }
 
-        public static Sprite VanillaSprite(string key)
+        public static Sprite? VanillaSprite(string? key)
         {
-            if (!VanillaEmojiToken.TryParseWhole(key, out string name)) return null;
+            if (!VanillaEmojiToken.TryParseWhole(key, out string? name)) return null;
             if (ResolveVanilla(Build()) == null) return null;
 
-            if (_vanillaSprites == null) _vanillaSprites = new Dictionary<string, Sprite>(StringComparer.Ordinal);
-            if (_vanillaSprites.TryGetValue(name, out Sprite cached)) return cached;
+            if (_vanillaSprites == null) _vanillaSprites = new Dictionary<string, Sprite?>(StringComparer.Ordinal);
+            if (_vanillaSprites.TryGetValue(name, out Sprite? cached)) return cached;
 
-            Sprite cut = CutVanillaSprite(name);
+            Sprite? cut = CutVanillaSprite(name);
             _vanillaSprites[name] = cut;
             return cut;
         }
 
-        public static bool TryTakeLeadingSprite(string text, out Sprite sprite, out string rest)
+        public static bool TryTakeLeadingSprite(string text,
+            [NotNullWhen(true)] out Sprite? sprite,
+            [NotNullWhen(true)] out string? rest)
         {
             sprite = null;
             rest = null;
-            if (!ChatEmoji.TryReadSpriteAt(text, 0, out string key, out int next)) return false;
+            if (!ChatEmoji.TryReadSpriteAt(text, 0, out string? key, out int next)) return false;
             sprite = AssetCatalog.GetSprite(key);
             if (sprite == null) return false;
 
@@ -124,7 +130,7 @@ namespace Werewolf.UI
             public string PreprocessText(string text) => Substitute(text);
         }
 
-        private static TMP_SpriteAsset Build()
+        private static TMP_SpriteAsset? Build()
         {
             if (_attempted) return _asset;
             _attempted = true;
@@ -141,7 +147,7 @@ namespace Werewolf.UI
             return _asset;
         }
 
-        private static TMP_SpriteAsset ResolveVanilla(TMP_SpriteAsset own)
+        private static TMP_SpriteAsset? ResolveVanilla(TMP_SpriteAsset? own)
         {
             if (_vanilla != null) return _vanilla;
 
@@ -149,7 +155,7 @@ namespace Werewolf.UI
             if (frame - _vanillaProbeFrame < ProbeIntervalFrames) return null;
             _vanillaProbeFrame = frame;
 
-            TMP_SpriteAsset found = null;
+            TMP_SpriteAsset? found = null;
             foreach (TMP_SpriteAsset candidate in Resources.FindObjectsOfTypeAll<TMP_SpriteAsset>())
             {
                 if (candidate != null && candidate.name == VanillaAssetName)
@@ -178,11 +184,14 @@ namespace Werewolf.UI
             return _vanilla;
         }
 
-        private static Sprite CutVanillaSprite(string name)
+        private static Sprite? CutVanillaSprite(string name)
         {
-            var sheet = _vanilla.spriteSheet as Texture2D;
+            TMP_SpriteAsset? vanilla = _vanilla;
+            Dictionary<string, TMP_SpriteCharacter>? characters = _vanillaCharacters;
+            if (vanilla == null || characters == null) return null;
+            var sheet = vanilla.spriteSheet as Texture2D;
             if (sheet == null) return null;
-            if (!_vanillaCharacters.TryGetValue(name, out TMP_SpriteCharacter character)) return null;
+            if (!characters.TryGetValue(name, out TMP_SpriteCharacter? character)) return null;
             if (character.glyph == null) return null;
 
             GlyphRect area = character.glyph.glyphRect;
@@ -191,7 +200,7 @@ namespace Werewolf.UI
                                  new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
         }
 
-        private static TMP_SpriteAsset Compose()
+        private static TMP_SpriteAsset? Compose()
         {
             var keys = new List<string>();
             foreach (string key in ChatEmoji.SpriteKeys.Values)
@@ -205,7 +214,7 @@ namespace Werewolf.UI
             int cellInner = 1;
             foreach (string key in keys)
             {
-                Texture2D tex = AssetCatalog.GetTexture(key);
+                Texture2D? tex = AssetCatalog.GetTexture(key);
                 if (tex == null)
                 {
                     WLog.Line("emoji_sprite_fallback", secret: false, ("reason", "png_missing"), ("key", key));
@@ -251,7 +260,7 @@ namespace Werewolf.UI
 
             asset.UpdateLookupTables();
 
-            Shader shader = Shader.Find("TextMeshPro/Sprite");
+            Shader? shader = Shader.Find("TextMeshPro/Sprite");
             if (shader == null)
             {
                 WLog.Line("emoji_sprite_fallback", secret: false, ("reason", "shader_missing"));

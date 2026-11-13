@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -22,7 +23,7 @@ namespace Werewolf.Core.Replay
 
         private const string LineTailForbidden = "（「『【〈《(";
 
-        public static string SanitizeForRecord(string raw)
+        public static string SanitizeForRecord(string? raw)
         {
             if (string.IsNullOrEmpty(raw)) return string.Empty;
             var sb = new StringBuilder(raw.Length);
@@ -36,7 +37,7 @@ namespace Werewolf.Core.Replay
             return TruncateDisplay(sb.ToString().Trim(), MaxDisplayChars);
         }
 
-        public static int DisplayLength(string s)
+        public static int DisplayLength(string? s)
         {
             if (string.IsNullOrEmpty(s)) return 0;
             int count = 0;
@@ -44,7 +45,7 @@ namespace Werewolf.Core.Replay
             return count;
         }
 
-        public static string TruncateDisplay(string s, int maxDisplayChars)
+        public static string TruncateDisplay(string? s, int maxDisplayChars)
         {
             if (string.IsNullOrEmpty(s)) return string.Empty;
             int count = 0;
@@ -58,7 +59,7 @@ namespace Werewolf.Core.Replay
             return s;
         }
 
-        public static (string Line1, string Line2) Wrap(string text)
+        public static (string Line1, string? Line2) Wrap(string? text)
         {
             if (string.IsNullOrEmpty(text)) return (string.Empty, null);
 

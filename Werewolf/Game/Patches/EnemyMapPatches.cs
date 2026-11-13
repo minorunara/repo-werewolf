@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
@@ -5,7 +6,7 @@ using Werewolf.Vanilla;
 
 namespace Werewolf.Game.Patches
 {
-    [HarmonyPatch(typeof(EnemyParent), "SpawnRPC")]
+    [HarmonyPatch(typeof(EnemyParent), nameof(EnemyParent.SpawnRPC))]
     internal static class EnemyMapSpawnPatch
     {
         private static void Postfix(EnemyParent __instance)
@@ -21,7 +22,7 @@ namespace Werewolf.Game.Patches
         }
     }
 
-    [HarmonyPatch(typeof(EnemyParent), "DespawnRPC")]
+    [HarmonyPatch(typeof(EnemyParent), nameof(EnemyParent.DespawnRPC))]
     internal static class EnemyMapDespawnPatch
     {
         private static void Postfix(EnemyParent __instance)

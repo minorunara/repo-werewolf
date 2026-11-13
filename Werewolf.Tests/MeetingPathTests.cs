@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Werewolf.Core;
 using Werewolf.Core.Replay;
@@ -41,6 +42,23 @@ namespace Werewolf.Tests
             into.Clear();
             path.DecimatedInto(100, into);
             Assert.Equal(10, into.Count);
+        }
+
+        [Fact]
+        public void ProjectionMethods_RejectMissingDestinationBuffers()
+        {
+            MeetingPath path = Assert.IsType<MeetingPath>(
+                MeetingPath.Build(Walk(0, 10, 0f, 5f, 1.0), new[] { 10.0 }, null));
+
+            #nullable enable
+            var decimatedError = Assert.Throws<ArgumentNullException>(() =>
+                path.DecimatedInto(4, null!));
+            var trailError = Assert.Throws<ArgumentNullException>(() =>
+                path.TrailInto(path.EndT, 4, null!));
+            #nullable restore
+
+            Assert.Equal("into", decimatedError.ParamName);
+            Assert.Equal("into", trailError.ParamName);
         }
 
         [Fact]

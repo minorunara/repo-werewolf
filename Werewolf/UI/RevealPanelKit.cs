@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections;
 using TMPro;
@@ -9,22 +10,47 @@ namespace Werewolf.UI
 {
     internal static class RevealPanelKit
     {
+        internal sealed class FullscreenRoot
+        {
+            internal FullscreenRoot(RectTransform rect, CanvasGroup group)
+            {
+                Rect = rect;
+                Group = group;
+            }
+
+            internal RectTransform Rect { get; }
+            internal CanvasGroup Group { get; }
+        }
+
         internal const float EntranceStartScale = 2.6f;
 
-        internal static RectTransform BuildFullscreenRoot(
-            Transform layerRoot, string name, Color backdropColor, out CanvasGroup group)
+        internal static FullscreenRoot BuildFullscreenRoot(
+            Transform layerRoot, string name, Color backdropColor)
         {
-            if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
+            GameObject? root = null;
+            try
+            {
+                if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            RectTransform rect = UiKit.CreateStretched(layerRoot, name);
+                RectTransform rect = UiKit.CreateStretched(layerRoot, name);
+                root = rect.gameObject;
+                CanvasGroup group = root.AddComponent<CanvasGroup>();
+                group.alpha = 0f;
+                group.blocksRaycasts = false;
+                group.interactable = false;
 
-            group = rect.gameObject.AddComponent<CanvasGroup>();
-            group.alpha = 0f;
-            group.blocksRaycasts = false;
-            group.interactable = false;
-
-            UiKit.CreateBackdrop(rect, "Backdrop", backdropColor);
-            return rect;
+                UiKit.CreateBackdrop(rect, "Backdrop", backdropColor);
+                return new FullscreenRoot(rect, group);
+            }
+            catch
+            {
+                if (root != null)
+                {
+                    root.SetActive(false);
+                    UnityEngine.Object.Destroy(root);
+                }
+                throw;
+            }
         }
 
         internal static TextMeshProUGUI CreateStampTitle(
@@ -46,7 +72,7 @@ namespace Werewolf.UI
             return front;
         }
 
-        internal static void SetIcon(Image image, Sprite sprite)
+        internal static void SetIcon(Image image, Sprite? sprite)
         {
             image.sprite = sprite;
             image.preserveAspect = true;
@@ -62,7 +88,7 @@ namespace Werewolf.UI
                 UiTween.Fade(fadeGroup, 0f, 1f, durationSec, UiTween.EaseIn()));
         }
 
-        internal static void InvokeCallback(Action callback, string errorLogKey)
+        internal static void InvokeCallback(Action? callback, string errorLogKey)
         {
             try { callback?.Invoke(); }
             catch (Exception e)

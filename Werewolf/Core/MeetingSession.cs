@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -56,7 +57,10 @@ namespace Werewolf.Core
         private readonly HashSet<int> _disconnected = new HashSet<int>();
 
         private readonly MeetingTimer _timer = new MeetingTimer();
-        private VoteBox _voteBox;
+        private VoteBox? _voteBox;
+
+        private VoteBox ActiveVoteBox => _voteBox
+            ?? throw new InvalidOperationException("vote box is unavailable outside voting");
 
         private long _warpUnixMs;
         private long _closingUntilUnixMs;
@@ -77,10 +81,10 @@ namespace Werewolf.Core
 
         public MeetingStage Stage { get; private set; } = MeetingStage.Idle;
 
-        public MeetingOutcome Outcome { get; private set; }
+        public MeetingOutcome? Outcome { get; private set; }
 
         public long ResultCeremonyDelayMs
-            => Outcome == null ? 0 : VoteTallyTimeline.CeremonyDelayMs(Outcome.VoteCounts);
+            => Outcome?.VoteCounts is int[] counts ? VoteTallyTimeline.CeremonyDelayMs(counts) : 0;
 
         public long LastMeetingEndUnixMs { get; private set; } = long.MinValue;
 
@@ -101,21 +105,21 @@ namespace Werewolf.Core
 
         public int VotedCount => _voteBox?.VotedActors.Count ?? 0;
 
-        public int[] VotersFor(int targetActor) => _voteBox?.VotersFor(targetActor);
+        public int[]? VotersFor(int targetActor) => _voteBox?.VotersFor(targetActor);
 
         public long EndUnixMs => Stage == MeetingStage.Idle ? 0 : _timer.EndUnixMs;
 
-        public event Action<OutboundMessage> OnSend;
+        public event Action<OutboundMessage>? OnSend;
 
-        public event Action<int> OnExecutePlayer;
+        public event Action<int>? OnExecutePlayer;
 
-        public event Action<GamePhase> OnPhaseChangeRequest;
+        public event Action<GamePhase>? OnPhaseChangeRequest;
 
-        public event Action<int, long> OnMeetingStateChanged;
+        public event Action<int, long>? OnMeetingStateChanged;
 
-        public event Action OnVotingStarted;
+        public event Action? OnVotingStarted;
 
-        public event Action<int, int> OnRightsChanged;
+        public event Action<int, int>? OnRightsChanged;
 
         public ConveneRejectReason TryConvene(int callerActor, long nowUnixMs)
             => TryConvene(callerActor, nowUnixMs, ConveneKind.Button,
@@ -133,10 +137,9 @@ namespace Werewolf.Core
 
                 if (reason != ConveneRejectReason.UnknownCaller)
                 {
-                    Send(new OutboundMessage(
+                    Send(OutboundMessage.ToActors(
                         WWMeetingCodes.ConveneDenied,
                         new object[] { ConveneDeniedWire.ToWire(reason) },
-                        MessageTarget.Actors,
                         new[] { callerActor }));
                 }
                 return reason;
@@ -188,10 +191,9 @@ namespace Werewolf.Core
                 ("caller", callerActor), ("kind", kind),
                 ("warpUnixMs", _warpUnixMs), ("endUnixMs", _timer.EndUnixMs));
 
-            Send(new OutboundMessage(
+            Send(OutboundMessage.ToAll(
                 WWMeetingCodes.StartMeeting,
-                new object[] { callerActor, _warpUnixMs, _timer.EndUnixMs, (byte)kind },
-                MessageTarget.All, null));
+                new object[] { callerActor, _warpUnixMs, _timer.EndUnixMs, (byte)kind }));
             OnPhaseChangeRequest?.Invoke(GamePhase.Meeting);
             OnMeetingStateChanged?.Invoke(callerActor, _timer.EndUnixMs);
         }
@@ -245,10 +247,9 @@ namespace Werewolf.Core
             WLog.Line("meeting_cancelled", secret: false,
                 ("caller", caller), ("reason", "final_extraction_started"), ("nowUnixMs", nowUnixMs));
 
-            Send(new OutboundMessage(
+            Send(OutboundMessage.ToAll(
                 WWMeetingCodes.MeetingCancelled,
-                new object[] { (byte)0 },
-                MessageTarget.All, null));
+                new object[] { (byte)0 }));
             OnMeetingStateChanged?.Invoke(-1, 0);
             OnPhaseChangeRequest?.Invoke(GamePhase.Play);
             return true;
@@ -282,7 +283,7 @@ namespace Werewolf.Core
                     break;
 
                 case MeetingStage.Voting:
-                    if (_voteBox.AllVotesIn || _timer.IsExpired(nowUnixMs)) CloseVoting(nowUnixMs);
+                    if (ActiveVoteBox.AllVotesIn || _timer.IsExpired(nowUnixMs)) CloseVoting(nowUnixMs);
                     break;
 
                 case MeetingStage.Closing:
@@ -300,7 +301,7 @@ namespace Werewolf.Core
                 return VoteRejectReason.NotVotingStage;
             }
 
-            var reason = _voteBox.TryCast(voterActor, targetActor);
+            var reason = ActiveVoteBox.TryCast(voterActor, targetActor);
             if (reason != VoteRejectReason.None)
             {
                 WLog.Line("vote_rejected", secret: false, ("voter", voterActor), ("reason", reason));
@@ -312,7 +313,7 @@ namespace Werewolf.Core
             if (_config.VoteTimeCutEnabled)
             {
                 long endBefore = _timer.EndUnixMs;
-                int preVoteRemaining = _voteBox.RemainingVoterCount + 1;
+                int preVoteRemaining = ActiveVoteBox.RemainingVoterCount + 1;
                 long endAfter = _timer.ReduceByVote(preVoteRemaining, nowUnixMs);
                 WLog.Line("vote_shorten", secret: false,
                     ("preVoteRemaining", preVoteRemaining),
@@ -358,23 +359,28 @@ namespace Werewolf.Core
 
         private void CloseVoting(long nowUnixMs)
         {
-            Outcome = _voteBox.Tally(IsEligibleForExecution);
+            MeetingOutcome outcome = ActiveVoteBox.Tally(IsEligibleForExecution);
+            Outcome = outcome;
             Stage = MeetingStage.Closing;
             _closingUntilUnixMs = nowUnixMs + ResultCeremonyDelayMs
                 + Math.Max(_config.ResultDisplaySec, PostResultKillDelaySec + 1) * 1000L;
 
-            Send(new OutboundMessage(
+            Send(OutboundMessage.ToAll(
                 WWMeetingCodes.MeetingResult,
-                new object[] { Outcome.ExecutedActor, Outcome.TargetActors, Outcome.VoteCounts },
-                MessageTarget.All, null));
+                new object[]
+                {
+                    outcome.ExecutedActor,
+                    outcome.TargetActors ?? Array.Empty<int>(),
+                    outcome.VoteCounts ?? Array.Empty<int>(),
+                }));
 
             WLog.Line("meeting_result", secret: false,
-                ("executed", Outcome.ExecutedActor),
-                ("targets", Outcome.TargetActors), ("counts", Outcome.VoteCounts));
+                ("executed", outcome.ExecutedActor),
+                ("targets", outcome.TargetActors), ("counts", outcome.VoteCounts));
 
-            if (Outcome.ExecutedActor != -1)
+            if (outcome.ExecutedActor != -1)
             {
-                OnExecutePlayer?.Invoke(Outcome.ExecutedActor);
+                OnExecutePlayer?.Invoke(outcome.ExecutedActor);
             }
         }
 
@@ -401,8 +407,8 @@ namespace Werewolf.Core
 
             if (Stage == MeetingStage.Voting)
             {
-                _voteBox.RemoveVoter(actorNumber);
-                _voteBox.RemoveTarget(actorNumber, disconnected: true);
+                ActiveVoteBox.RemoveVoter(actorNumber);
+                ActiveVoteBox.RemoveTarget(actorNumber, disconnected: true);
                 EmitVoteProgress();
             }
 
@@ -414,8 +420,8 @@ namespace Werewolf.Core
         {
             if (Stage == MeetingStage.Voting)
             {
-                _voteBox.RemoveVoter(actorNumber);
-                _voteBox.RemoveTarget(actorNumber, disconnected: false);
+                ActiveVoteBox.RemoveVoter(actorNumber);
+                ActiveVoteBox.RemoveTarget(actorNumber, disconnected: false);
                 EmitVoteProgress();
             }
 
@@ -430,14 +436,13 @@ namespace Werewolf.Core
 
         private void EmitVoteProgress()
         {
-            var voted = new List<int>(_voteBox.VotedActors);
-            Send(new OutboundMessage(
+            var voted = new List<int>(ActiveVoteBox.VotedActors);
+            Send(OutboundMessage.ToAll(
                 WWMeetingCodes.VoteProgress,
-                new object[] { voted.ToArray(), _timer.EndUnixMs },
-                MessageTarget.All, null));
+                new object[] { voted.ToArray(), _timer.EndUnixMs }));
         }
 
-        private WPlayer FindPlayer(int actorNumber)
+        private WPlayer? FindPlayer(int actorNumber)
         {
             foreach (var p in _players)
             {

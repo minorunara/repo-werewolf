@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -10,7 +11,7 @@ namespace Werewolf.Core.Replay
         public static string F2(double value)
             => value.ToString("0.##", CultureInfo.InvariantCulture);
 
-        public static void AppendEscaped(StringBuilder sb, string value)
+        public static void AppendEscaped(StringBuilder sb, string? value)
         {
             sb.Append('"');
             if (value != null)
@@ -40,7 +41,7 @@ namespace Werewolf.Core.Replay
             sb.Append('"');
         }
 
-        public static void AppendValue(StringBuilder sb, object value)
+        public static void AppendValue(StringBuilder sb, object? value)
         {
             switch (value)
             {
@@ -65,7 +66,7 @@ namespace Werewolf.Core.Replay
                 case IEnumerable items:
                     sb.Append('[');
                     bool first = true;
-                    foreach (object item in items)
+                    foreach (object? item in items)
                     {
                         if (!first) sb.Append(',');
                         first = false;
@@ -74,7 +75,7 @@ namespace Werewolf.Core.Replay
                     sb.Append(']');
                     break;
                 default:
-                    AppendEscaped(sb, value.ToString());
+                    AppendEscaped(sb, value.ToString() ?? string.Empty);
                     break;
             }
         }
@@ -148,14 +149,14 @@ namespace Werewolf.Core.Replay
             return sb.ToString();
         }
 
-        internal static string EventLine(double t, string name, (string Key, object Value)[] fields)
+        internal static string EventLine(double t, string name, (string Key, object? Value)[]? fields)
         {
             var sb = new StringBuilder(64);
             sb.Append("{\"k\":\"ev\",\"t\":").Append(F2(t)).Append(",\"e\":");
             AppendEscaped(sb, name);
             if (fields != null)
             {
-                foreach ((string key, object value) in fields)
+                foreach ((string key, object? value) in fields)
                 {
                     sb.Append(',');
                     AppendEscaped(sb, key);

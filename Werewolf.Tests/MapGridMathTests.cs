@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Werewolf.Core;
@@ -77,7 +78,17 @@ namespace Werewolf.Tests
                 new List<(float X, float Z)> { (500f, 500f) }, 6, 6));
             Assert.Null(MapGridMath.RangeFromModuleCenters(
                 new List<(float X, float Z)>(), 6, 6));
-            Assert.Null(MapGridMath.RangeFromModuleCenters(null, 6, 6));
+        }
+
+        [Fact]
+        public void RangeFromModuleCenters_NullCenters_ThrowsForCenters()
+        {
+            #nullable enable
+            var error = Assert.Throws<ArgumentNullException>(() =>
+                MapGridMath.RangeFromModuleCenters(null!, 6, 6));
+            #nullable restore
+
+            Assert.Equal("centers", error.ParamName);
         }
 
         [Fact]

@@ -66,17 +66,7 @@ Melee weapons are stronger against players in this mode, so whoever attacks firs
 
 ## UI language
 
-The UI is available in English and Japanese. English is selected automatically on a fresh install.
-
-To switch to Japanese:
-
-1. Open `MODS` in the main menu
-2. Find and select `Werewolf` in the mod list
-3. Change `Language (restart required)` from `English` to `日本語`
-4. Save with `SAVE CHANGES`
-5. Restart the game
-
-You can also edit the config file directly.
+The UI is available in English and Japanese and follows the game's own language setting. Switching the game to `日本語` in its options switches the mod to Japanese on the spot, with no restart. Every other game language shows the mod in English.
 
 ## Playing over text chat
 
@@ -414,6 +404,12 @@ Wolf Mode and Plant Bomb, as well as Beacon and Detonate, can each be bound to s
 - Setting the werewolf count (WerewolfCount) to the number of participants or higher also shows a warning and blocks the start (a role assignment with no villagers is impossible; lower the setting to proceed)
 - To play regular R.E.P.O., the host can turn off Werewolf Mode (WerewolfModeEnabled) in the settings (the host's setting decides whether the room runs Werewolf Mode; a guest's setting applies only when that player hosts)
 - **No contest**: when a bug, a disconnect, or an accident (a role getting exposed, for example) makes the match impossible to continue, the host can end it by holding `VoidMatchKey`. A confirmation screen appears, and holding the key again confirms it (two stages, so it cannot be triggered by accident). No team wins and no cosmetic tokens are awarded, but the result screen and the match log are shown as usual, and everyone's role is revealed
+
+## Alternative Execution Icon
+
+To replace the gallows used for the Executed status with a gavel icon, set
+`UseAlternativeExecutionIcon = true` in the `[Client UI]` section of the config and restart the game.
+This is a local visual setting and affects only your screen.
 
 ## Streamer-Safe Mode
 

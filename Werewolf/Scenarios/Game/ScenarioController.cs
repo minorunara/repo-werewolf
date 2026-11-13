@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using UnityEngine;
 using Werewolf.Core;
 using Werewolf.Vanilla;
@@ -13,13 +14,7 @@ namespace Werewolf.Scenarios.Game
     {
         private readonly WerewolfDirector _d;
 
-        private ScenarioFlow _flow;
-
-        private ScenarioDefinition _definition;
-
-        private ScenarioId _scenario;
-
-        private bool _started;
+        private ScenarioScriptRun? _script;
 
         private readonly ScenarioInterruptState _interrupt = new ScenarioInterruptState();
 
@@ -28,24 +23,33 @@ namespace Werewolf.Scenarios.Game
             _d = director;
         }
 
-        internal ScenarioFlow Flow => _flow;
+        internal ScenarioFlow? Flow => _script?.Flow;
 
-        private bool ScriptRunning => _flow != null && !_flow.Finished && _definition != null;
+        private bool ScriptRunning => _script != null && !_script.Flow.Finished;
+
+        private bool TryGetRunningScript([NotNullWhen(true)] out ScenarioScriptRun? script)
+        {
+            script = _script;
+            return script != null && !script.Flow.Finished;
+        }
 
         internal void FeedSignal(ScenarioSignal signal)
         {
-            if (_flow == null || _flow.Finished) return;
+            ScenarioScriptRun? script = _script;
+            if (script == null || script.Flow.Finished) return;
 
-            int from = _flow.Index;
+            ScenarioFlow flow = script.Flow;
 
-            ScenarioNotices notices = _definition != null ? _definition.Notices : default;
+            int from = flow.Index;
+
+            ScenarioNotices notices = script.Definition.Notices;
             if (notices.EarlyStartSignal.HasValue && signal == notices.EarlyStartSignal.Value
-                && !_flow.HasReached(notices.EarlyStartAfter))
+                && !flow.HasReached(notices.EarlyStartAfter))
             {
                 _interrupt.Defer(ScenarioInterrupt.EarlyStart, notices.EarlyStartLines);
             }
 
-            ScenarioPage pressed = _flow.Current;
+            ScenarioPage pressed = flow.Current;
             switch (signal)
             {
                 case ScenarioSignal.BombOnWrongTarget:
@@ -73,17 +77,17 @@ namespace Werewolf.Scenarios.Game
                     break;
             }
 
-            if (!_flow.Feed(signal)) return;
+            if (!flow.Feed(signal)) return;
 
             _interrupt.DropPressResponses();
 
             WLog.Line("scenario_page", secret: false,
-                ("scenario", _scenario), ("signal", signal),
-                ("from", from), ("to", _flow.Index), ("pages", _flow.PageCount));
+                ("scenario", script.Scenario), ("signal", signal),
+                ("from", from), ("to", flow.Index), ("pages", flow.PageCount));
 
-            if (_flow.Finished)
+            if (flow.Finished)
             {
-                WLog.Line("scenario_flow_finished", secret: false, ("scenario", _scenario));
+                WLog.Line("scenario_flow_finished", secret: false, ("scenario", script.Scenario));
             }
         }
 
@@ -91,14 +95,32 @@ namespace Werewolf.Scenarios.Game
         {
             if (_d.ClientScenarioSession) GuardVanillaEscMenu();
 
-            if (!_started && _d.ClientScenarioSession && _d.IsHostSessionActive)
+            if (_script == null && _d.ClientScenarioSession && _d.IsHostSessionActive)
             {
-                _started = true;
-                _scenario = ScenarioRun.Scenario;
-                _definition = ScenarioRun.Definition;
-                _flow = _definition != null ? _definition.CreateFlow() : null;
-                WLog.Line("scenario_flow_started", secret: false,
-                    ("scenario", _scenario), ("pages", _flow != null ? _flow.PageCount : 0));
+                ScenarioId scenario = ScenarioRun.Scenario;
+                ScenarioDefinition? definition = ScenarioRun.Definition;
+                if (definition == null)
+                {
+                    WLog.Line("scenario_flow_start_error", secret: false,
+                        ("scenario", scenario), ("reason", "no_definition"));
+                    ScenarioRun.ExitToTitle("no_definition");
+                }
+                else
+                {
+                    try
+                    {
+                        var script = new ScenarioScriptRun(scenario, definition);
+                        _script = script;
+                        WLog.Line("scenario_flow_started", secret: false,
+                            ("scenario", script.Scenario), ("pages", script.Flow.PageCount));
+                    }
+                    catch (System.Exception e)
+                    {
+                        WLog.Line("scenario_flow_start_error", secret: false,
+                            ("scenario", scenario), ("reason", "invalid_script"), ("err", e.Message));
+                        ScenarioRun.ExitToTitle("invalid_script");
+                    }
+                }
             }
 
             TickGuide(now);
@@ -146,22 +168,20 @@ namespace Werewolf.Scenarios.Game
 
         internal bool CheckmateArmed
             => !_d.ClientScenarioSession
-               || (_flow != null && _flow.HasEntered(ScenarioMilestone.CheckmateArmed));
+               || (_script != null && _script.Flow.HasEntered(ScenarioMilestone.CheckmateArmed));
 
         public void Reset()
         {
-            if (_started)
+            ScenarioScriptRun? script = _script;
+            if (script != null)
             {
                 WLog.Line("scenario_flow_ended", secret: false,
-                    ("scenario", _scenario),
-                    ("page", _flow != null ? _flow.Index : 0),
-                    ("pages", _flow != null ? _flow.PageCount : 0));
+                    ("scenario", script.Scenario),
+                    ("page", script.Flow.Index),
+                    ("pages", script.Flow.PageCount));
             }
 
-            _flow = null;
-            _definition = null;
-            _scenario = default;
-            _started = false;
+            _script = null;
 
             _interrupt.Reset();
             ScenarioEnemyHold.Release();
@@ -178,7 +198,7 @@ namespace Werewolf.Scenarios.Game
             => LocalPlayer.TryGetPosition(out position);
 
         private int ParticipantActor(int participantId)
-            => _definition != null ? _definition.Cast.ActorOf(participantId, _d.LocalActor) : 0;
+            => _script != null ? _script.Definition.Cast.ActorOf(participantId, _d.LocalActor) : 0;
 
         private bool TryBotActor(int participantId, out int actor)
         {

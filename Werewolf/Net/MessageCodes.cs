@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using Werewolf.Core;
 
@@ -97,7 +98,7 @@ namespace Werewolf.Net
         public static bool IsSecret(byte code) =>
             IsTargetOnly(code) || code == CastVote || code == RoleAction || code == BombDetonation;
 
-        public static Type[] Schema(byte code)
+        public static Type[]? Schema(byte code)
         {
             switch (code)
             {

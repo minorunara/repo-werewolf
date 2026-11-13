@@ -1,24 +1,18 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Werewolf.Core;
-using HarmonyLib;
 
 namespace Werewolf.Vanilla
 {
     internal static class EnemyMapIcons
     {
-        private static AccessTools.FieldRef<EnemyParent, Enemy> EnemyRef => GameRefs.EnemyParent_Enemy;
-        private static AccessTools.FieldRef<EnemyParent, bool> SpawnedRef => GameRefs.EnemyParent_Spawned;
-        private static AccessTools.FieldRef<Enemy, EnemyRigidbody> RigidbodyRef => GameRefs.Enemy_Rigidbody;
-        private static AccessTools.FieldRef<Enemy, bool> HasRigidbodyRef => GameRefs.Enemy_HasRigidbody;
-        private static AccessTools.FieldRef<MapCustom, MapCustomEntity> MapEntityRef => GameRefs.MapCustom_mapCustomEntity;
+        internal static Func<string, Texture2D?>? TextureResolver;
 
-        internal static Func<string, Texture2D> TextureResolver;
-
-        private static Sprite _spriteLevel1;
-        private static Sprite _spriteLevel2;
-        private static Sprite _spriteLevel3;
+        private static Sprite? _spriteLevel1;
+        private static Sprite? _spriteLevel2;
+        private static Sprite? _spriteLevel3;
 
         private static readonly List<MapCustom> _added = new List<MapCustom>();
         private static bool _active;
@@ -47,7 +41,7 @@ namespace Werewolf.Vanilla
             foreach (MapCustom custom in _added)
             {
                 if (custom == null) continue;
-                MapCustomEntity entity = MapEntityRef(custom);
+                MapCustomEntity entity = custom.mapCustomEntity;
                 if (entity == null || entity.spriteRenderer == null) continue;
                 SpriteRenderer renderer = entity.spriteRenderer;
                 Vector3 local = renderer.transform.localPosition;
@@ -71,7 +65,7 @@ namespace Werewolf.Vanilla
 
         internal static void OnDespawn(EnemyParent parent)
         {
-            Enemy enemy = EnemyRef(parent);
+            Enemy enemy = parent.Enemy;
             if (enemy == null) return;
             MapCustom custom = ResolveIconObject(enemy).GetComponent<MapCustom>();
             if (custom == null) return;
@@ -97,9 +91,9 @@ namespace Werewolf.Vanilla
         private static void AttachAll()
         {
             int count = 0;
-            foreach (EnemyParent parent in UnityEngine.Object.FindObjectsOfType<EnemyParent>())
+            foreach (EnemyParent parent in UnityEngine.Object.FindObjectsByType<EnemyParent>(FindObjectsSortMode.None))
             {
-                if (!SpawnedRef(parent)) continue;
+                if (!parent.Spawned) continue;
                 if (Attach(parent)) count++;
             }
             WLog.Line("enemy_map_on", secret: true, ("icons", count));
@@ -107,7 +101,7 @@ namespace Werewolf.Vanilla
 
         private static bool Attach(EnemyParent parent)
         {
-            Enemy enemy = EnemyRef(parent);
+            Enemy enemy = parent.Enemy;
             if (enemy == null) return false;
 
             GameObject target = ResolveIconObject(enemy);
@@ -124,13 +118,13 @@ namespace Werewolf.Vanilla
 
         private static GameObject ResolveIconObject(Enemy enemy)
         {
-            EnemyRigidbody rigidbody = HasRigidbodyRef(enemy) ? RigidbodyRef(enemy) : null;
+            EnemyRigidbody? rigidbody = enemy.HasRigidbody ? enemy.Rigidbody : null;
             return rigidbody != null ? rigidbody.gameObject : enemy.gameObject;
         }
 
         private static void DestroyIcon(MapCustom custom)
         {
-            MapCustomEntity entity = MapEntityRef(custom);
+            MapCustomEntity entity = custom.mapCustomEntity;
             if (entity != null)
             {
                 UnityEngine.Object.Destroy(entity.gameObject);
@@ -143,9 +137,9 @@ namespace Werewolf.Vanilla
             EnsureSprites();
             switch (difficulty)
             {
-                case EnemyParent.Difficulty.Difficulty2: return _spriteLevel2;
-                case EnemyParent.Difficulty.Difficulty3: return _spriteLevel3;
-                default: return _spriteLevel1;
+                case EnemyParent.Difficulty.Difficulty2: return _spriteLevel2!;
+                case EnemyParent.Difficulty.Difficulty3: return _spriteLevel3!;
+                default: return _spriteLevel1!;
             }
         }
 
@@ -166,9 +160,9 @@ namespace Werewolf.Vanilla
             _spriteLevel3 = CreateMonsterSprite("map_enemy_level3") ?? CreateTriangleSprite();
         }
 
-        private static Sprite CreateMonsterSprite(string assetKey)
+        private static Sprite? CreateMonsterSprite(string assetKey)
         {
-            Texture2D texture = TextureResolver != null ? TextureResolver(assetKey) : null;
+            Texture2D? texture = TextureResolver != null ? TextureResolver(assetKey) : null;
             if (texture == null) return null;
             return Sprite.Create(texture,
                 new Rect(0f, 0f, texture.width, texture.height),

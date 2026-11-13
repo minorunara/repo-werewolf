@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections;
 using System.Globalization;
@@ -16,10 +17,10 @@ namespace Werewolf.Core
     {
         public const string Prefix = "[WW]";
 
-        public static Action<string, bool> Sink;
+        public static Action<string, bool>? Sink;
 
-        public static void Event(string dir, int code, string target, object[] payload,
-            bool secret = false, int[] targetActors = null, int? transitMs = null)
+        public static void Event(string dir, int code, string target, object[]? payload,
+            bool secret = false, int[]? targetActors = null, int? transitMs = null)
         {
             if (Sink == null) return;
 
@@ -56,7 +57,7 @@ namespace Werewolf.Core
             Emit(sb, secret: false);
         }
 
-        public static void Line(string kind, bool secret, params (string Key, object Value)[] fields)
+        public static void Line(string kind, bool secret, params (string Key, object? Value)[]? fields)
         {
             if (Sink == null) return;
 
@@ -74,7 +75,20 @@ namespace Werewolf.Core
             Emit(sb, secret);
         }
 
-        internal static WLogLevel LevelOf(string line)
+        public static void Exception(string kind, Exception? error, bool secret = false,
+            params (string Key, object? Value)[] context)
+        {
+            int contextCount = context?.Length ?? 0;
+            var fields = new (string Key, object? Value)[contextCount + 3];
+            if (contextCount > 0) Array.Copy(context!, fields, contextCount);
+
+            fields[contextCount] = ("type", error?.GetType().FullName ?? "");
+            fields[contextCount + 1] = ("err", EscapeSingleLine(error?.Message));
+            fields[contextCount + 2] = ("stack", EscapeSingleLine(error?.StackTrace));
+            Line(kind, secret, fields);
+        }
+
+        internal static WLogLevel LevelOf(string? line)
         {
             string kind = KindOf(line);
 
@@ -85,14 +99,13 @@ namespace Werewolf.Core
                 || kind.EndsWith("_failed", StringComparison.Ordinal)
                 || kind.EndsWith("_fail", StringComparison.Ordinal)
                 || kind.EndsWith("_invalid", StringComparison.Ordinal)
-                || kind == "game_refs_disabled"
                 || kind == "harmony_disabled")
                 return WLogLevel.Error;
 
             return WLogLevel.Debug;
         }
 
-        internal static string KindOf(string line)
+        internal static string KindOf(string? line)
         {
             if (string.IsNullOrEmpty(line) || !line.StartsWith(Prefix, StringComparison.Ordinal))
                 return "unknown";
@@ -118,7 +131,16 @@ namespace Werewolf.Core
             }
         }
 
-        private static void AppendValue(StringBuilder sb, object value)
+        private static string EscapeSingleLine(string? value)
+        {
+            if (string.IsNullOrEmpty(value)) return "";
+            return value.Replace("\\", "\\\\")
+                .Replace("\r", "\\r")
+                .Replace("\n", "\\n")
+                .Replace("\t", "\\t");
+        }
+
+        private static void AppendValue(StringBuilder sb, object? value)
         {
             switch (value)
             {
@@ -144,7 +166,7 @@ namespace Werewolf.Core
                 case IEnumerable items:
                     sb.Append('[');
                     bool first = true;
-                    foreach (object item in items)
+                    foreach (object? item in items)
                     {
                         if (!first) sb.Append(',');
                         first = false;

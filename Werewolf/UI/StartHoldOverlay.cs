@@ -1,3 +1,4 @@
+#nullable enable
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -14,64 +15,116 @@ namespace Werewolf.UI
 
         private const float FadeOutPerSec = 1.25f;
 
-        private GameObject _root;
-        private CanvasGroup _group;
+        private sealed class ViewRefs
+        {
+            public ViewRefs(GameObject root, CanvasGroup group, TextMeshProUGUI messageText)
+            {
+                Root = root;
+                Group = group;
+                MessageText = messageText;
+            }
 
-        public bool Exists => _root != null;
+            public GameObject Root { get; }
+            public CanvasGroup Group { get; }
+            public TextMeshProUGUI MessageText { get; }
+        }
 
-        public bool Visible => _root != null && _root.activeSelf;
+        private ViewRefs? _view;
+        private readonly TextRefresh _textRefresh = new TextRefresh(nameof(StartHoldOverlay));
+
+        public bool Exists => GetLiveViewOrNull() != null;
+
+        public bool Visible
+        {
+            get
+            {
+                ViewRefs? view = GetLiveViewOrNull();
+                return view != null && view.Root.activeSelf;
+            }
+        }
 
         public void Build(Transform layerRoot)
         {
-            if (_root != null || layerRoot == null) return;
+            if (GetLiveViewOrNull() != null || layerRoot == null) return;
 
-            if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
+            GameObject? root = null;
+            try
+            {
+                if (!layerRoot.gameObject.activeSelf) layerRoot.gameObject.SetActive(true);
 
-            RectTransform rect = UiKit.CreateStretched(layerRoot, "WW_StartHold");
-            var go = rect.gameObject;
-            _root = go;
+                RectTransform rect = UiKit.CreateStretched(layerRoot, "WW_StartHold");
+                root = rect.gameObject;
 
-            _group = go.AddComponent<CanvasGroup>();
-            _group.alpha = 0f;
-            _group.blocksRaycasts = false;
-            _group.interactable = false;
+                CanvasGroup group = root.AddComponent<CanvasGroup>();
+                group.alpha = 0f;
+                group.blocksRaycasts = false;
+                group.interactable = false;
 
-            UiKit.CreateBackdrop(rect, "Backdrop", new Color(0f, 0f, 0f, BackdropAlpha));
+                UiKit.CreateBackdrop(rect, "Backdrop", new Color(0f, 0f, 0f, BackdropAlpha));
 
-            UiKit.CreateText(rect, "Message", new Vector2(0f, 0f), new Vector2(1600f, 100f),
-                Texts.Get(TextId.StartHoldWaitingOthers), 44f, Color.white, TextAlignmentOptions.Center);
+                TextMeshProUGUI messageText = UiKit.CreateText(rect, "Message", new Vector2(0f, 0f), new Vector2(1600f, 100f),
+                    Texts.Get(TextId.StartHoldWaitingOthers), 44f, Color.white, TextAlignmentOptions.Center);
 
-            _root.SetActive(false);
+                root.SetActive(false);
+                _view = new ViewRefs(root, group, messageText);
+                _textRefresh.Subscribe(() => Exists, ApplyTexts);
+            }
+            catch
+            {
+                _view = null;
+                if (root != null)
+                {
+                    root.SetActive(false);
+                    Object.Destroy(root);
+                }
+                throw;
+            }
         }
 
         public void Tick(bool holding)
         {
-            if (_root == null) return;
+            ViewRefs? view = GetLiveViewOrNull();
+            if (view == null) return;
 
             if (holding)
             {
-                if (!_root.activeSelf) _root.SetActive(true);
-                _group.alpha = 1f;
+                if (!view.Root.activeSelf) view.Root.SetActive(true);
+                view.Group.alpha = 1f;
                 return;
             }
 
-            if (!_root.activeSelf) return;
-            _group.alpha -= FadeOutPerSec * Time.unscaledDeltaTime;
-            if (_group.alpha <= 0f)
+            if (!view.Root.activeSelf) return;
+            view.Group.alpha -= FadeOutPerSec * Time.unscaledDeltaTime;
+            if (view.Group.alpha <= 0f)
             {
-                _group.alpha = 0f;
-                _root.SetActive(false);
+                view.Group.alpha = 0f;
+                view.Root.SetActive(false);
             }
+        }
+
+        private ViewRefs? GetLiveViewOrNull()
+        {
+            ViewRefs? view = _view;
+            if (view == null) return null;
+            if (view.Root != null) return view;
+
+            _view = null;
+            return null;
+        }
+
+        private void ApplyTexts()
+        {
+            ViewRefs? view = _view;
+            if (view != null && view.MessageText != null)
+                view.MessageText.text = Texts.Get(TextId.StartHoldWaitingOthers);
         }
 
         public void Destroy()
         {
-            if (_root != null)
-            {
-                Object.Destroy(_root);
-                _root = null;
-            }
-            _group = null;
+            _textRefresh.Unsubscribe();
+            ViewRefs? view = _view;
+            _view = null;
+            if (view != null && view.Root != null) Object.Destroy(view.Root);
         }
     }
 }

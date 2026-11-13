@@ -1,3 +1,4 @@
+#nullable enable
 namespace Werewolf.Vanilla
 {
     internal static class Session
@@ -6,7 +7,7 @@ namespace Werewolf.Vanilla
 
         public static bool IsMultiplayer => SemiFunc.IsMultiplayer();
 
-        public static string RoomId => Photon.Pun.PhotonNetwork.CurrentRoom?.Name;
+        public static string? RoomId => Photon.Pun.PhotonNetwork.CurrentRoom?.Name;
 
         public static bool IsRoleUnsettled
             => Photon.Pun.PhotonNetwork.InRoom && !SemiFunc.IsMultiplayer();
@@ -67,8 +68,8 @@ namespace Werewolf.Vanilla
         {
             seconds = float.MaxValue;
             RunManager rm = RunManager.instance;
-            if (rm == null || GameRefs.RunManager_cosmeticWorldObjectCooldown == null) return false;
-            seconds = GameRefs.RunManager_cosmeticWorldObjectCooldown(rm);
+            if (rm == null) return false;
+            seconds = rm.cosmeticWorldObjectCooldown;
             return true;
         }
     }

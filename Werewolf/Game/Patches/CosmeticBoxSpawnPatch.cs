@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
@@ -9,9 +10,6 @@ namespace Werewolf.Game.Patches
         internal static bool Armed;
 
         private static bool _blockLogged;
-
-        private static AccessTools.FieldRef<RunManager, bool> RestartingRef =>
-            GameRefs.RunManager_restarting;
 
         private static bool IsRunLevelTransition(RunManager run, RunManager.ChangeLevelType changeLevelType)
         {
@@ -34,7 +32,7 @@ namespace Werewolf.Game.Patches
         internal static void ReevaluateGate(RunManager run, RunManager.ChangeLevelType changeLevelType)
         {
             if (run == null) return;
-            if (RestartingRef != null && RestartingRef(run)) return;
+            if (run.restarting) return;
             if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
             if (!IsRunLevelTransition(run, changeLevelType)) return;
 
@@ -61,7 +59,7 @@ namespace Werewolf.Game.Patches
         }
     }
 
-    [HarmonyPatch(typeof(ValuableDirector), "SpawnCosmeticWorldObject")]
+    [HarmonyPatch(typeof(ValuableDirector), nameof(ValuableDirector.SpawnCosmeticWorldObject))]
     internal static class CosmeticBoxSkipPatch
     {
         private static bool Prefix()

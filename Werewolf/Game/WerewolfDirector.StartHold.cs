@@ -17,7 +17,7 @@ namespace Werewolf.Game
         {
             if (ScenarioRun.Active) return true;
             if (Session.IsHost) return LiveConfig.WerewolfModeEnabled();
-            return _lobbySettingsFeature.PanelModeEnabled;
+            return Runtime.LobbySettingsFeature.PanelModeEnabled;
         }
 
         private void TickStartHold()
@@ -32,7 +32,7 @@ namespace Werewolf.Game
 
             if (before != StartHoldPhase.Holding && _startHold.Phase == StartHoldPhase.Holding)
             {
-                if (_uiManager.EnsureCreated(gameObject)) EnsurePanelBuilt(_startHoldOverlay);
+                if (Runtime.UiManager.EnsureCreated(gameObject)) EnsurePanelBuilt(_startHoldOverlay);
             }
 
             if (freeze)

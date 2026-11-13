@@ -1,10 +1,11 @@
+#nullable enable
 namespace Werewolf.Core
 {
     public static class RoleRevealStartGate
     {
         public static bool IsReady(
             Role? localRole,
-            int[] knownWerewolves,
+            int[]? knownWerewolves,
             int werewolfCount,
             GamePhase phase,
             long revealStartUnixMs,

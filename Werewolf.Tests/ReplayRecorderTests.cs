@@ -36,6 +36,40 @@ namespace Werewolf.Tests
             => new ReplayEntitySample(ReplayEntityKind.Corpse, actor, x, 0f, 0f);
 
         [Fact]
+        public void CollectionMethods_RejectMissingRequiredInputs()
+        {
+            var rec = new ReplayRecorder();
+
+            #nullable enable
+            var headerError = Assert.Throws<ArgumentNullException>(() =>
+                rec.BeginSegment(null!, 0.0));
+            var sampleError = Assert.Throws<ArgumentNullException>(() => rec.Sample(0.0, null!));
+            var haulError = Assert.Throws<ArgumentNullException>(() => rec.NoteHaulIds(0.0, null!));
+            var eventNameError = Assert.Throws<ArgumentNullException>(() =>
+                rec.NoteEvent(0.0, null!));
+            var eventFieldsError = Assert.Throws<ArgumentNullException>(() =>
+                rec.NoteEvent(0.0, "event", null!));
+            var trackError = Assert.Throws<ArgumentNullException>(() =>
+                rec.OpenSegmentPlayerTrackInto(1, null!));
+            var queryNameError = Assert.Throws<ArgumentNullException>(() =>
+                rec.OpenSegmentEventTimesInto(null!, new List<double>()));
+            var eventError = Assert.Throws<ArgumentNullException>(() =>
+                rec.OpenSegmentEventTimesInto("meet_warp", null!));
+            var imageError = Assert.Throws<ArgumentNullException>(() => rec.AttachMapImage(null!));
+            #nullable restore
+
+            Assert.Equal("header", headerError.ParamName);
+            Assert.Equal("states", sampleError.ParamName);
+            Assert.Equal("ids", haulError.ParamName);
+            Assert.Equal("name", eventNameError.ParamName);
+            Assert.Equal("fields", eventFieldsError.ParamName);
+            Assert.Equal("into", trackError.ParamName);
+            Assert.Equal("name", queryNameError.ParamName);
+            Assert.Equal("into", eventError.ParamName);
+            Assert.Equal("image", imageError.ParamName);
+        }
+
+        [Fact]
         public void ShouldSample_FirstImmediately_ThenGatedByInterval()
         {
             var rec = new ReplayRecorder();

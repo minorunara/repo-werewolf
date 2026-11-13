@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -38,7 +39,7 @@ namespace Werewolf.Game
         private int _chatMeetingNumber;
 
         private long _chatDebugDueUnixMs = -1;
-        private string _chatDebugPendingText;
+        private string? _chatDebugPendingText;
 
         private bool _inputGateProbe;
         private bool _inputGateLastFree;
@@ -105,13 +106,13 @@ namespace Werewolf.Game
             _chatRecapBeaconUses = uses;
         }
 
-        internal void SetRecapDeaths(IReadOnlyList<string> labels)
+        internal void SetRecapDeaths(IReadOnlyList<string>? labels)
         {
             _chatRecapDeaths.Clear();
             if (labels != null) _chatRecapDeaths.AddRange(labels);
         }
 
-        internal void PostMeetingOpening(List<List<int>> lastGroups)
+        internal void PostMeetingOpening(List<List<int>>? lastGroups)
         {
             int lostSince = ConsumeRecapLostDelta();
             _chatMeetingNumber++;
@@ -121,21 +122,21 @@ namespace Werewolf.Game
 
         private int ConsumeRecapLostDelta()
         {
-            MeetingGaugeSnapshot gauge = _d.RolesClient != null ? _d.RolesClient.MeetingGauge : null;
+            MeetingGaugeSnapshot? gauge = _d.RolesClient != null ? _d.RolesClient.MeetingGauge : null;
             int total = gauge != null ? gauge.LostDollars : MeetingRecap.Unknown;
             int delta = MeetingRecap.LostSince(total, _chatRecapLostBaseline);
             if (total >= 0) _chatRecapLostBaseline = total;
             return delta;
         }
 
-        private void PostMeetingChatSystemLines(List<List<int>> lastGroups, int lostSince, int meetingNumber)
+        private void PostMeetingChatSystemLines(List<List<int>>? lastGroups, int lostSince, int meetingNumber)
         {
             try
             {
                 string speaker = Texts.Get(TextId.ChatLogSystemName);
                 bool emoji = EmojiSprites.Ready && EmojiSprites.VanillaReady;
                 string face = _chatRecapDeaths.Count > 0 ? ChatEmoji.RecapFaceDeaths : ChatEmoji.RecapFaceNoDeaths;
-                MeetingGaugeSnapshot gauge = _d.RolesClient != null ? _d.RolesClient.MeetingGauge : null;
+                MeetingGaugeSnapshot? gauge = _d.RolesClient != null ? _d.RolesClient.MeetingGauge : null;
                 var recap = new MeetingRecapData(
                     _chatRecapDeaths,
                     lostSince,
@@ -273,7 +274,7 @@ namespace Werewolf.Game
             return _chatPanel.TryGetRecapLineScreenRect(lineIndex, out rect);
         }
 
-        internal bool PostScenarioChat(int actor, string name, string text)
+        internal bool PostScenarioChat(int actor, string? name, string text)
             => DebugInjectChatCore(actor, name, text, playSfx: true, recordReplay: true,
                 logKey: "scenario_chat", logSuccess: false);
 
@@ -400,11 +401,11 @@ namespace Werewolf.Game
                 ("actor", actor), ("id", stampId), ("added", added));
         }
 
-        internal bool DebugInjectChat(int actor, string name, string text)
+        internal bool DebugInjectChat(int actor, string? name, string text)
             => DebugInjectChatCore(actor, name, text, playSfx: true, recordReplay: true);
 
         private bool DebugInjectChatCore(
-            int actor, string name, string text, bool playSfx, bool recordReplay,
+            int actor, string? name, string text, bool playSfx, bool recordReplay,
             string logKey = "chat_debug_inject", bool logSuccess = true)
         {
             if (!IsWindowOpen)
@@ -493,7 +494,7 @@ namespace Werewolf.Game
         private int[] BuildDebugSpeakerActors()
         {
             var list = new List<int> { _d.LocalActor };
-            IReadOnlyList<WPlayer> players = _d.HostSessionPlayers;
+            IReadOnlyList<WPlayer>? players = _d.HostSessionPlayers;
             if (players != null)
             {
                 foreach (WPlayer p in players)
@@ -571,7 +572,7 @@ namespace Werewolf.Game
             if (_chatDebugDueUnixMs >= 0 && now >= _chatDebugDueUnixMs)
             {
                 long due = _chatDebugDueUnixMs;
-                string text = _chatDebugPendingText;
+                string text = _chatDebugPendingText ?? string.Empty;
                 _chatDebugDueUnixMs = -1;
                 _chatDebugPendingText = null;
                 bool logged = DebugInjectChat(_d.LocalActor, null, text);
@@ -594,7 +595,7 @@ namespace Werewolf.Game
             int[] speakers = BuildDebugSpeakerActors();
             for (int i = 0; i < DebugChatAuto.MaxPostsPerFrame; i++)
             {
-                if (!_chatAuto.TryTakeDue(now, speakers.Length, out int slot, out string text)) break;
+                if (!_chatAuto.TryTakeDue(now, speakers.Length, out int slot, out string? text)) break;
                 DebugInjectChatCore(speakers[slot], null, text, playSfx: true, recordReplay: true);
             }
 

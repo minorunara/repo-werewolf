@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -52,7 +53,7 @@ namespace Werewolf.Core.Replay
         public int Actor;
         public string Text = "";
         public string Line1 = "";
-        public string Line2;
+        public string? Line2;
         public int DisplayChars;
 
         public int Slot;
@@ -100,7 +101,7 @@ namespace Werewolf.Core.Replay
 
         private readonly IReadOnlyList<(double T, int Actor, string Text)> _chats;
         private readonly IReadOnlyList<(double T, int ExecutedActor)> _results;
-        private readonly ReplayPace _pace;
+        private readonly ReplayPace? _pace;
         private readonly ReplayGameOver? _gameOver;
         private readonly List<ReplayDanmakuComment> _active = new List<ReplayDanmakuComment>();
 
@@ -112,9 +113,9 @@ namespace Werewolf.Core.Replay
         private double _stampElapsed;
 
         public ReplayDanmaku(
-            IReadOnlyList<(double T, int Actor, string Text)> chats,
-            IReadOnlyList<(double T, int ExecutedActor)> results,
-            ReplayPace pace,
+            IReadOnlyList<(double T, int Actor, string Text)>? chats,
+            IReadOnlyList<(double T, int ExecutedActor)>? results,
+            ReplayPace? pace,
             ReplayGameOver? gameOver = null)
         {
             _chats = chats ?? Array.Empty<(double, int, string)>();
@@ -134,7 +135,11 @@ namespace Werewolf.Core.Replay
             }
             if (_stampIsWin)
             {
-                ReplayGameOver go = _gameOver.Value;
+                if (_gameOver is not ReplayGameOver go)
+                {
+                    stamp = default;
+                    return false;
+                }
                 stamp = new ReplayStamp(ReplayStampKind.Win, 0, go.Team, go.Reason, 0);
                 return true;
             }
@@ -146,6 +151,7 @@ namespace Werewolf.Core.Replay
         public void Step(double prevT, double newT, double dtRealPlaying,
             Func<ReplayDanmakuComment, double> measureWidth)
         {
+            if (measureWidth == null) throw new ArgumentNullException(nameof(measureWidth));
             if (newT < prevT)
             {
                 ClearActive();
@@ -221,6 +227,7 @@ namespace Werewolf.Core.Replay
 
         public void RebuildAtSeek(double t, bool fast, Func<ReplayDanmakuComment, double> measureWidth)
         {
+            if (measureWidth == null) throw new ArgumentNullException(nameof(measureWidth));
             ClearActive();
             _chatCursor = ReplayPlayback.LastIndexAtOrBefore(CollectChatTimes(), t) + 1;
             _resultCursor = 0;
@@ -275,7 +282,11 @@ namespace Werewolf.Core.Replay
 
         public ReplayDanmakuComment SpawnAdHoc(int actor, string text,
             Func<ReplayDanmakuComment, double> measureWidth)
-            => Spawn(0, actor, text, elapsed: 0, measureWidth);
+        {
+            if (text == null) throw new ArgumentNullException(nameof(text));
+            if (measureWidth == null) throw new ArgumentNullException(nameof(measureWidth));
+            return Spawn(0, actor, text, elapsed: 0, measureWidth);
+        }
 
         public static double FontScaleFor(ReplayDanmakuComment c)
         {
@@ -588,6 +599,7 @@ namespace Werewolf.Core.Replay
 
         public static ReplayDanmakuProfile ProfileForClaim(string text, int displayChars)
         {
+            if (text == null) throw new ArgumentNullException(nameof(text));
             if (displayChars >= 31) return ReplayDanmakuProfile.Cool;
             if ((displayChars > 0 && displayChars <= 8) || EndsWithImpactMark(text))
                 return ReplayDanmakuProfile.Impact;
@@ -616,7 +628,7 @@ namespace Werewolf.Core.Replay
         private ReplayDanmakuComment Spawn(double spawnT, int actor, string text, double elapsed,
             Func<ReplayDanmakuComment, double> measureWidth)
         {
-            (string line1, string line2) = ReplayChatText.Wrap(text ?? "");
+            (string line1, string? line2) = ReplayChatText.Wrap(text ?? "");
             var c = new ReplayDanmakuComment
             {
                 Actor = actor,
@@ -726,7 +738,7 @@ namespace Werewolf.Core.Replay
             unchecked { return (hash ^ value) * 16777619u; }
         }
 
-        private List<double> _chatTimesCache;
+        private List<double>? _chatTimesCache;
 
         private List<double> CollectChatTimes()
         {

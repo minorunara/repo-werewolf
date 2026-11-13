@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
@@ -5,7 +6,7 @@ using Werewolf.Vanilla;
 
 namespace Werewolf.Game.Patches
 {
-    [HarmonyPatch(typeof(RoundDirector), "StartRoundLogic")]
+    [HarmonyPatch(typeof(RoundDirector), nameof(RoundDirector.StartRoundLogic))]
     internal static class HaulGoalPatch
     {
         private static void Postfix(RoundDirector __instance)

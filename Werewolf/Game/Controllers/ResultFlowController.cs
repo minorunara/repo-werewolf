@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -26,9 +27,9 @@ namespace Werewolf.Game
 
         private readonly ResultDigest _matchDigest = new ResultDigest();
 
-        private IReadOnlyList<DigestEntry> _clientDigestEntries;
+        private IReadOnlyList<DigestEntry>? _clientDigestEntries;
 
-        private Dictionary<int, Role> _resultRolesByActor;
+        private Dictionary<int, Role>? _resultRolesByActor;
 
         private readonly ResultReturnButtonFlow _resultReturnFlow = new ResultReturnButtonFlow();
 
@@ -39,7 +40,7 @@ namespace Werewolf.Game
             _d = director;
         }
 
-        internal IReadOnlyList<DigestEntry> ClientDigestEntries => _clientDigestEntries;
+        internal IReadOnlyList<DigestEntry>? ClientDigestEntries => _clientDigestEntries;
 
         internal int MatchWinReason()
         {
@@ -51,7 +52,7 @@ namespace Werewolf.Game
         {
             try
             {
-                if (msg == null || msg.Target != MessageTarget.All) return;
+                if (msg == null || msg.Destination is not MessageDestination.AllDestination) return;
                 _matchDigest.Observe(msg.Code, msg.Payload, SessionClock.NowMs(), _d.HostSession?.Winner);
                 if (msg.Code == WWEventCodes.GameOver && _d.ClientBus != null)
                 {
@@ -111,9 +112,10 @@ namespace Werewolf.Game
 
         private void SendReplayLossLedger()
         {
-            object[] wire = ReplaySampler.BuildLossLedgerWire();
-            if (wire == null) return;
-            _d.ClientBus.SendToAll(MessageCodes.ReplayLossLedger, wire);
+            object[]? wire = ReplaySampler.BuildLossLedgerWire();
+            INetBus? bus = _d.ClientBus;
+            if (wire == null || bus == null) return;
+            bus.SendToAll(MessageCodes.ReplayLossLedger, wire);
             WLog.Line("replay_ledger_sent", secret: false,
                 ("segments", (int)wire[0]), ("entries", ((int[])wire[1]).Length));
         }
@@ -235,7 +237,7 @@ namespace Werewolf.Game
             _d.EnsurePanelBuilt(_voidMatchPanel);
             if (!_voidMatchPanel.Exists) return;
 
-            GameSession session = _d.HostSession;
+            GameSession? session = _d.HostSession;
             bool available =
                 Session.IsHost
                 && session != null
@@ -246,7 +248,7 @@ namespace Werewolf.Game
             KeyCode key = Plugin.VoidMatchKey != null ? Plugin.VoidMatchKey.Value : KeyCode.F5;
             bool held = available && key != KeyCode.None && Input.GetKey(key);
 
-            bool cancel = _voidMatchHold.Armed && MenuKeyDownSafe();
+            bool cancel = _voidMatchHold.Armed && BackKeyDownSafe();
             if (_voidMatchHold.Armed) SuppressEscMenu();
 
             VoidMatchHoldEvent result =
@@ -255,12 +257,14 @@ namespace Werewolf.Game
             switch (result)
             {
                 case VoidMatchHoldEvent.Armed:
+                    if (session == null) break;
                     WLog.Line("void_match_armed", secret: false, ("phase", session.Phase));
                     break;
                 case VoidMatchHoldEvent.Cancelled:
                     WLog.Line("void_match_cancelled", secret: false);
                     break;
                 case VoidMatchHoldEvent.Confirmed:
+                    if (session == null) break;
                     WLog.Line("void_match_confirmed", secret: false, ("phase", session.Phase));
                     session.VoidMatch(nowUnixMs);
                     _voidMatchHold.Reset();
@@ -285,7 +289,7 @@ namespace Werewolf.Game
         }
 
         private static bool _escSuppressErrorLogged;
-        private static bool _menuKeyErrorLogged;
+        private static bool _backKeyErrorLogged;
         private static bool _textInputErrorLogged;
 
         private static void SuppressEscMenu()
@@ -302,17 +306,17 @@ namespace Werewolf.Game
             }
         }
 
-        private static bool MenuKeyDownSafe()
+        private static bool BackKeyDownSafe()
         {
             try
             {
-                return Inputs.Down(GameKey.Menu);
+                return Inputs.Down(GameKey.Back);
             }
             catch (Exception e)
             {
-                if (!_menuKeyErrorLogged)
+                if (!_backKeyErrorLogged)
                 {
-                    _menuKeyErrorLogged = true;
+                    _backKeyErrorLogged = true;
                     WLog.Line("result_menu_key_error", secret: false, ("err", e.Message));
                 }
                 return false;
@@ -355,8 +359,9 @@ namespace Werewolf.Game
         {
             if (Session.IsHost)
             {
+                GameConfig? hostConfig = _d.HostRoundConfig;
                 _roundGameOverAutoReturnSec = Math.Max(0,
-                    Plugin.GameConfig != null ? Plugin.GameConfig.GameOverAutoReturnSec : 0);
+                    hostConfig != null ? hostConfig.GameOverAutoReturnSec : 0);
                 return;
             }
 
@@ -367,9 +372,10 @@ namespace Werewolf.Game
             _roundGameOverAutoReturnSec = Math.Max(0, seconds);
         }
 
-        internal void FreezeAutoReturnForHost()
+        internal void FreezeAutoReturnForHost(GameConfig config)
         {
-            _roundGameOverAutoReturnSec = Math.Max(0, Plugin.GameConfig.GameOverAutoReturnSec);
+            if (config == null) throw new ArgumentNullException(nameof(config));
+            _roundGameOverAutoReturnSec = Math.Max(0, config.GameOverAutoReturnSec);
         }
 
         internal int RoundGameOverAutoReturnSec => _roundGameOverAutoReturnSec;

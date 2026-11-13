@@ -1,3 +1,4 @@
+#nullable enable
 using HarmonyLib;
 using Werewolf.Core;
 using Werewolf.Game;

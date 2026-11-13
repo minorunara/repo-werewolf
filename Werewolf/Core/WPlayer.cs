@@ -1,3 +1,4 @@
+#nullable enable
 namespace Werewolf.Core
 {
     public enum DeathCause : byte
@@ -13,9 +14,9 @@ namespace Werewolf.Core
 
         public int ActorNumber;
 
-        public string Name;
+        public string Name = string.Empty;
 
-        public string SteamId;
+        public string? SteamId;
 
         public bool IsBot;
 

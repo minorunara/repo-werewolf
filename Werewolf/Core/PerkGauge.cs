@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -82,7 +83,7 @@ namespace Werewolf.Core
             }
 
             float pct = _lostDollars / BaseDollars * 100f;
-            List<GaugeEvent> events = null;
+            List<GaugeEvent>? events = null;
 
             TryUnlock(ref events, pct, _config.StaminaUnlockPct, PerkId.InfiniteStamina);
             TryUnlock(ref events, pct, _config.JumpUnlockPct, PerkId.InfiniteJump);
@@ -131,7 +132,7 @@ namespace Werewolf.Core
             return true;
         }
 
-        private void TryUnlock(ref List<GaugeEvent> events, float pct, int thresholdPct, PerkId perk)
+        private void TryUnlock(ref List<GaugeEvent>? events, float pct, int thresholdPct, PerkId perk)
         {
             if (PerkFlagsUtil.Has(_unlocked, perk)) return;
             if (pct < thresholdPct) return;

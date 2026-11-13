@@ -57,8 +57,9 @@ namespace Werewolf.Tests
             foreach (var m in sent)
             {
                 if (m.Code != WWRolesCodes.SyncPerkGauge) continue;
-                if (m.Target != MessageTarget.Actors || m.TargetActors == null) continue;
-                foreach (int a in m.TargetActors)
+                int[] targets = m.ActorTargetsOrNull();
+                if (targets == null) continue;
+                foreach (int a in targets)
                 {
                     if (a == actor) { count++; break; }
                 }
@@ -71,8 +72,9 @@ namespace Werewolf.Tests
             int[] meta = null;
             foreach (var m in sent)
             {
-                if (m.Code != WWRolesCodes.SyncPerkGauge || m.TargetActors == null) continue;
-                foreach (int a in m.TargetActors)
+                int[] targets = m.ActorTargetsOrNull();
+                if (m.Code != WWRolesCodes.SyncPerkGauge || targets == null) continue;
+                foreach (int a in targets)
                 {
                     if (a == actor) { meta = (int[])m.Payload[5]; break; }
                 }
@@ -163,9 +165,7 @@ namespace Werewolf.Tests
             foreach (var m in sent)
             {
                 if (m.Code != WWRolesCodes.SyncPerkGauge) continue;
-                Assert.Equal(MessageTarget.Actors, m.Target);
-                Assert.NotNull(m.TargetActors);
-                Assert.Single(m.TargetActors);
+                Assert.Single(Assert.IsType<MessageDestination.ActorsDestination>(m.Destination).Actors);
             }
         }
 

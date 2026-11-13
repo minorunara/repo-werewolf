@@ -1,11 +1,12 @@
+#nullable enable
 namespace Werewolf.Core
 {
     public sealed class SharedSettingsPublishPolicy
     {
-        private string _publishedRoomId;
-        private string _publishedBlob;
+        private string? _publishedRoomId;
+        private string? _publishedBlob;
 
-        public bool Claim(string roomId, string blob)
+        public bool Claim(string? roomId, string? blob)
         {
             if (string.IsNullOrEmpty(roomId) || string.IsNullOrEmpty(blob)) return false;
             bool sameRoom = string.Equals(roomId, _publishedRoomId, System.StringComparison.Ordinal);

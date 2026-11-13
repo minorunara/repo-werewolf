@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Werewolf.Core;
 using Xunit;
@@ -45,6 +46,24 @@ namespace Werewolf.Tests
                 if (p.ActorNumber == actor) { p.Alive = false; break; }
             }
             s.OnPlayerDied(actor);
+        }
+
+        [Fact]
+        public void Ctor_NullSession_ThrowsForSession()
+        {
+            var error = Assert.Throws<ArgumentNullException>(() =>
+                new BombSession(Cfg(), (GameSession)null, T0));
+
+            Assert.Equal("session", error.ParamName);
+        }
+
+        [Fact]
+        public void Ctor_NullRoster_ThrowsForPlayers()
+        {
+            var error = Assert.Throws<ArgumentNullException>(() =>
+                new BombSession(Cfg(), (IReadOnlyList<WPlayer>)null, T0));
+
+            Assert.Equal("players", error.ParamName);
         }
 
         [Fact]

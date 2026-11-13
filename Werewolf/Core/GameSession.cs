@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -64,17 +65,20 @@ namespace Werewolf.Core
         private readonly Dictionary<int, Role> _forcedRoles = new Dictionary<int, Role>();
         private readonly HashSet<int> _voteMarked = new HashSet<int>();
         private List<WPlayer> _players = new List<WPlayer>();
-        private WinResult _pendingWin;
+        private WinResult? _pendingWin;
         private bool _forcedPeaceful;
         private RoundTimer _timer = new RoundTimer();
-        private DisclosureManager _disclosures;
-        private GameConfig _config;
+        private DisclosureManager? _disclosures;
+        private GameConfig _config = null!;
+
+        private DisclosureManager Disclosures => _disclosures
+            ?? throw new InvalidOperationException("disclosures are unavailable outside an active session");
 
         public GamePhase Phase { get; private set; } = GamePhase.Lobby;
 
         public IReadOnlyList<WPlayer> Players => _players;
 
-        public WinResult Winner { get; private set; }
+        public WinResult? Winner { get; private set; }
 
         public bool Peaceful { get; private set; }
 
@@ -88,9 +92,9 @@ namespace Werewolf.Core
 
         public long RoleRevealEndUnixMs { get; private set; }
 
-        public event Action<OutboundMessage> OnSend;
+        public event Action<OutboundMessage>? OnSend;
 
-        public event Action<SessionEvent> OnSessionEvent;
+        public event Action<SessionEvent>? OnSessionEvent;
 
         public void ReserveForcedRole(int actorNumber, Role role)
         {
@@ -158,7 +162,7 @@ namespace Werewolf.Core
                 ? new DisclosureManager(_players, config.BlackCatRevealDelaySec)
                 : new DisclosureManager(_players, nowUnixMs, config.BlackCatRevealDelaySec);
 
-            foreach (var disclosure in _disclosures.IssueInitialDisclosures())
+            foreach (var disclosure in Disclosures.IssueInitialDisclosures())
             {
                 Send(ToMessage(disclosure));
             }
@@ -166,21 +170,19 @@ namespace Werewolf.Core
             RoundStartPublicData publicData = BuildRoundStartPublicData(assigned.WerewolfSlots);
             if (preplay)
             {
-                Send(new OutboundMessage(
+                Send(OutboundMessage.ToAll(
                     WWEventCodes.PreplayStart,
                     RoundStartWire.ToPreplay(
-                        publicData, RoleRevealStartUnixMs, RoleRevealEndUnixMs),
-                    MessageTarget.All, null));
+                        publicData, RoleRevealStartUnixMs, RoleRevealEndUnixMs)));
                 SetPhase(GamePhase.RoleReveal, "role_reveal", nowUnixMs);
             }
             else
             {
                 _timer.Start(nowUnixMs, config.RoundSeconds, config.TimeLimitDisabled);
                 StartUnixMs = nowUnixMs;
-                Send(new OutboundMessage(
+                Send(OutboundMessage.ToAll(
                     WWEventCodes.GameStart,
-                    RoundStartWire.ToGameStart(publicData, _timer.EndUnixMs),
-                    MessageTarget.All, null));
+                    RoundStartWire.ToGameStart(publicData, _timer.EndUnixMs)));
                 SetPhase(GamePhase.Play, "start", nowUnixMs);
             }
             return StartResult.Ok();
@@ -200,14 +202,13 @@ namespace Werewolf.Core
             long playStartUnixMs = nowUnixMs;
             _timer.Start(playStartUnixMs, _config.RoundSeconds, _config.TimeLimitDisabled);
             StartUnixMs = playStartUnixMs;
-            _disclosures.BeginPlay(playStartUnixMs);
+            Disclosures.BeginPlay(playStartUnixMs);
 
             int werewolfSlots = RoleAssigner.CorrectedWerewolfSlots(_config, _players.Count);
-            Send(new OutboundMessage(
+            Send(OutboundMessage.ToAll(
                 WWEventCodes.GameStart,
                 RoundStartWire.ToGameStart(
-                    BuildRoundStartPublicData(werewolfSlots), _timer.EndUnixMs),
-                MessageTarget.All, null));
+                    BuildRoundStartPublicData(werewolfSlots), _timer.EndUnixMs)));
 
             SetPhase(GamePhase.Play, "start", nowUnixMs);
             return BeginPlayResult.Started;
@@ -224,10 +225,9 @@ namespace Werewolf.Core
 
         private void AbortPreplay(PreplayAbortReason reason, long nowUnixMs)
         {
-            Send(new OutboundMessage(
+            Send(OutboundMessage.ToAll(
                 WWEventCodes.PreplayAborted,
-                new object[] { (byte)reason },
-                MessageTarget.All, null));
+                new object[] { (byte)reason }));
             SetPhase(GamePhase.PreplayAborted, "preplay_aborted", nowUnixMs);
 
             _players.Clear();
@@ -246,7 +246,7 @@ namespace Werewolf.Core
 
             if (Phase == GamePhase.Play)
             {
-                foreach (var disclosure in _disclosures.Tick(nowUnixMs))
+                foreach (var disclosure in Disclosures.Tick(nowUnixMs))
                 {
                     Send(ToMessage(disclosure));
                 }
@@ -255,7 +255,7 @@ namespace Werewolf.Core
             if (_timer.CheckExpiry(nowUnixMs))
             {
                 ConfirmWinner(
-                    WinJudge.Judge(_players, extractionCompleted: false, timerExpired: true, peaceful: Peaceful),
+                    WinJudge.Judge(_players, extractionCompleted: false, timerExpired: true, peaceful: Peaceful)!,
                     "timer_expired", nowUnixMs);
             }
         }
@@ -264,7 +264,7 @@ namespace Werewolf.Core
         {
             if (Winner != null || (Phase != GamePhase.Play && Phase != GamePhase.Meeting)) return false;
 
-            WPlayer player = null;
+            WPlayer? player = null;
             foreach (var candidate in _players)
             {
                 if (candidate.ActorNumber == actorNumber)
@@ -285,10 +285,9 @@ namespace Werewolf.Core
             player.Alive = false;
             player.DeathCause = cause;
 
-            Send(new OutboundMessage(
+            Send(OutboundMessage.ToAll(
                 WWEventCodes.PlayerDied,
-                new object[] { actorNumber, (byte)cause },
-                MessageTarget.All, null));
+                new object[] { actorNumber, (byte)cause }));
             OnSessionEvent?.Invoke(SessionEvent.ForPlayerDied(actorNumber, cause));
 
             if (_pendingWin != null) return true;
@@ -306,7 +305,7 @@ namespace Werewolf.Core
             if (Winner != null || (Phase != GamePhase.RoleReveal
                 && Phase != GamePhase.Play && Phase != GamePhase.Meeting)) return;
 
-            WPlayer player = null;
+            WPlayer? player = null;
             foreach (var candidate in _players)
             {
                 if (candidate.ActorNumber == actorNumber)
@@ -338,11 +337,10 @@ namespace Werewolf.Core
                 ("team", result.WinningTeam), ("reason", result.Reason),
                 ("actor", decisive.ActorNumber), ("vanished", vanished));
 
-            Send(new OutboundMessage(
+            Send(OutboundMessage.ToAll(
                 WWEradicationCodes.EradicationReveal,
                 EradicationRevealWire.ToWire(
-                    decisive.ActorNumber, TeamCodes.Outcome(result), vanished, decisive.Name),
-                MessageTarget.All, null));
+                    decisive.ActorNumber, TeamCodes.Outcome(result), vanished, decisive.Name)));
             OnSessionEvent?.Invoke(
                 SessionEvent.ForWinLocked(result, decisive.ActorNumber, vanished));
         }
@@ -379,7 +377,7 @@ namespace Werewolf.Core
             if (completed)
             {
                 ConfirmWinner(
-                    WinJudge.Judge(_players, extractionCompleted: true, peaceful: Peaceful),
+                    WinJudge.Judge(_players, extractionCompleted: true, peaceful: Peaceful)!,
                     "extraction_completed", nowUnixMs);
             }
             else if (failed)
@@ -395,7 +393,7 @@ namespace Werewolf.Core
             if (Winner != null || (Phase != GamePhase.Play && Phase != GamePhase.Meeting)) return;
 
             var result = WinJudge.Judge(_players, extractionCompleted: true, peaceful: Peaceful);
-            ConfirmWinner(result, "mail_departure", nowUnixMs);
+            ConfirmWinner(result!, "mail_departure", nowUnixMs);
         }
 
         public void LockValueCheckmate()
@@ -423,7 +421,7 @@ namespace Werewolf.Core
         {
             if (Winner != null || (Phase != GamePhase.Play && Phase != GamePhase.Meeting)) return;
 
-            foreach (var disclosure in _disclosures.NotifyCondition(kind))
+            foreach (var disclosure in Disclosures.NotifyCondition(kind))
             {
                 Send(ToMessage(disclosure));
             }
@@ -474,10 +472,9 @@ namespace Werewolf.Core
                 roles[i] = (byte)_players[i].Role;
             }
 
-            Send(new OutboundMessage(
+            Send(OutboundMessage.ToAll(
                 WWEventCodes.GameOver,
-                new object[] { TeamCodes.VoidMatch, actors, roles },
-                MessageTarget.All, null));
+                new object[] { TeamCodes.VoidMatch, actors, roles }));
             OnSessionEvent?.Invoke(SessionEvent.ForMatchVoided());
 
             SetPhase(GamePhase.GameOver, "void_match", nowUnixMs);
@@ -514,10 +511,9 @@ namespace Werewolf.Core
                 roles[i] = (byte)_players[i].Role;
             }
 
-            Send(new OutboundMessage(
+            Send(OutboundMessage.ToAll(
                 WWEventCodes.GameOver,
-                new object[] { TeamCodes.Outcome(result), actors, roles },
-                MessageTarget.All, null));
+                new object[] { TeamCodes.Outcome(result), actors, roles }));
             OnSessionEvent?.Invoke(SessionEvent.ForWinnerConfirmed(result));
 
             SetPhase(GamePhase.GameOver, "win_" + reason, nowUnixMs);
@@ -529,10 +525,9 @@ namespace Werewolf.Core
             Phase = to;
             WLog.Phase(from, to, reason);
 
-            Send(new OutboundMessage(
+            Send(OutboundMessage.ToAll(
                 WWEventCodes.PhaseChanged,
-                new object[] { (byte)to, nowUnixMs, _timer.EndUnixMs },
-                MessageTarget.All, null));
+                new object[] { (byte)to, nowUnixMs, _timer.EndUnixMs }));
 
             OnSessionEvent?.Invoke(SessionEvent.ForPhaseChanged(to, _timer.EndUnixMs));
         }
@@ -542,27 +537,27 @@ namespace Werewolf.Core
             switch (disclosure.Type)
             {
                 case DisclosureType.RoleNotice:
-                    return new OutboundMessage(WWEventCodes.AssignRole,
+                    return OutboundMessage.ToActors(WWEventCodes.AssignRole,
                         new object[] { (byte)disclosure.ShownRole },
-                        MessageTarget.Actors, disclosure.TargetActors);
+                        disclosure.TargetActors);
 
                 case DisclosureType.SelfRoleReveal:
-                    return new OutboundMessage(WWEventCodes.RevealSelfRole,
+                    return OutboundMessage.ToActors(WWEventCodes.RevealSelfRole,
                         new object[] { (byte)disclosure.ShownRole },
-                        MessageTarget.Actors, disclosure.TargetActors);
+                        disclosure.TargetActors);
 
                 case DisclosureType.TeammatesReveal:
                 {
                     int[] actors = disclosure.WerewolfActors ?? System.Array.Empty<int>();
-                    byte[] roles = disclosure.WerewolfActorRoles;
+                    byte[]? roles = disclosure.WerewolfActorRoles;
                     if (roles == null || roles.Length != actors.Length)
                     {
                         roles = new byte[actors.Length];
                         for (int i = 0; i < roles.Length; i++) roles[i] = (byte)Role.Werewolf;
                     }
-                    return new OutboundMessage(WWEventCodes.RevealTeammates,
+                    return OutboundMessage.ToActors(WWEventCodes.RevealTeammates,
                         new object[] { actors, roles },
-                        MessageTarget.Actors, disclosure.TargetActors);
+                        disclosure.TargetActors);
                 }
 
                 default:

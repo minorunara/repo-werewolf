@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using HarmonyLib;
 using Werewolf.Core;
@@ -5,7 +6,7 @@ using Werewolf.Vanilla;
 
 namespace Werewolf.Game.Patches
 {
-    [HarmonyPatch(typeof(EnemyDirector), "AmountSetup")]
+    [HarmonyPatch(typeof(EnemyDirector), nameof(EnemyDirector.AmountSetup))]
     internal static class EnemySetPatch
     {
         private static void Prefix(EnemyDirector __instance)

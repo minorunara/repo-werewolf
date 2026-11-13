@@ -1,6 +1,6 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
-using HarmonyLib;
 using Photon.Voice.Unity;
 using UnityEngine;
 using Werewolf.Core;
@@ -9,15 +9,6 @@ namespace Werewolf.Vanilla
 {
     public sealed class VoiceMixerDriver
     {
-        private static AccessTools.FieldRef<PlayerAvatar, PlayerVoiceChat> s_voiceChatRef;
-
-        private static AccessTools.FieldRef<PlayerVoiceChat, AudioSource> s_audioSourceRef;
-
-        private static AccessTools.FieldRef<PlayerVoiceChat, Recorder> s_recorderRef;
-
-        private static AccessTools.FieldRef<RunManager, List<PlayerVoiceChat>> s_voiceChatsRef;
-        private static bool s_fieldRefResolved;
-
         private const float SpatialKeepAliveSeconds = 0.1f;
 
         private const float DeadCueMuteKeepAliveSeconds = 0.1f;
@@ -49,7 +40,7 @@ namespace Werewolf.Vanilla
 
         private FilterSet _debugSelfEchoFilters;
 
-        private AudioLowPassLogic _pausedLowPassLogic;
+        private AudioLowPassLogic? _pausedLowPassLogic;
         private bool _pausedLowPassLogicOriginalEnabled;
 
         private struct FilterSet
@@ -75,11 +66,6 @@ namespace Werewolf.Vanilla
         {
             try
             {
-                if (!ResolveFieldRef())
-                {
-                    return;
-                }
-
                 if (_debugSelfEchoOn)
                 {
                     DebugSelfEchoKeepAlive();
@@ -123,15 +109,7 @@ namespace Werewolf.Vanilla
             }
             try
             {
-                if (ResolveFieldRef())
-                {
-                    RestoreTouched(isDeadActor: null);
-                }
-                else
-                {
-                    DisableAllFilters(reason);
-                    _touched.Clear();
-                }
+                RestoreTouched(isDeadActor: null);
             }
             catch (Exception e)
             {
@@ -156,10 +134,8 @@ namespace Werewolf.Vanilla
         {
             try
             {
-                if (!ResolveFieldRef()) return;
-
                 RunManager rm = RunManager.instance;
-                List<PlayerVoiceChat> voices = rm != null ? s_voiceChatsRef(rm) : null;
+                List<PlayerVoiceChat>? voices = rm != null ? rm.voiceChats : null;
                 if (voices == null)
                 {
                     ClearInternalTracking();
@@ -169,7 +145,7 @@ namespace Werewolf.Vanilla
                 foreach (PlayerVoiceChat vc in voices)
                 {
                     if (vc == null) continue;
-                    if (s_audioSourceRef(vc) == null) continue;
+                    if (vc.audioSource == null) continue;
 
                     if (vc == PlayerVoiceChat.instance)
                     {
@@ -210,7 +186,7 @@ namespace Werewolf.Vanilla
 
         private static GameObject ResolveVoiceGameObject(PlayerVoiceChat vc)
         {
-            AudioSource audioSrc = s_audioSourceRef(vc);
+            AudioSource? audioSrc = vc.audioSource;
             return audioSrc != null ? audioSrc.gameObject : vc.gameObject;
         }
 
@@ -220,13 +196,6 @@ namespace Werewolf.Vanilla
         {
             try
             {
-                if (!ResolveFieldRef())
-                {
-                    WLog.Line("voice_debug_echo_rejected", secret: false,
-                        ("enabled", enabled ? 1 : 0), ("reason", "fieldref_failed"));
-                    return;
-                }
-
                 PlayerVoiceChat vc = PlayerVoiceChat.instance;
                 if (vc == null)
                 {
@@ -235,8 +204,8 @@ namespace Werewolf.Vanilla
                     return;
                 }
 
-                Recorder rec = s_recorderRef(vc);
-                AudioSource audioSrc = s_audioSourceRef(vc);
+                Recorder? rec = vc.recorder;
+                AudioSource? audioSrc = vc.audioSource;
                 GameObject go = audioSrc != null ? audioSrc.gameObject : vc.gameObject;
 
                 if (enabled)
@@ -280,8 +249,8 @@ namespace Werewolf.Vanilla
         {
             PlayerVoiceChat vc = PlayerVoiceChat.instance;
             if (vc == null) return;
-            Recorder rec = s_recorderRef(vc);
-            AudioSource audioSrc = s_audioSourceRef(vc);
+            Recorder? rec = vc.recorder;
+            AudioSource? audioSrc = vc.audioSource;
             if (rec != null && !rec.TransmitEnabled) rec.TransmitEnabled = true;
             if (audioSrc != null)
             {
@@ -352,7 +321,7 @@ namespace Werewolf.Vanilla
                 if (avatar == null) continue;
                 int actor = _registry.ResolveActor(avatar);
                 if (actor <= 0) continue;
-                PlayerVoiceChat vc = s_voiceChatRef(avatar);
+                PlayerVoiceChat? vc = avatar.voiceChat;
                 if (vc == null) continue;
 
                 vc.ToggleMixer(true, false);
@@ -372,7 +341,7 @@ namespace Werewolf.Vanilla
                 if (avatar == null) continue;
                 int actor = _registry.ResolveActor(avatar);
                 if (actor <= 0) continue;
-                PlayerVoiceChat vc = s_voiceChatRef(avatar);
+                PlayerVoiceChat? vc = avatar.voiceChat;
                 if (vc == null) continue;
 
                 bool dead = isDeadActor != null && isDeadActor(actor);
@@ -383,7 +352,7 @@ namespace Werewolf.Vanilla
                     _frameSeenTargets.Add(actor);
                     _touched.Add(actor);
 
-                    AudioSource audioSrc = s_audioSourceRef(vc);
+                    AudioSource? audioSrc = vc.audioSource;
                     if (audioSrc != null && audioSrc.outputAudioMixerGroup != vc.mixerMicrophoneSound)
                     {
                         vc.ToggleMixer(false, false);
@@ -437,7 +406,7 @@ namespace Werewolf.Vanilla
                     && isEavesdropTarget != null && isEavesdropTarget(actor);
                 if (!VoiceRules.IsDeadCueMuteTarget(dead, eavesdropAudible)) continue;
 
-                PlayerVoiceChat vc = s_voiceChatRef(avatar);
+                PlayerVoiceChat? vc = avatar.voiceChat;
                 if (vc == null) continue;
                 vc.OverrideMute(DeadCueMuteKeepAliveSeconds);
                 muted++;
@@ -452,11 +421,11 @@ namespace Werewolf.Vanilla
 
         private static float EavesdropVolume()
         {
-            GameConfig cfg = Plugin.GameConfig;
+            GameConfig? cfg = Plugin.GameConfig;
             return cfg != null ? Mathf.Clamp01(cfg.NecroVoiceVolume) : 0.05f;
         }
 
-        private void RestoreTouched(Func<int, bool> isDeadActor)
+        private void RestoreTouched(Func<int, bool>? isDeadActor)
         {
             if (_touched.Count == 0 && _filterEnabledActors.Count == 0) return;
 
@@ -469,7 +438,7 @@ namespace Werewolf.Vanilla
                     int actor = _registry.ResolveActor(avatar);
                     if (actor <= 0) continue;
                     if (!_touched.Contains(actor)) continue;
-                    PlayerVoiceChat vc = s_voiceChatRef(avatar);
+                    PlayerVoiceChat? vc = avatar.voiceChat;
                     if (vc == null) continue;
 
                     bool dead = isDeadActor != null
@@ -493,7 +462,7 @@ namespace Werewolf.Vanilla
                 return;
             }
 
-            AudioSource audioSrc = s_audioSourceRef(vc);
+            AudioSource? audioSrc = vc.audioSource;
             GameObject go = audioSrc != null ? audioSrc.gameObject : vc.gameObject;
             if (go == null) return;
 
@@ -538,7 +507,7 @@ namespace Werewolf.Vanilla
         private static void ApplyFilterParams(FilterSet set)
         {
             if (!set.IsAlive()) return;
-            GameConfig cfg = Plugin.GameConfig;
+            GameConfig? cfg = Plugin.GameConfig;
             if (cfg == null) return;
 
             set.LowPass.cutoffFrequency = cfg.NecroVoiceLowPassCutoffHz;
@@ -568,7 +537,7 @@ namespace Werewolf.Vanilla
             EnsureFilters(actor, vc);
             if (!_filters.TryGetValue(actor, out FilterSet set) || !set.IsAlive()) return;
 
-            AudioSource audioSrc = s_audioSourceRef(vc);
+            AudioSource? audioSrc = vc.audioSource;
             GameObject go = audioSrc != null ? audioSrc.gameObject : vc.gameObject;
             PauseActorLowPassLogic(actor, go);
 
@@ -605,17 +574,6 @@ namespace Werewolf.Vanilla
             {
                 DisableFilters(a, reason);
             }
-        }
-
-        private static bool ResolveFieldRef()
-        {
-            if (s_fieldRefResolved) return true;
-            s_voiceChatRef = GameRefs.PlayerAvatar_voiceChat;
-            s_audioSourceRef = GameRefs.PlayerVoiceChat_audioSource;
-            s_recorderRef = GameRefs.PlayerVoiceChat_recorder;
-            s_voiceChatsRef = GameRefs.RunManager_voiceChats;
-            s_fieldRefResolved = true;
-            return true;
         }
     }
 }
